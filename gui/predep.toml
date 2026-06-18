@@ -1,25 +1,34 @@
+main = "gui-docker"
+
+[[vendor]]
+name = "CLI11"
+url = "https://github.com/CLIUtils/CLI11/releases/download/v2.6.2/CLI11.hpp"
+sha256 = "227a16fe5f9f8ada80c3c409492475536f597e7bd83a6c26eacc3c8c149a9295"
+dest = "root://vendor/"
+create_directory = true
+
+[[stages]]
+name = "gui-vendor"
+description = "Download vendor dependencies"
+type = "vendor"
+
 [[stages]]
 name = "gui-build"
 description = "Build GUI binary"
 type = "run"
-depends = []
+depends = ["gui-vendor"]
 outputs = ["root://bin/predoc-gui"]
 
 commands = [
-    "cd gui && bash build.sh",
-]
-
-[platform.linux]
-commands = [
-    "cd gui && bash build.sh",
+    "echo 'disabled for now'",
 ]
 
 [[stages]]
 name = "gui-docker"
 description = "Build GUI binary via Docker"
 type = "docker"
-depends = []
+depends = ["gui-vendor"]
 outputs = ["root://bin/predoc-gui"]
-recipe = "gui/Dockerfile"
+recipe = "Dockerfile"
 target = "/build/bin/predoc-gui"
 dest = "root://bin/"

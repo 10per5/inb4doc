@@ -3,7 +3,7 @@
 <div align="center">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
-[![Sponsors](https://img.shields.io/badge/Sponsors-BECOME A SPONSOR-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/10per5)
+[![Sponsors](https://img.shields.io/badge/Sponsors-BECOME%20A%20SPONSOR-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/10per5)
 [![Stars](https://img.shields.io/github/stars/10per5/predoc?style=for-the-badge&logo=github)](https://github.com/10per5/predoc/stargazers)
 
 [Live Demo](https://10per5.github.io/predoc/)

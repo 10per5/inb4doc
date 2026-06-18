@@ -5,10 +5,7 @@ Static site generator (SSG) using [Hugo](https://gohugo.io/) with the [hugo-book
 ## Commands
 
 ```bash
-# Build static site (native if hugo installed, else Docker)
-bash build.sh
-
-# Or build directly with Hugo
+# Build directly with Hugo
 hugo --source . --contentDir ../content --themesDir themes --theme book --destination build
 
 # Dev server with live reload

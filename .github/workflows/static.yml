@@ -1,9 +1,9 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Deploy Hugo site to GitHub Pages via predep
 name: Deploy static content to Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -25,60 +25,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache build output
-        id: cache-build
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: build-${{ hashFiles('content/**/*.md', 'hugo.toml', 'themes/**/*', 'cli/fetch-deps.ts', 'cli/ssg.ts', 'bun.lock', 'package.json') }}
-
-      - name: Cache bun output
-        id: cache-bun
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: bun-${{ hashFiles('package.json', 'bun.lock') }}
-
-      - name: Cache deps bin
-        id: cache-bin
-        uses: actions/cache@v4
-        with:
-          path: bin
-          key: bin-${{ hashFiles('cli/fetch-deps.ts') }}
-
-      - name: Check if all caches hit
-        id: check-caches
+      - name: Download predep
         run: |
-          if [ "${{ steps.cache-build.outputs.cache-hit }}" == "true" ] && [ "${{ steps.cache-bun.outputs.cache-hit }}" == "true" ] && [ "${{ steps.cache-bin.outputs.cache-hit }}" == "true" ]; then
-            echo "All caches hit, skipping deployment"
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "echo=false" >> $GITHUB_OUTPUT
-          fi
+          curl -sL \
+            https://github.com/10per5/predep/releases/download/v0.0.1/predep-linux-x86_64.tar.gz \
+            -o /tmp/predep.tar.gz
+          tar xzf /tmp/predep.tar.gz -C /usr/local/bin
 
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        if: steps.check-caches.outputs.skip != 'true'
-
-      - name: Install dependencies
-        run: bun install
-        if: steps.cache-bun.outputs.cache-hit != 'true' && steps.check-caches.outputs.skip != 'true'
-
-      - name: Fetch deps (Hugo + theme)
-        run: bun run fetch-deps
-        if: steps.cache-bin.outputs.cache-hit != 'true' && steps.check-caches.outputs.skip != 'true'
-
-      - name: Build static site
-        run: HUGO_BASEURL=/predoc/ bun run ssg:build
-        if: steps.check-caches.outputs.skip != 'true'
+      - name: Build Hugo site
+        working-directory: hugo-view
+        env:
+          HUGO_BASEURL: /predoc/
+        run: predep hugo-build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "build"
-        if: steps.check-caches.outputs.skip != 'true'
+          path: hugo-view/build
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
-        if: steps.check-caches.outputs.skip != 'true'

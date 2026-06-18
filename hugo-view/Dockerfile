@@ -1,7 +1,3 @@
-# predoc-hugo-view builder
-#
-# Single-stage: produce static site build via Hugo.
-#
 # Usage:
 #   docker build -t predoc-hugo-view -f hugo-view/Dockerfile .
 #   docker create --name tmp predoc-hugo-view
@@ -37,10 +33,10 @@ COPY hugo-view/layouts/ /output/layouts/
 # Build the static site
 RUN mkdir -p /output/build && \
     hugo --source /output \
-         --contentDir /content \
-         --themesDir /output/themes \
-         --theme book \
-         --destination /output/build
+    --contentDir /content \
+    --themesDir /output/themes \
+    --theme book \
+    --destination /output/build
 
 FROM debian:trixie-slim
 COPY --from=builder /output/build/ /output/build/

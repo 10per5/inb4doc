@@ -5,19 +5,41 @@ weight: 2
 
 # Build
 
-predoc produces two binaries from independent build steps. You can build on one machine and run on another — only the runtime artifacts need to be transferred.
+predoc uses [predep](https://github.com/10per5/predep) to orchestrate all build recipes. predep is a self-building tool — it compiles itself and then executes the stages defined in `predep.toml` files throughout the project.
+
+To build everything:
+
+```bash
+predep build
+```
+
+Or via Docker:
+
+```bash
+predep build-docker
+```
+
+To assemble a release archive:
+
+```bash
+predep package
+```
 
 ## Build Steps
 
-| Step | Command | Produces |
+All build recipes are declared in `predep.toml` at each subproject root:
+
+| Step | Recipe File | Produces |
 |---|---|---|
-| CLI | `cli/build.sh` | `cli/bin/predoc` |
-| GUI | `gui/build.sh` | `gui/bin/predoc-gui` |
-| Editor JS | `editor/dev.sh build` | `editor/public/assets/app.js` |
+| CLI | [`cli/predep.toml`](https://github.com/10per5/predoc/tree/main/cli/predep.toml) | `cli/bin/predoc` |
+| GUI | [`gui/predep.toml`](https://github.com/10per5/predoc/tree/main/gui/predep.toml) | `gui/bin/predoc-gui` |
+| Editor JS | [`editor/predep.toml`](https://github.com/10per5/predoc/tree/main/editor/predep.toml) | `editor/public/assets/app.js` |
 
-Each build script prefers Docker and falls back to native tools if available.
+The root [`predep.toml`](https://github.com/10per5/predoc/blob/main/predep.toml) ties them together via `[[include]]` directives and defines the top-level `build` and `build-docker` stage groups.
 
-### CLI (`cli/build.sh`)
+Each subproject recipe uses Docker by default and falls back to native tools when available.
+
+### CLI
 
 Uses `cli/Dockerfile` (debian:trixie-slim, premake5 beta8, g++-15). Builds with C++23 and the vendored CLI11 header:
 
@@ -26,7 +48,7 @@ Uses `cli/Dockerfile` (debian:trixie-slim, premake5 beta8, g++-15). Builds with 
 
 Falls back to `premake5 gmake && make` if premake5 is available natively.
 
-### GUI (`gui/build.sh`)
+### GUI
 
 Uses `gui/Dockerfile` (debian:trixie-slim, Qt6 WebEngine, Saucer built from source):
 

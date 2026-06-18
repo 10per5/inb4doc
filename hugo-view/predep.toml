@@ -1,3 +1,5 @@
+main = "hugo-docker"
+
 [[stages]]
 name = "hugo-binary"
 description = "Download Hugo static site generator"
@@ -8,6 +10,7 @@ name = "hugo"
 url = "https://github.com/gohugoio/hugo/releases/download/v${VERSION}/hugo_extended_${VERSION}_${PLATFORM}-${CPU}.tar.gz"
 extract = true
 version = "0.158.0"
+sha256 = "c2a724ac3c8e949fca56dd438b868b2128837754420c20a6e7ae345616c4e625"
 
 [[stages]]
 name = "hugo-theme"
@@ -21,6 +24,7 @@ dest = "root://themes/"
 extract = true
 create_directory = true
 version = "0.14.0"
+sha256 = "2332a2b3fb3ddff07ccd6e1eeca49df60401bba54d9617daa6fa5ee71199eb32"
 
 [[stages]]
 name = "hugo-build"
@@ -30,20 +34,21 @@ depends = ["hugo-binary", "hugo-theme"]
 outputs = ["root://build/index.html"]
 
 commands = [
-    "hugo --source hugo-view --contentDir ../content --themesDir themes --theme book --destination build",
+    "hugo --contentDir ../content --themesDir themes --theme book --destination build",
 ]
 
 [platform.windows]
 commands = [
-    "hugo.exe --source hugo-view --contentDir ../content --themesDir themes --theme book --destination build",
+    "hugo.exe --contentDir ../content --themesDir themes --theme book --destination build",
 ]
 
 [[stages]]
 name = "hugo-docker"
 description = "Generate static site via Docker"
 type = "docker"
-depends = ["hugo-theme"]
+depends = []
 outputs = ["root://build/index.html"]
-recipe = "hugo-view/Dockerfile"
-target = "/output/build/"
+recipe = "Dockerfile"
+target = "/output/build/."
 dest = "root://build/"
+build_context = "parent"

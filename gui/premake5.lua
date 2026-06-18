@@ -13,6 +13,7 @@ targetdir("bin")
 files({ "src/**.cpp" })
 
 filter("system:linux")
+includedirs({ "vendor" })
 for _, lib in ipairs(include_libs) do
 	includedirs({ "/usr/local/include/" .. lib })
 end

@@ -5,72 +5,85 @@ weight: 15
 
 # GUI Architecture
 
-The GUI is a standalone C++23 desktop application built with [Saucer](https://github.com/saucer/saucer), which wraps Qt6 WebEngine on Linux (with WebKitGTK, WKWebView, and WebView2 backends available for other platforms).
+The GUI is a native desktop window that hosts the predoc editor. It is a thin shell — it provides the OS window, loads the editor UI, and bridges JavaScript calls to the local filesystem.
 
-## Content Serving
+## Operating Modes
 
-The GUI does **not** start a TCP server. Instead, it registers a custom `app://` URL scheme via Saucer's `handle_scheme()` API. This is an in-process handler that intercepts all navigation and sub-resource requests — no port, no thread, no special permissions.
+The GUI supports two mutually exclusive modes:
 
-```
-app://_/index.html          → serves editor/public/index.html
-app://_/assets/app.js       → serves editor static files
-app://_/content/my-page.md  → reads/writes content/my-page.md
-app://_/api/tree            → returns JSON tree of content/
-app://_/api/move            → renames/moves content files
-```
+**Local mode** — the GUI acts as its own editor server in-process. No external HTTP server is needed, no port is opened, and no special permissions are required. All editor UI requests and content API calls are handled internally via a custom URL scheme (`app://`).
 
-All Saucer backends support custom URL schemes (Qt WebEngine via `QWebEngineUrlSchemeHandler`, WebKitGTK via `webkit_web_context_register_uri_scheme`, etc.), making this approach fully cross-platform.
+**Remote mode** — the GUI connects to an already-running editor HTTP server. All editor UI and content requests go over HTTP to the specified host and port.
 
-## Runtime Flow
+## Interface: `app://` Protocol (Local Mode)
 
-```
-cli/bin/predoc
-  └─ fork/exec: gui/bin/predoc-gui
-       --editor-root <root>/editor
-       --content-root <root>/content
-       [--debug]
+When running in local mode, the GUI intercepts all requests to the `app://` scheme and maps them to the local filesystem:
 
-       └─ Saucer creates native OS window
-            ├─ registers app:// scheme handler
-            ├─ loads app://_/ (→ index.html)
-            ├─ editor JS fetch() → app:// handler → filesystem
-            └─ on window close → Saucer exits → CLI exits
-```
-
-## Flags
-
-| Flag | Description |
+| URL | Action |
 |---|---|
-| `--editor-root <path>` | Path to editor directory (must contain `public/`) |
-| `--content-root <path>` | Path to content markdown directory |
-| `--port <n>` | Connect to an external HTTP server instead of app:// |
-| `--live-port <n>` | Hugo preview server URL for the "Preview" button |
-| `--favicon <path>` | Custom window icon |
-| `--disable-gpu` | Disable hardware acceleration |
-| `--debug` | Verbose debug logging to stderr |
+| `app://_/index.html` | Serve `{editor-root}/index.html` |
+| `app://_/assets/*` | Serve static files from `{editor-root}/assets/` |
+| `app://_/content/<path>` | GET/PUT/DELETE/HEAD on `{content-root}/<path>` |
+| `app://_/api/tree` | GET — returns JSON directory tree of `{content-root}` |
+| `app://_/api/move` | POST — renames a file or directory within `{content-root}` |
 
-## Entry Point (`src/main.cpp`)
+This approach avoids TCP ports, threads, and network permissions — the entire backend runs in-process. The same scheme API is supported across Qt WebEngine, WebKitGTK, WKWebView, and WebView2 backends.
 
-The entry point parses CLI flags, registers the `app://` scheme (via `saucer::webview::register_scheme("app")`), then enters the Saucer event loop:
+## Interface: CLI Flags
 
-1. Create a native OS window
-2. Create a `saucer::smartview` (webview + JS bridge)
-3. Register the scheme handler with `webview.handle_scheme("app", handler)`
-4. Set URL to `app://_/` and show the window
-5. Block until the window closes
+```
+predoc-gui --editor-root <path> --content-root <path> [options]
+predoc-gui --host <addr> [--port <n>] [options]
+```
 
-The scheme handler routes requests by path prefix:
-- `content/` → filesystem operations (GET, PUT, DELETE, HEAD)
-- `api/tree` → builds JSON tree from content directory
-- `api/move` → renames/moves content files
-- Everything else → static files from `editor_root/public/`
+| Flag | Required | Mode | Description |
+|---|---|---|---|
+| `--editor-root <path>` | yes* | local | Directory containing `index.html` (the editor web root) |
+| `--content-root <path>` | yes* | local | Directory containing markdown content |
+| `--host <addr>` | yes* | remote | Editor HTTP server address |
+| `--port <n>` | no | remote | Editor HTTP server port (default 3000) |
+| `--live-port <n>` | no | both | Live preview server port for the "Preview" JS callback (default 5000) |
+| `--favicon <path>` | no | both | Custom window icon |
+| `--disable-gpu` | no | both | Disable hardware acceleration |
+| `--debug` | no | both | Verbose stderr logging |
+
+\* Exactly one mode must be chosen: `--editor-root` + `--content-root` (local) **or** `--host` ± `--port` (remote). These groups are mutually exclusive.
+
+## Navigation Policy
+
+All navigation and JS bridge calls are subject to a whitelist. Only the following destinations are allowed to load in the webview:
+
+- `app://*` (local mode)
+- `http://localhost:*` and `http://127.0.0.1:*` on the live preview port
+- New-window navigations to whitelisted destinations are redirected into the existing view
+
+External URLs are blocked and shown in an in-app toast notification.
+
+## JS Bridges
+
+The editor communicates with the host window through named JavaScript callbacks:
+
+| JS Callback | Trigger | Action |
+|---|---|---|
+| `navigateToEditor()` | User wants to return to editor | Sets webview URL to editor URL |
+| `navigateToPreview(path)` | User clicks "Preview" | Sets webview URL to `{live-url}{path}` |
+| `handleExternalNav(url)` | Editor wants to open a link | Navigates if whitelisted, shows toast otherwise |
+
+## Window Properties
+
+| Property | Default |
+|---|---|
+| Title | `"predoc"` |
+| Initial size | 1200 × 800 |
+| GPU acceleration | On (can be disabled via `--disable-gpu`) |
+| Icon | None (optional `--favicon`) |
 
 ## License Notes
 
 | Component | License | Linkage |
 |---|---|---|
 | predoc-gui | MIT | — |
-| Saucer | MIT | Static (compiled into binary) |
+| Saucer | MIT | Static |
 | Qt6 (Widgets, WebEngine, WebChannel) | LGPL 3.0 | Dynamic (`.so` at runtime) |
 
 Qt6 is dynamically linked — users get it from their system package manager. This is the standard arrangement for Qt applications and allows free redistribution.

@@ -1,4 +1,4 @@
-main = "package"
+main = "build-docker"
 
 [[include]]
 path = "editor/predep.toml"

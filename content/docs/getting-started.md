@@ -14,15 +14,17 @@ Hugo and the Book theme are downloaded automatically by `predoc fetch-deps`.
 
 ## Quick Start
 
-```bash
-# Build the CLI
-cd cli && bash build.sh
+Builds are orchestrated by [predep](https://github.com/10per5/predep), which compiles itself from source and follows the recipes in [`predep.toml`](https://github.com/10per5/predoc/blob/main/predep.toml) files throughout the project.
 
-# Build the GUI
-cd gui && bash build.sh
+```bash
+# Build CLI + GUI + Editor JS
+predep build
+
+# Or build via Docker
+predep build-docker
 
 # Launch the editor
-cd .. && cli/bin/predoc
+cli/bin/predoc
 
 # With debug logging
 cli/bin/predoc --debug
@@ -30,12 +32,12 @@ cli/bin/predoc --debug
 
 ## Commands
 
-| Command | Description |
-|---|---|---|
-| `predoc` (no subcommand) | Launch the native GUI window with the editor |
-| `predoc --debug` | Same, with verbose debug output |
-| `predoc fetch-deps` | Download Hugo binary + Book theme to cache |
-| `predoc package` | Build editor assets + GUI binary, assemble output |
+| Command                  | Description                                       |
+| ------------------------ | ------------------------------------------------- |
+| `predoc` (no subcommand) | Launch the native GUI window with the editor      |
+| `predoc --debug`         | Same, with verbose debug output                   |
+| `predoc fetch-deps`      | Download Hugo binary + Book theme to cache        |
+| `predoc package`         | Build editor assets + GUI binary, assemble output |
 
 ## Content
 

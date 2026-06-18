@@ -9,9 +9,6 @@
 #   docker create --name tmp predoc-gui
 #   docker cp tmp:/opt/predoc-gui/bin/predoc-gui ./gui/bin/
 #   docker rm tmp
-#
-# Or via the build script:
-#   cd gui && bash build.sh
 
 FROM debian:trixie-slim AS builder
 RUN apt-get update && apt-get install -y \
@@ -61,7 +58,7 @@ RUN wget -qO- \
 WORKDIR /deps
 RUN --mount=type=cache,target=/deps/saucer/build \
     if [ ! -d /deps/saucer-src/.git ]; then \
-        git clone https://github.com/saucer/saucer.git /deps/saucer-src; \
+    git clone https://github.com/saucer/saucer.git /deps/saucer-src; \
     fi && \
     cd /deps/saucer-src && \
     git fetch --depth 1 origin 811cd2f8ee7044d7143fc8d36b9ceaaef878de39 && \
@@ -71,29 +68,39 @@ RUN --mount=type=cache,target=/deps/saucer/build \
     sed -i 's|return from({std::from_range, data()});|return from(vec(data().begin(), data().end()));|' src/stash.cpp && \
     grep -q 'return from(vec(data().begin(), data().end()));' src/stash.cpp && \
     cmake -B /deps/saucer/build -G Ninja -S . \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DCMAKE_CXX_FLAGS="-mno-direct-extern-access" \
-        -DSAUCER_USE_QTWEBENGINE=ON \
-        -Dsaucer_backend=Qt && \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DCMAKE_CXX_FLAGS="-mno-direct-extern-access" \
+    -DSAUCER_USE_QTWEBENGINE=ON \
+    -Dsaucer_backend=Qt && \
     cmake --build /deps/saucer/build -j"$(nproc)" && \
     cp -v /deps/saucer/build/libsaucer.a /deps/saucer/build/_deps/coco-build/libcoco.a /usr/local/lib/ && \
     cmake --install /deps/saucer/build && \
     for d in /deps/saucer/build/_deps/*/include/; do \
-        [ -d "$d" ] || continue; \
-        cp -r "$d"/* /usr/local/include/ 2>/dev/null; \
+    [ -d "$d" ] || continue; \
+    cp -r "$d"/* /usr/local/include/ 2>/dev/null; \
     done
 
 # Version-agnostic symlinks for installed headers
 RUN for d in /usr/local/include/*-*/; do \
-        base="${d%%-*}"; \
-        base="${base%/}"; \
-        base="${base##*/}"; \
-        ln -sf "$d" "/usr/local/include/$base" 2>/dev/null; \
+    base="${d%%-*}"; \
+    base="${base%/}"; \
+    base="${base##*/}"; \
+    ln -sf "$d" "/usr/local/include/$base" 2>/dev/null; \
     done
+
+# Download predep (stage-resolver for vendor deps)
+RUN curl -sL \
+    https://github.com/10per5/predep/releases/download/v0.0.1/predep-linux-x86_64.tar.gz \
+    -o /tmp/predep.tar.gz \
+    && tar xzf /tmp/predep.tar.gz -C /usr/local/bin \
+    && predep --help > /dev/null
 
 # Build predoc-gui — cache busts only on premake5.lua or src/ changes
 WORKDIR /build
+COPY predep.toml ./
+RUN predep gui-vendor
+
 COPY premake5.lua ./
 COPY src/ src/
 ENV CXXFLAGS="-std=c++23 -mno-direct-extern-access"

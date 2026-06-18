@@ -1,3 +1,5 @@
+main = "editor-docker"
+
 [[stages]]
 name = "editor-build"
 description = "Build editor static assets"
@@ -17,8 +19,7 @@ commands = [
 name = "editor-docker"
 description = "Build editor static assets via Docker"
 type = "docker"
-depends = []
 outputs = ["root://public/"]
-recipe = "editor/Dockerfile"
+recipe = "Dockerfile"
 target = "/output/editor/public/"
 dest = "root://public/"

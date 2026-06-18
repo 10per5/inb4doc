@@ -1,15 +1,7 @@
-# predoc-editor builder
-#
-# Single-stage: produce editor static assets, extract via docker cp.
-# Builds the Milkdown editor frontend (TypeScript + CSS) via Bun.
-#
-# Static files (index.html, favicon.ico) come from static/;
-# the build writes assets/app.js + app.css into public/.
-#
 # Usage:
-#   docker build -t predoc-editor -f editor/Dockerfile .
+#   docker build -t predoc-editor -f Dockerfile .
 #   docker create --name tmp predoc-editor
-#   docker cp tmp:/output/editor/public/. ./editor/public/
+#   docker cp tmp:/output/editor/public/. ./public/
 #   docker rm tmp
 
 FROM debian:trixie-slim AS builder
@@ -21,11 +13,11 @@ ENV PATH="/root/.bun/bin:$PATH"
 
 WORKDIR /src
 
-COPY editor/package.json ./
+COPY package.json ./
 RUN bun install
 
-COPY editor/src/ src/
-COPY editor/static/ public/
+COPY src/ src/
+COPY static/ public/
 RUN bun run build
 
 FROM debian:trixie-slim
