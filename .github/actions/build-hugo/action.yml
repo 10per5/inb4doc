@@ -17,7 +17,7 @@ runs:
     - name: Trust cache step
       working-directory: hugo-view
       shell: bash
-      run: predep --privileged 6e18cca1b29c239e8d21f5c60e15c465f51285f5343e5a36f82c84856f11c3da cache
+      run: predep --privileged 73e2778a08f4f6955fb5016c476020f63ff07b767ef077323051ebbec635442c cache
 
     - name: Cache Hugo binary
       uses: actions/cache@v4
@@ -53,6 +53,4 @@ runs:
       env:
         HUGO_BASEURL: ${{ inputs.baseurl }}
         EDITOR_URL: ${{ inputs.editor-url }}
-      run: predep --privileged 6e18cca1b29c239e8d21f5c60e15c465f51285f5343e5a36f82c84856f11c3da build
-
-
+      run: predep --privileged 73e2778a08f4f6955fb5016c476020f63ff07b767ef077323051ebbec635442c build

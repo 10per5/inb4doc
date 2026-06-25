@@ -46,7 +46,7 @@ binary  = "hugo"
 depends = ["hugo-binary", "hugo-theme"]
 outputs = ["root://build/index.html"]
 
-[stages.params]
+[params.binary.build]
 contentDir  = "../content"
 themesDir   = "themes"
 theme       = "book"
