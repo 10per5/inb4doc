@@ -157,7 +157,7 @@ jobs:
         run: |
           $ver = "dev"
           $msg = "${{ github.event.head_commit.message }}"
-          if ($msg -match '^build\(v(\d+\.\d+\.\d+)\)') {
+          if ($msg -match '^build\(v(\d+\.\d+\.\d+)(?:p\d+)?\)') {
             $ver = "v$($matches[1])"
           }
           echo "version=$ver" >> $env:GITHUB_OUTPUT
