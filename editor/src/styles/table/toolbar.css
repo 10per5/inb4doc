@@ -1,0 +1,72 @@
+.toolbar-heading-wrap {
+  position: relative;
+}
+
+.toolbar-heading-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 32px;
+}
+
+.toolbar-heading-btn .heading-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.toolbar-heading-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 90px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.toolbar-heading-dropdown.open {
+  display: block;
+}
+
+.toolbar-heading-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.toolbar-heading-dropdown button:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.toolbar-heading-dropdown button[data-h="1"] {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.toolbar-heading-dropdown button[data-h="2"] {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toolbar-heading-dropdown button[data-h="3"] {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.toolbar-section-center button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: currentColor;
+}

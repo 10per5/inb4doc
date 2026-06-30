@@ -1,0 +1,16 @@
+span[data-type="math_inline"] {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0 2px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+span[data-type="math_inline"]:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+span[data-type="math_inline"] .katex {
+  font-size: 1.05em;
+}

@@ -7,6 +7,7 @@ export interface PressTwiceButtonOptions {
   onConfirm: () => void
   timeout?: number
   small?: boolean
+  idleBadge?: string
 }
 
 export function pressTwiceButton(opts: PressTwiceButtonOptions): HTMLButtonElement {
@@ -29,7 +30,13 @@ export function pressTwiceButton(opts: PressTwiceButtonOptions): HTMLButtonEleme
     const s = pending ? v.pending : v.idle
     btn.style.background = s.bg
     btn.style.color = s.color
-    btn.textContent = pending ? opts.pendingText : opts.idleText
+    if (pending) {
+      btn.textContent = opts.pendingText
+    } else if (opts.idleBadge) {
+      btn.innerHTML = `${opts.idleText} <span style="font-size:0.7rem;opacity:0.85">${opts.idleBadge}</span>`
+    } else {
+      btn.textContent = opts.idleText
+    }
   }
 
   function reset() {

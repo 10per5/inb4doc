@@ -1,5 +1,5 @@
 import { editorSelfBase } from "../config";
-import { getCurrentPath, buildEditorUrl } from "../../lib/url";
+import { getCurrentPath, buildEditorUrl } from "../utils/url";
 
 export class PathService {
   getInitialPath(): string {

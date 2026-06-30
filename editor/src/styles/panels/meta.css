@@ -1,0 +1,145 @@
+/* ── Meta Panel (Right Sidebar) ────────────────────────────────────– */
+
+.meta-panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.meta-panel {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 1rem;
+}
+
+.meta-panel-header {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8fbcbb;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+/* ── Meta Fields ───────────────────────────────────────────────────── */
+
+.meta-field {
+  margin-bottom: 0.75rem;
+}
+
+.meta-field label {
+  display: block;
+  font-size: 0.75rem;
+  color: #5e81ac;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.meta-field input {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+.meta-field input:focus {
+  outline: none;
+  border-color: #5e81ac;
+}
+
+/* ── Meta Extra Fields ─────────────────────────────────────────────── */
+
+.meta-extra-header {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8fbcbb;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+}
+
+.meta-extra-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.meta-extra-row input {
+  flex: 1;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+.meta-extra-row input:focus {
+  outline: none;
+  border-color: #5e81ac;
+}
+
+.meta-extra-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-error);
+  font-size: 1rem;
+  padding: 0 0.3rem;
+}
+
+.meta-extra-add {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.3rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 3px;
+  background: transparent;
+  color: #5e81ac;
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.meta-extra-add:hover {
+  background: var(--color-bg-tertiary);
+  border-color: #5e81ac;
+}
+
+/* ── Meta Panel Footer ─────────────────────────────────────────────── */
+
+.meta-panel-footer {
+  margin-top: auto;
+  padding: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+/* ── GitHub Link ───────────────────────────────────────────────────── */
+
+.github-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: #24292e;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  transition: all 0.2s ease;
+}
+
+.github-link:hover {
+  background: #f3f4f6;
+  border-color: #24292e;
+  color: #24292e;
+}
+
+.github-icon {
+  width: 18px;
+  height: 18px;
+}

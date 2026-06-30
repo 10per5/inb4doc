@@ -17,6 +17,11 @@ export interface PromptOptions {
   cancelLabel?: string
 }
 
+export interface CreateDialogResult {
+  name: string
+  asDirectory: boolean
+}
+
 function createOverlay(): HTMLDivElement {
   const existing = document.getElementById("predoc-dialog-overlay")
   if (existing) existing.remove()
@@ -121,6 +126,60 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
 
     overlay.querySelector(".predoc-dialog-cancel")!.addEventListener("click", () => cleanup(null))
     overlay.querySelector(".predoc-dialog-confirm")!.addEventListener("click", () => cleanup(input?.value ?? null))
+    overlay.addEventListener("click", () => cleanup(null))
+  })
+}
+
+export function promptCreateDialog(title: string): Promise<CreateDialogResult | null> {
+  const overlay = createOverlay()
+  const inputId = "predoc-create-input-" + Math.random().toString(36).slice(2)
+  const checkId = "predoc-create-check-" + Math.random().toString(36).slice(2)
+
+  const close = () => overlay.remove()
+
+  const tmpl = html`
+    <style>${dialogStyles}
+      .predoc-dialog-check { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 1rem; }
+      .predoc-dialog-check input { width: auto; margin: 0; }
+      .predoc-dialog-check label { margin: 0; cursor: pointer; }
+    </style>
+    <div class="predoc-dialog-box" @click=${(e: MouseEvent) => e.stopPropagation()}>
+      <h3>${title}</h3>
+      <label for="${inputId}">Name</label>
+      <input id="${inputId}" type="text" placeholder="My Page" @keydown=${(e: KeyboardEvent) => {
+        if (e.key === "Enter") (e.target as HTMLElement).closest(".predoc-dialog-box")?.querySelector<HTMLElement>(".predoc-dialog-confirm")?.click()
+        if (e.key === "Escape") close()
+      }}>
+      <div class="predoc-dialog-check">
+        <input id="${checkId}" type="checkbox">
+        <label for="${checkId}">Create directory</label>
+      </div>
+      <div class="predoc-dialog-actions">
+        <button class="predoc-dialog-cancel">Cancel</button>
+        <button class="predoc-dialog-confirm">Create</button>
+      </div>
+    </div>
+  `
+
+  render(tmpl, overlay)
+
+  return new Promise<CreateDialogResult | null>((resolve) => {
+    const input = document.getElementById(inputId) as HTMLInputElement
+    const checkbox = document.getElementById(checkId) as HTMLInputElement
+    input?.focus()
+    input?.select()
+
+    const cleanup = (result: CreateDialogResult | null) => {
+      close()
+      resolve(result)
+    }
+
+    overlay.querySelector(".predoc-dialog-cancel")!.addEventListener("click", () => cleanup(null))
+    overlay.querySelector(".predoc-dialog-confirm")!.addEventListener("click", () => {
+      const name = input?.value?.trim()
+      if (!name) return
+      cleanup({ name, asDirectory: checkbox?.checked ?? false })
+    })
     overlay.addEventListener("click", () => cleanup(null))
   })
 }

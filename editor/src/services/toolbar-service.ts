@@ -1,6 +1,6 @@
 /**
  * ToolbarService
- * 
+ *
  * Manages toolbar visibility and auto-hide behavior based on scroll position
  * Handles sticky toolbar preferences and scroll event listeners
  */
@@ -20,7 +20,7 @@ export class ToolbarService {
   private showOnFocus: (() => void) | null = null;
 
   constructor(config: ToolbarConfig) {
-    this.toolbar = document.querySelector(".app-toolbar");
+    this.toolbar = document.getElementById("app-toolbar");
     this.editorEl = document.getElementById("milkdown-editor");
     this.autoHidePref = config.stickyToolbar;
   }
@@ -35,7 +35,7 @@ export class ToolbarService {
     this.showOnFocus = this.createFocusHandler();
 
     const layoutEl = document.querySelector(".book-layout");
-    
+
     // Attach scroll listeners to both possible scroll containers
     layoutEl?.addEventListener("scroll", this.onScroll, { passive: true });
     window.addEventListener("scroll", this.onScroll, { passive: true });
@@ -50,7 +50,7 @@ export class ToolbarService {
    */
   public setStickyPreference(sticky: boolean): void {
     this.autoHidePref = sticky;
-    
+
     if (!sticky) {
       // Show toolbar immediately and reset styles
       this.toolbar?.classList.remove("hidden");
@@ -84,7 +84,7 @@ export class ToolbarService {
 
       if (sy > 100 && sy > this.lastScrollY) {
         // Scrolling down and past threshold: hide toolbar
-        this.toolbar.style.top = "";
+        this.toolbar.style.top = sy + "px";
         this.toolbar.classList.add("hidden");
       } else if (sy < this.lastScrollY) {
         // Scrolling up: show toolbar

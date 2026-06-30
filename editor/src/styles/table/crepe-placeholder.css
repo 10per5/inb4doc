@@ -1,0 +1,13 @@
+.crepe-placeholder {
+  position: relative;
+}
+
+.crepe-placeholder::after {
+  content: attr(data-placeholder);
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  color: #b0b8c8;
+  font-style: italic;
+}

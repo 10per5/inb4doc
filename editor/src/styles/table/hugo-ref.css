@@ -1,0 +1,14 @@
+.hugo-ref-link {
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  border-bottom: 1px dashed var(--color-accent);
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.hugo-ref-link:hover {
+  background: var(--color-bg-tertiary);
+}

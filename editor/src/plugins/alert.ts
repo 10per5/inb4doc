@@ -19,8 +19,11 @@ function walkAlerts(tree: Root) {
     const type = match[1].toLowerCase();
     if (!ALERT_TYPES.includes(type)) continue;
     firstText.value = firstText.value.slice(match[0].length);
-    if (firstText.value === "" && firstChild.children.length === 1) {
-      (node as any).children.shift();
+    if (firstText.value === "") {
+      firstChild.children.shift();
+      if (firstChild.children.length === 0) {
+        (node as any).children.shift();
+      }
     }
     children[i] = {
       type: "alert",

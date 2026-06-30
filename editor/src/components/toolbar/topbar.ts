@@ -16,9 +16,14 @@ import type { ViewType } from "../views/view"
 import {
   boldIcon, italicIcon, strikethroughIcon, codeIcon, linkIcon, dividerIcon,
 } from "../icons"
+import { mountFileMenu } from "./file-menu"
+import { pressTwiceButton } from "../dialogs/press-twice-button"
+import { formatBytes } from "../../utils/format"
 
 export interface TopbarAPI {
-  updateCounter(count: number, totalBytes: number): void
+  updateCounter(count: number, totalBytes: number, pendingCount?: number): void
+  showSingleDiscard(path: string, bytes: number): void
+  hideSingleDiscard(): void
   setDirtyState(hasDirty: boolean): void
   setProviderBadge(icon: string, label: string): void
   setProviderType(type: string): void
@@ -31,21 +36,19 @@ export function mountTopbar(
   callbacks: {
     onPrefs: () => void
     onDirtyClick?: () => void
+    onSingleDiscard?: (path: string) => void
     onChangeProvider: () => void
     onViewChange: (view: ViewType) => void
     onSave?: () => void
     onLoad?: () => void
+    onImageManager?: () => void
     onToggleSidebar?: () => void
     onToggleMetaPanel?: () => void
   },
 ): TopbarAPI {
   const counterId = "dirty-counter-" + Math.random().toString(36).slice(2)
   const flushId = "flush-btn-" + Math.random().toString(36).slice(2)
-  const providerId = "provider-badge-" + Math.random().toString(36).slice(2)
-  const viewEditorId = "view-editor-" + Math.random().toString(36).slice(2)
-  const viewStatsId = "view-stats-" + Math.random().toString(36).slice(2)
-  const saveBtnId = "save-btn-" + Math.random().toString(36).slice(2)
-  const loadBtnId = "load-btn-" + Math.random().toString(36).slice(2)
+  const fileMenuMountId = "file-menu-" + Math.random().toString(36).slice(2)
 
   const exec = (cmd: string, ...args: unknown[]) => {
     const milkdown = getEditor()
@@ -81,6 +84,7 @@ export function mountTopbar(
   }
 
   container.classList.add("app-toolbar")
+
   container.addEventListener("click", (e) => {
     const target = e.target as HTMLElement
     if (target.closest(".dirty-counter")?.classList.contains("clickable")) {
@@ -92,22 +96,7 @@ export function mountTopbar(
       <div class="toolbar-section toolbar-section-left">
         <button @click=${() => callbacks.onToggleSidebar?.()} title="Toggle Sidebar" class="mobile-only" style="display:none">☰</button>
         <span class="toolbar-sep mobile-only" style="display:none"></span>
-        <button class="toolbar-provider" id="${providerId}" @click=${() => callbacks.onChangeProvider()} title="Change project">
-          ☁️ Server
-        </button>
-        <button class="toolbar-save-btn" id="${saveBtnId}" @click=${() => callbacks.onSave?.()} title="Save all to zip" style="display:none">
-          💾 Save
-        </button>
-        <button class="toolbar-load-btn" id="${loadBtnId}" @click=${() => callbacks.onLoad?.()} title="Load from zip" style="display:none">
-          📂 Load
-        </button>
-        <span class="toolbar-sep"></span>
-        <button class="toolbar-view-btn active" id="${viewEditorId}" @click=${() => callbacks.onViewChange("editor")} title="Editor">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
-        </button>
-        <button class="toolbar-view-btn" id="${viewStatsId}" @click=${() => callbacks.onViewChange("disk-usage")} title="Disk Usage">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-        </button>
+        <div id="${fileMenuMountId}"></div>
       </div>
       <span class="toolbar-sep"></span>
       <div class="toolbar-section toolbar-section-center">
@@ -146,44 +135,72 @@ export function mountTopbar(
 
   render(tmpl, container)
 
+  const fileMenuMount = document.getElementById(fileMenuMountId)
+  const fileMenu = fileMenuMount
+    ? mountFileMenu(fileMenuMount, {
+        onChangeProvider: callbacks.onChangeProvider,
+        onViewChange: callbacks.onViewChange,
+        onSave: callbacks.onSave,
+        onLoad: callbacks.onLoad,
+        onImageManager: callbacks.onImageManager,
+      })
+    : null
+
   return {
-    updateCounter(count: number, totalBytes: number) {
+    updateCounter(count: number, totalBytes: number, pendingCount: number = 0) {
       const el = document.getElementById(counterId)
       if (!el) return
-      if (count === 0) {
+      el.style.display = ""
+      if (count === 0 && pendingCount === 0) {
         el.textContent = ""
         el.classList.toggle("clickable", false)
         return
       }
-      const sign = totalBytes >= 0 ? "+" : "-"
-      const abs = Math.abs(totalBytes)
-      const size = abs < 1024
-        ? `${sign}${abs} B`
-        : `${sign}${(abs / 1024).toFixed(1)} KB`
-      const color = totalBytes > 0 ? colors.green : totalBytes < 0 ? colors.danger : 'inherit'
-      el.innerHTML = `<div class="dirty-count">${count} unsaved</div><div class="dirty-size" style="color:${color}">${size}</div>`
+      const parts: string[] = []
+      if (count > 0) {
+        const color = totalBytes > 0 ? colors.green : totalBytes < 0 ? colors.danger : 'inherit'
+        parts.push(`<span>${count} unsaved</span><span style="color:${color};font-size:0.7rem;margin-left:4px">${formatBytes(totalBytes)}</span>`)
+      }
+      if (pendingCount > 0) {
+        parts.push(`<span style="color:#856404;font-size:0.7rem">${pendingCount} pending</span>`)
+      }
+      el.innerHTML = `<div style="display:flex;gap:6px;align-items:center">${parts.join('<span style="color:#ccc">|</span>')}</div>`
       el.classList.toggle("clickable", true)
+    },
+    showSingleDiscard(path: string, bytes: number) {
+      const el = document.getElementById(counterId)
+      if (!el) return
+      el.style.display = ""
+      el.innerHTML = ""
+      el.classList.toggle("clickable", false)
+      const btn = pressTwiceButton({
+        idleText: "Discard",
+        pendingText: "Press again",
+        variant: "danger",
+        small: true,
+        idleBadge: `(${formatBytes(bytes)})`,
+        onConfirm: () => callbacks.onSingleDiscard?.(path),
+      })
+      el.appendChild(btn)
+    },
+    hideSingleDiscard() {
+      const el = document.getElementById(counterId)
+      if (!el) return
+      el.textContent = ""
+      el.classList.toggle("clickable", false)
     },
     setDirtyState(hasDirty: boolean) {
       const flush = document.getElementById(flushId) as HTMLButtonElement
       if (flush) flush.disabled = !hasDirty
     },
     setProviderBadge(icon: string, label: string) {
-      const el = document.getElementById(providerId)
-      if (el) el.innerHTML = `${icon} ${label}`
+      fileMenu?.setProviderBadge(icon, label)
     },
-    setProviderType(type: string) {
-      const show = type === "localStorage"
-      const saveBtn = document.getElementById(saveBtnId)
-      const loadBtn = document.getElementById(loadBtnId)
-      if (saveBtn) saveBtn.style.display = show ? "" : "none"
-      if (loadBtn) loadBtn.style.display = show ? "" : "none"
+    setProviderType(_type: string) {
+      // no-op: save/load are always visible in the File menu
     },
     setView(view: ViewType) {
-      const editorBtn = document.getElementById(viewEditorId)
-      const statsBtn = document.getElementById(viewStatsId)
-      editorBtn?.classList.toggle("active", view === "editor")
-      statsBtn?.classList.toggle("active", view === "disk-usage")
+      fileMenu?.setView(view)
     },
   }
 }

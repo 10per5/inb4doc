@@ -15,11 +15,13 @@ The editor is a Milkdown v7 WYSIWYG interface loaded inside the native GUI windo
 
 Navigation and interaction use [Hotwired](https://hotwired.dev):
 
-- **Turbo Drive** — SPA-like navigation without client-side routing
-- **Turbo Frames** — Inline editing without hand-coded fetch calls
-- **Stimulus** — Tiny controllers for editor mount/unmount, mode toggle, save buffer, flush
+* **Turbo Drive** — SPA-like navigation without client-side routing
 
-Combined bundle: **~28KB gzip**.
+* **Turbo Frames** — Inline editing without hand-coded fetch calls
+
+* **Stimulus** — Tiny controllers for editor mount/unmount, mode toggle, save buffer, flush
+
+Combined bundle: **\~28KB gzip**.
 
 ## Flush-Based Writes
 
@@ -58,7 +60,7 @@ These render as colored callout blocks in the WYSIWYG editor matching the Hugo B
 
 ### Hugo Shortcodes
 
-Hugo/Book shortcodes (e.g., `{{</* hint info */)>}}`, `{{</* details "Summary" */>}}`, `{{</* param "name" */>}}`) are preserved as-is in the markdown source and highlighted as styled badges in the WYSIWYG editor. For a full list of supported shortcodes, see the Hugo Book shortcode reference and Hugo shortcode documentation. Unimplemented shortcodes pass through the editor unchanged.
+Hugo/Book shortcodes (e.g., `{{</* hint info */>}}`, `{{</* details "Summary" */>}}`, `{{</* param "name" */>}}`) are preserved as-is in the markdown source and highlighted as styled badges in the WYSIWYG editor. For a full list of supported shortcodes, see the Hugo Book shortcode reference and Hugo shortcode documentation. Unimplemented shortcodes pass through the editor unchanged.
 
 ## Backends
 

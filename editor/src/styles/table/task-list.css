@@ -1,0 +1,25 @@
+li[data-item-type="task"] {
+  list-style: none;
+  position: relative;
+  padding-left: 1.8em;
+}
+
+li[data-item-type="task"][data-checked="true"]::before {
+  content: "☑";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 1em;
+  line-height: inherit;
+  color: var(--color-accent);
+}
+
+li[data-item-type="task"][data-checked="false"]::before {
+  content: "☐";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 1em;
+  line-height: inherit;
+  color: var(--color-text-secondary);
+}

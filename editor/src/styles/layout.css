@@ -50,11 +50,11 @@
     transform: translateX(-100%);
     transition: transform 0.3s ease;
   }
-  
+
   .book-menu.sidebar-open {
     transform: translateX(0);
   }
-  
+
   .book-menu-backdrop {
     position: fixed;
     inset: 0;
@@ -64,7 +64,7 @@
     pointer-events: none;
     transition: opacity 0.3s ease;
   }
-  
+
   .book-menu-backdrop.visible {
     opacity: 1;
     pointer-events: auto;
@@ -79,6 +79,7 @@
   flex-direction: column;
   min-width: 0;
   position: relative;
+  padding: var(--editor-padding-x);
 }
 
 .book-page-main {
@@ -200,7 +201,7 @@
   .book-aside {
     display: none;
   }
-  
+
   .book-aside.panel-visible {
     display: flex;
     position: fixed;
@@ -211,7 +212,7 @@
     z-index: 100;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
   }
-  
+
   .book-aside-backdrop {
     position: fixed;
     inset: 0;
@@ -221,7 +222,7 @@
     pointer-events: none;
     transition: opacity 0.3s ease;
   }
-  
+
   .book-aside-backdrop.visible {
     opacity: 1;
     pointer-events: auto;
@@ -238,12 +239,12 @@
   .sidebar-provider-bar {
     display: none !important;
   }
-  
+
   #editor-area {
     max-width: 100%;
     width: 100%;
   }
-  
+
   #milkdown-editor .ProseMirror {
     padding: 0;
   }

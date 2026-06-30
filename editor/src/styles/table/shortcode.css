@@ -1,0 +1,37 @@
+.shortcode-tag {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.shortcode-param {
+  border-color: #8fbcbb;
+}
+
+.shortcode-detail-tag {
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.shortcode-percent {
+  border-color: #b48ead;
+  font-style: italic;
+}
+
+.shortcode-body {
+  background: #fff0e0;
+  border-radius: 2px;
+  padding: 1px 2px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.85em;
+}
+
+.shortcode-inner {
+  color: var(--color-accent);
+  font-weight: 500;
+}

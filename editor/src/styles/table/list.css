@@ -1,0 +1,21 @@
+.list-item-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.list-item-block .list-item-marker {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.list-item-block .list-item-marker svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+.list-item-block .list-item-content {
+  flex: 1;
+}

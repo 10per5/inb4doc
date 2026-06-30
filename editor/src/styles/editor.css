@@ -157,6 +157,168 @@
   }
 }
 
+/* ── Code Block UI (CodeMirror) ──────────────────────────────────── */
+
+.code-block-wrapper {
+  position: relative;
+  margin: 0.5em 0;
+  border: 1px solid #434c5e;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #282c34;
+}
+
+.code-block-wrapper.selected {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.code-block-wrapper .cm-editor {
+  outline: none;
+}
+
+.code-block-wrapper .cm-editor .cm-scroller {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.code-block-wrapper .cm-editor .cm-gutters {
+  border-right: 1px solid #3b4252;
+  background: #282c34;
+}
+
+.code-block-wrapper .cm-editor .cm-activeLineGutter {
+  background: transparent;
+}
+
+.code-block-overlay {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.code-block-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.code-block-wrapper:hover .code-block-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.code-block-lang-picker {
+  position: relative;
+}
+
+.code-block-lang-input {
+  background: rgba(40, 44, 52, 0.85);
+  border: 1px solid #4c566a;
+  border-radius: 4px;
+  color: #d8dee9;
+  font-size: 0.72rem;
+  font-family: inherit;
+  padding: 2px 6px;
+  width: 90px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.code-block-lang-input::placeholder {
+  color: #616e88;
+}
+
+.code-block-lang-input:focus {
+  border-color: #81a1c1;
+}
+
+.code-block-lang-list {
+  display: none;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #2e3440;
+  border: 1px solid #4c566a;
+  border-radius: 4px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.code-block-lang-list.visible {
+  display: block;
+}
+
+.code-block-lang-item {
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #d8dee9;
+}
+
+.code-block-lang-item:hover,
+.code-block-lang-item.focused {
+  background: #3b4252;
+}
+
+.code-block-lang-item.selected {
+  color: #88c0d0;
+  font-weight: 600;
+}
+
+.code-block-lang-alias {
+  color: #616e88;
+  font-size: 0.65rem;
+}
+
+.code-block-preview {
+  display: none;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #d8dee9;
+}
+
+.code-block-preview .katex-display {
+  margin: 0.5em 0;
+}
+
+.code-block-wrapper.latex .cm-gutters {
+  display: none;
+}
+
+.code-block-copy-btn {
+  background: rgba(40, 44, 52, 0.85);
+  border: 1px solid #4c566a;
+  border-radius: 4px;
+  color: #d8dee9;
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.code-block-copy-btn:hover {
+  background: rgba(59, 66, 82, 0.9);
+}
+
+.code-block-copy-btn.copied {
+  background: rgba(163, 190, 140, 0.25);
+  border-color: #a3be8c;
+}
+
+.code-block-copy-btn.copied svg {
+  stroke: #a3be8c;
+}
+
 /* ── Link Editor ───────────────────────────────────────────────────── */
 
 .milkdown-link-edit {

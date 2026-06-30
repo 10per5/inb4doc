@@ -1,4 +1,9 @@
 #include "scheme.h"
+#include "config.h"
+#include "gitignore.h"
+#include "search.h"
+#include "images.h"
+#include "json.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -8,147 +13,6 @@
 #include <algorithm>
 #include <string>
 namespace fs = std::filesystem;
-
-// ── gitignore pattern matching ──────────────────────────────────────────
-
-struct GitIgnorePattern
-{
-    std::string pattern; ///< cleaned pattern (no leading !, no trailing /)
-    bool negate   = false;
-    bool dir_only = false;
-    bool anchored = false; ///< has / in pattern (match relative path, not basename)
-};
-
-static std::vector<GitIgnorePattern> load_gitignore(const fs::path &dir)
-{
-    std::vector<GitIgnorePattern> out;
-    auto gi_path = dir / ".gitignore";
-    std::ifstream f(gi_path);
-    if (!f)
-        return out;
-
-    std::string line;
-    while (std::getline(f, line))
-    {
-        // strip trailing whitespace
-        while (!line.empty() && (line.back() == ' ' || line.back() == '\t'))
-            line.pop_back();
-        if (line.empty() || line[0] == '#')
-            continue;
-
-        GitIgnorePattern p;
-
-        if (line[0] == '!')
-        {
-            p.negate = true;
-            line = line.substr(1);
-        }
-
-        if (!line.empty() && line.back() == '/')
-        {
-            p.dir_only = true;
-            line.pop_back();
-        }
-
-        if (line.empty())
-            continue;
-
-        p.pattern = line;
-        p.anchored = line.find('/') != std::string::npos;
-        out.push_back(p);
-    }
-    return out;
-}
-
-static bool glob_match(const std::string &pat, std::size_t pi,
-                       const std::string &str, std::size_t si)
-{
-    // consume rest of pattern?
-    for (;;)
-    {
-        if (pi == pat.size() && si == str.size())
-            return true;
-
-        // ** matches everything
-        if (pi + 1 < pat.size() && pat[pi] == '*' && pat[pi + 1] == '*')
-        {
-            // skip second *
-            pi += 2;
-            // ** at end matches any trailing chars
-            if (pi == pat.size())
-                return true;
-            // try matching remaining pattern at every position
-            for (auto i = si; i <= str.size(); ++i)
-                if (glob_match(pat, pi, str, i))
-                    return true;
-            return false;
-        }
-
-        // * matches any chars except /
-        if (pi < pat.size() && pat[pi] == '*')
-        {
-            ++pi;
-            for (auto i = si; i <= str.size(); ++i)
-            {
-                if (i > si && str[i - 1] == '/')
-                    break;
-                if (glob_match(pat, pi, str, i))
-                    return true;
-            }
-            return false;
-        }
-
-        // ? matches any single char except /
-        if (pi < pat.size() && pat[pi] == '?')
-        {
-            if (si >= str.size() || str[si] == '/')
-                return false;
-            ++pi;
-            ++si;
-            continue;
-        }
-
-        // literal
-        if (pi < pat.size() && si < str.size() && pat[pi] == str[si])
-        {
-            ++pi;
-            ++si;
-            continue;
-        }
-
-        return false;
-    }
-}
-
-static bool is_ignored(const std::string &name, bool is_dir,
-                       const std::vector<GitIgnorePattern> &patterns)
-{
-    bool ignored = false;
-    for (const auto &p : patterns)
-    {
-        if (p.dir_only && !is_dir)
-            continue;
-
-        bool matched = false;
-
-        if (p.anchored)
-        {
-            // match against full relative path
-            matched = glob_match(p.pattern, 0, name, 0);
-        }
-        else
-        {
-            // match against basename
-            auto slash = name.rfind('/');
-            auto base  = (slash == std::string::npos) ? name : name.substr(slash + 1);
-            matched = glob_match(p.pattern, 0, base, 0);
-        }
-
-        if (matched)
-            ignored = !p.negate;
-    }
-    return ignored;
-}
 
 // ── ─────────────────────────────────────────────────────────────────────
 
@@ -191,6 +55,12 @@ static std::string guess_mime(const std::string &path)
         return "image/svg+xml";
     if (ext == ".ico")
         return "image/x-icon";
+    if (ext == ".gif")
+        return "image/gif";
+    if (ext == ".webp")
+        return "image/webp";
+    if (ext == ".bmp")
+        return "image/bmp";
     if (ext == ".woff2")
         return "font/woff2";
     if (ext == ".woff")
@@ -201,6 +71,8 @@ static std::string guess_mime(const std::string &path)
         return "application/json";
     return "application/octet-stream";
 }
+
+// ── ─────────────────────────────────────────────────────────────────────
 
 static int extract_weight(const fs::path &file)
 {
@@ -275,6 +147,9 @@ static void build_tree(const fs::path &dir, std::ostringstream &out,
         }
     }
 
+    std::sort(items.begin(), items.end(),
+              [](const item &a, const item &b) { return a.name < b.name; });
+
     bool first = true;
     for (auto &it : items)
     {
@@ -284,6 +159,8 @@ static void build_tree(const fs::path &dir, std::ostringstream &out,
         out << prefix << "  \"" << it.name << "\": " << it.json;
     }
 }
+
+// ── ─────────────────────────────────────────────────────────────────────
 
 saucer::scheme::response handle_app_request(
     const config &cfg,
@@ -334,22 +211,8 @@ saucer::scheme::response handle_app_request(
     {
         std::string body(req.content().str());
 
-        auto find_val = [&](const std::string &key) -> std::string
-        {
-            auto pos = body.find("\"" + key + "\"");
-            if (pos == std::string::npos)
-                return "";
-            pos = body.find('"', pos + key.size() + 3);
-            if (pos == std::string::npos)
-                return "";
-            auto end = body.find('"', pos + 1);
-            if (end == std::string::npos)
-                return "";
-            return std::string(body.substr(pos + 1, end - pos - 1));
-        };
-
-        auto from = find_val("from");
-        auto to = find_val("to");
+        auto from = json_string_value(body, "from");
+        auto to = json_string_value(body, "to");
 
         if (from.empty() || to.empty())
             return {.data = saucer::stash::from_str("Missing from/to"),
@@ -364,13 +227,11 @@ saucer::scheme::response handle_app_request(
             return {.data = saucer::stash::from_str("Invalid path"),
                     .mime = "text/plain", .status = 400};
 
-        if (from.find("..") != std::string::npos ||
-            to.find("..") != std::string::npos)
+        fs::path src, dst;
+        if (!resolve_within(fs::path(cfg.content_root) / from, cfg.content_root, src) ||
+            !resolve_within(fs::path(cfg.content_root) / to, cfg.content_root, dst))
             return {.data = saucer::stash::from_str("Invalid path"),
-                    .mime = "text/plain", .status = 400};
-
-        auto src = fs::path(cfg.content_root) / from;
-        auto dst = fs::path(cfg.content_root) / to;
+                    .mime = "text/plain", .status = 403};
 
         if (!fs::exists(src))
             return {.data = saucer::stash::from_str("Source not found"),
@@ -381,7 +242,27 @@ saucer::scheme::response handle_app_request(
                     .mime = "text/plain", .status = 409};
 
         fs::create_directories(dst.parent_path());
-        fs::rename(src, dst);
+
+        std::error_code rename_ec;
+        fs::rename(src, dst, rename_ec);
+        if (rename_ec)
+        {
+            // Cross-device fallback: copy + delete (handles EXDEV)
+            std::ifstream src_f(src, std::ios::binary);
+            if (!src_f)
+                return {.data = saucer::stash::from_str("Read failed"),
+                        .mime = "text/plain", .status = 500};
+            std::string content((std::istreambuf_iterator<char>(src_f)),
+                                std::istreambuf_iterator<char>());
+            src_f.close();
+            std::ofstream dst_f(dst, std::ios::binary);
+            if (!dst_f)
+                return {.data = saucer::stash::from_str("Write failed"),
+                        .mime = "text/plain", .status = 500};
+            dst_f << content;
+            dst_f.close();
+            fs::remove(src);
+        }
 
         auto parent = src.parent_path();
         while (parent != fs::path(cfg.content_root) && fs::is_empty(parent))
@@ -392,6 +273,13 @@ saucer::scheme::response handle_app_request(
 
         return {.data = saucer::stash::from_str("ok"),
                 .mime = "text/plain", .status = 200};
+    }
+
+    // -- API: search --
+
+    if (path == "api/search" && method == "POST")
+    {
+        return handle_search(cfg, req.content().str());
     }
 
     // -- Content API: /content/{path} --
@@ -407,23 +295,33 @@ saucer::scheme::response handle_app_request(
 
         auto fpath = fs::path(cfg.content_root) / spath;
 
+        // Auto-append .md if the path has no extension (matching Node.js behavior)
+        if (fpath.extension().empty())
+            fpath += ".md";
+
         if (fpath.extension() != ".md")
             return {.data = saucer::stash::from_str("Not Found"),
                     .mime = "text/plain", .status = 404};
 
+        // Path traversal guard
+        fs::path resolved;
+        if (!resolve_within(fpath, cfg.content_root, resolved))
+            return {.data = saucer::stash::from_str("Forbidden"),
+                    .mime = "text/plain", .status = 403};
+
         if (method == "GET")
         {
-            if (!fs::exists(fpath) || fs::is_directory(fpath))
+            if (!fs::exists(resolved) || fs::is_directory(resolved))
                 return {.data = saucer::stash::from_str(""),
                         .mime = "text/markdown", .status = 404};
 
-            return {.data = stash_from_file(fpath.string()),
+            return {.data = stash_from_file(resolved.string()),
                     .mime = "text/markdown; charset=utf-8", .status = 200};
         }
 
         if (method == "HEAD")
         {
-            if (!fs::exists(fpath) || !fs::is_regular_file(fpath))
+            if (!fs::exists(resolved) || !fs::is_regular_file(resolved))
                 return {.data = saucer::stash::from_str(""),
                         .mime = "text/markdown", .status = 404};
 
@@ -434,17 +332,22 @@ saucer::scheme::response handle_app_request(
         if (method == "PUT")
         {
             std::string body(req.content().str());
-            if (fpath.string().find("..") != std::string::npos)
-                return {.data = saucer::stash::from_str("Invalid path"),
-                        .mime = "text/plain", .status = 400};
 
-            fs::create_directories(fpath.parent_path());
-            std::ofstream f(fpath, std::ios::binary);
+            if (body.size() > cfg.max_content_size)
+                return {.data = saucer::stash::from_str("Content too large"),
+                        .mime = "text/plain", .status = 413};
+
+            fs::create_directories(resolved.parent_path());
+            std::ofstream f(resolved, std::ios::binary);
             if (!f)
                 return {.data = saucer::stash::from_str("Write failed"),
                         .mime = "text/plain", .status = 500};
             f << body;
             f.close();
+
+            // Remove orphaned images after document save
+            auto doc_dir = fs::path(spath).parent_path().string();
+            remove_orphaned_images(cfg, doc_dir);
 
             return {.data = saucer::stash::from_str("ok"),
                     .mime = "text/plain", .status = 200};
@@ -452,13 +355,17 @@ saucer::scheme::response handle_app_request(
 
         if (method == "DELETE")
         {
-            if (!fs::exists(fpath))
+            if (!fs::exists(resolved))
                 return {.data = saucer::stash::from_str("Not found"),
                         .mime = "text/plain", .status = 404};
 
-            fs::remove(fpath);
+            fs::remove(resolved);
 
-            auto parent = fpath.parent_path();
+            // Remove orphaned images after document delete
+            auto doc_dir = fs::path(spath).parent_path().string();
+            remove_orphaned_images(cfg, doc_dir);
+
+            auto parent = resolved.parent_path();
             while (parent != fs::path(cfg.content_root) && fs::is_empty(parent))
             {
                 fs::remove(parent);
@@ -473,22 +380,67 @@ saucer::scheme::response handle_app_request(
                 .mime = "text/plain", .status = 405};
     }
 
+    // -- Image API: GET /uploads/{path} --
+
+    const std::string uploads_prefix = "uploads/";
+    if (path.size() > uploads_prefix.size() &&
+        path.substr(0, uploads_prefix.size()) == uploads_prefix &&
+        method == "GET")
+    {
+        auto rel_path = path.substr(uploads_prefix.size());
+        auto qm = rel_path.find('?');
+        if (qm != std::string::npos)
+            rel_path = rel_path.substr(0, qm);
+        return handle_serve_image(cfg, rel_path);
+    }
+
+    // -- Image API: POST /api/upload --
+
+    if (path == "api/upload" && method == "POST")
+    {
+        auto headers = req.headers();
+        std::string body(req.content().str());
+        return handle_upload_image(cfg, body, headers);
+    }
+
+    // -- Image API: GET /api/images --
+
+    if (path == "api/images" && method == "GET")
+    {
+        auto qs = req_url.query();
+        return handle_list_images(cfg, qs);
+    }
+
+    // -- Image API: DELETE /api/images/{name} --
+
+    const std::string images_api_prefix = "api/images/";
+    if (path.size() > images_api_prefix.size() &&
+        path.substr(0, images_api_prefix.size()) == images_api_prefix &&
+        method == "DELETE")
+    {
+        auto name = path.substr(images_api_prefix.size());
+        name = url_decode(name);
+        auto qs = req_url.query();
+        return handle_delete_image(cfg, name, qs);
+    }
+
     // -- Static files --
 
-    std::string file_path;
+    fs::path file_target;
     if (path.empty() || path == "index.html")
-        file_path = cfg.editor_root + "/index.html";
+        file_target = fs::path(cfg.editor_root) / "index.html";
     else
-        file_path = cfg.editor_root + "/" + path;
+        file_target = fs::path(cfg.editor_root) / path;
 
-    if (file_path.find("..") != std::string::npos)
+    fs::path file_resolved;
+    if (!resolve_within(file_target, cfg.editor_root, file_resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
-    if (!fs::exists(file_path) || !fs::is_regular_file(file_path))
+    if (!fs::exists(file_resolved) || !fs::is_regular_file(file_resolved))
         return {.data = saucer::stash::from_str("Not Found"),
                 .mime = "text/plain", .status = 404};
 
-    return {.data = stash_from_file(file_path),
-            .mime = guess_mime(file_path), .status = 200};
+    return {.data = stash_from_file(file_resolved.string()),
+            .mime = guess_mime(file_resolved.string()), .status = 200};
 }

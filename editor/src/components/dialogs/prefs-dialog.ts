@@ -1,5 +1,6 @@
 import { html, render } from "lit-html"
 import { loadPrefs, savePrefs } from "../../storage"
+import type { ImageStorageMode } from "../../storage"
 
 function createOverlay(): HTMLDivElement {
   const existing = document.getElementById("predoc-dialog-overlay")
@@ -12,6 +13,7 @@ function createOverlay(): HTMLDivElement {
 
 export interface PrefsDialogActions {
   onStickyToolbarChange: (sticky: boolean) => void
+  onImageStorageModeChange?: (mode: ImageStorageMode) => void
 }
 
 export function mountPrefsDialog(actions: PrefsDialogActions) {
@@ -33,6 +35,10 @@ export function mountPrefsDialog(actions: PrefsDialogActions) {
       display: flex; align-items: center; gap: 0.5rem;
       font-size: 0.9rem; cursor: pointer;
     }
+    .predoc-prefs-box .prefs-section { margin: 0.75rem 0; }
+    .predoc-prefs-box .prefs-section-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #4c566a; }
+    .predoc-prefs-box .radio-group { display: flex; flex-direction: column; gap: 0.3rem; padding-left: 0.5rem; }
+    .predoc-prefs-box .radio-group label { font-size: 0.85rem; }
     .predoc-prefs-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
     .predoc-prefs-actions button {
       padding: 0.4rem 1.2rem; border: 1px solid #d8dee9; border-radius: 4px;
@@ -49,6 +55,19 @@ export function mountPrefsDialog(actions: PrefsDialogActions) {
         <input type="checkbox" id="predoc-sticky-checkbox" ?checked=${prefs.stickyToolbar} />
         Auto-hide toolbar on scroll
       </label>
+      <div class="prefs-section">
+        <div class="prefs-section-title">Image storage</div>
+        <div class="radio-group">
+          <label>
+            <input type="radio" name="image-mode" value="file" ?checked=${prefs.imageStorageMode === "file"} />
+            Save to <code>image/</code> folder
+          </label>
+          <label>
+            <input type="radio" name="image-mode" value="base64" ?checked=${prefs.imageStorageMode === "base64"} />
+            Embed as base64 in document
+          </label>
+        </div>
+      </div>
       <div class="predoc-prefs-actions">
         <button class="predoc-prefs-close">Close</button>
       </div>
@@ -59,11 +78,22 @@ export function mountPrefsDialog(actions: PrefsDialogActions) {
 
   const box = overlay.querySelector(".predoc-prefs-box")!
   const checkbox = box.querySelector("#predoc-sticky-checkbox") as HTMLInputElement
+  const radioButtons = box.querySelectorAll<HTMLInputElement>('input[name="image-mode"]')
 
   checkbox.addEventListener("change", () => {
     prefs.stickyToolbar = checkbox.checked
     savePrefs(prefs)
     actions.onStickyToolbarChange(checkbox.checked)
+  })
+
+  radioButtons.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      if (radio.checked) {
+        prefs.imageStorageMode = radio.value as ImageStorageMode
+        savePrefs(prefs)
+        actions.onImageStorageModeChange?.(prefs.imageStorageMode)
+      }
+    })
   })
 
   box.querySelector(".predoc-prefs-close")!.addEventListener("click", () => {

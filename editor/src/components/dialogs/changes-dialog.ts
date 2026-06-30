@@ -3,6 +3,7 @@ import { diffLines } from "diff"
 import { miniWindow } from "../ui"
 import { pressTwiceButton } from "./press-twice-button"
 import { colors } from "../../theme"
+import { formatBytes } from "../../utils/format"
 import type { MetaPanelData } from "../panels/meta-panel"
 
 function createOverlay(): HTMLDivElement {
@@ -42,10 +43,12 @@ function stripFrontmatter(content: string): { frontmatter: MetaPanelData | null;
 }
 
 export interface ChangesDialogData {
-  path: string
-  currentPath: boolean
-  md: string
-  changeSize: number
+  path?: string
+  currentPath?: boolean
+  md?: string
+  changeSize?: number
+  isPendingOp?: boolean
+  opLabel?: string
 }
 
 export interface ChangesDialogActions {
@@ -96,11 +99,21 @@ export function mountChangesDialog(
   `
 
   const renderItem = (data: ChangesDialogData) => {
+    if (data.isPendingOp) {
+      return html`
+        <div class="predoc-changes-item" style="opacity:0.85">
+          <div class="predoc-changes-header" style="background:#fff8e1;border-left:3px solid #f0ad4e">
+            <div class="predoc-changes-path" style="font-size:0.85rem;padding:0.3rem 0.6rem">
+              <span style="color:#856404">${data.opLabel}</span>
+            </div>
+          </div>
+        </div>
+      `
+    }
+
     const bgColor = data.currentPath ? "#eef4f9" : ""
-    const size = data.changeSize
-    const sign = size >= 0 ? "+" : "-"
-    const abs = Math.abs(size)
-    const sizeStr = abs < 1024 ? `${sign}${abs} B` : `${sign}${(abs / 1024).toFixed(1)} KB`
+    const size = data.changeSize ?? 0
+    const sizeStr = formatBytes(size)
     const sizeColor = size > 0 ? colors.green : size < 0 ? colors.danger : colors.teal
 
     return html`
@@ -117,6 +130,11 @@ export function mountChangesDialog(
     `
   }
 
+  const dirtyCount = changes.filter(c => !c.isPendingOp).length
+  const pendingCount = changes.filter(c => c.isPendingOp).length
+  const titleParts = [`Unsaved Changes (${dirtyCount})`]
+  if (pendingCount > 0) titleParts.push(`Pending Ops (${pendingCount})`)
+
   const bodyTmpl = html`
     <style>${itemStyles}</style>
     ${changes.map(d => renderItem(d))}
@@ -127,7 +145,7 @@ export function mountChangesDialog(
     <button class="predoc-btn" data-action="close">Close</button>
   `
 
-  const tmpl = html`<style>${itemStyles}</style>${miniWindow(`Unsaved Changes (${changes.length})`, bodyTmpl, actionsTmpl)}`
+  const tmpl = html`<style>${itemStyles}</style>${miniWindow(titleParts.join(" — "), bodyTmpl, actionsTmpl)}`
 
   render(tmpl, overlay)
 
@@ -139,6 +157,9 @@ export function mountChangesDialog(
     const preview = item.querySelector(".predoc-changes-preview") as HTMLElement
     const header = item.querySelector(".predoc-changes-header") as HTMLElement
 
+    // Skip pending ops — no click/dblclick/discard/reload interaction
+    if (data.isPendingOp) return
+
     header!.addEventListener("click", () => {
       const isOpen = preview!.style.display === "block"
       preview!.style.display = isOpen ? "none" : "block"
@@ -147,7 +168,7 @@ export function mountChangesDialog(
     header!.addEventListener("dblclick", () => {
       overlay.remove()
       onClose()
-      actions.onNavigate(data.path)
+      actions.onNavigate(data.path!)
     })
 
     const placeholder = item.querySelector(".predoc-discard-placeholder") as HTMLElement
@@ -158,14 +179,19 @@ export function mountChangesDialog(
       variant: "danger",
       small: true,
       onConfirm: () => {
-        actions.onDiscard(data.path)
+        actions.onDiscard(data.path!)
         const itemEl = discardBtn.closest(".predoc-changes-item")
         if (itemEl) {
           itemEl.remove()
-          const remaining = bodyEl.querySelectorAll(".predoc-changes-item")
+          const remainingDirty = bodyEl.querySelectorAll(".predoc-changes-item:not([style*='opacity'])")
+          const pending = bodyEl.querySelectorAll(".predoc-changes-item[style*='opacity']")
           const headerEl = windowEl.querySelector(".predoc-window-header")
-          if (headerEl) headerEl.textContent = `Unsaved Changes (${remaining.length})`
-          if (remaining.length === 0) {
+          if (headerEl) {
+            const parts = [`Unsaved Changes (${remainingDirty.length})`]
+            if (pending.length > 0) parts.push(`Pending Ops (${pending.length})`)
+            headerEl.textContent = parts.join(" — ")
+          }
+          if (remainingDirty.length === 0) {
             overlay.remove()
             onClose()
           }
@@ -174,9 +200,9 @@ export function mountChangesDialog(
     })
     placeholder.replaceWith(discardBtn)
 
-    actions.onReload(data.path).then((original) => {
+    actions.onReload(data.path!).then((original) => {
       const origStripped = stripFrontmatter(original)
-      const modStripped = stripFrontmatter(data.md)
+      const modStripped = stripFrontmatter(data.md!)
 
       let html = ""
 
@@ -269,7 +295,7 @@ export function mountChangesDialog(
         }
       })
     }).catch(() => {
-      preview!.textContent = data.md.slice(0, 500) + (data.md.length > 500 ? "\n..." : "")
+      preview!.textContent = (data.md ?? "").slice(0, 500) + ((data.md ?? "").length > 500 ? "\n..." : "")
     })
   })
 

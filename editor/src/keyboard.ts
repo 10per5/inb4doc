@@ -20,7 +20,7 @@ export function createKeymap() {
     "Mod-Shift--": (state, dispatch) => {
       const hr = state.schema.nodes.hr.create()
       const tr = state.tr.replaceSelectionWith(hr)
-      dispatch(tr.scrollIntoView())
+      if (dispatch) dispatch(tr.scrollIntoView())
       return true
     },
     "Mod-z": (state, dispatch) => undo(state, dispatch),

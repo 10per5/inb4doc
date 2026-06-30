@@ -61,7 +61,7 @@ export class MentionView {
     this.provider = new SlashProvider({
       content: this.content,
       shouldShow(view) {
-        const text = this.getContent(view, (node) =>
+        const text = (this as any).getContent(view, (node: any) =>
           ["paragraph", "heading"].includes(node.type.name)
         )
         if (text == null) return false

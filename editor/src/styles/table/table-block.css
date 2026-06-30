@@ -1,0 +1,168 @@
+.milkdown-table-block {
+  position: relative;
+  margin: 1rem 0;
+  overflow: visible;
+}
+
+.milkdown-table-block table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.milkdown-table-block table tr:first-child > * {
+  background: var(--color-bg-tertiary) !important;
+  font-weight: 600;
+  border-bottom-width: 2px;
+}
+
+.milkdown-table-block table tr:not(:first-child) > * {
+  background: #fff !important;
+}
+
+.milkdown-table-block th,
+.milkdown-table-block td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  min-width: 60px;
+  vertical-align: top;
+  position: relative;
+}
+
+.milkdown-table-block .content-dom {
+  display: contents;
+}
+
+.milkdown-table-block .handle.cell-handle {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.milkdown-table-block .handle.cell-handle[data-show="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.milkdown-table-block .handle.cell-handle[data-show="false"] {
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.12s ease 0.5s;
+}
+
+.milkdown-table-block .handle.cell-handle:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.milkdown-table-block .handle.cell-handle:active {
+  background: var(--color-bg-secondary);
+}
+
+.milkdown-table-block .handle.cell-handle[data-show="false"]:hover {
+  opacity: 1 !important;
+}
+
+.milkdown-table-block .handle.cell-handle .milkdown-icon {
+  display: flex;
+  align-items: center;
+}
+
+.milkdown-table-block .handle.line-handle {
+  position: absolute;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.milkdown-table-block .handle.line-handle[data-show="true"] {
+  opacity: 1;
+}
+
+.milkdown-table-block .handle.line-handle .add-button {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: auto;
+  height: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.milkdown-table-block .handle.line-handle .add-button:hover {
+  background: var(--color-accent);
+  color: white;
+}
+
+.milkdown-table-block .handle.line-handle .add-button .milkdown-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.milkdown-table-block .drag-preview {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0.6;
+  background: var(--color-bg-primary);
+  border: 1px dashed var(--color-accent);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.milkdown-table-block .drag-preview[data-show="false"] {
+  display: none;
+}
+
+.milkdown-table-block .button-group {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 12;
+}
+
+.milkdown-table-block .button-group[data-show="false"] {
+  display: none;
+}
+
+.milkdown-table-block .button-group button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 2px;
+}
+
+.milkdown-table-block .button-group button:hover {
+  background: var(--color-bg-tertiary);
+}

@@ -3,7 +3,7 @@ import type { TreeNode } from "../components/panels/sidebar"
 import { getProvider } from "../content/provider-registry"
 import { stripFrontmatter } from "../utils/frontmatter"
 import type { MetaPanelData } from "../components/panels/meta-panel"
-import { pushPath, getCurrentPath } from "../../lib/url"
+import { pushPath, getCurrentPath } from "../utils/url"
 
 export async function fetchContent(path: string): Promise<{
   content: string

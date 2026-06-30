@@ -6,7 +6,7 @@
  */
 
 import { stripFrontmatter } from "../utils/frontmatter";
-import { createPage, deletePage, renamePage, movePage } from "../editor-actions";
+import { createNewItem, deletePage, renamePage, movePage } from "../editor-actions";
 import { setupNavListeners, collectPageList } from "../features/navigation";
 import { getProvider, setProvider, cacheKeyForProvider, getProviderDisplayInfo } from "../content/provider-registry";
 import { createProviderByType } from "../content";
@@ -15,7 +15,19 @@ import { mountProviderDialog } from "../components/dialogs/provider-dialog";
 import { showToast } from "../components/toast/toast";
 import { cache } from "../cache";
 import { editorSelfBase } from "../config";
-import { pushPath, replacePath } from "../../lib/url";
+import { pushPath, replacePath } from "../utils/url";
+import type { CacheManagementService } from "./cache-management-service";
+import type { PendingOp } from "../utils/tree";
+
+function existsInTree(tree: TreeNode, mdPath: string): boolean {
+  const parts = mdPath.split("/");
+  let node: TreeNode | null | undefined = tree;
+  for (const part of parts) {
+    if (!node || typeof node !== "object") return false;
+    node = node[part] as TreeNode | null | undefined;
+  }
+  return node !== undefined;
+}
 
 export interface NavigationCallbacks {
   onBeforeNavigate?: (path: string) => void;
@@ -28,6 +40,7 @@ export interface NavigationCallbacks {
   onPageRenamed?: () => void;
   onPageMoved?: () => void;
   onUpdateUI?: () => void;
+  onSearchNavigate?: (query: string, matchIndex?: number, snippetText?: string) => void;
 }
 
 export class NavigationService {
@@ -35,9 +48,14 @@ export class NavigationService {
   private loading: boolean = false;
   private emptyTreePrompted: boolean = false;
   private callbacks: NavigationCallbacks;
+  private cacheService!: CacheManagementService;
 
   constructor(callbacks: NavigationCallbacks = {}) {
     this.callbacks = callbacks;
+  }
+
+  setCacheService(service: CacheManagementService): void {
+    this.cacheService = service;
   }
 
   /**
@@ -61,7 +79,7 @@ export class NavigationService {
   /**
    * Navigate to a page
    */
-  async navigate(path: string, pushHistory = true): Promise<void> {
+  async navigate(path: string, pushHistory = true, searchQuery?: string, matchIndex?: number, snippetText?: string): Promise<void> {
     if (this.loading) return;
     this.loading = true;
 
@@ -86,6 +104,11 @@ export class NavigationService {
       if (content) {
         await this.callbacks.onContentReady?.(path, content);
         this.callbacks.onNavigate?.(path);
+        if (searchQuery) {
+          requestAnimationFrame(() => {
+            this.callbacks.onSearchNavigate?.(searchQuery, matchIndex, snippetText);
+          });
+        }
       }
 
       // Reload sidebar
@@ -100,7 +123,7 @@ export class NavigationService {
    * Load and render sidebar
    */
   async loadSidebar(
-    onNavigate: (path: string) => void,
+    onNavigate: (path: string, searchQuery?: string, matchIndex?: number, snippetText?: string) => void,
     onUpdateMention?: (pages: string[], meta: any) => void
   ): Promise<void> {
     const sidebarEl = document.getElementById("sidebar-nav");
@@ -121,10 +144,15 @@ export class NavigationService {
         return;
       }
 
+      // Build display tree with pending ops applied
+      const displayTree = this.cacheService.applyPendingOpsToTree(sidebarCache);
+      const pendingOps: PendingOp[] = this.cacheService.getPendingOps();
+      const dirtyPaths = cache.getDirtyPaths();
+
       const actions: SidebarActions = {
-        onNavigate: (path) => onNavigate(path),
-        onNewPage: (parentPath) =>
-          createPage(parentPath, (p) => onNavigate(p), () => this.loadSidebar(onNavigate, onUpdateMention)),
+        onNavigate: (path, searchQuery, matchIndex, snippetText) => onNavigate(path, searchQuery, matchIndex, snippetText),
+        onNewItem: (parentPath) =>
+          createNewItem(this.cacheService, parentPath, (p) => onNavigate(p), () => this.loadSidebar(onNavigate, onUpdateMention)),
         onDelete: (path) => this.deletePage(path, onNavigate),
         onRename: (path) => this.renamePage(path, onNavigate),
         onMove: (from, to) => this.movePage(from, to, onNavigate),
@@ -132,10 +160,10 @@ export class NavigationService {
       };
 
       const pdi = getProviderDisplayInfo(provider.name);
-      mountSidebar(sidebarEl, sidebarCache, this.currentPath, actions, pdi.icon, pdi.label, provider.name);
+      mountSidebar(sidebarEl, displayTree, this.currentPath, actions, pdi.icon, pdi.label, provider.name, pendingOps, dirtyPaths, sidebarCache);
       setupNavListeners((path: string) => onNavigate(path));
 
-      const pages = collectPageList(sidebarCache);
+      const pages = collectPageList(displayTree);
       onUpdateMention?.(pages, {});
     } catch (error) {
       console.error("Failed to load sidebar:", error);
@@ -175,7 +203,7 @@ export class NavigationService {
    * Delete a page
    */
   async deletePage(pagePath: string, onNavigate: (path: string) => void): Promise<void> {
-    await deletePage(pagePath, () => {
+    await deletePage(this.cacheService, pagePath, () => {
       cache.clearPath(pagePath);
       cache.sync();
 
@@ -187,6 +215,7 @@ export class NavigationService {
 
       this.callbacks.onPageDeleted?.();
       this.callbacks.onUpdateUI?.();
+      this.cacheService.updateDirtyCounter();
     });
   }
 
@@ -194,7 +223,7 @@ export class NavigationService {
    * Rename a page
    */
   async renamePage(pagePath: string, onNavigate: (path: string) => void): Promise<void> {
-    await renamePage(pagePath, (newPath) => {
+    await renamePage(this.cacheService, pagePath, (newPath) => {
       if (newPath == null) return;
 
       cache.clearPath(pagePath);
@@ -208,6 +237,19 @@ export class NavigationService {
 
       this.callbacks.onPageRenamed?.();
       this.callbacks.onUpdateUI?.();
+      this.cacheService.updateDirtyCounter();
+    }, async (slug, parentDir) => {
+      if (slug === "_index") {
+        const provider = getProvider();
+        const tree = await provider?.getTree();
+        if (tree) {
+          const targetPath = parentDir ? `${parentDir}/_index.md` : "_index.md";
+          if (existsInTree(tree, targetPath)) {
+            return `"_index.md" already exists in this directory.`;
+          }
+        }
+      }
+      return null;
     });
   }
 
@@ -215,7 +257,7 @@ export class NavigationService {
    * Move a page
    */
   async movePage(from: string, to: string, onNavigate: (path: string) => void): Promise<void> {
-    await movePage(from, to, () => {
+    await movePage(this.cacheService, from, to, () => {
       cache.clearPath(from);
       cache.sync();
 
@@ -227,6 +269,7 @@ export class NavigationService {
       this.callbacks.onPageMoved?.();
       this.callbacks.onSidebarReload?.();
       this.callbacks.onUpdateUI?.();
+      this.cacheService.updateDirtyCounter();
     });
   }
 

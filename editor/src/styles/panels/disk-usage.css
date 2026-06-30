@@ -1,0 +1,158 @@
+/* ── Disk Usage View ───────────────────────────────────────────────── */
+
+.disk-usage-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1rem 1.5rem;
+  overflow-y: auto;
+}
+
+.disk-usage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.disk-usage-close {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.5rem;
+  color: var(--color-text-secondary);
+}
+
+.disk-usage-close:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.disk-usage-mode-toggle {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.disk-usage-mode-btn {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.disk-usage-mode-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.disk-usage-mode-btn:hover:not(.active) {
+  background: var(--color-bg-tertiary);
+}
+
+.disk-usage-chart-area {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.disk-usage-svg-container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.disk-usage-pie {
+  width: 200px;
+  height: 200px;
+}
+
+.disk-usage-pie path:hover {
+  opacity: 0.8;
+  stroke: var(--color-text-primary);
+  stroke-width: 1.5;
+}
+
+.disk-usage-tooltip {
+  position: absolute;
+  background: var(--color-text-primary);
+  color: var(--color-bg-tertiary);
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 50;
+  max-width: 220px;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.disk-usage-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  min-width: 60px;
+}
+
+.legend-value {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.disk-usage-stats {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+
+.disk-usage-stat-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.disk-usage-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  padding: 0.25rem 0;
+}
+
+.disk-usage-stat-row .stat-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.disk-usage-stat-row .stat-value {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}

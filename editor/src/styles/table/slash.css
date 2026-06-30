@@ -1,0 +1,173 @@
+.milkdown-slash {
+  position: absolute;
+  z-index: 100;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  min-width: 220px;
+}
+
+.milkdown-slash[data-show="false"] {
+  display: none;
+}
+
+.milkdown-slash[data-show="true"] {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .milkdown-slash {
+    min-width: 200px;
+    max-width: calc(100vw - 2rem);
+    font-size: var(--font-size-small);
+  }
+}
+
+.slash-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.slash-item:hover,
+.slash-item:focus {
+  background: var(--color-bg-tertiary);
+}
+
+@media (max-width: 767px) {
+  .slash-item {
+    padding: 8px 10px;
+  }
+}
+
+.slash-icon {
+  display: flex;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+}
+
+.slash-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.slash-label {
+  color: #3b4252;
+}
+
+/* Image picker inside slash menu */
+.slash-image-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+}
+.slash-image-suggestions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.slash-image-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 80px;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  text-align: center;
+  overflow: hidden;
+}
+.slash-image-item:hover,
+.slash-image-item:focus {
+  background: var(--color-bg-tertiary);
+}
+.slash-image-item img {
+  width: 72px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+}
+.slash-image-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 72px;
+}
+.slash-image-pending {
+  color: var(--color-warning);
+  font-size: 0.65rem;
+}
+.slash-image-empty {
+  color: var(--color-text-tertiary);
+  font-size: 0.8rem;
+  padding: 12px 8px;
+}
+.slash-url-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.slash-url-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  outline: none;
+}
+.slash-url-input:focus {
+  border-color: var(--color-accent);
+}
+.slash-url-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.slash-url-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+.slash-cancel-btn {
+  color: var(--color-text-tertiary);
+}
+.slash-remove-btn {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.slash-upload-row {
+  padding-top: 4px;
+}
+.slash-upload-label {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+.slash-upload-label:hover {
+  background: var(--color-bg-tertiary);
+}

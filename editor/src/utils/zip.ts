@@ -38,7 +38,16 @@ export async function exportToZip(): Promise<void> {
   showToast(`Exported ${count} file${count > 1 ? "s" : ""}`)
 }
 
-export async function importFromZip(): Promise<number> {
+export interface ZipEntry {
+  relPath: string
+  content: string
+}
+
+export interface ZipFileEntry extends ZipEntry {
+  exists: boolean
+}
+
+export async function pickAndParseZip(): Promise<ZipEntry[] | null> {
   const input = document.createElement("input")
   input.type = "file"
   input.accept = ".zip"
@@ -48,7 +57,7 @@ export async function importFromZip(): Promise<number> {
     input.click()
   })
 
-  if (!file) return 0
+  if (!file) return null
 
   const buffer = await file.arrayBuffer()
   const data = new Uint8Array(buffer)
@@ -58,21 +67,21 @@ export async function importFromZip(): Promise<number> {
     extracted = unzipSync(data)
   } catch {
     showToast("Failed to read zip file")
-    return 0
+    return null
   }
 
-  let count = 0
+  const entries: ZipEntry[] = []
+
   for (const [relPath, content] of Object.entries(extracted)) {
     if (!relPath.endsWith(".md")) continue
-    localStorage.setItem(STORAGE_PREFIX + relPath, strFromU8(content))
-    count++
+    const text = strFromU8(content)
+    entries.push({ relPath, content: text })
   }
 
-  if (count === 0) {
+  if (entries.length === 0) {
     showToast("No markdown files found in archive")
-    return 0
+    return null
   }
 
-  showToast(`Imported ${count} file${count > 1 ? "s" : ""}`)
-  return count
+  return entries
 }

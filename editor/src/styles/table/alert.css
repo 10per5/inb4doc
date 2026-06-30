@@ -1,0 +1,35 @@
+.book-hint {
+  border-left: 4px solid var(--color-accent);
+  background: var(--color-bg-tertiary);
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.book-hint.info,
+.book-hint.note {
+  border-color: var(--color-accent);
+  background: var(--color-bg-tertiary);
+}
+
+.book-hint.warning,
+.book-hint.caution {
+  border-color: var(--color-warning);
+  background: #fdf6ec;
+}
+
+.book-hint.danger {
+  border-color: var(--color-error);
+  background: #fcecec;
+}
+
+.book-hint.tip,
+.book-hint.success {
+  border-color: var(--color-success);
+  background: #f0f7ed;
+}
+
+.book-hint.important {
+  border-color: #ebcb8b;
+  background: #fcf8e8;
+}

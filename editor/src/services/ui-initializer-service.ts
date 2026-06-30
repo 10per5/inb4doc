@@ -17,10 +17,12 @@ import type { ViewManager } from "../components/views/view";
 export interface UIInitializeOptions {
   onPrefs?: () => void;
   onDirtyClick?: () => void;
+  onSingleDiscard?: (path: string) => void;
   onChangeProvider?: () => void;
   onViewChange?: (view: ViewType) => void;
   onSave?: () => void;
   onLoad?: () => void;
+  onImageManager?: () => void;
   onToggleSidebar?: () => void;
   onToggleMetaPanel?: () => void;
   onMetaPanelChange?: (data: any) => void;
@@ -49,11 +51,13 @@ export class UIInitializerService {
           },
         });
       },
-      onDirtyClick: options.onDirtyClick,
-      onChangeProvider: options.onChangeProvider,
-      onViewChange: options.onViewChange,
+      onDirtyClick: options.onDirtyClick ?? undefined,
+      onSingleDiscard: options.onSingleDiscard ?? undefined,
+      onChangeProvider: options.onChangeProvider ?? (() => {}),
+      onViewChange: options.onViewChange ?? (() => {}),
       onSave: options.onSave,
       onLoad: options.onLoad,
+      onImageManager: options.onImageManager,
       onToggleSidebar: options.onToggleSidebar,
       onToggleMetaPanel: options.onToggleMetaPanel,
     });
@@ -108,9 +112,9 @@ export class UIInitializerService {
   /**
    * Update dirty counter in topbar
    */
-  public updateDirtyCounter(count: number, totalBytes: number): void {
-    this.topbar?.updateCounter(count, totalBytes);
-    this.topbar?.setDirtyState(count > 0);
+  public updateDirtyCounter(count: number, totalBytes: number, pendingCount: number = 0): void {
+    this.topbar?.updateCounter(count, totalBytes, pendingCount);
+    this.topbar?.setDirtyState(count > 0 || pendingCount > 0);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { colors } from "../../theme"
+import { formatBytes } from "../../utils/format"
 import type { TreeNode } from "../panels/sidebar"
 
 const PIE_COLORS = [
@@ -241,11 +242,7 @@ function renderStats(area: HTMLElement, data: DiskUsageData, segments: Segment[]
   area.innerHTML = ""
   const totalFiles = segments.reduce((s, seg) => s + seg.count, 0)
   const totalSize = Array.from(data.fileSizes.values()).reduce((s, v) => s + v, 0)
-  const sizeStr = totalSize < 1024
-    ? `${totalSize} B`
-    : totalSize < 1024 * 1024
-      ? `${(totalSize / 1024).toFixed(1)} KB`
-      : `${(totalSize / (1024 * 1024)).toFixed(2)} MB`
+  const sizeStr = formatBytes(totalSize, false)
 
   const lastMod = Array.from(data.lastModified.values()).reduce((max, t) => Math.max(max, t), 0)
   const lastModStr = lastMod > 0 ? new Date(lastMod).toLocaleString() : "N/A"

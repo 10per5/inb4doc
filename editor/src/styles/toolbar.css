@@ -20,12 +20,17 @@
   left: 0;
   right: 0;
   z-index: 10;
-  transition: top 0.12s;
+  transition:
+    top 0.12s,
+    opacity 0.3s;
 }
 
 .app-toolbar.hidden {
   opacity: 0;
   pointer-events: none;
+  transition:
+    top 0.12s,
+    opacity 0.46s;
 }
 
 /* Mobile: toolbar wraps */
@@ -36,11 +41,11 @@
     min-height: 36px;
     padding: 0.5rem 1rem;
   }
-  
+
   .toolbar-section {
     margin-bottom: 0.25rem;
   }
-  
+
   .toolbar-spacer {
     flex-basis: 100%;
   }
@@ -115,6 +120,10 @@
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+.toolbar-section-left {
+  position: relative;
 }
 
 .toolbar-spacer {

@@ -1,6 +1,6 @@
 ---
 title: Hosting
-weight: 40
+weight: 30
 ---
 
 # Hosting

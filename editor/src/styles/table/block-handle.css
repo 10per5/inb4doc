@@ -1,0 +1,63 @@
+.milkdown-block-handle {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  cursor: grab;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+
+.milkdown-block-handle[data-show="false"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.milkdown-block-handle button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  padding: 0;
+}
+
+.milkdown-block-handle button:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.milkdown-block-handle button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  display: block;
+}
+
+.milkdown-block-handle .block-handle-drag {
+  cursor: grab;
+}
+
+@media (max-width: 767px) {
+  .milkdown-block-handle {
+    gap: 4px;
+  }
+
+  .milkdown-block-handle button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .milkdown-block-handle button svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .milkdown-block-handle.touch-active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

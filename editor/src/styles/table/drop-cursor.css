@@ -1,0 +1,8 @@
+.predoc-drop-cursor {
+  position: fixed;
+  pointer-events: none;
+  background-color: var(--color-accent);
+  opacity: 0.5;
+  transition: all 0.2s;
+  z-index: 300;
+}
