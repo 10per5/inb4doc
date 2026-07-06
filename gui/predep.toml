@@ -28,6 +28,9 @@ recipe = "images/linux.Dockerfile"
 target = "/build/bin/predoc-gui"
 dest = "root://bin/"
 
+[stages.build_args]
+SAUCER_BUILD_TYPE = "Release"
+
 [platform.darwin.stage.docker]
 recipe = "images/darwin.Dockerfile"
 target = "/build/bin/predoc-gui"

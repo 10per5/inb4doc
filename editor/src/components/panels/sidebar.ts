@@ -255,6 +255,7 @@ export function mountSidebar(
           </a>
           <button
             class="nav-more"
+            tabindex="-1"
             @click=${(e: Event) => {
               e.stopPropagation();
               showMenu(e.target as HTMLElement, pagePath, actions, false);
@@ -388,17 +389,18 @@ export function mountSidebar(
               />
             </svg>
           </span>
-          ${folderIcon}${label}</span
+          ${folderIcon}${label}
+          <button
+            class="nav-more"
+            tabindex="-1"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              showMenu(e.target as HTMLElement, path, actions, true);
+            }}
+          >
+            ⋮
+          </button></span
         >
-        <button
-          class="nav-more"
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            showMenu(e.target as HTMLElement, path, actions, true);
-          }}
-        >
-          ⋮
-        </button>
         <div class="nav-section-children" style="--line-color: ${lineColor}">
           ${children}
         </div>
@@ -539,6 +541,48 @@ export function mountSidebar(
     }, 200);
   }
 
+  function getVisibleItems(): HTMLAnchorElement[] {
+    const items = container.querySelectorAll<HTMLAnchorElement>(".nav-link");
+    return Array.from(items).filter(
+      (a) => a.offsetParent !== null && a.closest(".nav-item")?.style.display !== "none"
+    );
+  }
+
+  function handleSidebarKeydown(e: KeyboardEvent): void {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+    const items = getVisibleItems();
+    if (items.length === 0) return;
+
+    const current = document.activeElement as HTMLElement;
+    let idx = items.indexOf(current as HTMLAnchorElement);
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (idx < 0) idx = -1;
+        items[(idx + 1) % items.length].focus();
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (idx < 0) idx = 0;
+        items[(idx - 1 + items.length) % items.length].focus();
+        break;
+      case "Home":
+        e.preventDefault();
+        items[0].focus();
+        break;
+      case "End":
+        e.preventDefault();
+        items[items.length - 1].focus();
+        break;
+      case "Enter":
+        if (idx >= 0) { e.preventDefault(); items[idx].click(); }
+        break;
+    }
+  }
+
   render(
     html`
       <div
@@ -548,6 +592,7 @@ export function mountSidebar(
             .querySelectorAll(".drag-over")
             .forEach((el) => el.classList.remove("drag-over"));
         }}
+        @keydown=${handleSidebarKeydown}
       >
         ${treeEmpty
           ? html`

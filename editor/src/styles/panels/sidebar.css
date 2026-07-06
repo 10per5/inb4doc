@@ -281,7 +281,7 @@
 }
 
 .nav-item:hover .nav-more,
-.nav-section:hover > .nav-more {
+.nav-section:hover .nav-more {
   opacity: 1;
 }
 
@@ -290,11 +290,8 @@
   color: var(--color-text-primary);
 }
 
-.nav-section > .nav-more {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.5rem;
-  z-index: 1;
+.nav-section-title .nav-more {
+  margin-left: auto;
 }
 
 /* ── Empty Sidebar ────────────────────────────────────────────────── */

@@ -37,26 +37,28 @@ const dialogStyles = `
     z-index: 1000; display: flex; align-items: center; justify-content: center;
   }
   .predoc-dialog-box {
-    background: #fff; border-radius: 8px; padding: 1.5rem;
+    background: var(--color-bg-primary); border-radius: 8px; padding: 1.5rem;
     min-width: 360px; max-width: 480px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   }
-  .predoc-dialog-box h3 { margin: 0 0 0.5rem; font-size: 1.1rem; }
-  .predoc-dialog-box p { margin: 0 0 1rem; color: #666; font-size: 0.9rem; }
-  .predoc-dialog-box label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; color: #5e81ac; font-weight: 600; }
+  .predoc-dialog-box h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--color-text-primary); }
+  .predoc-dialog-box p { margin: 0 0 1rem; color: var(--color-text-secondary); font-size: 0.9rem; }
+  .predoc-dialog-box label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; color: var(--color-accent); font-weight: 600; }
   .predoc-dialog-box input {
-    width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #d8dee9; border-radius: 4px;
+    width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 4px;
     font-size: 0.9rem; margin-bottom: 1rem; box-sizing: border-box;
+    background: var(--color-bg-primary); color: var(--color-text-primary);
   }
-  .predoc-dialog-box input:focus { outline: none; border-color: #5e81ac; }
+  .predoc-dialog-box input:focus { outline: none; border-color: var(--color-accent); }
   .predoc-dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
   .predoc-dialog-actions button {
-    padding: 0.4rem 1.2rem; border: 1px solid #d8dee9; border-radius: 4px;
-    background: #fff; cursor: pointer; font-size: 0.9rem;
+    padding: 0.4rem 1.2rem; border: 1px solid var(--color-border); border-radius: 4px;
+    background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem;
+    color: var(--color-text-primary);
   }
-  .predoc-dialog-actions button:hover { background: #e5e9f0; }
-  .predoc-dialog-actions .predoc-dialog-confirm { background: #5e81ac; color: #fff; border-color: #5e81ac; }
-  .predoc-dialog-actions .predoc-dialog-confirm:hover { background: #4a7098; }
+  .predoc-dialog-actions button:hover { background: var(--color-bg-tertiary); }
+  .predoc-dialog-actions .predoc-dialog-confirm { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+  .predoc-dialog-actions .predoc-dialog-confirm:hover { background: var(--color-accent-hover); }
 `
 
 export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {

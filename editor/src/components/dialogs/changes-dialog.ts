@@ -69,12 +69,12 @@ export function mountChangesDialog(
 
   const itemStyles = `
     .predoc-changes-item {
-      margin-bottom: 0.5rem; border: 1px solid #e5e9f0;
+      margin-bottom: 0.5rem; border: 1px solid var(--color-border);
       border-radius: 4px; overflow: hidden;
     }
     .predoc-changes-header {
       display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.4rem 0.6rem; border-bottom: 1px solid #e5e9f0;
+      padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--color-border);
     }
     .predoc-changes-path {
       flex: 1; padding: 0.4rem 0.6rem; cursor: pointer;
@@ -83,19 +83,20 @@ export function mountChangesDialog(
     }
     .predoc-changes-preview {
       display: none; font-family: 'SF Mono', Monaco, monospace;
-      font-size: 0.75rem; background: #fafafa;
-      border-top: 1px solid #e5e9f0; max-height: 300px; overflow-y: auto;
+      font-size: 0.75rem; background: var(--color-bg-primary);
+      border-top: 1px solid var(--color-border); max-height: 300px; overflow-y: auto;
     }
     .predoc-changes-preview-line {
       padding: 2px 8px; white-space: pre-wrap; position: relative;
     }
     .predoc-changes-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
     .predoc-changes-actions button {
-      padding: 0.4rem 1.2rem; border: 1px solid #d8dee9; border-radius: 4px;
-      background: #fff; cursor: pointer; font-size: 0.9rem;
+      padding: 0.4rem 1.2rem; border: 1px solid var(--color-border); border-radius: 4px;
+      background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem;
+      color: var(--color-text-primary);
     }
-    .predoc-changes-actions button:hover { background: #e5e9f0; }
-    .predoc-dialog-close { padding: 0.4rem 1.2rem; border: 1px solid #d8dee9; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
+    .predoc-changes-actions button:hover { background: var(--color-bg-tertiary); }
+    .predoc-dialog-close { padding: 0.4rem 1.2rem; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem; color: var(--color-text-primary); }
   `
 
   const renderItem = (data: ChangesDialogData) => {

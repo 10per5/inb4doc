@@ -10,3 +10,6 @@ std::string exe_path();
 /// platform-specific default (e.g. /opt/predoc/editor on Linux).
 /// Returns empty if no candidate was found (caller must still validate).
 std::string default_editor_root();
+
+/// Platform-standard writable data directory for predoc (e.g. ~/.local/share/predoc).
+std::string default_data_dir();

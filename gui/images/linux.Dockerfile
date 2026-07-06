@@ -10,6 +10,8 @@
 
 FROM debian:trixie-slim AS builder
 
+ARG SAUCER_BUILD_TYPE=Release
+
 # ── Layer 1: system dependencies (stable) ──────────────────────────────
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -47,7 +49,10 @@ RUN wget -qO- \
     | tar xz -C /usr/local/bin premake5 \
     && chmod +x /usr/local/bin/premake5
 
-# ── Layer 5: Saucer + dependencies (busts on commit change) ───────────
+# ── Layer 5: patches (busts on file changes) ──────────────────────────
+COPY patches/ /build/patches/
+
+# ── Layer 6: Saucer + dependencies (busts on commit change) ───────────
 WORKDIR /build/vendor
 RUN --mount=type=cache,target=/build/vendor/saucer/build \
     if [ ! -d saucer-src/.git ]; then \
@@ -56,12 +61,10 @@ RUN --mount=type=cache,target=/build/vendor/saucer/build \
     cd saucer-src && \
     git fetch --depth 1 origin 811cd2f8ee7044d7143fc8d36b9ceaaef878de39 && \
     git checkout 811cd2f8ee7044d7143fc8d36b9ceaaef878de39 && \
-    sed -i 's|value_or({native::id\.data()})|value_or(decltype(native::argv){native::id.data()})|' src/qt.app.cpp && \
-    grep -q 'decltype(native::argv){native::id.data()}' src/qt.app.cpp && \
-    sed -i 's|return from({std::from_range, data()});|return from(vec(data().begin(), data().end()));|' src/stash.cpp && \
-    grep -q 'return from(vec(data().begin(), data().end()));' src/stash.cpp && \
+    patch -p1 < /build/patches/000-saucer-build.diff && \
+    patch -p1 < /build/patches/001-saucer-qtwebengine.diff && \
     cmake -B /build/vendor/saucer/build -G Ninja -S . \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_BUILD_TYPE=${SAUCER_BUILD_TYPE} \
     -DCMAKE_INSTALL_PREFIX=/build/vendor/saucer \
     -DCMAKE_CXX_FLAGS="-mno-direct-extern-access" \
     -DSAUCER_USE_QTWEBENGINE=ON \
@@ -76,24 +79,29 @@ RUN --mount=type=cache,target=/build/vendor/saucer/build \
     cp -r "$d"/* /build/vendor/saucer/include/ 2>/dev/null; \
     done
 
-# ── Layer 6: predep (stage-resolver for vendor deps) ──────────────────
+# ── Layer 7: create build user (predep dislikes running as root) ──────
+RUN groupadd -r builduser && useradd -r -g builduser builduser \
+    && chown -R builduser:builduser /build
+
+# ── Layer 8: predep (stage-resolver for vendor deps) ──────────────────
 RUN curl -sL \
     https://github.com/10per5/predep/releases/download/v0.0.1/predep-linux-x86_64.tar.gz \
     -o /tmp/predep.tar.gz \
     && tar xzf /tmp/predep.tar.gz -C /usr/local/bin \
     && predep --help > /dev/null
 
-# ── Layer 7: vendor deps (busts only on predep.toml changes) ──────────
+# ── Layer 9: vendor deps (busts only on predep.toml changes) ──────────
 WORKDIR /build
 COPY predep.toml ./
-RUN predep vendor --privileged 4dcd8fa19807b4e88036493f79f5520ccb2e2356388454164b77062cef2f4751 
+USER builduser
+RUN predep vendor
 
-# ── Layer 8: predoc-gui binary (busts on premake5.lua or src/ changes) ──
+# ── Layer 10: predoc-gui binary (busts on premake5.lua or src/ changes) ──
 COPY premake5.lua ./
 COPY src/ src/
 ENV CXXFLAGS="-std=c++23 -mno-direct-extern-access" \
     LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
-RUN premake5 gmake && make config=redist -j"$(nproc)" CXX=g++-15
+RUN premake5 gmake && make config=$(echo ${SAUCER_BUILD_TYPE} | tr '[:upper:]' '[:lower:]') -j"$(nproc)" CXX=g++-15
 
 # ── Output stage ──────────────────────────────────────────────────────
 FROM scratch

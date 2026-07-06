@@ -152,7 +152,7 @@ export class MentionView {
 
   private highlight(items: NodeListOf<HTMLElement>) {
     for (let i = 0; i < items.length; i++) {
-      items[i].style.background = i === this.activeIndex ? "#e5e9f0" : ""
+      items[i].style.background = i === this.activeIndex ? "var(--color-bg-tertiary)" : ""
     }
   }
 }

@@ -1,4 +1,5 @@
 #include "app.h"
+#include "platform.h"
 #include "scheme.h"
 #include <saucer/smartview.hpp>
 #include <saucer/icon.hpp>
@@ -6,20 +7,77 @@
 #include <saucer/navigation.hpp>
 #include <print>
 #include <string>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <memory>
-
 #if defined(__linux__)
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QShortcut>
+#include <saucer/modules/stable/qt.hpp>
+#elif defined(_WIN32)
+#include <saucer/modules/stable/webview2.hpp>
 #endif
 
 #if defined(__APPLE__)
 #include <objc/runtime.h>
 #include <objc/message.h>
+#include "mac_shortcuts.h"
 #elif defined(_WIN32)
 #include <windows.h>
+
+static std::filesystem::path g_data_dir;
+
+static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+    if (msg == WM_HOTKEY)
+    {
+        if (auto *a = static_cast<saucer::application *>(
+                GetPropW(hwnd, L"PD_APP")))
+        {
+            if (wp == 1)
+            {
+                if (auto *w = static_cast<saucer::smartview *>(
+                        GetPropW(hwnd, L"PD_WV")))
+                {
+                    double zoom;
+                    w->native<true>().controller->get_ZoomFactor(&zoom);
+                    save_zoom(g_data_dir, static_cast<float>(zoom));
+                }
+                a->quit();
+                return 0;
+            }
+            if (wp == 2)
+            {
+                if (auto *w = static_cast<saucer::smartview *>(
+                        GetPropW(hwnd, L"PD_WV")))
+                    static_cast<saucer::webview &>(*w).execute(
+                        "window.predocUI?.openFind?.()");
+                return 0;
+            }
+            if (wp == 3)
+            {
+                if (auto *w = static_cast<saucer::smartview *>(
+                        GetPropW(hwnd, L"PD_WV")))
+                    static_cast<saucer::webview &>(*w).execute(
+                        "window.predocUI?.findNext?.()");
+                return 0;
+            }
+            if (wp == 4)
+            {
+                if (auto *w = static_cast<saucer::smartview *>(
+                        GetPropW(hwnd, L"PD_WV")))
+                    static_cast<saucer::webview &>(*w).execute(
+                        "window.predocUI?.findPrev?.()");
+                return 0;
+            }
+        }
+    }
+    auto *orig = static_cast<WNDPROC>(GetPropW(hwnd, L"PD_ORIG"));
+    return CallWindowProcW(orig, hwnd, msg, wp, lp);
+}
 #endif
 
 static void toast(saucer::smartview &wv, const std::string &msg)
@@ -40,6 +98,23 @@ static void toast(saucer::smartview &wv, const std::string &msg)
     }
     auto js = "window.predocUI.showToast('" + escaped + "')";
     static_cast<saucer::webview &>(wv).execute(js.c_str());
+}
+
+static float load_zoom(const std::filesystem::path &data_dir)
+{
+    auto path = data_dir / "zoom";
+    std::ifstream ifs(path);
+    if (!ifs)
+        return 1.0f;
+    float v{};
+    ifs >> v;
+    return ifs.fail() ? 1.0f : v;
+}
+
+static void save_zoom(const std::filesystem::path &data_dir, float zoom)
+{
+    if (auto ofs = std::ofstream(data_dir / "zoom"))
+        ofs << zoom;
 }
 
 static bool internal_url(std::size_t live_port,
@@ -69,14 +144,41 @@ int run_app(config cfg)
         {
             auto window = saucer::window::create(app).value();
 
-            saucer::smartview::options opts{.window = window};
+            auto data_dir = default_data_dir();
+            if (!data_dir.empty())
+                std::filesystem::create_directories(data_dir);
+
+            saucer::smartview::options opts{
+                .window = window,
+                .storage_path = data_dir.empty() ? std::nullopt : std::optional<std::filesystem::path>(data_dir),
+            };
             if (safe->disable_gpu)
-            {
                 opts.hardware_acceleration = false;
-                opts.browser_flags = {"--disable-gpu"};
-            }
             opts.browser_flags.insert("--no-sandbox");
+            if (safe->disable_gpu)
+                opts.browser_flags.insert("--disable-gpu");
+
             auto wv = saucer::smartview::create(opts).value();
+
+            {
+                auto zoom = load_zoom(data_dir);
+                if (zoom != 1.0f)
+                {
+#if defined(__linux__)
+                    wv.native<true>().webview->page()->setZoomFactor(zoom);
+#elif defined(_WIN32)
+                    wv.native<true>().controller->put_ZoomFactor(zoom);
+#endif
+                }
+            }
+
+            if (safe->debug)
+            {
+                wv.set_dev_tools(true);
+#if defined(__linux__)
+                qputenv("QTWEBENGINE_REMOTE_DEBUGGING", "9222");
+#endif
+            }
 
             if (!safe->favicon.empty())
                 if (auto ico = saucer::icon::from(safe->favicon))
@@ -217,6 +319,83 @@ int run_app(config cfg)
                               "navigator\n" + url);
             });
 
+            wv.expose("log", [](const std::string &msg)
+            {
+                std::println(std::cerr, "  [js] {}\n", msg);
+            });
+
+            // -- keyboard shortcuts --
+
+            window->on<saucer::window::event::closed>({{
+                .func = [&wv, data_dir]
+                {
+#if defined(__linux__)
+                    save_zoom(data_dir, wv.native<true>().webview->page()->zoomFactor());
+#elif defined(_WIN32)
+                    double zoom;
+                    wv.native<true>().controller->get_ZoomFactor(&zoom);
+                    save_zoom(data_dir, static_cast<float>(zoom));
+#endif
+                },
+                .clearable = false,
+            }});
+
+#if defined(__linux__)
+            {
+                auto *main_win = window->native<true>().window;
+
+                auto *sq = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), main_win);
+                QObject::connect(sq, &QShortcut::activated, [&wv, app, data_dir]()
+                {
+                    save_zoom(data_dir, wv.native<true>().webview->page()->zoomFactor());
+                    app->quit();
+                });
+
+                auto *sf = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_F), main_win);
+                QObject::connect(sf, &QShortcut::activated, [&wv]()
+                {
+                    static_cast<saucer::webview &>(wv).execute(
+                        "window.predocUI?.openFind?.()");
+                });
+
+                auto *f3 = new QShortcut(QKeySequence(Qt::Key_F3), main_win);
+                QObject::connect(f3, &QShortcut::activated, [&wv]()
+                {
+                    static_cast<saucer::webview &>(wv).execute(
+                        "window.predocUI?.findNext?.()");
+                });
+
+                auto *sf3 = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F3), main_win);
+                QObject::connect(sf3, &QShortcut::activated, [&wv]()
+                {
+                    static_cast<saucer::webview &>(wv).execute(
+                        "window.predocUI?.findPrev?.()");
+                });
+            }
+#elif defined(_WIN32)
+            {
+                g_data_dir = data_dir;
+                auto hwnd = window->native<true>().hwnd;
+
+                SetPropW(hwnd, L"PD_APP", reinterpret_cast<HANDLE>(app));
+                SetPropW(hwnd, L"PD_WV", reinterpret_cast<HANDLE>(&wv));
+
+                auto orig = reinterpret_cast<WNDPROC>(
+                    GetWindowLongPtrW(hwnd, GWLP_WNDPROC));
+                SetPropW(hwnd, L"PD_ORIG", reinterpret_cast<HANDLE>(orig));
+
+                SetWindowLongPtrW(hwnd, GWLP_WNDPROC,
+                    reinterpret_cast<LONG_PTR>(HotkeyProc));
+
+                RegisterHotKey(hwnd, 1, MOD_CONTROL | MOD_NOREPEAT, 'Q');
+                RegisterHotKey(hwnd, 2, MOD_CONTROL | MOD_NOREPEAT, 'F');
+                RegisterHotKey(hwnd, 3, MOD_NOREPEAT, VK_F3);
+                RegisterHotKey(hwnd, 4, MOD_SHIFT | MOD_NOREPEAT, VK_F3);
+            }
+#elif defined(__APPLE__)
+            setup_mac_shortcuts(app, &static_cast<saucer::webview &>(wv));
+#endif
+
             // -- launch --
 
             if (safe->debug)
@@ -227,6 +406,8 @@ int run_app(config cfg)
             window->show();
 
             co_await app->finish();
+
+            wv.remove_scheme("app");
         }
     );
 }

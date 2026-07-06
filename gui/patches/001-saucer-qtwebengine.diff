@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: predoc <dev@predoc.app>
+Date: Sun, 5 Jul 2026 00:00:00 +0000
+Subject: [PATCH] fix(qt/webview): pass named profile to QWebEnginePage
+
+storage_path from webview::options was being applied to the named
+QWebEngineProfile("saucer"), but QWebEnginePage() default constructor
+uses QWebEngineProfile::defaultProfile() instead.  Pass the named
+profile explicitly so localStorage, IndexedDB, cookies etc. honour
+the configured storage path.
+
+See https://github.com/saucer/saucer/issues/??? for the upstream report.
+
+diff --git a/src/qt.webview.cpp b/src/qt.webview.cpp
+index 465465e..717d56d 100644
+--- a/src/qt.webview.cpp
++++ b/src/qt.webview.cpp
+@@ -74,7 +74,7 @@ namespace saucer
+ 
+         platform->profile     = std::move(profile);
+         platform->web_view    = utils::make_deferred<QWebEngineView>();
+-        platform->web_page    = std::make_unique<QWebEnginePage>();
++        platform->web_page    = std::make_unique<QWebEnginePage>(platform->profile.get());
+         platform->channel     = std::make_unique<QWebChannel>();
+         platform->channel_obj = std::make_unique<web_class>(this);
+ 
+-- 
+2.47.0

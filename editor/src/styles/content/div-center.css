@@ -1,0 +1,10 @@
+/* ── Div Center ──────────────────────────────────────────────── */
+
+.ProseMirror div[data-type="div-center"] {
+  text-align: center;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+}

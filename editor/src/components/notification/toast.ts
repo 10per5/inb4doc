@@ -53,11 +53,8 @@ export function initToast() {
   from { opacity: 0; transform: translateX(-50%) translateY(-0.5rem); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-    `;
+        `;
     document.head.appendChild(style);
   }
-
-  // Expose globally for C++ bridge
-  (window as any).predocUI = { showToast };
 }
 

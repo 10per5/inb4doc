@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: predoc <dev@predoc.app>
+Date: Sun, 5 Jul 2026 00:00:00 +0000
+Subject: [PATCH] fix(build): C++23 compat fixes for g++-15
+
+g++-15 / C++23 no longer accepts certain implicit constructor
+invocations that worked in earlier standards.  These two hunks
+fix the build errors:
+
+1. src/qt.app.cpp:20 — `value_or({native::id.data()})` is rejected
+   because brace-enclosed initializer lists can no longer be used to
+   implicitly construct a std::vector<char *> in C++23 context.
+   Fix: explicitly name the type via `decltype(native::argv){...}`.
+
+2. src/stash.cpp:26 — `from({std::from_range, data()})` fails because
+   the std::from_range tagged constructor cannot be selected through
+   brace-initialization in C++23.  Fix: construct the vector from
+   iterators explicitly and pass it to from().
+
+diff --git a/src/qt.app.cpp b/src/qt.app.cpp
+index 2b5e6b5..af6e3f3 100644
+--- a/src/qt.app.cpp
++++ b/src/qt.app.cpp
+@@ -17,7 +17,7 @@ namespace saucer
+ 
+         native::id   = opts.id.value();
+         native::argc = opts.argc.value_or(1);
+-        native::argv = opts.argv.transform(make_args).value_or({native::id.data()});
++        native::argv = opts.argv.transform(make_args).value_or(decltype(native::argv){native::id.data()});
+ 
+         platform->application = std::make_unique<QApplication>(native::argc, native::argv.data());
+         platform->application->setQuitOnLastWindowClosed(opts.quit_on_last_window_closed);
+diff --git a/src/stash.cpp b/src/stash.cpp
+index 7083e67..7318e19 100644
+--- a/src/stash.cpp
++++ b/src/stash.cpp
+@@ -23,7 +23,7 @@ namespace saucer
+ 
+     stash stash::duplicate() const
+     {
+-        return from({std::from_range, data()});
++        return from(vec(data().begin(), data().end()));
+     }
+ 
+     stash stash::from(std::vector<std::uint8_t> data)
+-- 
+2.47.0

@@ -30,7 +30,10 @@ import {
   tableIcon,
   todoListIcon,
   imageIcon,
+  videoIcon,
 } from "@/components/ui/icons";
+import { defaultVideoAttrs } from "@/plugins/video";
+import { mountVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
 import {
   getAllImages,
   uploadImage,
@@ -53,6 +56,7 @@ const SLASH_ITEMS: SlashItem[] = [
   { cmd: "math_block", label: "Math Block (LaTeX)", icon: mathIcon },
   { cmd: "table", label: "Table", icon: tableIcon },
   { cmd: "image", label: "Image", icon: imageIcon },
+  { cmd: "video", label: "Video", icon: videoIcon },
 ];
 
 class BlockHandleView {
@@ -229,6 +233,11 @@ class SlashView {
       this.openImageEditor(pos, src);
     }) as EventListener);
 
+    view.dom.addEventListener("predoc:edit-video", ((e: CustomEvent) => {
+      const { pos, attrs } = e.detail;
+      this.openVideoEditor(pos, attrs);
+    }) as EventListener);
+
     document.addEventListener("keydown", this.handleKeydown, true);
 
     const self = this;
@@ -372,6 +381,34 @@ class SlashView {
       this.#programmaticActive = true;
       this.#programmaticPos = $from.pos;
       this.renderImagePicker();
+      return;
+    }
+
+    if (cmd === "video") {
+      const { $from } = view.state.selection;
+      const textBefore = $from.parent.textBetween(
+        Math.max(0, $from.parentOffset - 500),
+        $from.parentOffset,
+      );
+      const slashPos = textBefore.lastIndexOf("/");
+      if (slashPos >= 0) {
+        const deleteFrom = $from.pos - ($from.parentOffset - slashPos);
+        view.dispatch(view.state.tr.delete(deleteFrom, $from.pos));
+      }
+      const { state } = view;
+      const { $from: afterDel } = state.selection;
+      const blockStart = afterDel.before(afterDel.depth);
+      const blockEnd = afterDel.end(afterDel.depth);
+      const videoNode = state.schema.nodes.video?.create(defaultVideoAttrs);
+      if (videoNode) {
+        const tr = state.tr.replaceWith(blockStart, blockEnd, videoNode);
+        view.dispatch(tr.scrollIntoView());
+        view.dom.dispatchEvent(new CustomEvent("predoc:edit-video", {
+          bubbles: true,
+          detail: { pos: blockStart, attrs: { ...defaultVideoAttrs } },
+        }));
+      }
+      view.focus();
       return;
     }
 
@@ -591,6 +628,30 @@ class SlashView {
     dispatch(tr);
   }
 
+  private openVideoEditor(pos: number, attrs: VideoDialogResult) {
+    const view = this.view;
+
+    mountVideoDialog(
+      attrs,
+      (result) => {
+        const { state, dispatch } = view;
+        const node = state.doc.nodeAt(pos);
+        if (node) {
+          dispatch(
+            state.tr.setNodeMarkup(pos, null, { ...node.attrs, ...result }),
+          );
+        }
+        view.focus();
+      },
+      () => {
+        const { state, dispatch } = view;
+        const tr = state.tr.delete(pos, pos + (state.doc.nodeAt(pos)?.nodeSize ?? 0));
+        dispatch(tr);
+        view.focus();
+      },
+    );
+  }
+
   private renderImagePicker() {
     const editState = this.#editState;
     const currentSrc = editState?.type === "edit" ? editState.src : "";
@@ -802,7 +863,7 @@ class SlashView {
 
   private highlight(items: NodeListOf<HTMLElement>) {
     for (let i = 0; i < items.length; i++) {
-      items[i].style.background = i === this.activeIndex ? "#e5e9f0" : "";
+      items[i].style.background = i === this.activeIndex ? "var(--color-bg-tertiary)" : "";
     }
   }
 }

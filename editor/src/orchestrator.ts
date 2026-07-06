@@ -21,6 +21,7 @@ import { applyThemeFromPrefs } from "@/components/dialogs/prefs-dialog";
 import { getCurrentPath } from "@/utils/url";
 import { imageRegistry } from "@/stores/image-registry";
 import { hotkeys } from "@/services/hotkey-manager";
+import { setEditorService } from "@/bridge/index";
 
 let sessionStarted = 0;
 
@@ -69,6 +70,7 @@ export class AppOrchestrator {
       onDirtyChange: () => this.cache?.updateDirtyCounter(),
     })
     this.editor.setCurrentPath(this.initialPath)
+    setEditorService(this.editor)
 
     this.cache = new CacheManagementService({
       getCurrentContent: () => this.editor.getCurrentContent(),

@@ -51,36 +51,38 @@ export function mountHugoRefEditDialog(view: EditorView, pos: number) {
         background: rgba(0,0,0,0.3);
       }
       .predoc-hugoref-box {
-        background: #fff; border-radius: 8px; padding: 1rem 1.25rem;
+        background: var(--color-bg-primary); border-radius: 8px; padding: 1rem 1.25rem;
         min-width: 360px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid #d8dee9;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid var(--color-border);
       }
       .predoc-hugoref-box label {
         display: block;
         font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
-        color: #5e81ac; font-weight: 700; margin-bottom: 0.4rem; margin-top: 0.6rem;
+        color: var(--color-accent); font-weight: 700; margin-bottom: 0.4rem; margin-top: 0.6rem;
       }
       .predoc-hugoref-box label:first-child { margin-top: 0; }
       .predoc-hugoref-box input {
         width: 100%; padding: 0.4rem 0.6rem;
-        border: 1px solid #d8dee9; border-radius: 4px;
+        border: 1px solid var(--color-border); border-radius: 4px;
         font-size: 0.9rem; box-sizing: border-box;
+        background: var(--color-bg-primary); color: var(--color-text-primary);
       }
-      .predoc-hugoref-box input:focus { outline: none; border-color: #5e81ac; }
+      .predoc-hugoref-box input:focus { outline: none; border-color: var(--color-accent); }
       .predoc-hugoref-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem; }
       .predoc-hugoref-actions button {
-        padding: 0.35rem 1rem; border: 1px solid #d8dee9; border-radius: 4px;
-        background: #fff; cursor: pointer; font-size: 0.85rem;
+        padding: 0.35rem 1rem; border: 1px solid var(--color-border); border-radius: 4px;
+        background: var(--color-bg-primary); cursor: pointer; font-size: 0.85rem;
+        color: var(--color-text-primary);
       }
-      .predoc-hugoref-actions button:hover { background: #e5e9f0; }
+      .predoc-hugoref-actions button:hover { background: var(--color-bg-tertiary); }
       .predoc-hugoref-actions .predoc-hugoref-save {
-        background: #5e81ac; color: #fff; border-color: #5e81ac;
+        background: var(--color-accent); color: #fff; border-color: var(--color-accent);
       }
-      .predoc-hugoref-actions .predoc-hugoref-save:hover { background: #4a7098; }
+      .predoc-hugoref-actions .predoc-hugoref-save:hover { background: var(--color-accent-hover); }
       .predoc-hugoref-actions .predoc-hugoref-remove {
-        color: #bf616a; border-color: #bf616a;
+        color: var(--color-error); border-color: var(--color-error);
       }
-      .predoc-hugoref-actions .predoc-hugoref-remove:hover { background: #fce8e8; }
+      .predoc-hugoref-actions .predoc-hugoref-remove:hover { background: var(--color-bg-tertiary); }
     </style>
     <div class="predoc-hugoref-box" @click=${(e: MouseEvent) => e.stopPropagation()}>
       <label for="${pathId}">Page Path</label>

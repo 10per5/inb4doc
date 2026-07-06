@@ -1,7 +1,9 @@
 #include "platform.h"
+#include <cstdlib>
 #include <filesystem>
 #ifdef _WIN32
 #include <windows.h>
+#include <shlobj.h>
 #else
 #include <unistd.h>
 #endif
@@ -44,5 +46,29 @@ std::string default_editor_root()
     return "C:/Program Files/predoc/editor";
 #else
     return "/opt/predoc/editor";
+#endif
+}
+
+std::string default_data_dir()
+{
+#ifdef _WIN32
+    wchar_t *raw = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &raw)))
+    {
+        auto dir = fs::path(raw) / "predoc";
+        CoTaskMemFree(raw);
+        return dir.string();
+    }
+    CoTaskMemFree(raw);
+    return {};
+#elif defined(__APPLE__)
+    auto home = std::getenv("HOME");
+    return home ? (fs::path(home) / "Library" / "Application Support" / "predoc").string() : std::string{};
+#else
+    auto xdg = std::getenv("XDG_DATA_HOME");
+    if (xdg)
+        return (fs::path(xdg) / "predoc").string();
+    auto home = std::getenv("HOME");
+    return home ? (fs::path(home) / ".local" / "share" / "predoc").string() : std::string{};
 #endif
 }

@@ -79,13 +79,16 @@ export async function mountProviderDialog(
           .provider-dialog-body {
             padding: 0.5rem 0;
           }
+          .provider-dialog-body {
+            padding: 0.5rem 0;
+          }
           .provider-current {
             font-size: 0.9rem;
             margin-bottom: 1rem;
             padding: 0.5rem 0.75rem;
-            background: #e5e9f0;
+            background: var(--color-bg-tertiary);
             border-radius: 6px;
-            color: #4c566a;
+            color: var(--color-text-primary);
           }
           .provider-options {
             display: flex;
@@ -97,22 +100,23 @@ export async function mountProviderDialog(
             align-items: flex-start;
             gap: 0.75rem;
             padding: 0.75rem;
-            border: 1px solid #d8dee9;
+            border: 1px solid var(--color-border);
             border-radius: 6px;
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
+            color: var(--color-text-primary);
           }
           .provider-option:hover:not(.provider-option-disabled):not(.provider-option-active) {
-            border-color: #5e81ac;
-            background: #eef4f9;
+            border-color: var(--color-accent);
+            background: var(--color-bg-tertiary);
           }
           .provider-option-disabled {
             opacity: 0.5;
             cursor: not-allowed;
           }
           .provider-option-active {
-            border-color: #5e81ac;
-            background: #eef4f9;
+            border-color: var(--color-accent);
+            background: var(--color-bg-tertiary);
           }
           .provider-option-icon {
             font-size: 1.5rem;
@@ -126,16 +130,16 @@ export async function mountProviderDialog(
           .provider-option-name {
             font-weight: 600;
             font-size: 0.95rem;
-            color: #2e3440;
+            color: var(--color-text-primary);
           }
           .provider-option-desc {
             font-size: 0.8rem;
-            color: #6b7280;
+            color: var(--color-text-tertiary);
             margin-top: 0.15rem;
           }
           .provider-option-reason {
             font-size: 0.8rem;
-            color: #bf616a;
+            color: var(--color-error);
             margin-top: 0.25rem;
           }
           .provider-option-current-badge {
@@ -143,7 +147,7 @@ export async function mountProviderDialog(
             font-size: 0.7rem;
             padding: 0.1rem 0.4rem;
             border-radius: 3px;
-            background: #5e81ac;
+            background: var(--color-accent);
             color: #fff;
             margin-top: 0.25rem;
           }

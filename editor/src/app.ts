@@ -1,24 +1,24 @@
 import "@milkdown/theme-nord/style.css"
 
-/* KaTeX math inline style */
-import "./styles/math.css"
+/* ── Foundation ────────────────────────────────────────────────── */
+import "./styles/foundation/base.css"
 
-/* Base styles and CSS variables */
-import "./styles/base.css"
+/* ── Layout ─────────────────────────────────────────────────────── */
+import "./styles/layout/layout.css"
+import "./styles/layout/responsive.css"
 
-/* Layout structure */
-import "./styles/layout.css"
+/* ── Editor ─────────────────────────────────────────────────────── */
+import "./styles/editor/editor.css"
+import "./styles/editor/math.css"
+import "./styles/editor/milkdown.css"
 
-/* Component styles */
-import "./styles/toolbar.css"
-import "./styles/editor.css"
-import "./styles/panels.css"
-import "./styles/search.css"
-import "./styles/milkdown.css"
-import "./styles/dialogs.css"
+/* ── Panels ─────────────────────────────────────────────────────── */
+import "./styles/panels/panels.css"
+import "./styles/panels/search.css"
 
-/* Responsive adjustments (applied last for higher specificity) */
-import "./styles/responsive.css"
+/* ── App UI ─────────────────────────────────────────────────────── */
+import "./styles/app/toolbar.css"
+import "./styles/app/dialogs.css"
 
 import { Application } from "@hotwired/stimulus"
 import ShellController from "@/controllers/shell_controller"
@@ -26,6 +26,7 @@ import { setSessionStarted } from "@/orchestrator"
 import { setProvider } from "@/providers/provider-registry"
 import { initToast } from "@/components/notification/toast"
 import { initNotifications } from "@/components/notification/notification"
+import { initBridge } from "@/bridge/index"
 import { createProvider } from "@/providers"
 
 async function init() {
@@ -41,9 +42,11 @@ async function init() {
     app.load()
     initToast()
     initNotifications()
+    initBridge()
   })
   initToast()
   initNotifications()
+  initBridge()
 }
 
 init()

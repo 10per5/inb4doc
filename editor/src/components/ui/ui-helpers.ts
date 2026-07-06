@@ -11,15 +11,17 @@ export const overlayStyles = `
 
 export const windowStyles = `
 .predoc-window {
-  background: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  background: var(--color-bg-primary); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   display: flex; flex-direction: column; max-height: 80vh;
   min-width: 420px; max-width: 560px;
 }
 .predoc-window-header {
   padding: 1rem 1.5rem 0; font-size: 1.1rem; font-weight: 600; flex-shrink: 0;
+  color: var(--color-text-primary);
 }
 .predoc-window-body {
   padding: 0.5rem 1.5rem; overflow-y: auto; flex: 1;
+  color: var(--color-text-primary);
 }
 .predoc-window-actions {
   display: flex; gap: 0.5rem; justify-content: flex-end;
@@ -30,16 +32,16 @@ export const windowStyles = `
 export const buttonStyles = `
 .predoc-btn {
   padding: 0.4rem 1.2rem; border-radius: 4px; cursor: pointer;
-  font-size: 0.9rem; border: 1px solid #d8dee9; background: #fff;
-  color: #4c566a; transition: background 0.15s, border-color 0.15s;
+  font-size: 0.9rem; border: 1px solid var(--color-border); background: var(--color-bg-primary);
+  color: var(--color-text-primary); transition: background 0.15s, border-color 0.15s;
 }
-.predoc-btn:hover { background: #e5e9f0; }
+.predoc-btn:hover { background: var(--color-bg-tertiary); }
 .predoc-btn.predoc-btn-primary {
-  background: #5e81ac; color: #fff; border-color: #5e81ac;
+  background: var(--color-accent); color: #fff; border-color: var(--color-accent);
 }
-.predoc-btn.predoc-btn-primary:hover { background: #4a7098; }
+.predoc-btn.predoc-btn-primary:hover { background: var(--color-accent-hover); }
 .predoc-btn.predoc-btn-danger {
-  background: #bf616a; color: #fff; border-color: #bf616a;
+  background: var(--color-error); color: #fff; border-color: var(--color-error);
 }
 .predoc-btn.predoc-btn-danger:hover { background: #a9444e; }
 `

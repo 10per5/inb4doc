@@ -324,6 +324,13 @@
   stroke: #a3be8c;
 }
 
+/* Override external `.table { display: table }` (e.g. Tailwind) that
+   breaks Prism's `<span class="token table ...">` into a block element. */
+.prism-code-editor .token.table,
+.prism-code-editor .token.table.class-name {
+  display: inline;
+}
+
 /* ── Link Editor ───────────────────────────────────────────────────── */
 
 .milkdown-link-edit {

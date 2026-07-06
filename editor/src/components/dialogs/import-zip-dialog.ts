@@ -30,11 +30,11 @@ export function mountImportZipDialog(
       .import-file-row {
         display: flex; align-items: center; gap: 8px;
         padding: 4px 0; font-size: 0.85rem;
-        border-bottom: 1px solid #e5e9f0;
+        border-bottom: 1px solid var(--color-border);
       }
       .import-file-row:last-child { border-bottom: none; }
       .import-file-row input { margin: 0; flex-shrink: 0; }
-      .import-file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .import-file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-primary); }
       .import-file-badge {
         font-size: 0.7rem; padding: 1px 6px; border-radius: 3px;
         font-weight: 600; flex-shrink: 0;
@@ -43,7 +43,7 @@ export function mountImportZipDialog(
       .import-file-badge.replace { background: #fff3cd; color: #856404; }
     </style>
     ${newEntries.length > 0 ? html`
-      <div style="font-size:0.75rem;font-weight:600;color:#888;padding:4px 0 2px;text-transform:uppercase;letter-spacing:0.5px">New files</div>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-tertiary);padding:4px 0 2px;text-transform:uppercase;letter-spacing:0.5px">New files</div>
       ${newEntries.map((e, i) => html`
         <label class="import-file-row">
           <input type="checkbox" checked data-idx="${i}" data-type="new">
@@ -53,7 +53,7 @@ export function mountImportZipDialog(
       `)}
     ` : ""}
     ${replaceEntries.length > 0 ? html`
-      <div style="font-size:0.75rem;font-weight:600;color:#888;padding:8px 0 2px;text-transform:uppercase;letter-spacing:0.5px">Will replace</div>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-tertiary);padding:8px 0 2px;text-transform:uppercase;letter-spacing:0.5px">Will replace</div>
       ${replaceEntries.map((e, i) => html`
         <label class="import-file-row">
           <input type="checkbox" data-idx="${i}" data-type="replace">
@@ -75,14 +75,14 @@ export function mountImportZipDialog(
   const tmpl = html`
     <style>
       #overlay-id { position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center; }
-      .predoc-window { background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh;min-width:420px;max-width:520px; }
-      .predoc-window-header { padding:1rem 1.5rem 0;font-size:1.1rem;font-weight:600;flex-shrink:0; }
-      .predoc-window-body { padding:0.5rem 1.5rem;overflow-y:auto;flex:1; }
+      .predoc-window { background:var(--color-bg-primary);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh;min-width:420px;max-width:520px; }
+      .predoc-window-header { padding:1rem 1.5rem 0;font-size:1.1rem;font-weight:600;flex-shrink:0;color:var(--color-text-primary); }
+      .predoc-window-body { padding:0.5rem 1.5rem;overflow-y:auto;flex:1;color:var(--color-text-primary); }
       .predoc-window-actions { display:flex;gap:0.5rem;justify-content:flex-end;padding:0.75rem 1.5rem 1rem;flex-shrink:0;align-items:center; }
-      .predoc-btn { padding:0.4rem 1.2rem;border-radius:4px;cursor:pointer;font-size:0.9rem;border:1px solid #d8dee9;background:#fff;color:#4c566a; }
-      .predoc-btn:hover { background:#e5e9f0; }
-      .predoc-btn.predoc-btn-primary { background:#5e81ac;color:#fff;border-color:#5e81ac; }
-      .predoc-btn.predoc-btn-primary:hover { background:#4a7098; }
+      .predoc-btn { padding:0.4rem 1.2rem;border-radius:4px;cursor:pointer;font-size:0.9rem;border:1px solid var(--color-border);background:var(--color-bg-primary);color:var(--color-text-primary); }
+      .predoc-btn:hover { background:var(--color-bg-tertiary); }
+      .predoc-btn.predoc-btn-primary { background:var(--color-accent);color:#fff;border-color:var(--color-accent); }
+      .predoc-btn.predoc-btn-primary:hover { background:var(--color-accent-hover); }
       .predoc-btn:disabled { opacity:0.5;cursor:default; }
     </style>
     <div class="predoc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>

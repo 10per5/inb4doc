@@ -1,6 +1,7 @@
 import { html, render } from "lit-html"
 import type { Editor } from "@milkdown/kit/core"
 import { editorViewCtx } from "@milkdown/kit/core"
+import { TextSelection } from "@milkdown/kit/prose/state"
 import { toggleMark } from "prosemirror-commands"
 
 export function mountLinkDialog(getEditor: () => Editor | null) {
@@ -36,14 +37,41 @@ export function mountLinkDialog(getEditor: () => Editor | null) {
     const input = document.getElementById(inputId) as HTMLInputElement
     const url = input?.value.trim()
     close()
-    if (!url) return
     const editor = getEditor()
     if (!editor) return
     editor.action((ctx) => {
       const view = ctx.get(editorViewCtx)
       view.focus()
       const { state, dispatch } = view
-      toggleMark(state.schema.marks.link, { href: url })(state, dispatch)
+      const linkMark = state.schema.marks.link
+      if (url) {
+        toggleMark(linkMark, { href: url })(state, (tr) => {
+          const afterLink = tr.selection.to
+          tr.insert(afterLink, state.schema.text(" "))
+          tr.setSelection(TextSelection.create(tr.doc, afterLink + 1))
+          dispatch(tr.setStoredMarks([]))
+        })
+      } else {
+        const $head = state.selection.$head
+        const existingMark = $head.marks().find((m) => m.type === linkMark)
+        if (existingMark) {
+          let from = $head.pos
+          let to = $head.pos
+          while (from > 0) {
+            const resolved = state.doc.resolve(from - 1)
+            if (!resolved.marks().some((m) => m.type === linkMark)) break
+            from--
+          }
+          while (to < state.doc.content.size) {
+            const resolved = state.doc.resolve(to + 1)
+            if (!resolved.marks().some((m) => m.type === linkMark)) break
+            to++
+          }
+          dispatch(state.tr.removeMark(from, to, linkMark).setStoredMarks([]))
+        } else {
+          dispatch(state.tr.setStoredMarks([]))
+        }
+      }
     })
   }
 
@@ -55,31 +83,33 @@ export function mountLinkDialog(getEditor: () => Editor | null) {
         background: rgba(0,0,0,0.3);
       }
       .predoc-link-box {
-        background: #fff; border-radius: 8px; padding: 1rem 1.25rem;
+        background: var(--color-bg-primary); border-radius: 8px; padding: 1rem 1.25rem;
         min-width: 320px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid #d8dee9;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2); border: 1px solid var(--color-border);
       }
       .predoc-link-box label {
         display: block;
         font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
-        color: #8fbcbb; font-weight: 700; margin-bottom: 0.4rem;
+        color: var(--color-accent); font-weight: 700; margin-bottom: 0.4rem;
       }
       .predoc-link-box input {
         width: 100%; padding: 0.4rem 0.6rem;
-        border: 1px solid #d8dee9; border-radius: 4px;
+        border: 1px solid var(--color-border); border-radius: 4px;
         font-size: 0.9rem; margin-bottom: 0.75rem; box-sizing: border-box;
+        background: var(--color-bg-primary); color: var(--color-text-primary);
       }
-      .predoc-link-box input:focus { outline: none; border-color: #5e81ac; }
+      .predoc-link-box input:focus { outline: none; border-color: var(--color-accent); }
       .predoc-link-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
       .predoc-link-actions button {
-        padding: 0.35rem 1rem; border: 1px solid #d8dee9; border-radius: 4px;
-        background: #fff; cursor: pointer; font-size: 0.85rem;
+        padding: 0.35rem 1rem; border: 1px solid var(--color-border); border-radius: 4px;
+        background: var(--color-bg-primary); cursor: pointer; font-size: 0.85rem;
+        color: var(--color-text-primary);
       }
-      .predoc-link-actions button:hover { background: #e5e9f0; }
+      .predoc-link-actions button:hover { background: var(--color-bg-tertiary); }
       .predoc-link-actions .predoc-link-save {
-        background: #5e81ac; color: #fff; border-color: #5e81ac;
+        background: var(--color-accent); color: #fff; border-color: var(--color-accent);
       }
-      .predoc-link-actions .predoc-link-save:hover { background: #4a7098; }
+      .predoc-link-actions .predoc-link-save:hover { background: var(--color-accent-hover); }
     </style>
     <div class="predoc-link-box" @click=${(e: MouseEvent) => e.stopPropagation()}>
       <label for="${inputId}">URL</label>

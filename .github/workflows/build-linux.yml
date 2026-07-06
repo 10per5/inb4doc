@@ -99,10 +99,8 @@ jobs:
           cd /tmp/saucer-src
           git fetch --depth 1 origin $SAUCER_COMMIT
           git checkout $SAUCER_COMMIT
-          sed -i 's|value_or({native::id\.data()})|value_or(decltype(native::argv){native::id.data()})|' src/qt.app.cpp
-          grep -q 'decltype(native::argv){native::id.data()}' src/qt.app.cpp
-          sed -i 's|return from({std::from_range, data()});|return from(vec(data().begin(), data().end()));|' src/stash.cpp
-          grep -q 'return from(vec(data().begin(), data().end()));' src/stash.cpp
+          patch -p1 < "$GITHUB_WORKSPACE/gui/patches/000-saucer-build.diff"
+          patch -p1 < "$GITHUB_WORKSPACE/gui/patches/001-saucer-qtwebengine.diff"
           absSaucerDir="$GITHUB_WORKSPACE/gui/$SAUCER_DIR"
           cmake -B /tmp/saucer-build -G Ninja -S . \
             -DCMAKE_BUILD_TYPE=Release \

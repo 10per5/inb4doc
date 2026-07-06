@@ -4,6 +4,6 @@
  * Delegates to split files under panels/ for each concern
  */
 
-@import "./panels/sidebar.css";
-@import "./panels/meta.css";
-@import "./panels/disk-usage.css";
+@import "./sidebar.css";
+@import "./meta.css";
+@import "./disk-usage.css";

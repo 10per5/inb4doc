@@ -1,0 +1,76 @@
+.video-wrapper {
+  position: relative;
+  margin: 0.5em 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #000;
+  line-height: 0;
+}
+
+.video-wrapper.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.video-wrapper video {
+  display: block;
+  width: 100%;
+  max-height: 400px;
+  outline: none;
+}
+
+.video-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 120px;
+  background: var(--color-bg-secondary, #1a1a2e);
+  color: var(--color-text-secondary, #888);
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.video-placeholder:hover {
+  background: var(--color-bg-tertiary, #252540);
+  color: var(--color-text-primary, #ccc);
+}
+
+.video-placeholder-icon {
+  font-size: 28px;
+  opacity: 0.6;
+}
+
+.video-edit-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  padding: 0;
+}
+
+.video-wrapper:hover .video-edit-btn {
+  opacity: 1;
+}
+
+.video-edit-btn:hover {
+  background: rgba(0,0,0,0.75);
+}

@@ -60,7 +60,7 @@
 }
 
 .slash-label {
-  color: #3b4252;
+  color: var(--color-text-primary);
 }
 
 /* Image picker inside slash menu */

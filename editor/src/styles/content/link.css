@@ -91,7 +91,7 @@
   background: transparent;
   width: 200px;
   font-size: 14px;
-  color: #3b4252;
+  color: var(--color-text-primary);
   border: none;
 }
 

@@ -16,7 +16,7 @@ import {
 import { commonmark as _commonmark, wrapInHeadingInputRule } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
 import { nord } from "@milkdown/theme-nord";
-import { EditorState, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state";
+import { EditorState, NodeSelection, TextSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state";
 import { parserCtx, remarkStringifyOptionsCtx } from "@milkdown/core";
 import { clipboard } from "@milkdown/plugin-clipboard";
 import { history } from "@milkdown/kit/plugin/history";
@@ -67,6 +67,13 @@ import {
   toggleLatexCommand,
 } from "@/plugins/math";
 import { codeBlockUI } from "@/plugins/code-block-ui";
+import { videoRemarkPlugin, videoSchema, videoView } from "@/plugins/video";
+import { divCenterRemarkPlugin, divCenterSchema } from "@/plugins/div-center";
+import { createDirtyPlugin } from "@/plugins/dirty";
+import { createMentionPlugin } from "@/plugins/mention";
+import { createImagePastePlugin } from "@/plugins/image-paste";
+import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
+import { createImageEditPlugin } from "@/plugins/image-edit";
 import { cache } from "@/stores/cache";
 import { toggleSourceMode, applySourceContent } from "@/features/editor-source";
 import { getProvider } from "@/providers/provider-registry";
@@ -398,127 +405,16 @@ export class EditorService {
         }));
 
         ctx.update(prosePluginsCtx, (plugins) => {
-          const dirtyPlugin = new Plugin({
-            key: new PluginKey("predoc-dirty"),
-            view: () => ({
-              update: (view, prevState) => {
-                if (!prevState) return;
-                const prevLastSet =
-                  self.lastSetContent.get(self.currentPath) ?? "";
-                if (prevLastSet === "") {
-                  const serializer = ctx.get(serializerCtx);
-                  self.lastSetContent.set(
-                    self.currentPath,
-                    serializer(view.state.doc)
-                      .replace(/\r\n/g, "\n")
-                      .replace(/\n+$/, "\n"),
-                  );
-                  return;
-                }
-                if (view.state.doc.eq(prevState.doc)) return;
-                const serializer = ctx.get(serializerCtx);
-                const md = serializer(view.state.doc)
-                  .replace(/\r\n/g, "\n")
-                  .replace(/\n+$/, "\n");
-                if (md === prevLastSet) return;
-                self.lastSetContent.set(self.currentPath, md);
-                cache.setBody(self.currentPath, md);
-                cache.sync();
-                self.config.onDirtyChange?.(true);
-              },
-            }),
-          });
-
-          const mentionPlugin = new Plugin({
-            key: new PluginKey("predoc-mention"),
-            view: (v) => {
-              const mv = new MentionView(v, ctx);
-              self.mentionView = mv;
-              return mv;
-            },
-          });
-
-          const imagePastePlugin = new Plugin({
-            key: new PluginKey("predoc-image-paste"),
-            props: {
-              handlePaste: (view, event) => {
-                const items = event.clipboardData?.items;
-                if (!items) return false;
-                for (let i = 0; i < items.length; i++) {
-                  const item = items[i];
-                  if (item.type.startsWith("image/")) {
-                    event.preventDefault();
-                    const file = item.getAsFile();
-                    if (!file) return true;
-                    uploadImage(file).then((url) => {
-                      const node = view.state.schema.nodes[
-                        "image-block"
-                      ]?.create({ src: url, caption: "", ratio: 1 });
-                      if (!node) return;
-                      view.dispatch(view.state.tr.replaceSelectionWith(node));
-                      view.focus();
-                    });
-                    return true;
-                  }
-                }
-                return false;
-              },
-              handleDrop: (view, event) => {
-                const files = event.dataTransfer?.files;
-                if (!files || files.length === 0) return false;
-                for (let i = 0; i < files.length; i++) {
-                  const file = files[i];
-                  if (file.type.startsWith("image/")) {
-                    event.preventDefault();
-                    const pos = view.posAtCoords({
-                      left: event.clientX,
-                      top: event.clientY,
-                    });
-                    if (!pos) return true;
-                    uploadImage(file).then((url) => {
-                      const node = view.state.schema.nodes[
-                        "image-block"
-                      ]?.create({ src: url, caption: "", ratio: 1 });
-                      if (!node) return;
-                      view.dispatch(view.state.tr.insert(pos.pos, node));
-                      view.focus();
-                    });
-                    return true;
-                  }
-                }
-                return false;
-              },
-            },
-          });
-
-          const imageEditPlugin = new Plugin({
-            key: new PluginKey("predoc-image-edit"),
-            props: {
-              handleDOMEvents: {
-                dblclick: (view, event) => {
-                  const target = event.target as HTMLElement;
-                  const img = target.closest("img[data-type='image-block']");
-                  if (!img) return false;
-                  const pos = view.posAtDOM(img, 0);
-                  if (pos == null) return false;
-                  const node = view.state.doc.nodeAt(pos);
-                  if (!node) return false;
-                  const src = node.attrs.src || "";
-                  view.dom.dispatchEvent(new CustomEvent("predoc:edit-image", {
-                    bubbles: true,
-                    detail: { pos, src },
-                  }));
-                  return true;
-                },
-              },
-            },
-          });
-
           return plugins.concat(
-            dirtyPlugin,
-            mentionPlugin,
-            imagePastePlugin,
-            imageEditPlugin,
+            createDirtyPlugin(ctx, {
+              lastSetContent: self.lastSetContent,
+              getCurrentPath: () => self.currentPath,
+              onDirtyChange: self.config.onDirtyChange,
+            }),
+            createMentionPlugin(ctx, (mv) => { self.mentionView = mv }),
+            createImagePastePlugin({ uploadImage }),
+            createLinkBoundaryPlugin(),
+            createImageEditPlugin(),
             createKeymap(),
           );
         });
@@ -540,6 +436,11 @@ export class EditorService {
       .use(tableBlock)
       .use(imageBlockComponent)
       .use(codeBlockUI)
+      .use(videoRemarkPlugin)
+      .use(videoSchema)
+      .use(videoView)
+      .use(divCenterRemarkPlugin)
+      .use(divCenterSchema)
       .use(cursor)
       .use(remarkMathPlugin)
       .use(remarkMathBlockPlugin)
@@ -693,24 +594,12 @@ export class EditorService {
    * Scroll to a match in the editor by walking .ProseMirror text nodes
    */
   scrollToText(query: string, matchIndex?: number, snippetText?: string): void {
-    if (!this.editor) {
-      console.log("[scrollToText] no editor");
-      return;
-    }
+    if (!this.editor) return;
     const q = query.toLowerCase().trim();
-    if (!q) {
-      console.log("[scrollToText] empty query");
-      return;
-    }
-
-    console.log("[scrollToText] inputs:", { query: JSON.stringify(q), matchIndex, snippetText: JSON.stringify(snippetText) });
+    if (!q) return;
 
     const result = findTextInProseMirror(q, matchIndex, snippetText);
-    console.log("[scrollToText] findTextInProseMirror result:", result ? { nodeType: result.node.nodeType, nodeText: JSON.stringify((result.node.textContent || '').slice(0, 60)), offset: result.offset, parentTag: result.node.parentElement?.tagName } : null);
-    if (!result) {
-      console.log("[scrollToText] no result — bailing");
-      return;
-    }
+    if (!result) return;
 
     const proseMirror = document.querySelector('.ProseMirror');
     if (!proseMirror) return;
@@ -727,6 +616,17 @@ export class EditorService {
       } catch {
         rect = null;
       }
+
+      // Set ProseMirror selection at match
+      this.editor?.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const pos = view.posAtDOM(result.node, result.offset);
+        if (pos == null) return;
+        const tr = view.state.tr.setSelection(
+          TextSelection.create(view.state.doc, pos, pos + q.length)
+        );
+        view.dispatch(tr);
+      });
       if (!rect || rect.width === 0) {
         const parent = result.node.parentElement;
         if (parent) rect = parent.getBoundingClientRect();

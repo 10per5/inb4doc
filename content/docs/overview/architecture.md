@@ -13,7 +13,7 @@ predoc is composed of four independent layers that share a single `content/` dir
 
 **GUI** — A native C++23 desktop window (Saucer + Qt6 WebEngine / WebKitGTK / WKWebView / WebView2) that hosts the editor. Serves editor files and handles content API calls entirely in-process via a custom `app://` URL scheme handler — no TCP server, no database, no port.
 
-**CLI** — A native C++23 binary (`cli/bin/predoc`) that orchestrates the layers. Default command spawns the GUI. Subcommands: `fetch-deps` (download Hugo + theme), `package` (build + assemble artifacts).
+**CLI** — A native C++23 binary (`cli/bin/predoc`) that orchestrates the layers. Default command spawns the GUI.
 
 **SSG** — Runs [Hugo](https://gohugo.io) with the [Book theme](https://github.com/alex-shpak/hugo-book) to produce a static site into `build/`. Hugo and the theme are downloaded automatically by `predoc fetch-deps`.
 
