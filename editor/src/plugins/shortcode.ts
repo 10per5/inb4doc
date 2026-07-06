@@ -23,7 +23,7 @@ function addDeco(decos: Decoration[], from: number, to: number, cls: string) {
 }
 
 export const shortcodeDecoration = $prose(() => {
-  const key = new PluginKey("predoc-shortcode-deco");
+  const key = new PluginKey("inb4doc-shortcode-deco");
 
   return new Plugin({
     key,

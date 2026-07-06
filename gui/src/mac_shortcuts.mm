@@ -21,7 +21,7 @@ void setup_mac_shortcuts(saucer::application *app, saucer::webview *wv)
             if ([chars isEqualToString:@"f"])
             {
                 auto *wk = static_cast<WKWebView *>(wv->native<true>().webview);
-                [wk evaluateJavaScript:@"window.predocUI?.openFind?.()"
+                [wk evaluateJavaScript:@"window.inb4docUI?.openFind?.()"
                      completionHandler:nil];
                 return nil;
             }
@@ -30,10 +30,10 @@ void setup_mac_shortcuts(saucer::application *app, saucer::webview *wv)
         {
             auto *wk = static_cast<WKWebView *>(wv->native<true>().webview);
             if ([event modifierFlags] & NSEventModifierFlagShift)
-                [wk evaluateJavaScript:@"window.predocUI?.findPrev?.()"
+                [wk evaluateJavaScript:@"window.inb4docUI?.findPrev?.()"
                      completionHandler:nil];
             else
-                [wk evaluateJavaScript:@"window.predocUI?.findNext?.()"
+                [wk evaluateJavaScript:@"window.inb4docUI?.findNext?.()"
                      completionHandler:nil];
             return nil;
         }

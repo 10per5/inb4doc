@@ -1,5 +1,5 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: predoc <dev@predoc.app>
+From: inb4doc <dev@inb4doc.app>
 Date: Sun, 5 Jul 2026 00:00:00 +0000
 Subject: [PATCH] fix(build): C++23 compat fixes for g++-15
 

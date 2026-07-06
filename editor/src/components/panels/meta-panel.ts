@@ -33,7 +33,7 @@ export function mountMetaPanel(
         <div class="meta-extra"></div>
       </div>
       <div class="meta-panel-footer">
-        <a href="https://github.com/10per5/predoc" target="_blank" rel="noopener noreferrer" class="github-link">
+        <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
           ${githubIconStr}
           <span>View on GitHub</span>
         </a>

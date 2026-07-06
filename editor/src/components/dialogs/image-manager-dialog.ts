@@ -16,7 +16,7 @@ export async function mountImageManagerDialog(): Promise<void> {
 
   const allEntries = getAllImages()
 
-  const overlayId = "predoc-image-mgr-" + Math.random().toString(36).slice(2)
+  const overlayId = "inb4doc-image-mgr-" + Math.random().toString(36).slice(2)
   const overlay = document.createElement("div")
   overlay.id = overlayId
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center"
@@ -94,17 +94,17 @@ export async function mountImageManagerDialog(): Promise<void> {
 
   const tmpl = html`
     <style>
-      .predoc-window { background:var(--color-bg-primary);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh;min-width:520px;max-width:600px; }
-      .predoc-window-header { padding:1rem 1.5rem 0;font-size:1.1rem;font-weight:600;flex-shrink:0;color:var(--color-text-primary); }
-      .predoc-window-body { padding:0.5rem 1.5rem;overflow-y:auto;flex:1;color:var(--color-text-primary); }
-      .predoc-window-actions { display:flex;gap:0.5rem;justify-content:flex-end;padding:0.75rem 1.5rem 1rem;flex-shrink:0; }
-      .predoc-btn { padding:0.4rem 1.2rem;border-radius:4px;cursor:pointer;font-size:0.9rem;border:1px solid var(--color-border);background:var(--color-bg-primary);color:var(--color-text-primary); }
-      .predoc-btn:hover { background:var(--color-bg-tertiary); }
+      .inb4doc-window { background:var(--color-bg-primary);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh;min-width:520px;max-width:600px; }
+      .inb4doc-window-header { padding:1rem 1.5rem 0;font-size:1.1rem;font-weight:600;flex-shrink:0;color:var(--color-text-primary); }
+      .inb4doc-window-body { padding:0.5rem 1.5rem;overflow-y:auto;flex:1;color:var(--color-text-primary); }
+      .inb4doc-window-actions { display:flex;gap:0.5rem;justify-content:flex-end;padding:0.75rem 1.5rem 1rem;flex-shrink:0; }
+      .inb4doc-btn { padding:0.4rem 1.2rem;border-radius:4px;cursor:pointer;font-size:0.9rem;border:1px solid var(--color-border);background:var(--color-bg-primary);color:var(--color-text-primary); }
+      .inb4doc-btn:hover { background:var(--color-bg-tertiary); }
     </style>
-    <div class="predoc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
-      <div class="predoc-window-header">${title}</div>
-      <div class="predoc-window-body">${bodyTmpl}</div>
-      <div class="predoc-window-actions"><button class="predoc-btn">Close</button></div>
+    <div class="inb4doc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
+      <div class="inb4doc-window-header">${title}</div>
+      <div class="inb4doc-window-body">${bodyTmpl}</div>
+      <div class="inb4doc-window-actions"><button class="inb4doc-btn">Close</button></div>
     </div>
   `
 
@@ -114,7 +114,7 @@ export async function mountImageManagerDialog(): Promise<void> {
     if (e.target === overlay) close()
   })
 
-  overlay.querySelector(".predoc-window-actions .predoc-btn")?.addEventListener("click", close)
+  overlay.querySelector(".inb4doc-window-actions .inb4doc-btn")?.addEventListener("click", close)
 
   if (!loadError && allEntries.length > 0) {
     overlay.querySelectorAll('[data-action="review"]').forEach(btn => {

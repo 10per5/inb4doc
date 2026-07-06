@@ -5,9 +5,9 @@ inputs:
   live-url-base:
     description: Base URL for the live site link in the editor sidebar
     required: false
-    default: "/predoc"
+    default: "/inb4doc"
   editor-self-base:
-    description: Base URL path where the editor is deployed (e.g. /predoc/editor-live/)
+    description: Base URL path where the editor is deployed (e.g. /inb4doc/editor-live/)
     required: false
     default: ""
 

@@ -13,7 +13,7 @@ export async function mountProviderDialog(
 
   return new Promise((resolve) => {
     const overlay = document.createElement("div")
-    overlay.id = "predoc-dialog-overlay"
+    overlay.id = "inb4doc-dialog-overlay"
     overlay.style.cssText = `
       position: fixed; inset: 0; background: rgba(0,0,0,0.4);
       z-index: 1000; display: flex; align-items: center; justify-content: center;
@@ -152,10 +152,10 @@ export async function mountProviderDialog(
             margin-top: 0.25rem;
           }
         </style>
-        <div class="predoc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
-          <div class="predoc-window-header">Change Project</div>
-          <div class="predoc-window-body">${body}</div>
-          <div class="predoc-window-actions">${actions}</div>
+        <div class="inb4doc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
+          <div class="inb4doc-window-header">Change Project</div>
+          <div class="inb4doc-window-body">${body}</div>
+          <div class="inb4doc-window-actions">${actions}</div>
         </div>
       `,
       overlay,
@@ -163,7 +163,7 @@ export async function mountProviderDialog(
 
     document.body.appendChild(overlay)
 
-    const cancelBtn = overlay.querySelector(".predoc-btn") as HTMLButtonElement
+    const cancelBtn = overlay.querySelector(".inb4doc-btn") as HTMLButtonElement
     cancelBtn?.addEventListener("click", () => {
       overlay.remove()
       resolve(null)

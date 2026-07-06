@@ -5,7 +5,7 @@ weight: 15
 
 # GUI Architecture
 
-The GUI is a native desktop window that hosts the predoc editor. It is a thin shell — it provides the OS window, loads the editor UI, and bridges JavaScript calls to the local filesystem.
+The GUI is a native desktop window that hosts the inb4doc editor. It is a thin shell — it provides the OS window, loads the editor UI, and bridges JavaScript calls to the local filesystem.
 
 ## Operating Modes
 
@@ -32,8 +32,8 @@ This approach avoids TCP ports, threads, and network permissions — the entire 
 ## Interface: CLI Flags
 
 ```
-predoc-gui --editor-root <path> --content-root <path> [options]
-predoc-gui --host <addr> [--port <n>] [options]
+inb4doc-gui --editor-root <path> --content-root <path> [options]
+inb4doc-gui --host <addr> [--port <n>] [options]
 ```
 
 | Flag | Required | Mode | Description |
@@ -73,7 +73,7 @@ The editor communicates with the host window through named JavaScript callbacks:
 
 | Property | Default |
 |---|---|
-| Title | `"predoc"` |
+| Title | `"inb4doc"` |
 | Initial size | 1200 × 800 |
 | GPU acceleration | On (can be disabled via `--disable-gpu`) |
 | Icon | None (optional `--favicon`) |
@@ -82,7 +82,7 @@ The editor communicates with the host window through named JavaScript callbacks:
 
 | Component | License | Linkage |
 |---|---|---|
-| predoc-gui | MIT | — |
+| inb4doc-gui | MIT | — |
 | Saucer | MIT | Static |
 | Qt6 (Widgets, WebEngine, WebChannel) | LGPL 3.0 | Dynamic (`.so` at runtime) |
 

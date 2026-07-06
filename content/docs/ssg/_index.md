@@ -6,7 +6,7 @@ bookFlatSection: true
 
 # SSG
 
-The static site generation layer and content server behind predoc.
+The static site generation layer and content server behind inb4doc.
 
 ## Topics
 

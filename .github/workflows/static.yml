@@ -2,7 +2,7 @@ name: Deploy static content to Pages
 
 on:
   push:
-    branches: [main]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -27,13 +27,13 @@ jobs:
 
       - uses: ./.github/actions/build-editor
         with:
-          live-url-base: /predoc
-          editor-self-base: /predoc/editor-live/
+          live-url-base: /inb4doc
+          editor-self-base: /inb4doc/editor-live/
 
       - uses: ./.github/actions/build-hugo
         with:
-          baseurl: /predoc/
-          editor-url: /predoc/editor-live
+          baseurl: /inb4doc/
+          editor-url: /inb4doc/editor-live
 
       - name: Copy editor into site output
         shell: bash

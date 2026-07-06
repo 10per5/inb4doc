@@ -1,11 +1,11 @@
-# predoc-gui linux builder
+# inb4doc-gui linux builder
 #
-# Produces: /build/bin/predoc-gui  (Linux x86_64, Qt6 WebEngine backend)
+# Produces: /build/bin/inb4doc-gui  (Linux x86_64, Qt6 WebEngine backend)
 #
 # Usage:
-#   docker build -t predoc-gui:linux -f images/linux.Dockerfile .
-#   docker create --name tmp predoc-gui:linux
-#   docker cp tmp:/build/bin/predoc-gui ./bin/
+#   docker build -t inb4doc-gui:linux -f images/linux.Dockerfile .
+#   docker create --name tmp inb4doc-gui:linux
+#   docker cp tmp:/build/bin/inb4doc-gui ./bin/
 #   docker rm tmp
 
 FROM debian:trixie-slim AS builder
@@ -96,7 +96,7 @@ COPY predep.toml ./
 USER builduser
 RUN predep vendor
 
-# ── Layer 10: predoc-gui binary (busts on premake5.lua or src/ changes) ──
+# ── Layer 10: inb4doc-gui binary (busts on premake5.lua or src/ changes) ──
 COPY premake5.lua ./
 COPY src/ src/
 ENV CXXFLAGS="-std=c++23 -mno-direct-extern-access" \

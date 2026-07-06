@@ -1,4 +1,4 @@
-# predoc-gui
+# inb4doc-gui
 
 Native desktop window built with [Saucer](https://github.com/saucer/saucer)
 (C++23) using the WebKitGTK backend (Docker builds) or Qt QWebEngine
@@ -14,9 +14,9 @@ Docker builds use the WebKitGTK backend on Ubuntu 24.04. The binary
 dynamically links WebKitGTK from the host at runtime.
 
 ```bash
-docker build -t predoc-gui gui/
-docker create --name tmp predoc-gui
-docker cp tmp:/build/bin/predoc-gui ./gui/bin/
+docker build -t inb4doc-gui gui/
+docker create --name tmp inb4doc-gui
+docker cp tmp:/build/bin/inb4doc-gui ./gui/bin/
 docker rm tmp
 ```
 
@@ -59,10 +59,10 @@ premake5 gmake && make -C build config=release
 ## Run
 
 ```bash
-./bin/predoc-gui --port 3000
+./bin/inb4doc-gui --port 3000
 ```
 
 ## License
 
-MIT (same as predoc). Saucer is MIT. WebKitGTK (LGPL) and Qt6 (LGPL) are
+MIT (same as inb4doc). Saucer is MIT. WebKitGTK (LGPL) and Qt6 (LGPL) are
 dynamically linked — no redistribution restrictions.

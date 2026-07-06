@@ -40,7 +40,7 @@ import {
   listImages,
 } from "@/services/image-config";
 
-const slash = slashFactory("predoc");
+const slash = slashFactory("inb4doc");
 
 type SlashItem = { cmd: string; label: string; icon: string; level?: number };
 const SLASH_ITEMS: SlashItem[] = [
@@ -228,12 +228,12 @@ class SlashView {
         this.provider.hide();
       }
     };
-    view.dom.addEventListener("predoc:edit-image", ((e: CustomEvent) => {
+    view.dom.addEventListener("inb4doc:edit-image", ((e: CustomEvent) => {
       const { pos, src } = e.detail;
       this.openImageEditor(pos, src);
     }) as EventListener);
 
-    view.dom.addEventListener("predoc:edit-video", ((e: CustomEvent) => {
+    view.dom.addEventListener("inb4doc:edit-video", ((e: CustomEvent) => {
       const { pos, attrs } = e.detail;
       this.openVideoEditor(pos, attrs);
     }) as EventListener);
@@ -403,7 +403,7 @@ class SlashView {
       if (videoNode) {
         const tr = state.tr.replaceWith(blockStart, blockEnd, videoNode);
         view.dispatch(tr.scrollIntoView());
-        view.dom.dispatchEvent(new CustomEvent("predoc:edit-video", {
+        view.dom.dispatchEvent(new CustomEvent("inb4doc:edit-video", {
           bubbles: true,
           detail: { pos: blockStart, attrs: { ...defaultVideoAttrs } },
         }));

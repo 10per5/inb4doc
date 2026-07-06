@@ -6,7 +6,7 @@ export interface ImagePasteConfig {
 
 export function createImagePastePlugin(config: ImagePasteConfig) {
   return new Plugin({
-    key: new PluginKey("predoc-image-paste"),
+    key: new PluginKey("inb4doc-image-paste"),
     props: {
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items

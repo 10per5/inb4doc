@@ -123,14 +123,23 @@ jobs:
             | tar xz -C /usr/local/bin
           predep --help > /dev/null
 
-      - name: Build predoc-gui
+      - name: Load PREDEP SHAs
+        id: predep-shas
+        run: |
+          get_sha() { awk -v k="$1" '$1==k":"{print $2}' .github/predep-shas.yml; }
+          echo "gui=$(get_sha gui)" >> $GITHUB_OUTPUT
+          echo "editor=$(get_sha editor)" >> $GITHUB_OUTPUT
+          echo "package=$(get_sha package)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build inb4doc-gui
         env:
           CC: gcc-15
           CXX: g++-15
           CXXFLAGS: "-std=c++23 -mno-direct-extern-access"
         run: |
-          predep --privileged 4dcd8fa19807b4e88036493f79f5520ccb2e2356388454164b77062cef2f4751 build 
-          make config=redist -j "$(nproc)"
+          predep --privileged ${{ steps.predep-shas.outputs.gui }} build
+          make config=release -j "$(nproc)"
         working-directory: gui
 
       - name: Install bun
@@ -140,19 +149,19 @@ jobs:
 
       - name: Build editor
         run: |
-          predep --privileged 2fccfa440e3a112b6e31c6ae4a9360e50304d4cd2cac6cab9d732998a0ad727a build
+          predep --privileged ${{ steps.predep-shas.outputs.editor }} build
         working-directory: editor
 
       - name: Package via predep
         run: |
-          predep --privileged 942aeb72b04c747d837d96bd218a9fde88482254c32cb39be613d05bf28d3dc2 package
+          predep --privileged ${{ steps.predep-shas.outputs.package }} package
         working-directory: ${{ github.workspace }}
 
       - name: Read version
         id: version
         run: |
           msg="${{ github.event.head_commit.message }}"
-          ver=$(echo "$msg" | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+(?=p[0-9]+|$)' | head -n 1)
+          ver=$(echo "$msg" | grep -oP '(?<=^build\()v[0-9]+\.[0-9]+\.[0-9]+(?=(?:p[0-9]+)?\))' | head -n 1)
           if [ -z "$ver" ]; then
             ver="dev"
           fi
@@ -161,8 +170,8 @@ jobs:
       # - name: Upload artifact
       #   uses: actions/upload-artifact@v4
       #   with:
-      #     name: predoc-linux-x64-${{ steps.version.outputs.version }}
-      #     path: predoc-*.tar.gz
+      #     name: inb4doc-linux-x64-${{ steps.version.outputs.version }}
+      #     path: inb4doc-*.tar.gz
       #     if-no-files-found: error
 
       - name: Create GitHub Release
@@ -171,11 +180,11 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
-          files: predoc-*.tar.gz
+          files: inb4doc-*.tar.gz
           generate_release_notes: false
           body: |
             ## Release ${{ steps.version.outputs.version }}
             This release was automatically triggered by commit: ${{ github.sha }}
 
             ### Changes:
-            - [View commit history for this release](https://github.com/10per5/predoc/commits/${{ github.ref_name }})
+            - [View commit history for this release](https://github.com/10per5/inb4doc/commits/${{ github.ref_name }})

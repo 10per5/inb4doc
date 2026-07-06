@@ -1,4 +1,4 @@
-# TODO — predoc editor improvements
+# TODO — inb4doc editor improvements
 
 ## 2d. LaTeX math — COMPLETED
 - Added `katex`, `remark-math`, `unist-util-visit` deps

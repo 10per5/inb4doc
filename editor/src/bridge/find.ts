@@ -19,7 +19,7 @@ export function setEditorService(es: EditorService): void {
   editorService = es
 }
 
-// ── public API exposed on predocUI ──
+// ── public API exposed on inb4docUI ──
 
 export function openFind(): void {
   if (bar) { close(); return }

@@ -6,7 +6,7 @@ parsed_args parse_args(int argc, char **argv)
 {
     parsed_args args;
 
-    CLI::App app("predoc - desktop GUI for the editor");
+    CLI::App app("inb4doc - desktop GUI for the editor");
 
     app.add_option("--host", args.host,
                    "Remote editor host (default 127.0.0.1; use with --port)");

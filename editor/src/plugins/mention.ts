@@ -4,7 +4,7 @@ import { MentionView } from "@/features/mention"
 
 export function createMentionPlugin(ctx: Ctx, setMentionView: (mv: MentionView | null) => void) {
   return new Plugin({
-    key: new PluginKey("predoc-mention"),
+    key: new PluginKey("inb4doc-mention"),
     view: (v) => {
       const mv = new MentionView(v, ctx)
       setMentionView(mv)

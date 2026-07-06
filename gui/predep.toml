@@ -17,15 +17,15 @@ name = "build"
 description = "Build GUI binary"
 type = "premake5"
 depends = ["vendor"]
-outputs = ["root://bin/predoc-gui"]
+outputs = ["root://bin/inb4doc-gui"]
 
 [[stages]]
 name = "docker"
 description = "Build GUI binary via Docker (Linux)"
 type = "docker"
-outputs = ["root://bin/predoc-gui"]
+outputs = ["root://bin/inb4doc-gui"]
 recipe = "images/linux.Dockerfile"
-target = "/build/bin/predoc-gui"
+target = "/build/bin/inb4doc-gui"
 dest = "root://bin/"
 
 [stages.build_args]
@@ -33,5 +33,5 @@ SAUCER_BUILD_TYPE = "Release"
 
 [platform.darwin.stage.docker]
 recipe = "images/darwin.Dockerfile"
-target = "/build/bin/predoc-gui"
+target = "/build/bin/inb4doc-gui"
 dest = "root://bin/"

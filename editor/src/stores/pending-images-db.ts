@@ -1,4 +1,4 @@
-const DB_NAME = "predoc-pending-images"
+const DB_NAME = "inb4doc-pending-images"
 const STORE_NAME = "images"
 const DB_VERSION = 1
 

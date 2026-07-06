@@ -11,7 +11,7 @@ export function mountImportZipDialog(
   onImport: (result: ImportDialogResult) => void,
   onCancel: () => void,
 ) {
-  const overlayId = "predoc-import-zip-overlay-" + Math.random().toString(36).slice(2)
+  const overlayId = "inb4doc-import-zip-overlay-" + Math.random().toString(36).slice(2)
   const overlay = document.createElement("div")
   overlay.id = overlayId
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center"
@@ -68,27 +68,27 @@ export function mountImportZipDialog(
     <label style="display:flex;align-items:center;gap:6px;margin-right:auto;font-size:0.85rem;cursor:pointer">
       <input type="checkbox" id="replace-all-check"> Replace all
     </label>
-    <button class="predoc-btn predoc-btn-primary" id="import-btn">Import</button>
-    <button class="predoc-btn" id="cancel-btn">Cancel</button>
+    <button class="inb4doc-btn inb4doc-btn-primary" id="import-btn">Import</button>
+    <button class="inb4doc-btn" id="cancel-btn">Cancel</button>
   `
 
   const tmpl = html`
     <style>
       #overlay-id { position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center; }
-      .predoc-window { background:var(--color-bg-primary);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh;min-width:420px;max-width:520px; }
-      .predoc-window-header { padding:1rem 1.5rem 0;font-size:1.1rem;font-weight:600;flex-shrink:0;color:var(--color-text-primary); }
-      .predoc-window-body { padding:0.5rem 1.5rem;overflow-y:auto;flex:1;color:var(--color-text-primary); }
-      .predoc-window-actions { display:flex;gap:0.5rem;justify-content:flex-end;padding:0.75rem 1.5rem 1rem;flex-shrink:0;align-items:center; }
-      .predoc-btn { padding:0.4rem 1.2rem;border-radius:4px;cursor:pointer;font-size:0.9rem;border:1px solid var(--color-border);background:var(--color-bg-primary);color:var(--color-text-primary); }
-      .predoc-btn:hover { background:var(--color-bg-tertiary); }
-      .predoc-btn.predoc-btn-primary { background:var(--color-accent);color:#fff;border-color:var(--color-accent); }
-      .predoc-btn.predoc-btn-primary:hover { background:var(--color-accent-hover); }
-      .predoc-btn:disabled { opacity:0.5;cursor:default; }
+      .inb4doc-window { background:var(--color-bg-primary);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.2);display:flex;flex-direction:column;max-height:80vh;min-width:420px;max-width:520px; }
+      .inb4doc-window-header { padding:1rem 1.5rem 0;font-size:1.1rem;font-weight:600;flex-shrink:0;color:var(--color-text-primary); }
+      .inb4doc-window-body { padding:0.5rem 1.5rem;overflow-y:auto;flex:1;color:var(--color-text-primary); }
+      .inb4doc-window-actions { display:flex;gap:0.5rem;justify-content:flex-end;padding:0.75rem 1.5rem 1rem;flex-shrink:0;align-items:center; }
+      .inb4doc-btn { padding:0.4rem 1.2rem;border-radius:4px;cursor:pointer;font-size:0.9rem;border:1px solid var(--color-border);background:var(--color-bg-primary);color:var(--color-text-primary); }
+      .inb4doc-btn:hover { background:var(--color-bg-tertiary); }
+      .inb4doc-btn.inb4doc-btn-primary { background:var(--color-accent);color:#fff;border-color:var(--color-accent); }
+      .inb4doc-btn.inb4doc-btn-primary:hover { background:var(--color-accent-hover); }
+      .inb4doc-btn:disabled { opacity:0.5;cursor:default; }
     </style>
-    <div class="predoc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
-      <div class="predoc-window-header">Import from Zip</div>
-      <div class="predoc-window-body">${bodyTmpl}</div>
-      <div class="predoc-window-actions">${actionsTmpl}</div>
+    <div class="inb4doc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
+      <div class="inb4doc-window-header">Import from Zip</div>
+      <div class="inb4doc-window-body">${bodyTmpl}</div>
+      <div class="inb4doc-window-actions">${actionsTmpl}</div>
     </div>
   `
 

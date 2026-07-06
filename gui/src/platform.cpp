@@ -43,9 +43,9 @@ std::string default_editor_root()
     }
 
 #ifdef _WIN32
-    return "C:/Program Files/predoc/editor";
+    return "C:/Program Files/inb4doc/editor";
 #else
-    return "/opt/predoc/editor";
+    return "/opt/inb4doc/editor";
 #endif
 }
 
@@ -55,7 +55,7 @@ std::string default_data_dir()
     wchar_t *raw = nullptr;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &raw)))
     {
-        auto dir = fs::path(raw) / "predoc";
+        auto dir = fs::path(raw) / "inb4doc";
         CoTaskMemFree(raw);
         return dir.string();
     }
@@ -63,12 +63,12 @@ std::string default_data_dir()
     return {};
 #elif defined(__APPLE__)
     auto home = std::getenv("HOME");
-    return home ? (fs::path(home) / "Library" / "Application Support" / "predoc").string() : std::string{};
+    return home ? (fs::path(home) / "Library" / "Application Support" / "inb4doc").string() : std::string{};
 #else
     auto xdg = std::getenv("XDG_DATA_HOME");
     if (xdg)
-        return (fs::path(xdg) / "predoc").string();
+        return (fs::path(xdg) / "inb4doc").string();
     auto home = std::getenv("HOME");
-    return home ? (fs::path(home) / ".local" / "share" / "predoc").string() : std::string{};
+    return home ? (fs::path(home) / ".local" / "share" / "inb4doc").string() : std::string{};
 #endif
 }

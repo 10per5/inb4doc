@@ -6,7 +6,7 @@ bookFlatSection: true
 
 # Overview
 
-High-level architecture, components, and design of predoc.
+High-level architecture, components, and design of inb4doc.
 
 ## Topics
 

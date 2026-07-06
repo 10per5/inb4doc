@@ -206,7 +206,7 @@ function dispatchEditEvent(view: any, getPos: () => number | undefined) {
   if (pos == null) return
   const currentAttrs = view.state.doc.nodeAt(pos)?.attrs
   if (!currentAttrs) return
-  view.dom.dispatchEvent(new CustomEvent("predoc:edit-video", {
+  view.dom.dispatchEvent(new CustomEvent("inb4doc:edit-video", {
     bubbles: true,
     detail: { pos, attrs: { ...currentAttrs } },
   }))

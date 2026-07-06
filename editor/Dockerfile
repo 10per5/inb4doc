@@ -1,6 +1,6 @@
 # Usage:
-#   docker build -t predoc-editor -f Dockerfile .
-#   docker create --name tmp predoc-editor
+#   docker build -t inb4doc-editor -f Dockerfile .
+#   docker create --name tmp inb4doc-editor
 #   docker cp tmp:/output/editor/public/. ./public/
 #   docker rm tmp
 

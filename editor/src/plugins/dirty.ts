@@ -12,7 +12,7 @@ export interface DirtyPluginConfig {
 
 export function createDirtyPlugin(ctx: Ctx, config: DirtyPluginConfig) {
   return new Plugin({
-    key: new PluginKey("predoc-dirty"),
+    key: new PluginKey("inb4doc-dirty"),
     view: () => ({
       update: (view, prevState) => {
         if (!prevState) return

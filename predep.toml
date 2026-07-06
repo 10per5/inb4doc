@@ -1,5 +1,5 @@
 main = "docker"
-project = "predoc"
+project = "inb4doc"
 
 [[include]]
 path = "editor/predep.toml"
@@ -34,18 +34,18 @@ depends = [
 name = "package"
 description = "Assemble release archive"
 type = "package"
-bundle = "predoc"
+bundle = "inb4doc"
 # depends = ["build"]
 artifacts = [
-    { source = "root://gui/bin/predoc-gui", dest = "predoc-gui", binary = true },
+    { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui", binary = true },
     { source = "root://editor/public", dest = "editor" },
 ]
 
 [install]
-dir = "/opt/predoc"
+dir = "/opt/inb4doc"
 symlink = true
 artifacts = [
-  { source = "root://gui/bin/predoc-gui", dest = "predoc-gui" },
+  { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui" },
   { source = "root://editor/public/",      dest = "editor" },
   { source = "root://content",            dest = "content" },
   { source = "root://hugo-view/themes",   dest = "hugo/themes" },

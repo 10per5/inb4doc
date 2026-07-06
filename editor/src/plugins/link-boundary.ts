@@ -2,7 +2,7 @@ import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state"
 
 export function createLinkBoundaryPlugin() {
   return new Plugin({
-    key: new PluginKey("predoc-link-boundary"),
+    key: new PluginKey("inb4doc-link-boundary"),
     props: {
       handleTextInput: (view, from, to, text) => {
         if (from !== to) return false

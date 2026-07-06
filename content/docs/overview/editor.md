@@ -11,7 +11,7 @@ The editor is a Milkdown v7 WYSIWYG interface loaded inside the native GUI windo
 
 [Milkdown](https://milkdown.dev) (v7, 11k+ stars) is the core editor. It's built on ProseMirror + Remark and works with markdown natively — no HTML→MD→HTML roundtrip. Both WYSIWYG and raw markdown source modes are available via toggle.
 
-predoc's plugin surface is intentionally small, but Milkdown and ProseMirror have a large [plugin ecosystem](https://github.com/artemnistuley/awesome-prosemirror) — individual maintainers or forks can implement custom behavior through ProseMirror plugins or Milkdown prosemirror plugins.
+inb4doc's plugin surface is intentionally small, but Milkdown and ProseMirror have a large [plugin ecosystem](https://github.com/artemnistuley/awesome-prosemirror) — individual maintainers or forks can implement custom behavior through ProseMirror plugins or Milkdown prosemirror plugins.
 
 ## Hotwired (Turbo + Stimulus)
 

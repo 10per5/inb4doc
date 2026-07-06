@@ -5,11 +5,6 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-defaults:
-  run:
-    shell: pwsh
-    working-directory: gui
-
 env:
   SAUCER_DIR: vendor\saucer
   SAUCER_COMMIT: 811cd2f8ee7044d7143fc8d36b9ceaaef878de39
@@ -35,21 +30,25 @@ jobs:
 
       - name: Install CMake (Saucer 8.2 needs >= 4.4)
         if: steps.cache-cmake.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri 'https://github.com/Kitware/CMake/releases/download/v4.4.0-rc1/cmake-4.4.0-rc1-windows-x86_64.zip' -OutFile cmake.zip
           Expand-Archive cmake.zip -DestinationPath C:\cmake-tmp
           Move-Item C:\cmake-tmp\cmake-4.4.0-rc1-windows-x86_64 C:\cmake
 
       - name: Add CMake to PATH
+        shell: pwsh
         run: echo "C:\cmake\bin" >> $env:GITHUB_PATH
 
       - name: Install Ninja
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri 'https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip' -OutFile ninja.zip
           Expand-Archive ninja.zip -DestinationPath C:\ninja
           echo "C:\ninja" >> $env:GITHUB_PATH
 
       - name: Install premake5
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0-beta8/premake-5.0.0-beta8-windows.zip' -OutFile premake.zip
           Expand-Archive premake.zip -DestinationPath C:\premake5
@@ -78,20 +77,30 @@ jobs:
 
       - name: Install WebView2 SDK
         if: steps.cache-wv2.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.3650.58' -OutFile wv2.zip
           Expand-Archive wv2.zip -DestinationPath C:\wv2
 
       - name: Export WebView2 paths
         if: steps.cache-saucer.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
           echo "CMAKE_INCLUDE_PATH=C:\wv2\build\native\include" >> $env:GITHUB_ENV
           echo "CMAKE_LIBRARY_PATH=C:\wv2\build\native\x64" >> $env:GITHUB_ENV
 
-      - name: Copy WebView2LoaderStatic.lib to vendor
+      - name: Copy WebView2 SDK to vendor
+        shell: pwsh
+        working-directory: gui
         run: |
+          $vendorInc = "$env:SAUCER_DIR\include"
           $vendorLib = "$env:SAUCER_DIR\lib"
-          New-Item -ItemType Directory -Force -Path $vendorLib | Out-Null
+          New-Item -ItemType Directory -Force -Path $vendorInc, $vendorLib | Out-Null
+          if (Test-Path "C:\wv2\build\native\include\WebView2.h") {
+            Copy-Item "C:\wv2\build\native\include\*" "$vendorInc\" -Recurse -Force
+          } else {
+            Write-Warning "WebView2.h not found at C:\wv2\build\native\include"
+          }
           if (Test-Path "C:\wv2\build\native\x64\WebView2LoaderStatic.lib") {
             Copy-Item "C:\wv2\build\native\x64\WebView2LoaderStatic.lib" "$vendorLib\" -Force
           } else {
@@ -100,6 +109,7 @@ jobs:
 
       - name: Build Saucer
         if: steps.cache-saucer.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
           if (-not (Test-Path C:\saucer-src\.git)) {
             git clone https://github.com/saucer/saucer.git C:\saucer-src
@@ -125,30 +135,43 @@ jobs:
           if (Test-Path "C:\saucer-build\_deps\coco-build\coco.lib") { Copy-Item "C:\saucer-build\_deps\coco-build\coco.lib" "$absSaucerDir\lib\" -Force }
 
       - name: Install predep
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri 'https://github.com/10per5/predep/releases/download/v0.0.1/predep-windows-x86_64.zip' -OutFile predep.zip
           Expand-Archive predep.zip -DestinationPath C:\predep
           echo "C:\predep" >> $env:GITHUB_PATH
 
-      - name: Build predoc-gui
+      - name: Load PREDEP SHAs
+        id: predep-shas
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          get_sha() { awk -v k="$1" '$1==k":"{print $2}' .github/predep-shas.yml; }
+          echo "editor=$(get_sha editor)" >> $GITHUB_OUTPUT
+          echo "package=$(get_sha package)" >> $GITHUB_OUTPUT
+
+      - name: Build inb4doc-gui
+        shell: pwsh
+        working-directory: gui
         run: |
           predep vendor
           premake5 vs2022
-          msbuild predoc-gui.sln /p:Configuration=redist /p:Platform=x64 /m:$env:NUMBER_OF_PROCESSORS
+          msbuild inb4doc-gui.sln /p:Configuration=release /p:Platform=x64 /m:$env:NUMBER_OF_PROCESSORS
 
       - name: Install bun
+        shell: pwsh
         run: |
           powershell -c "iwr bun.sh/install.ps1 -useb | iex"
           echo "$env:USERPROFILE\.bun\bin" >> $env:GITHUB_PATH
 
       - name: Build editor
         run: |
-          predep --privileged 2fccfa440e3a112b6e31c6ae4a9360e50304d4cd2cac6cab9d732998a0ad727a build
+          predep --privileged ${{ steps.predep-shas.outputs.editor }} build
         working-directory: editor
 
       - name: Package via predep
         run: |
-          predep --privileged 942aeb72b04c747d837d96bd218a9fde88482254c32cb39be613d05bf28d3dc2 package
+          predep --privileged ${{ steps.predep-shas.outputs.package }} package
         working-directory: ${{ github.workspace }}
 
       - name: Read version
@@ -165,8 +188,8 @@ jobs:
       # - name: Upload artifact
       #   uses: actions/upload-artifact@v4
       #   with:
-      #     name: predoc-windows-x64-${{ steps.version.outputs.version }}
-      #     path: predoc-windows-x86_64.zip
+      #     name: inb4doc-windows-x64-${{ steps.version.outputs.version }}
+      #     path: inb4doc-windows-x86_64.zip
       #     if-no-files-found: error
 
       - name: Create GitHub Release
@@ -175,5 +198,5 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
-          files: predoc-windows-x86_64.zip
+          files: inb4doc-windows-x86_64.zip
           generate_release_notes: false

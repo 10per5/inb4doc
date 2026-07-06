@@ -1,11 +1,11 @@
 local qt_libs = { "Qt6Widgets", "Qt6WebChannel", "Qt6WebEngineWidgets", "Qt6Gui", "Qt6Core", "Qt6WebEngineCore" }
 local saucer_dir = os.getenv("SAUCER_DIR") or "vendor/saucer"
 
-workspace("predoc-gui")
+workspace("inb4doc-gui")
 configurations({ "debug", "release" })
 architecture("x86_64")
 
-project("predoc-gui")
+project("inb4doc-gui")
 kind("ConsoleApp")
 language("C++")
 cppdialect("C++23")

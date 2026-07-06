@@ -1,18 +1,29 @@
 /// <reference types="bun" />
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, copyFileSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  mkdirSync,
+  copyFileSync,
+} from "fs";
 import { join, extname, dirname } from "path";
 import { interpolateHtml } from "./lib/interpolate";
 import { handleApiRoutes, type ServerContext } from "./lib/endpoints";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const HOST = process.env.HOST || "0.0.0.0";
-const DISABLE_CONTENT_API = process.env.DISABLE_CONTENT_API === "1" || process.env.DISABLE_CONTENT_API === "true";
-const NO_IGNORE = process.env.NO_IGNORE === "1" || process.env.NO_IGNORE === "true";
+const DISABLE_CONTENT_API =
+  process.env.DISABLE_CONTENT_API === "1" ||
+  process.env.DISABLE_CONTENT_API === "true";
+const NO_IGNORE =
+  process.env.NO_IGNORE === "1" || process.env.NO_IGNORE === "true";
 const TREE_DEPTH = parseInt(process.env.TREE_DEPTH || "0", 10) || 0;
 
 const SCRIPT_DIR = dirname(new URL(import.meta.url).pathname);
 const EDITOR_DIR = join(SCRIPT_DIR, "public");
-const CONTENT_DIR = process.env.PREDOC_CONTENT || join(SCRIPT_DIR, "..", "content");
+const CONTENT_DIR =
+  process.env.INB4DOC_CONTENT || join(SCRIPT_DIR, "..", "content");
 
 const SELF_BASE = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "");
 
@@ -93,7 +104,8 @@ Bun.serve({
     }
 
     const editorPath = join(EDITOR_DIR, path === "/" ? "index.html" : path);
-    const result = serveFile(editorPath) || serveFile(join(EDITOR_DIR, "index.html"));
+    const result =
+      serveFile(editorPath) || serveFile(join(EDITOR_DIR, "index.html"));
     if (result) return result;
 
     return new Response("Not found", { status: 404 });

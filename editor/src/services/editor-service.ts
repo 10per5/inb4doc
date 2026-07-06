@@ -327,7 +327,7 @@ export class EditorService {
         configureBlockEdit(ctx);
 
         ctx.update(dropIndicatorConfig.key, () => ({
-          class: "predoc-drop-cursor",
+          class: "inb4doc-drop-cursor",
           width: 4,
           color: false as const,
         }));
@@ -389,9 +389,9 @@ export class EditorService {
             if (!url) return url;
             if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
             if (url.startsWith("/uploads/")) return url;
-            if (url.startsWith("predoc-image:")) {
-              const name = url.slice("predoc-image:".length);
-              return localStorage.getItem("predoc:image:" + name) || url;
+            if (url.startsWith("inb4doc-image:")) {
+              const name = url.slice("inb4doc-image:".length);
+              return localStorage.getItem("inb4doc:image:" + name) || url;
             }
             if (url.startsWith("pending-image:")) {
               const blobUrl = imageRegistry.getBlobUrl(url.slice("pending-image:".length));
@@ -452,7 +452,7 @@ export class EditorService {
       .use(
         $prose(() => {
           const dragDropPlugin = new Plugin({
-            key: new PluginKey("predoc-drag-drop"),
+            key: new PluginKey("inb4doc-drag-drop"),
             props: {
               handleDOMEvents: {
                 dragstart(view, event) {

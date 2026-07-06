@@ -3,11 +3,11 @@ title: Home
 type: docs
 ---
 
-# predoc
+# inb4doc
 
 <br />
 
-[![GitHub](https://img.shields.io/badge/GitHub-View%20on%20GitHub-181717?style=for-the-badge\&logo=github)](https://github.com/10per5/predoc)
+[![GitHub](https://img.shields.io/badge/GitHub-View%20on%20GitHub-181717?style=for-the-badge\&logo=github)](https://github.com/10per5/inb4doc)
 
 ***
 

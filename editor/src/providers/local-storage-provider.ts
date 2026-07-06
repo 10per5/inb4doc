@@ -1,8 +1,8 @@
 import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 
-const STORAGE_PREFIX = "predoc:"
-const IMAGE_PREFIX = "predoc:image:"
+const STORAGE_PREFIX = "inb4doc:"
+const IMAGE_PREFIX = "inb4doc:image:"
 
 export class LocalStorageProvider implements ContentProvider {
   readonly name = "localStorage"
@@ -105,7 +105,7 @@ export class LocalStorageProvider implements ContentProvider {
     const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
     const base64 = await this.fileToBase64(file)
     localStorage.setItem(IMAGE_PREFIX + name, base64)
-    return `predoc-image:${name}`
+    return `inb4doc-image:${name}`
   }
 
   async listImages(_dir: string, refs?: boolean): Promise<ImageEntry[]> {
@@ -116,15 +116,15 @@ export class LocalStorageProvider implements ContentProvider {
         const name = key.slice(IMAGE_PREFIX.length)
         const base64 = localStorage.getItem(key)!
         const usedIn = refs ? this.findRefs(name) : []
-        entries.push({ name, url: base64, storageUrl: `predoc-image:${name}`, usedIn })
+        entries.push({ name, url: base64, storageUrl: `inb4doc-image:${name}`, usedIn })
       }
     }
     return entries
   }
 
   resolveImageUrl(url: string): string | undefined {
-    if (url.startsWith("predoc-image:")) {
-      const name = url.slice("predoc-image:".length)
+    if (url.startsWith("inb4doc-image:")) {
+      const name = url.slice("inb4doc-image:".length)
       return localStorage.getItem(IMAGE_PREFIX + name) || undefined
     }
     return undefined
@@ -136,7 +136,7 @@ export class LocalStorageProvider implements ContentProvider {
       const key = localStorage.key(i)
       if (key && key.startsWith(STORAGE_PREFIX) && key.endsWith(".md")) {
         const content = localStorage.getItem(key)
-        if (content && content.includes(`predoc-image:${imageName}`)) {
+        if (content && content.includes(`inb4doc-image:${imageName}`)) {
           refs.push(key.slice(STORAGE_PREFIX.length))
         }
       }

@@ -7,10 +7,10 @@ import { formatBytes } from "@/utils/format"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
 
 function createOverlay(): HTMLDivElement {
-  const existing = document.getElementById("predoc-dialog-overlay")
+  const existing = document.getElementById("inb4doc-dialog-overlay")
   if (existing) existing.remove()
   const overlay = document.createElement("div")
-  overlay.id = "predoc-dialog-overlay"
+  overlay.id = "inb4doc-dialog-overlay"
   document.body.appendChild(overlay)
   return overlay
 }
@@ -68,43 +68,43 @@ export function mountChangesDialog(
   const overlay = createOverlay()
 
   const itemStyles = `
-    .predoc-changes-item {
+    .inb4doc-changes-item {
       margin-bottom: 0.5rem; border: 1px solid var(--color-border);
       border-radius: 4px; overflow: hidden;
     }
-    .predoc-changes-header {
+    .inb4doc-changes-header {
       display: flex; align-items: center; gap: 0.5rem;
       padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--color-border);
     }
-    .predoc-changes-path {
+    .inb4doc-changes-path {
       flex: 1; padding: 0.4rem 0.6rem; cursor: pointer;
       display: flex; align-items: center; gap: 0.5rem;
       font-size: 0.9rem; user-select: none;
     }
-    .predoc-changes-preview {
+    .inb4doc-changes-preview {
       display: none; font-family: 'SF Mono', Monaco, monospace;
       font-size: 0.75rem; background: var(--color-bg-primary);
       border-top: 1px solid var(--color-border); max-height: 300px; overflow-y: auto;
     }
-    .predoc-changes-preview-line {
+    .inb4doc-changes-preview-line {
       padding: 2px 8px; white-space: pre-wrap; position: relative;
     }
-    .predoc-changes-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
-    .predoc-changes-actions button {
+    .inb4doc-changes-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+    .inb4doc-changes-actions button {
       padding: 0.4rem 1.2rem; border: 1px solid var(--color-border); border-radius: 4px;
       background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem;
       color: var(--color-text-primary);
     }
-    .predoc-changes-actions button:hover { background: var(--color-bg-tertiary); }
-    .predoc-dialog-close { padding: 0.4rem 1.2rem; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem; color: var(--color-text-primary); }
+    .inb4doc-changes-actions button:hover { background: var(--color-bg-tertiary); }
+    .inb4doc-dialog-close { padding: 0.4rem 1.2rem; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem; color: var(--color-text-primary); }
   `
 
   const renderItem = (data: ChangesDialogData) => {
     if (data.isPendingOp) {
       return html`
-        <div class="predoc-changes-item" style="opacity:0.85">
-          <div class="predoc-changes-header" style="background:#fff8e1;border-left:3px solid #f0ad4e">
-            <div class="predoc-changes-path" style="font-size:0.85rem;padding:0.3rem 0.6rem">
+        <div class="inb4doc-changes-item" style="opacity:0.85">
+          <div class="inb4doc-changes-header" style="background:#fff8e1;border-left:3px solid #f0ad4e">
+            <div class="inb4doc-changes-path" style="font-size:0.85rem;padding:0.3rem 0.6rem">
               <span style="color:#856404">${data.opLabel}</span>
             </div>
           </div>
@@ -118,15 +118,15 @@ export function mountChangesDialog(
     const sizeColor = size > 0 ? colors.green : size < 0 ? colors.danger : colors.teal
 
     return html`
-      <div class="predoc-changes-item">
-        <div class="predoc-changes-header">
-          <div class="predoc-changes-path" style="background: ${bgColor}">
+      <div class="inb4doc-changes-item">
+        <div class="inb4doc-changes-header">
+          <div class="inb4doc-changes-path" style="background: ${bgColor}">
             <span style="flex:1">${data.path}</span>
             <span style="color:${sizeColor};font-size:0.8rem">${sizeStr}</span>
           </div>
-          <span class="predoc-discard-placeholder"></span>
+          <span class="inb4doc-discard-placeholder"></span>
         </div>
-        <div class="predoc-changes-preview"></div>
+        <div class="inb4doc-changes-preview"></div>
       </div>
     `
   }
@@ -141,22 +141,22 @@ export function mountChangesDialog(
     ${changes.map(d => renderItem(d))}
   `
   const actionsTmpl = html`
-    <button class="predoc-btn predoc-btn-primary" data-action="save-all">Save all</button>
-    <span class="predoc-discard-all-placeholder"></span>
-    <button class="predoc-btn" data-action="close">Close</button>
+    <button class="inb4doc-btn inb4doc-btn-primary" data-action="save-all">Save all</button>
+    <span class="inb4doc-discard-all-placeholder"></span>
+    <button class="inb4doc-btn" data-action="close">Close</button>
   `
 
   const tmpl = html`<style>${itemStyles}</style>${miniWindow(titleParts.join(" — "), bodyTmpl, actionsTmpl)}`
 
   render(tmpl, overlay)
 
-  const windowEl = overlay.querySelector(".predoc-window") as HTMLElement
-  const bodyEl = overlay.querySelector(".predoc-window-body") as HTMLElement
+  const windowEl = overlay.querySelector(".inb4doc-window") as HTMLElement
+  const bodyEl = overlay.querySelector(".inb4doc-window-body") as HTMLElement
 
   changes.forEach((data, idx) => {
-    const item = bodyEl.querySelectorAll(".predoc-changes-item")[idx] as HTMLElement
-    const preview = item.querySelector(".predoc-changes-preview") as HTMLElement
-    const header = item.querySelector(".predoc-changes-header") as HTMLElement
+    const item = bodyEl.querySelectorAll(".inb4doc-changes-item")[idx] as HTMLElement
+    const preview = item.querySelector(".inb4doc-changes-preview") as HTMLElement
+    const header = item.querySelector(".inb4doc-changes-header") as HTMLElement
 
     // Skip pending ops — no click/dblclick/discard/reload interaction
     if (data.isPendingOp) return
@@ -172,7 +172,7 @@ export function mountChangesDialog(
       actions.onNavigate(data.path!)
     })
 
-    const placeholder = item.querySelector(".predoc-discard-placeholder") as HTMLElement
+    const placeholder = item.querySelector(".inb4doc-discard-placeholder") as HTMLElement
     let discardBtn: HTMLButtonElement
     discardBtn = pressTwiceButton({
       idleText: "Discard",
@@ -181,12 +181,12 @@ export function mountChangesDialog(
       small: true,
       onConfirm: () => {
         actions.onDiscard(data.path!)
-        const itemEl = discardBtn.closest(".predoc-changes-item")
+        const itemEl = discardBtn.closest(".inb4doc-changes-item")
         if (itemEl) {
           itemEl.remove()
-          const remainingDirty = bodyEl.querySelectorAll(".predoc-changes-item:not([style*='opacity'])")
-          const pending = bodyEl.querySelectorAll(".predoc-changes-item[style*='opacity']")
-          const headerEl = windowEl.querySelector(".predoc-window-header")
+          const remainingDirty = bodyEl.querySelectorAll(".inb4doc-changes-item:not([style*='opacity'])")
+          const pending = bodyEl.querySelectorAll(".inb4doc-changes-item[style*='opacity']")
+          const headerEl = windowEl.querySelector(".inb4doc-window-header")
           if (headerEl) {
             const parts = [`Unsaved Changes (${remainingDirty.length})`]
             if (pending.length > 0) parts.push(`Pending Ops (${pending.length})`)
@@ -310,7 +310,7 @@ export function mountChangesDialog(
     closeDialog()
   })
 
-  const discardAllPlaceholder = overlay.querySelector(".predoc-discard-all-placeholder") as HTMLElement;
+  const discardAllPlaceholder = overlay.querySelector(".inb4doc-discard-all-placeholder") as HTMLElement;
   let discardAllBtn: HTMLButtonElement;
   discardAllBtn = pressTwiceButton({
     idleText: "Discard all",

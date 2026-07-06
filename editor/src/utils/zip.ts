@@ -1,7 +1,7 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate"
 import { showNotification } from "@/components/notification/notification"
 
-const STORAGE_PREFIX = "predoc:"
+const STORAGE_PREFIX = "inb4doc:"
 
 export async function exportToZip(): Promise<void> {
   const files: Record<string, Uint8Array> = {}
@@ -29,7 +29,7 @@ export async function exportToZip(): Promise<void> {
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `predoc-backup-${new Date().toISOString().slice(0, 10)}.zip`
+  a.download = `inb4doc-backup-${new Date().toISOString().slice(0, 10)}.zip`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

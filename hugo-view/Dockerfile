@@ -1,6 +1,6 @@
 # Usage:
-#   docker build -t predoc-hugo-view -f hugo-view/Dockerfile .
-#   docker create --name tmp predoc-hugo-view
+#   docker build -t inb4doc-hugo-view -f hugo-view/Dockerfile .
+#   docker create --name tmp inb4doc-hugo-view
 #   docker cp tmp:/output/. ./hugo-view/build/
 #   docker rm tmp
 

@@ -1,15 +1,16 @@
-# predoc-gui darwin cross-builder
+# inb4doc-gui darwin cross-builder
 #
-# Produces: /build/bin/predoc-gui  (macOS x86_64, WKWebView backend)
+# Produces: /build/bin/inb4doc-gui  (macOS x86_64, WKWebView backend)
 #
 # Uses osxcross to provide a macOS cross-toolchain on Linux.  The macOS
 # SDK is sourced from https://github.com/joseluisq/macosx-sdks — check
 # the Xcode license terms before use.
 #
 # Usage:
-#   docker build -t predoc-gui:darwin -f images/darwin.Dockerfile .
-#   docker create --name tmp predoc-gui:darwin
-#   docker cp tmp:/build/bin/predoc-gui ./bin/
+#   docker build --build-arg PRIVILEGE_SHA=$(sha256sum gui/predep.toml | cut -d' ' -f1) \
+#       -t inb4doc-gui:darwin -f images/darwin.Dockerfile .
+#   docker create --name tmp inb4doc-gui:darwin
+#   docker cp tmp:/build/bin/inb4doc-gui ./bin/
 #   docker rm tmp
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -84,7 +85,7 @@ RUN git clone https://github.com/saucer/saucer.git saucer-src && \
     done
 
 # ═══════════════════════════════════════════════════════════════════════
-# Stage 3: predoc-gui for macOS
+# Stage 3: inb4doc-gui for macOS
 # ═══════════════════════════════════════════════════════════════════════
 FROM toolchain AS builder
 
@@ -105,7 +106,8 @@ RUN curl -sL \
 
 WORKDIR /build
 COPY predep.toml ./
-RUN predep vendor --privileged 4dcd8fa19807b4e88036493f79f5520ccb2e2356388454164b77062cef2f4751 
+ARG PRIVILEGE_SHA
+RUN predep vendor --privileged $PRIVILEGE_SHA
 
 COPY premake5.lua ./
 COPY src/ src/

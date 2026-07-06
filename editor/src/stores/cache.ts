@@ -198,14 +198,14 @@ class Cache {
         frontmatter: [...this.frontmatterCache.entries()],
         serverTimes: [...this.serverTimes.entries()],
       }
-      localStorage.setItem(`predoc-cache-${key}`, JSON.stringify(state))
+      localStorage.setItem(`inb4doc-cache-${key}`, JSON.stringify(state))
     } catch {}
   }
 
   restoreState(key: string) {
     this.clearAll()
     try {
-      const raw = localStorage.getItem(`predoc-cache-${key}`)
+      const raw = localStorage.getItem(`inb4doc-cache-${key}`)
       if (!raw) return
       const state = JSON.parse(raw)
       for (const [k, v] of state.patches ?? []) this.patches.set(k, v)

@@ -1,4 +1,4 @@
-# Agent Notes — predoc editor
+# Agent Notes — inb4doc editor
 
 ## Rules
 

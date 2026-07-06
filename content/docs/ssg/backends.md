@@ -40,9 +40,9 @@ For unimplemented shortcodes, the raw `{{</* … */>}}` syntax is preserved in t
 
 ### Dependencies
 
-`predoc fetch-deps` downloads:
+`inb4doc fetch-deps` downloads:
 
-* **Hugo** → `~/.cache/predoc/bin/hugo` (auto-detected on PATH)
+* **Hugo** → `~/.cache/inb4doc/bin/hugo` (auto-detected on PATH)
 
 * **Book theme** → `ssg/themes/book/`
 
@@ -60,7 +60,7 @@ hugo --source . \
      --destination build
 
 # Or via the SSG CLI
-predoc package
+inb4doc package
 ```
 
 Output: `ssg/build/` — a portable static site compatible with GitHub Pages, Netlify, Surge, Vercel, or plain S3.

@@ -1,4 +1,4 @@
-# predoc-hugo-view
+# inb4doc-hugo-view
 
 Static site generator (SSG) using [Hugo](https://gohugo.io/) with the [hugo-book](https://github.com/alex-shpak/hugo-book) theme. Reads content from `../content/`.
 
@@ -12,8 +12,8 @@ hugo --source . --contentDir ../content --themesDir themes --theme book --destin
 hugo server --source . --contentDir ../content --themesDir themes --theme book
 
 # Docker build
-docker build -t predoc-hugo-view .
-docker create --name tmp predoc-hugo-view
+docker build -t inb4doc-hugo-view .
+docker create --name tmp inb4doc-hugo-view
 docker cp tmp:/output/. ./build/
 docker rm tmp
 ```

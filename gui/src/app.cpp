@@ -30,6 +30,8 @@
 
 static std::filesystem::path g_data_dir;
 
+static void save_zoom(const std::filesystem::path &data_dir, float zoom);
+
 static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     if (msg == WM_HOTKEY)
@@ -54,7 +56,7 @@ static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 if (auto *w = static_cast<saucer::smartview *>(
                         GetPropW(hwnd, L"PD_WV")))
                     static_cast<saucer::webview &>(*w).execute(
-                        "window.predocUI?.openFind?.()");
+                        "window.inb4docUI?.openFind?.()");
                 return 0;
             }
             if (wp == 3)
@@ -62,7 +64,7 @@ static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 if (auto *w = static_cast<saucer::smartview *>(
                         GetPropW(hwnd, L"PD_WV")))
                     static_cast<saucer::webview &>(*w).execute(
-                        "window.predocUI?.findNext?.()");
+                        "window.inb4docUI?.findNext?.()");
                 return 0;
             }
             if (wp == 4)
@@ -70,7 +72,7 @@ static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 if (auto *w = static_cast<saucer::smartview *>(
                         GetPropW(hwnd, L"PD_WV")))
                     static_cast<saucer::webview &>(*w).execute(
-                        "window.predocUI?.findPrev?.()");
+                        "window.inb4docUI?.findPrev?.()");
                 return 0;
             }
         }
@@ -96,7 +98,7 @@ static void toast(saucer::smartview &wv, const std::string &msg)
         else
             escaped += c;
     }
-    auto js = "window.predocUI.showToast('" + escaped + "')";
+    auto js = "window.inb4docUI.showToast('" + escaped + "')";
     static_cast<saucer::webview &>(wv).execute(js.c_str());
 }
 
@@ -139,7 +141,7 @@ int run_app(config cfg)
 
     auto safe = std::make_shared<config>(std::move(cfg));
 
-    return saucer::application::create({.id = "predoc"})->run(
+    return saucer::application::create({.id = "inb4doc"})->run(
         [safe](saucer::application *app) -> coco::stray
         {
             auto window = saucer::window::create(app).value();
@@ -184,7 +186,7 @@ int run_app(config cfg)
                 if (auto ico = saucer::icon::from(safe->favicon))
                     window->set_icon(*ico);
 
-            window->set_title("predoc");
+            window->set_title("inb4doc");
             window->set_size({.w = 1200, .h = 800});
 
             // -- app:// scheme handler (local mode only) --
@@ -355,21 +357,21 @@ int run_app(config cfg)
                 QObject::connect(sf, &QShortcut::activated, [&wv]()
                 {
                     static_cast<saucer::webview &>(wv).execute(
-                        "window.predocUI?.openFind?.()");
+                        "window.inb4docUI?.openFind?.()");
                 });
 
                 auto *f3 = new QShortcut(QKeySequence(Qt::Key_F3), main_win);
                 QObject::connect(f3, &QShortcut::activated, [&wv]()
                 {
                     static_cast<saucer::webview &>(wv).execute(
-                        "window.predocUI?.findNext?.()");
+                        "window.inb4docUI?.findNext?.()");
                 });
 
                 auto *sf3 = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F3), main_win);
                 QObject::connect(sf3, &QShortcut::activated, [&wv]()
                 {
                     static_cast<saucer::webview &>(wv).execute(
-                        "window.predocUI?.findPrev?.()");
+                        "window.inb4docUI?.findPrev?.()");
                 });
             }
 #elif defined(_WIN32)

@@ -1,11 +1,11 @@
 /**
  * Central registry for all JavaScript APIs exposed to the native Saucer GUI
- * bridge (window.predocUI).
+ * bridge (window.inb4docUI).
  *
  * When adding a new native → JS entry point:
  *   1. Implement the function in its own module under bridge/.
- *   2. Import it here and add it to the predocUI object.
- *   3. Call it from C++ via wv.execute("window.predocUI?.fnName?.()").
+ *   2. Import it here and add it to the inb4docUI object.
+ *   3. Call it from C++ via wv.execute("window.inb4docUI?.fnName?.()").
  */
 import { showToast } from "@/components/notification/toast"
 import { openFind, findNext, findPrev } from "./find"
@@ -34,7 +34,7 @@ function pipeConsole(): void {
 }
 
 export function initBridge(): void {
-  ;(window as any).predocUI = {
+  ;(window as any).inb4docUI = {
     showToast,
     openFind,
     findNext,

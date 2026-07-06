@@ -1,6 +1,6 @@
-const STORAGE_KEY = "predoc-storage";
-const PREFS_KEY = "predoc-prefs";
-const PENDING_OPS_KEY = "predoc-pending-ops";
+const STORAGE_KEY = "inb4doc-storage";
+const PREFS_KEY = "inb4doc-prefs";
+const PENDING_OPS_KEY = "inb4doc-pending-ops";
 
 export interface WikiStorage {
   patches: [string, string][];
