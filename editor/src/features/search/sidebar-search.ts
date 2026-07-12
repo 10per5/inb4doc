@@ -1,9 +1,9 @@
-import { getProvider } from "@/providers/provider-registry";
+import { getProvider } from "@/stores/provider-store";
 import type { TreeNode } from "@/components/panels/sidebar";
-import { searchCache, type SearchMatch } from "@/services/cache-management-service";
-import { hotkeys } from "@/services/hotkey-manager";
+import { searchCache, type SearchMatch } from "@/controllers/file-sync-controller";
+import { register as registerHotkey } from "@/utils/hotkeys";
 
-export type { SearchMatch } from "@/services/cache-management-service";
+export type { SearchMatch } from "@/controllers/file-sync-controller";
 
 export function focusSidebarSearch(): void {
   const input = document.querySelector<HTMLInputElement>(".sidebar-search");
@@ -12,7 +12,7 @@ export function focusSidebarSearch(): void {
 }
 
 // Register global hotkey
-hotkeys.register("ctrl+shift+f", focusSidebarSearch);
+registerHotkey("ctrl+shift+f", focusSidebarSearch);
 
 export function collectPagePaths(node: TreeNode): string[] {
   const paths: string[] = [];

@@ -1,15 +1,18 @@
 import { html, render } from "lit-html"
-import { miniWindow, actionBtn, overlayStyles, windowStyles } from "@/components/ui/ui-helpers"
-import { getAvailableProviders, type ProviderInfo } from "@/providers"
+import { actionBtn, overlayStyles, windowStyles, buttonStyles } from "@/components/ui/ui-helpers"
+import { getAvailableProviders } from "@/stores/provider-store"
+import { connectionStore } from "@/stores/connection-store"
+import type { ProviderType } from "@/providers/index"
 
 export interface ProviderDialogResult {
-  type: "remote" | "filesystem" | "localStorage"
+  type: ProviderType
 }
 
 export async function mountProviderDialog(
   currentProvider: string,
 ): Promise<ProviderDialogResult | null> {
   const providers = await getAvailableProviders()
+  await connectionStore.probe()
 
   return new Promise((resolve) => {
     const overlay = document.createElement("div")
@@ -23,9 +26,12 @@ export async function mountProviderDialog(
       resolve(null)
     })
 
-    function choose(type: "remote" | "filesystem" | "localStorage") {
+    let selectedType: ProviderType | null = currentProvider as ProviderType
+
+    function accept() {
+      if (!selectedType) return
       overlay.remove()
-      resolve({ type })
+      resolve({ type: selectedType })
     }
 
     const providerBadges: Record<string, { icon: string; label: string }> = {
@@ -35,138 +41,201 @@ export async function mountProviderDialog(
     }
 
     const currentInfo = providerBadges[currentProvider] || { icon: "❓", label: currentProvider }
+    const conn = connectionStore.getConfig()
 
-    const body = html`
-      <div class="provider-dialog-body">
-        <div class="provider-current">
-          Currently using: <strong>${currentInfo.icon} ${currentInfo.label}</strong>
-        </div>
-        <div class="provider-options">
-          ${providers.map(
-            (p) => html`
-              <div
-                class="provider-option ${p.available ? "" : "provider-option-disabled"} ${p.type === currentProvider ? "provider-option-active" : ""}"
-                @click=${p.available && p.type !== currentProvider ? () => choose(p.type) : undefined}
-                role="button"
-                tabindex=${p.available ? "0" : "-1"}
-              >
-                <div class="provider-option-icon">${providerBadges[p.type]?.icon || "❓"}</div>
-                <div class="provider-option-info">
-                  <div class="provider-option-name">${providerBadges[p.type]?.label || p.type}</div>
-                  <div class="provider-option-desc">${p.description}</div>
-                  ${!p.available && p.reason
-                    ? html`<div class="provider-option-reason">⛔ ${p.reason}</div>`
-                    : ""}
-                  ${p.type === currentProvider
-                    ? html`<div class="provider-option-current-badge">current</div>`
-                    : ""}
+    function renderBody() {
+      const remoteAvailable = connectionStore.remoteAvailable
+      const remoteReason = !remoteAvailable
+        ? "Server not reachable — enter host/port and wait"
+        : undefined
+
+      const mergedProviders = providers.map((p) => ({
+        ...p,
+        available: p.type === "remote" ? remoteAvailable || p.type === currentProvider : p.available,
+        reason: p.type === "remote" ? remoteReason : p.reason,
+      }))
+
+      const body = html`
+        <div class="provider-dialog-body">
+          <div class="provider-current">
+            Currently using: <strong>${currentInfo.icon} ${currentInfo.label}</strong>
+          </div>
+          <div class="provider-options">
+            ${mergedProviders.map(
+              (p) => html`
+                <div
+                  class="provider-option ${p.available ? "" : "provider-option-disabled"} ${selectedType === p.type ? "provider-option-selected" : ""} ${p.type === currentProvider ? "provider-option-active" : ""}"
+                  data-type=${p.type}
+                  @click=${p.available ? () => { selectedType = p.type; renderBody() } : undefined}
+                  role="button"
+                  tabindex=${p.available ? "0" : "-1"}
+                >
+                  <div class="provider-option-icon">${providerBadges[p.type]?.icon || "❓"}</div>
+                  <div class="provider-option-info">
+                    <div class="provider-option-name">${providerBadges[p.type]?.label || p.type}</div>
+                    <div class="provider-option-desc">${p.description}</div>
+                    ${!p.available && p.reason
+                      ? html`<div class="provider-option-reason">⛔ ${p.reason}</div>`
+                      : ""}
+                    ${p.type === currentProvider
+                      ? html`<div class="provider-option-current-badge">current</div>`
+                      : ""}
+                    ${p.type === "remote" ? renderRemoteSection() : ""}
+                  </div>
                 </div>
-              </div>
-            `,
-          )}
+              `,
+            )}
+          </div>
         </div>
-      </div>
-    `
+      `
+      render(
+        html`
+          <style>
+            ${overlayStyles}${windowStyles}${buttonStyles}
+            .provider-dialog-body { padding: 0.5rem 0; }
+            .provider-current {
+              font-size: 0.9rem; margin-bottom: 1rem; padding: 0.5rem 0.75rem;
+              background: var(--color-bg-tertiary); border-radius: 6px;
+              color: var(--color-text-primary);
+            }
+            .provider-options { display: flex; flex-direction: column; gap: 0.5rem; }
+            .provider-option {
+              display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem;
+              border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer;
+              transition: border-color 0.15s, background 0.15s; color: var(--color-text-primary);
+            }
+            .provider-option:hover:not(.provider-option-disabled):not(.provider-option-active):not(.provider-option-selected) {
+              border-color: var(--color-accent); background: var(--color-bg-tertiary);
+            }
+            .provider-option-disabled { opacity: 0.5; cursor: not-allowed; }
+            .provider-option-active {
+              border-color: var(--color-border); background: var(--color-bg-secondary);
+              opacity: 0.85;
+            }
+            .provider-option-active::before {
+              content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+              border-radius: 6px 0 0 6px; background: var(--color-success, #28a745);
+            }
+            .provider-option { position: relative; }
+            .provider-option-selected {
+              border-color: var(--color-accent); background: var(--color-bg-tertiary);
+              box-shadow: inset 0 0 0 1px var(--color-accent);
+            }
+            .provider-option-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem; }
+            .provider-option-info { flex: 1; min-width: 0; }
+            .provider-option-name { font-weight: 600; font-size: 0.95rem; color: var(--color-text-primary); }
+            .provider-option-desc { font-size: 0.8rem; color: var(--color-text-tertiary); margin-top: 0.15rem; }
+            .provider-option-reason { font-size: 0.8rem; color: var(--color-error); margin-top: 0.25rem; }
+            .provider-option-current-badge {
+              display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.4rem;
+              border-radius: 3px; background: var(--color-accent); color: #fff; margin-top: 0.25rem;
+            }
+            .remote-section { margin-top: 0.5rem; }
+            .remote-fields { display: flex; gap: 0.5rem; align-items: end; }
+            .remote-field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+            .remote-field label { font-size: 0.75rem; color: var(--color-text-tertiary); }
+            .remote-field input {
+              padding: 0.35rem 0.5rem; border: 1px solid var(--color-border); border-radius: 4px;
+              font-size: 0.85rem; background: var(--color-bg-primary); color: var(--color-text-primary);
+              width: 100%; box-sizing: border-box;
+            }
+            .remote-field input:focus { outline: none; border-color: var(--color-accent); }
+            .remote-status { font-size: 0.8rem; margin-top: 0.3rem; min-height: 1.2rem; }
+            .remote-status.ok { color: var(--color-success, #28a745); }
+            .remote-status.err { color: var(--color-error); }
+          </style>
+          <div class="inb4doc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
+            <div class="inb4doc-window-header">Change Project</div>
+            <div class="inb4doc-window-body">${body}</div>
+            <div class="inb4doc-window-actions">
+              ${actionBtn({ label: "Cancel", variant: "danger" })}
+              ${actionBtn({ label: "Accept", variant: "success", disabled: !selectedType })}
+            </div>
+          </div>
+        `,
+        overlay,
+      )
 
-    const actions = html`
-      ${actionBtn({ label: "Cancel", variant: "default" })}
-    `
+      document.body.appendChild(overlay)
 
-    render(
-      html`
-        <style>
-          ${overlayStyles}${windowStyles}
-          .provider-dialog-body {
-            padding: 0.5rem 0;
-          }
-          .provider-dialog-body {
-            padding: 0.5rem 0;
-          }
-          .provider-current {
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            padding: 0.5rem 0.75rem;
-            background: var(--color-bg-tertiary);
-            border-radius: 6px;
-            color: var(--color-text-primary);
-          }
-          .provider-options {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-          }
-          .provider-option {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            border: 1px solid var(--color-border);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: border-color 0.15s, background 0.15s;
-            color: var(--color-text-primary);
-          }
-          .provider-option:hover:not(.provider-option-disabled):not(.provider-option-active) {
-            border-color: var(--color-accent);
-            background: var(--color-bg-tertiary);
-          }
-          .provider-option-disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
-          .provider-option-active {
-            border-color: var(--color-accent);
-            background: var(--color-bg-tertiary);
-          }
-          .provider-option-icon {
-            font-size: 1.5rem;
-            flex-shrink: 0;
-            margin-top: 0.1rem;
-          }
-          .provider-option-info {
-            flex: 1;
-            min-width: 0;
-          }
-          .provider-option-name {
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: var(--color-text-primary);
-          }
-          .provider-option-desc {
-            font-size: 0.8rem;
-            color: var(--color-text-tertiary);
-            margin-top: 0.15rem;
-          }
-          .provider-option-reason {
-            font-size: 0.8rem;
-            color: var(--color-error);
-            margin-top: 0.25rem;
-          }
-          .provider-option-current-badge {
-            display: inline-block;
-            font-size: 0.7rem;
-            padding: 0.1rem 0.4rem;
-            border-radius: 3px;
-            background: var(--color-accent);
-            color: #fff;
-            margin-top: 0.25rem;
-          }
-        </style>
-        <div class="inb4doc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
-          <div class="inb4doc-window-header">Change Project</div>
-          <div class="inb4doc-window-body">${body}</div>
-          <div class="inb4doc-window-actions">${actions}</div>
+      const btns = overlay.querySelectorAll(".inb4doc-btn")
+      const cancelBtn = btns[0] as HTMLButtonElement
+      const acceptBtn = btns[1] as HTMLButtonElement
+      cancelBtn?.addEventListener("click", () => {
+        overlay.remove()
+        resolve(null)
+      })
+      acceptBtn?.addEventListener("click", accept)
+    }
+
+    function renderRemoteSection() {
+      const hostId = "conn-host-" + Math.random().toString(36).slice(2)
+      const portId = "conn-port-" + Math.random().toString(36).slice(2)
+      const statusId = "conn-status-" + Math.random().toString(36).slice(2)
+
+      let probeTimer: ReturnType<typeof setTimeout> | null = null
+
+      function scheduleProbe() {
+        if (probeTimer) clearTimeout(probeTimer)
+        const statusEl = document.getElementById(statusId)
+        if (statusEl) { statusEl.textContent = ""; statusEl.className = "remote-status" }
+
+        probeTimer = setTimeout(() => {
+          const host = (document.getElementById(hostId) as HTMLInputElement)?.value.trim() || "localhost"
+          const port = parseInt((document.getElementById(portId) as HTMLInputElement)?.value || "3000", 10)
+          connectionStore.setConfig(host, port)
+          connectionStore.probe().then((ok) => {
+            if (statusEl) {
+              statusEl.textContent = ok ? "✓ Online" : "✗ Cannot reach server"
+              statusEl.className = "remote-status " + (ok ? "ok" : "err")
+            }
+            // Update remote card disabled state without re-rendering inputs
+            const remoteCard = overlay.querySelector('.provider-option[data-type="remote"]') as HTMLElement
+            if (remoteCard) {
+              if (ok) {
+                remoteCard.classList.remove("provider-option-disabled")
+                remoteCard.style.cursor = "pointer"
+              } else {
+                remoteCard.classList.add("provider-option-disabled")
+                remoteCard.style.cursor = "not-allowed"
+                // Clear selection if remote was selected but is now unreachable
+                if (selectedType === "remote") {
+                  selectedType = null
+                  // Update Accept button disabled state
+                  const acceptBtn = overlay.querySelectorAll(".inb4doc-btn")[1] as HTMLButtonElement
+                  if (acceptBtn) acceptBtn.disabled = true
+                }
+              }
+              const reasonEl = remoteCard.querySelector(".provider-option-reason")
+              if (reasonEl) reasonEl.remove()
+            }
+          })
+        }, 600)
+      }
+
+      const initialStatus = connectionStore.remoteAvailable
+        ? html`<div id="${statusId}" class="remote-status ok">✓ Online</div>`
+        : html`<div id="${statusId}" class="remote-status"></div>`
+
+      return html`
+        <div class="remote-section" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="remote-fields">
+            <div class="remote-field">
+              <label for="${hostId}">Host</label>
+              <input id="${hostId}" type="text" value="${conn.host}" placeholder="localhost"
+                @input=${() => scheduleProbe()}>
+            </div>
+            <div class="remote-field" style="max-width: 80px">
+              <label for="${portId}">Port</label>
+              <input id="${portId}" type="number" value="${conn.port}" placeholder="3000"
+                @input=${() => scheduleProbe()}>
+            </div>
+          </div>
+          ${initialStatus}
         </div>
-      `,
-      overlay,
-    )
+      `
+    }
 
-    document.body.appendChild(overlay)
-
-    const cancelBtn = overlay.querySelector(".inb4doc-btn") as HTMLButtonElement
-    cancelBtn?.addEventListener("click", () => {
-      overlay.remove()
-      resolve(null)
-    })
+    renderBody()
   })
 }

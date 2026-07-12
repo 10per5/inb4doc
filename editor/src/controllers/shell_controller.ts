@@ -1,21 +1,21 @@
 import { Controller } from "@hotwired/stimulus"
-import { AppOrchestrator } from "@/orchestrator"
+import { AppController } from "@/controllers/app-controller"
 import { getCurrentPath } from "@/utils/url"
 
 export default class extends Controller {
-  private orchestrator!: AppOrchestrator
+  private app!: AppController
 
   async connect() {
     const initialPath = this.data.get("path") || getCurrentPath()
-    this.orchestrator = new AppOrchestrator({ initialPath })
-    await this.orchestrator.initialize()
+    this.app = new AppController({ initialPath })
+    await this.app.initialize()
   }
 
   disconnect() {
-    this.orchestrator?.destroy()
+    this.app?.destroy()
   }
 
-  toggleSource = () => this.orchestrator.editor.toggleSourceMode()
-  applySource  = () => this.orchestrator.editor.applySourceContent()
-  flush        = () => this.orchestrator.cache.flushDirtyFiles()
+  toggleSource = () => this.app.editor.toggleSourceMode()
+  applySource  = () => this.app.editor.applySourceContent()
+  flush        = () => this.app.cache.flushDirtyFiles()
 }

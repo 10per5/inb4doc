@@ -34,11 +34,7 @@ import {
 } from "@/components/ui/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { mountVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
-import {
-  getAllImages,
-  uploadImage,
-  listImages,
-} from "@/services/image-config";
+import { imageRepository } from "@/repositories/imageRepository";
 
 const slash = slashFactory("inb4doc");
 
@@ -718,7 +714,7 @@ class SlashView {
       urlInput.select();
     }
 
-    listImages()
+    imageRepository.listImages()
       .catch(() => {})
       .then(() => {
         this.renderImageSuggestions();
@@ -728,7 +724,7 @@ class SlashView {
   private renderImageSuggestions() {
     const el = this.content.querySelector("[data-area='suggestions']");
     if (!el) return;
-    const allImages = getAllImages();
+    const allImages = imageRepository.getAllImages();
     el.innerHTML =
       allImages
         .slice(0, 3)
@@ -791,7 +787,7 @@ class SlashView {
   }
 
   private triggerImageUpload(file: File) {
-    uploadImage(file).then((url) => {
+    imageRepository.uploadImage(file).then((url) => {
       this.confirmImageUrl(url);
     });
   }

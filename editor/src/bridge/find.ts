@@ -1,6 +1,7 @@
-import type { EditorService } from "@/services/editor-service"
+import type { EditorController } from "@/controllers/editor-controller"
+import { scrollToText } from "@/features/search/scroll-to-text"
 
-let editorService: EditorService | null = null
+let editorController: EditorController | null = null
 
 let bar: HTMLDivElement | null = null
 let input: HTMLInputElement | null = null
@@ -15,8 +16,8 @@ let srcPositions: { start: number; end: number }[] = []
 
 // ── registered by AppOrchestrator at startup ──
 
-export function setEditorService(es: EditorService): void {
-  editorService = es
+export function setEditorService(es: EditorController): void {
+  editorController = es
 }
 
 // ── public API exposed on inb4docUI ──
@@ -131,7 +132,7 @@ function search(q: string): void {
   currentQuery = trimmed
   currentIdx = -1
 
-  if (editorService?.isSourceMode()) {
+  if (editorController?.isSourceMode()) {
     searchSource(trimmed)
   } else {
     searchProseMirror(trimmed)
@@ -196,10 +197,10 @@ function prevMatch(): void {
 function applyMatch(idx: number): void {
   if (!currentQuery) return
 
-  if (editorService?.isSourceMode()) {
+  if (editorController?.isSourceMode()) {
     showSourceMatch(idx)
   } else {
-    editorService?.scrollToText(currentQuery, idx)
+    editorController && scrollToText(editorController.getEditor()!, currentQuery, idx)
   }
   // scrollToText focuses ProseMirror — restore focus to find input
   setTimeout(() => input?.focus(), 0)

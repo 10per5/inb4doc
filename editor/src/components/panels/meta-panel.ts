@@ -1,4 +1,5 @@
 import { githubIconStr } from "@/components/ui/icons";
+import { appEvents, AppEvent } from "@/stores/app-events";
 
 export interface MetaPanelData {
   title: string;
@@ -11,10 +12,7 @@ export interface MetaPanelAPI {
   getData(): MetaPanelData;
 }
 
-export function mountMetaPanel(
-  container: HTMLElement,
-  onChange: (data: MetaPanelData) => void,
-): MetaPanelAPI {
+export function mountMetaPanel(container: HTMLElement): MetaPanelAPI {
   let currentData: MetaPanelData = { title: "" };
 
   container.innerHTML = `
@@ -76,7 +74,7 @@ export function mountMetaPanel(
 
   function notify() {
     const data = getData();
-    onChange(data);
+    appEvents.emit(AppEvent.MetaDataChanged, { data });
   }
 
   function getData(): MetaPanelData {

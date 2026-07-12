@@ -1,0 +1,153 @@
+/**
+ * ViewController — manages view switching and disk usage view.
+ *
+ * ViewManager was inlined here since it was only used as an implementation
+ * detail of this controller. The view type and switching logic live together.
+ */
+
+import { stripFrontmatter } from "@/utils/frontmatter";
+import { mountDiskUsageView } from "@/components/views/disk-usage-view";
+import { mountEmptyProjectView } from "@/components/views/empty-project-view";
+import { registerEditorView } from "@/components/views/editor-view";
+import { pageRepository } from "@/repositories/pageRepository";
+import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
+import { treeStore } from "@/stores/tree-store";
+import { collectLeaves } from "@/utils/tree";
+import { appEvents, AppEvent } from "@/stores/app-events";
+import type { EditorController } from "@/controllers/editor-controller";
+
+export type ViewType = "editor" | "disk-usage" | "empty-project"
+
+type ViewHandlers = { activate: () => void; deactivate: () => void }
+
+export class ViewController {
+  private current: ViewType = "editor"
+  private views = new Map<ViewType, ViewHandlers>()
+  private editor: EditorController
+  private sessionStarted: number
+  private unsubs: (() => void)[] = [];
+
+  constructor(editor: EditorController, sessionStarted: number = 0) {
+    this.editor = editor;
+    this.sessionStarted = sessionStarted;
+  }
+
+  switchTo(type: ViewType): void {
+    if (type === this.current) return
+    this.views.get(this.current)?.deactivate()
+    this.current = type
+    this.views.get(type)?.activate()
+    appEvents.emit(AppEvent.ViewChanged, { view: type })
+  }
+
+  getCurrent(): ViewType {
+    return this.current
+  }
+
+  /** Expose register for editor-view.ts registration. */
+  get register(): (type: ViewType, handlers: ViewHandlers) => void {
+    return (type, handlers) => this.views.set(type, handlers)
+  }
+
+  initialize(): void {
+    registerEditorView(this.register, {
+      sourceMode: () => this.editor.isSourceMode(),
+    });
+
+    this.setupDiskUsageView();
+    this.setupEmptyProjectView();
+  }
+
+  destroy(): void {
+    this.unsubs.forEach((unsub) => unsub());
+    this.unsubs = [];
+  }
+
+  private setupEmptyProjectView(): void {
+    const editorArea = document.getElementById("editor-area");
+    const milkdownEl = document.getElementById("milkdown-editor");
+    const sourceEl = document.getElementById("source-editor");
+    if (!editorArea || !milkdownEl || !sourceEl) return;
+
+    this.views.set("empty-project", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        mountEmptyProjectView(editorArea);
+      },
+      deactivate: () => {
+        const empty = editorArea.querySelector(".empty-project");
+        if (empty) empty.remove();
+      },
+    });
+  }
+
+  private setupDiskUsageView(): void {
+    const editorArea = document.getElementById("editor-area");
+    const milkdownEl = document.getElementById("milkdown-editor");
+    const sourceEl = document.getElementById("source-editor");
+
+    if (!editorArea || !milkdownEl || !sourceEl) return;
+
+    this.views.set("disk-usage", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        this.showDiskUsage();
+      },
+      deactivate: () => {
+        const du = editorArea.querySelector(".disk-usage-wrapper");
+        if (du) du.remove();
+      },
+    });
+  }
+
+  private showDiskUsage(): void {
+    const self = this;
+    const tree = treeStore.getTree();
+    const provider = getProvider();
+
+    if (self.current !== "disk-usage") return;
+
+    (async () => {
+      const fileSizes = new Map<string, number>();
+      const lastModified = new Map<string, number>();
+      const leaves = collectLeaves(tree);
+
+      for (const leaf of leaves) {
+        const existing = pageRepository.get(leaf);
+        const body = existing?.bodyState.body || existing?.bodyState.baseline;
+        if (body) {
+          fileSizes.set(leaf, body.length);
+        } else {
+          try {
+            const content = await provider?.readFile(leaf);
+            if (content && self.current === "disk-usage") {
+              fileSizes.set(leaf, stripFrontmatter(content).body.length);
+            }
+          } catch (error) {
+            console.error(`Failed to read ${leaf}:`, error);
+          }
+        }
+
+        const st = pageRepository.get(leaf)?.getServerTime();
+        if (st) lastModified.set(leaf, st);
+      }
+
+      const editorArea = document.getElementById("editor-area");
+      if (!editorArea || self.current !== "disk-usage") return;
+
+      mountDiskUsageView(
+        editorArea,
+        {
+          tree,
+          fileSizes,
+          lastModified,
+          providerName: getProviderDisplayInfo(provider.name).label,
+          sessionStarted: self.sessionStarted,
+        },
+        () => self.switchTo("editor"),
+      );
+    })();
+  }
+}

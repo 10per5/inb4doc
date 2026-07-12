@@ -68,6 +68,11 @@ export function mountDropdownMenu(opts: DropdownMenuOptions): { updateItem: (id:
   const menu = mountEl.querySelector(`#${menuId}`) as HTMLElement
 
   trigger?.addEventListener("click", (e) => {
+    const opening = !menu?.classList.contains("open")
+    if (opening) {
+      document.querySelectorAll(".toolbar-menu.open").forEach((el) => el.classList.remove("open"))
+      document.querySelectorAll(".toolbar-heading-dropdown.open").forEach((el) => el.classList.remove("open"))
+    }
     menu?.classList.toggle("open")
     e.stopPropagation()
   })

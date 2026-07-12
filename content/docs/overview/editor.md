@@ -60,3 +60,5 @@ Triggered by typing `@` in the editor.
 ## See Also
 
 - [Superdoc](https://github.com/superdoc-dev/superdoc) — a modern collaborative DOCX editor. Too heavy for this project ([5.79 MB build](https://sizepanic.com/package/superdoc), [113 MB deps](https://pkg-size.dev/superdoc)), but a nice option if full Office-style editing is needed.
+- [Quill](https://github.com/slab/quill) — a modern rich text editor built for compatibility and extensibility. A lighter-weight alternative if a simpler WYSIWYG is acceptable.
+- [Tiptap](https://tiptap.dev/) — a headless, customizable editor framework built on ProseMirror, well suited for custom editing experiences.

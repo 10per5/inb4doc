@@ -9,6 +9,10 @@ export class FileSystemProvider implements ContentProvider {
   private imageUrlCache = new Map<string, string>()
   private currentDir: string = ""
 
+  async isAvailable(): Promise<boolean> {
+    return typeof (window as any).showDirectoryPicker === "function"
+  }
+
   async init(): Promise<void> {
     if (this.dirHandle) return
     this.dirHandle = await (window as any).showDirectoryPicker()

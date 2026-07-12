@@ -15,6 +15,19 @@ The current PUT endpoint sends the entire markdown body on every save. For large
 
 A `maxContentSize` config flag (default ~10 MB) currently rejects oversized PUT bodies at the server — but the real fix is to never send them in the first place.
 
+## AI integration — Concept (ObservableHQ / Jupyter-style)
+
+- `/` invokes a command palette that includes an "AI generate" option
+- Opens a prompt input box (like Crepe's `AIInstructionTooltip`) where user describes what they want
+- AI generates markdown content and inserts it into the editor at cursor
+- **Future considerations:**
+  - Cell-based interface (like ObservableHQ where each block is a cell)
+  - Multi-provider support (OpenAI, Anthropic, local)
+  - Streaming response with diff review (accept/reject)
+  - Potential integration with `/` menu for "Improve writing", "Fix grammar", "Continue", "Summarize"
+  - Prompt history and favorites
+- Not started — needs separate discussion and scoping
+
 ## Decoupled Server
 
 The server is currently a single-file Bun route handler. Future path toward a deployable, scalable server:

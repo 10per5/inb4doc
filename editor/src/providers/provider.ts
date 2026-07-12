@@ -16,6 +16,8 @@ export interface ImageEntry {
 
 export interface ContentProvider {
   readonly name: string
+  /** Check if this provider is reachable / supported in the current environment. */
+  isAvailable(): Promise<boolean>
   getTree(): Promise<TreeNode>
   readFile(path: string): Promise<string | null>
   writeFile(path: string, content: string): Promise<void>

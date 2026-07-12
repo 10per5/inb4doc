@@ -1,14 +1,5 @@
-const STORAGE_KEY = "inb4doc-storage";
 const PREFS_KEY = "inb4doc-prefs";
 const PENDING_OPS_KEY = "inb4doc-pending-ops";
-
-export interface WikiStorage {
-  patches: [string, string][];
-  lastServerTime?: [string, number][];
-  frontmatter?: [string, Record<string, string | number | undefined>][];
-  bodies?: [string, string][];
-  baselines?: [string, string][];
-}
 
 export type ImageStorageMode = "file" | "base64"
 
@@ -36,44 +27,21 @@ export function savePrefs(prefs: WikiPrefs) {
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 }
 
-export function loadStorage(): WikiStorage {
+export function savePendingOps(ops: unknown[], providerKey?: string): void {
+  const key = providerKey ? `${PENDING_OPS_KEY}-${providerKey}` : PENDING_OPS_KEY
+  try { localStorage.setItem(key, JSON.stringify(ops)) } catch {}
+}
+
+export function loadPendingOps<T = unknown[]>(providerKey?: string): T {
+  const key = providerKey ? `${PENDING_OPS_KEY}-${providerKey}` : PENDING_OPS_KEY
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const data = JSON.parse(raw);
-      return {
-        patches: data.patches || [],
-        lastServerTime: data.lastServerTime || [],
-        frontmatter: data.frontmatter || [],
-        bodies: data.bodies || [],
-        baselines: data.baselines || [],
-      };
-    }
-  } catch {}
-  return { patches: [] };
-}
-
-export function saveStorage(storage: WikiStorage) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
-}
-
-export function savePendingOps(ops: unknown[]): void {
-  try { localStorage.setItem(PENDING_OPS_KEY, JSON.stringify(ops)) } catch {}
-}
-
-export function loadPendingOps<T = unknown[]>(): T {
-  try {
-    const raw = localStorage.getItem(PENDING_OPS_KEY)
+    const raw = localStorage.getItem(key)
     if (raw) return JSON.parse(raw)
   } catch {}
   return [] as unknown as T
 }
 
-export function clearPendingOpsStorage(): void {
-  localStorage.removeItem(PENDING_OPS_KEY)
-}
-
-/** Clear all cached storage data from localStorage. Useful when switching to/from localStorage provider. */
-export function clearStorage() {
-  localStorage.removeItem(STORAGE_KEY);
+export function clearPendingOpsStorage(providerKey?: string): void {
+  const key = providerKey ? `${PENDING_OPS_KEY}-${providerKey}` : PENDING_OPS_KEY
+  localStorage.removeItem(key)
 }

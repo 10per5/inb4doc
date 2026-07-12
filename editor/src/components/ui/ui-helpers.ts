@@ -1,6 +1,6 @@
 import { html } from "lit-html"
 
-export type ButtonVariant = "primary" | "danger" | "default"
+export type ButtonVariant = "primary" | "danger" | "success" | "default"
 
 export const overlayStyles = `
 #inb4doc-dialog-overlay {
@@ -44,6 +44,10 @@ export const buttonStyles = `
   background: var(--color-error); color: #fff; border-color: var(--color-error);
 }
 .inb4doc-btn.inb4doc-btn-danger:hover { background: #a9444e; }
+.inb4doc-btn.inb4doc-btn-success {
+  background: #28a745; color: #fff; border-color: #28a745;
+}
+.inb4doc-btn.inb4doc-btn-success:hover { background: #218838; }
 `
 
 export function miniWindow(title: string, body: unknown, actions: unknown) {
@@ -67,5 +71,6 @@ export function actionBtn(opts: ButtonOpts) {
   const cls = ["inb4doc-btn"]
   if (opts.variant === "primary") cls.push("inb4doc-btn-primary")
   if (opts.variant === "danger") cls.push("inb4doc-btn-danger")
+  if (opts.variant === "success") cls.push("inb4doc-btn-success")
   return html`<button class=${cls.join(" ")} ?disabled=${opts.disabled ?? false}>${opts.label}</button>`
 }

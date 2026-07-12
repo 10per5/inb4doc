@@ -41,7 +41,6 @@ const args = [
   "src/app.ts",
   "--outdir",
   "public/assets",
-  "--minify",
   "--splitting",
   "--define",
   "__VUE_OPTIONS_API__=true",
@@ -50,6 +49,7 @@ const args = [
   "--define",
   "__VUE_PROD_HYDRATION_MISMATCH_DETAILS__=false",
 ];
+if (!watch) args.splice(4, 0, "--minify");
 if (withMeta) args.push("--metafile-md=/tmp/opencode/bundle-report.md");
 if (watch) args.push("--watch");
 

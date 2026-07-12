@@ -1,4 +1,8 @@
 import type { TreeNode } from "@/components/panels/sidebar"
+import { PendingOpType, type PendingOp } from "@/entities/PendingOps"
+
+export type { PendingOp }
+export { PendingOpType }
 
 export function collectLeaves(tree: TreeNode, prefix = ""): string[] {
   const leaves: string[] = [];
@@ -12,12 +16,6 @@ export function collectLeaves(tree: TreeNode, prefix = ""): string[] {
   }
   return leaves;
 }
-
-export type PendingOp =
-  | { type: "create"; path: string; content: string }
-  | { type: "delete"; path: string }
-  | { type: "rename"; from: string; to: string; content?: string }
-  | { type: "move"; from: string; to: string; content?: string }
 
 export function setPath(tree: TreeNode, path: string): void {
   const parts = path.split("/")
@@ -38,7 +36,7 @@ export function setPath(tree: TreeNode, path: string): void {
   }
 }
 
-function removePath(tree: TreeNode, path: string): void {
+export function removePath(tree: TreeNode, path: string): void {
   const parts = path.split("/")
   let node = tree
   for (let i = 0; i < parts.length - 1; i++) {
@@ -60,17 +58,17 @@ export function applyPendingOps(tree: TreeNode, ops: PendingOp[]): TreeNode {
   const result: TreeNode = JSON.parse(JSON.stringify(tree))
   for (const op of ops) {
     switch (op.type) {
-      case "create":
+      case PendingOpType.Create:
         setPath(result, op.path)
         break
-      case "delete":
-        removePath(result, op.path)
+      case PendingOpType.Delete:
+        // Keep the node in the tree — sidebar renders it with a "pending-delete" badge.
         break
-      case "rename":
+      case PendingOpType.Rename:
         removePath(result, op.from)
         setPath(result, op.to)
         break
-      case "move":
+      case PendingOpType.Move:
         removePath(result, op.from)
         setPath(result, op.to)
         break

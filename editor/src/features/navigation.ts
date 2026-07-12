@@ -1,25 +1,5 @@
-import { editorSelfBase } from "@/config"
 import type { TreeNode } from "@/components/panels/sidebar"
-import { getProvider } from "@/providers/provider-registry"
-import { stripFrontmatter } from "@/utils/frontmatter"
-import type { MetaPanelData } from "@/components/panels/meta-panel"
 import { pushPath, getCurrentPath } from "@/utils/url"
-
-export async function fetchContent(path: string): Promise<{
-  content: string
-  frontmatter: MetaPanelData | null
-}> {
-  const provider = getProvider()
-  const raw = await provider.readFile(path)
-  if (!raw) return { content: "# New Page\n\nStart writing...", frontmatter: null }
-  const { frontmatter, body } = stripFrontmatter(raw)
-  return { content: body, frontmatter }
-}
-
-export async function fetchRaw(path: string): Promise<string> {
-  const provider = getProvider()
-  return (await provider.readFile(path)) || ""
-}
 
 export function collectPageList(tree: TreeNode, prefix = ""): string[] {
   const pages: string[] = []

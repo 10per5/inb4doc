@@ -3,6 +3,7 @@ import type { EditorView } from "@milkdown/kit/prose/view"
 import type { EditorState } from "@milkdown/kit/prose/state"
 import { editorViewCtx } from "@milkdown/kit/core"
 import type { Ctx } from "@milkdown/kit/ctx"
+import { pageRepository } from "@/repositories/pageRepository"
 
 export class MentionView {
   provider: SlashProvider
@@ -98,7 +99,7 @@ export class MentionView {
   private renderItems(filter: string) {
     const lowerFilter = filter.toLowerCase()
     const matching = this.pageList.filter(p => {
-      const title = this.pageTitles[p] || p.replace(/\//g, " ").replace(/-/g, " ").replace(/\.md$/, "")
+      const title = this.pageTitles[p] || pageRepository.getOrCreate(p).name
       return title.toLowerCase().includes(lowerFilter) || p.toLowerCase().includes(lowerFilter)
     })
 
@@ -109,7 +110,7 @@ export class MentionView {
     }
 
     this.content.innerHTML = matching.map(p => {
-      const title = this.pageTitles[p] || p.replace(/\//g, " / ").replace(/-/g, " ").replace(/\.md$/, "")
+      const title = this.pageTitles[p] || pageRepository.getOrCreate(p).name
       return `<div data-page="${p}" data-title="${title}">${title}</div>`
     }).join("")
 

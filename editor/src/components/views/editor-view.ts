@@ -1,11 +1,11 @@
-import type { ViewManager, ViewType } from "@/components/views/view"
+import type { ViewController, ViewType } from "@/controllers/view-controller"
 
 export interface EditorViewOptions {
   sourceMode: () => boolean
 }
 
 export function registerEditorView(
-  registerFn: ViewManager["register"],
+  registerFn: ViewController["register"],
   opts: EditorViewOptions,
 ) {
   const milkdownEl = document.getElementById("milkdown-editor")!

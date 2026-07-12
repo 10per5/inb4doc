@@ -1,11 +1,11 @@
 import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
 import type { Ctx } from "@milkdown/kit/ctx"
 import { serializerCtx } from "@milkdown/kit/core"
-import { cache } from "@/stores/cache"
+import { pageRepository } from "@/repositories/pageRepository"
 
 export interface DirtyPluginConfig {
-  lastSetContent: Map<string, string>
-  currentPath: string
+  getLastSetContent: (path: string) => string
+  setLastSetContent: (path: string, content: string) => void
   onDirtyChange?: (dirty: boolean) => void
   getCurrentPath: () => string
 }
@@ -17,10 +17,10 @@ export function createDirtyPlugin(ctx: Ctx, config: DirtyPluginConfig) {
       update: (view, prevState) => {
         if (!prevState) return
         const path = config.getCurrentPath()
-        const prevLastSet = config.lastSetContent.get(path) ?? ""
+        const prevLastSet = config.getLastSetContent(path)
         if (prevLastSet === "") {
           const serializer = ctx.get(serializerCtx)
-          config.lastSetContent.set(
+          config.setLastSetContent(
             path,
             serializer(view.state.doc)
               .replace(/\r\n/g, "\n")
@@ -34,9 +34,9 @@ export function createDirtyPlugin(ctx: Ctx, config: DirtyPluginConfig) {
           .replace(/\r\n/g, "\n")
           .replace(/\n+$/, "\n")
         if (md === prevLastSet) return
-        config.lastSetContent.set(path, md)
-        cache.setBody(path, md)
-        cache.sync()
+        config.setLastSetContent(path, md)
+        pageRepository.getOrCreate(path).setBody(md)
+        pageRepository.save()
         config.onDirtyChange?.(true)
       },
     }),

@@ -1,18 +1,36 @@
 import { confirmDialog, promptDialog, promptCreateDialog } from "@/components/dialogs/dialog"
 import { serializeFrontmatter } from "@/utils/frontmatter"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
-import { cache } from "@/stores/cache"
-import type { CacheManagementService } from "@/services/cache-management-service"
+import { pageRepository } from "@/repositories/pageRepository"
+import type { FileSyncController } from "@/controllers/file-sync-controller"
 import { showNotification } from "@/components/notification/notification"
+import { treeStore } from "@/stores/tree-store"
+import { HOME_PATH, validateHugoSlug } from "@/utils/hugo-compat"
+
+function dirIsEmpty(parentDir: string): boolean {
+  const tree = treeStore.getTree()
+  const children = parentDir
+    ? (tree[parentDir] as Record<string, unknown> | undefined)
+    : tree
+  if (!children) return true
+  return Object.keys(children).length === 0
+}
 
 export async function createNewItem(
-  cacheService: CacheManagementService,
+  cacheService: FileSyncController,
   pagePath: string,
   doNavigate: (path: string) => void,
   loadSidebar: () => Promise<void>,
   isFolder?: boolean,
 ): Promise<void> {
-  const result = await promptCreateDialog("New")
+  const parentDir = isFolder
+    ? pagePath
+    : pagePath.includes("/")
+      ? pagePath.substring(0, pagePath.lastIndexOf("/"))
+      : ""
+
+  const isDirEmpty = dirIsEmpty(parentDir)
+  const result = await promptCreateDialog("New", { defaultValue: isDirEmpty ? HOME_PATH : undefined })
   if (!result) return
 
   const slug = result.name
@@ -21,20 +39,15 @@ export async function createNewItem(
     .replace(/[^a-z0-9_-]/g, "")
   if (!slug) return
 
-  if (slug.startsWith("_") && slug !== "_index") {
-    alert('Only "_index" is allowed as a name starting with "_".')
+  const slugError = validateHugoSlug(slug)
+  if (slugError) {
+    alert(slugError)
     return
   }
 
-  const parentDir = isFolder
-    ? pagePath
-    : pagePath.includes("/")
-      ? pagePath.substring(0, pagePath.lastIndexOf("/"))
-      : ""
-
   if (result.asDirectory) {
     const dirPath = parentDir ? `${parentDir}/${slug}` : slug
-    const indexPath = `${dirPath}/_index`
+    const indexPath = `${dirPath}/${HOME_PATH}`
     if (await cacheService.pathExists(indexPath)) {
       showNotification(`"${indexPath}" already exists.`, { title: "Duplicate", type: "warning" })
       return
@@ -45,9 +58,10 @@ export async function createNewItem(
     const content = `---\n${fmStr}\n---\n\n${body}`
 
     cacheService.queueCreate(indexPath, content)
-    cache.setFrontmatter(indexPath, fmData)
-    cache.cacheBody(indexPath, body)
-    cache.setBaseline(indexPath, body)
+    const idxPage = pageRepository.getOrCreate(indexPath)
+    idxPage.setFrontmatter(fmData)
+    idxPage.bodyState.cacheBody(body)
+    idxPage.setBaseline(body)
 
     await loadSidebar()
     doNavigate(indexPath)
@@ -63,9 +77,10 @@ export async function createNewItem(
     const content = `---\n${fmStr}\n---\n\n${body}`
 
     cacheService.queueCreate(fullPath, content)
-    cache.setFrontmatter(fullPath, fmData)
-    cache.cacheBody(fullPath, body)
-    cache.setBaseline(fullPath, body)
+    const fp = pageRepository.getOrCreate(fullPath)
+    fp.setFrontmatter(fmData)
+    fp.bodyState.cacheBody(body)
+    fp.setBaseline(body)
 
     await loadSidebar()
     doNavigate(fullPath)
@@ -73,7 +88,7 @@ export async function createNewItem(
 }
 
 export async function deletePage(
-  cacheService: CacheManagementService,
+  cacheService: FileSyncController,
   pagePath: string,
   afterDelete: () => void
 ): Promise<boolean> {
@@ -91,7 +106,7 @@ export async function deletePage(
 }
 
 export async function renamePage(
-  cacheService: CacheManagementService,
+  cacheService: FileSyncController,
   pagePath: string,
   afterRename: (newPath: string | null) => void,
   validateSlug?: (slug: string, parentDir: string) => string | null | Promise<string | null>,
@@ -105,8 +120,9 @@ export async function renamePage(
     .replace(/[^a-z0-9_-]/g, "")
   if (!slug) return
 
-  if (slug.startsWith("_") && slug !== "_index") {
-    alert('Only "_index" is allowed as a name starting with "_".')
+  const slugError = validateHugoSlug(slug)
+  if (slugError) {
+    alert(slugError)
     return
   }
 
@@ -127,7 +143,7 @@ export async function renamePage(
 }
 
 export async function createDirectory(
-  cacheService: CacheManagementService,
+  cacheService: FileSyncController,
   parentPath: string,
   doNavigate: (path: string) => void,
   loadSidebar: () => Promise<void>
@@ -145,8 +161,9 @@ export async function createDirectory(
     .replace(/[^a-z0-9_-]/g, "")
   if (!slug) return
 
-  if (slug.startsWith("_") && slug !== "_index") {
-    alert('Only "_index" is allowed as a name starting with "_".')
+  const slugError = validateHugoSlug(slug)
+  if (slugError) {
+    alert(slugError)
     return
   }
 
@@ -158,16 +175,17 @@ export async function createDirectory(
   const content = `---\n${fmStr}\n---\n\n${body}`
 
   cacheService.queueCreate(indexPath, content)
-  cache.setFrontmatter(indexPath, fmData)
-  cache.cacheBody(indexPath, body)
-  cache.setBaseline(indexPath, body)
+  const idp = pageRepository.getOrCreate(indexPath)
+  idp.setFrontmatter(fmData)
+  idp.bodyState.cacheBody(body)
+  idp.setBaseline(body)
 
   await loadSidebar()
   doNavigate(indexPath)
 }
 
 export async function movePage(
-  cacheService: CacheManagementService,
+  cacheService: FileSyncController,
   from: string,
   to: string,
   afterMove: () => void

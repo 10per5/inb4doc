@@ -7,6 +7,10 @@ const IMAGE_PREFIX = "inb4doc:image:"
 export class LocalStorageProvider implements ContentProvider {
   readonly name = "localStorage"
 
+  async isAvailable(): Promise<boolean> {
+    return true
+  }
+
   async getTree(): Promise<TreeNode> {
     const result: TreeNode = {}
     const mdKeys = this.getAllMdKeys()

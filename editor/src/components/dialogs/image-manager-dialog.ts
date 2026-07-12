@@ -1,20 +1,20 @@
 import { html, render } from "lit-html"
-import { listImages, deleteImage, getCurrentDocDir, getAllImages } from "@/services/image-config"
+import { imageRepository } from "@/repositories/imageRepository"
 import { showNotification } from "@/components/notification/notification"
 
 export async function mountImageManagerDialog(): Promise<void> {
-  const dir = getCurrentDocDir()
+  const dir = imageRepository.getCurrentDocDir()
 
   // Fetch data first, then render once — avoids stale "Loading…" text
-  let entries: Awaited<ReturnType<typeof listImages>> = []
+  let entries: Awaited<ReturnType<typeof imageRepository.listImages>> = []
   let loadError: string | null = null
   try {
-    entries = await listImages(true)
+    entries = await imageRepository.listImages(true)
   } catch (e: any) {
     loadError = e.message
   }
 
-  const allEntries = getAllImages()
+  const allEntries = imageRepository.getAllImages()
 
   const overlayId = "inb4doc-image-mgr-" + Math.random().toString(36).slice(2)
   const overlay = document.createElement("div")
@@ -130,7 +130,7 @@ export async function mountImageManagerDialog(): Promise<void> {
         if (!name) return
         if (!confirm(`Delete "${name}"?`)) return
         try {
-          await deleteImage(name)
+          await imageRepository.deleteImage(name)
           const row = btn.closest(".img-row") as HTMLElement
           row.remove()
           const remaining = overlay.querySelectorAll(".img-row").length

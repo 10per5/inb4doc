@@ -1,4 +1,5 @@
 import { html, render } from "lit-html"
+import { isHugoIndex, HUGO_INDEX_HINT } from "@/utils/hugo-compat"
 
 export interface ConfirmOptions {
   title: string
@@ -132,10 +133,11 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
   })
 }
 
-export function promptCreateDialog(title: string): Promise<CreateDialogResult | null> {
+export function promptCreateDialog(title: string, opts?: { defaultValue?: string }): Promise<CreateDialogResult | null> {
   const overlay = createOverlay()
   const inputId = "inb4doc-create-input-" + Math.random().toString(36).slice(2)
   const checkId = "inb4doc-create-check-" + Math.random().toString(36).slice(2)
+  const hintId = "inb4doc-create-hint-" + Math.random().toString(36).slice(2)
 
   const close = () => overlay.remove()
 
@@ -144,14 +146,20 @@ export function promptCreateDialog(title: string): Promise<CreateDialogResult | 
       .inb4doc-dialog-check { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 1rem; }
       .inb4doc-dialog-check input { width: auto; margin: 0; }
       .inb4doc-dialog-check label { margin: 0; cursor: pointer; }
+      .inb4doc-hint { font-size: 0.82rem; color: var(--color-text-secondary); margin-top: 0.3rem; min-height: 1.2rem; }
     </style>
     <div class="inb4doc-dialog-box" @click=${(e: MouseEvent) => e.stopPropagation()}>
       <h3>${title}</h3>
       <label for="${inputId}">Name</label>
-      <input id="${inputId}" type="text" placeholder="My Page" @keydown=${(e: KeyboardEvent) => {
+      <input id="${inputId}" type="text" placeholder="My Page" value="${opts?.defaultValue ?? ""}" @input=${(e: Event) => {
+        const val = (e.target as HTMLInputElement).value.trim()
+        const hintEl = document.getElementById(hintId)
+        if (hintEl) hintEl.textContent = isHugoIndex(val) ? HUGO_INDEX_HINT : ""
+      }} @keydown=${(e: KeyboardEvent) => {
         if (e.key === "Enter") (e.target as HTMLElement).closest(".inb4doc-dialog-box")?.querySelector<HTMLElement>(".inb4doc-dialog-confirm")?.click()
         if (e.key === "Escape") close()
       }}>
+      <div id="${hintId}" class="inb4doc-hint">${opts?.defaultValue && isHugoIndex(opts.defaultValue) ? HUGO_INDEX_HINT : ""}</div>
       <div class="inb4doc-dialog-check">
         <input id="${checkId}" type="checkbox">
         <label for="${checkId}">Create directory</label>

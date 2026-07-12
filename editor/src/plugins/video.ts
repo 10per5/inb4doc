@@ -233,7 +233,7 @@ export const videoView = $view(videoSchema.node, () => {
     })
 
     wrapper.addEventListener("click", (e) => {
-      if (e.target === editBtn || editBtn.contains(e.target as Node)) return
+      if (e.target === editBtn || (editBtn as HTMLElement).contains(e.target as Element)) return
       if ((e.target as HTMLElement).closest("video")) return
       e.preventDefault()
       dispatchEditEvent(view, getPos)
@@ -260,7 +260,7 @@ export const videoView = $view(videoSchema.node, () => {
       video.loop = a.loop
       video.muted = a.muted
       video.autoplay = a.autoplay
-      video.playsinline = a.playsinline
+      video.playsInline = a.playsinline
       if (a.width) video.style.width = a.width + (String(a.width).match(/^\d+$/) ? "px" : "")
       if (a.height) video.style.maxHeight = a.height + (String(a.height).match(/^\d+$/) ? "px" : "")
       while (video.firstChild) video.removeChild(video.firstChild)

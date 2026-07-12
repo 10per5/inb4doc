@@ -4,12 +4,19 @@ import { liveIcon } from "@/components/ui/icons";
 import { confirmDialog } from "@/components/dialogs/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { buildEditorUrl } from "@/utils/url";
-import type { PendingOp } from "@/utils/tree";
+import { pageRepository } from "@/repositories/pageRepository";
+import { PendingOpType, type PendingOp } from "@/utils/tree";
 import {
   collectPagePaths,
   searchContent,
   type SearchMatch,
 } from "@/features/search/sidebar-search";
+import {
+  isRootPath,
+  isHomePageFilename,
+  HOME_FILENAME,
+  nodeWeight,
+} from "@/utils/hugo-compat";
 
 const fileIcon = html`<svg
   class="sidebar-icon sidebar-icon-file"
@@ -87,28 +94,28 @@ export function mountSidebar(
   rawTree?: TreeNode,
 ) {
   const basePath = editorSelfBase;
-  const page = current === "_index" ? "" : `/${current}`;
+  const page = isRootPath(current) ? "" : `/${current}`;
   const baseUrl = liveUrlBase || (isDev ? "http://localhost:5000" : "");
   const liveUrl = baseUrl
     ? `${baseUrl}${providerType === "localStorage" ? "" : page}`
     : "";
 
   const pendingDeleteSet = new Set(
-    pendingOps?.filter((o) => o.type === "delete").map((o) => o.path) ?? [],
+    pendingOps?.filter((o) => o.type === PendingOpType.Delete).map((o) => o.path) ?? [],
   );
   const pendingRenameFromSet = new Set(
-    pendingOps?.filter((o) => o.type === "rename").map((o) => o.from) ?? [],
+    pendingOps?.filter((o) => o.type === PendingOpType.Rename).map((o) => o.from) ?? [],
   );
   const pendingRenameToMap = new Map(
-    pendingOps?.filter((o) => o.type === "rename").map((o) => [o.from, o.to]) ??
+    pendingOps?.filter((o) => o.type === PendingOpType.Rename).map((o) => [o.from, o.to]) ??
       [],
   );
   const pendingCreateSet = new Set(
-    pendingOps?.filter((o) => o.type === "create").map((o) => o.path) ?? [],
+    pendingOps?.filter((o) => o.type === PendingOpType.Create).map((o) => o.path) ?? [],
   );
   const pendingMoveToSet = new Set(
     pendingOps
-      ?.filter((o) => o.type === "move" || o.type === "rename")
+      ?.filter((o) => o.type === PendingOpType.Move || o.type === PendingOpType.Rename)
       .map((o) => o.to) ?? [],
   );
   const dirtySet = new Set(dirtyPaths ?? []);
@@ -151,7 +158,7 @@ export function mountSidebar(
     }
     if (pendingMoveToSet.has(pagePath)) {
       const from = pendingOps?.find(
-        (o) => (o.type === "move" || o.type === "rename") && o.to === pagePath,
+        (o) => (o.type === PendingOpType.Move || o.type === PendingOpType.Rename) && o.to === pagePath,
       );
       if (from && "from" in from) {
         result.push(
@@ -190,23 +197,11 @@ export function mountSidebar(
     }
     const entries = Object.entries(display).sort(
       ([nameA, valA], [nameB, valB]) => {
-        if (nameA === "_index.md") return -1;
-        if (nameB === "_index.md") return 1;
+        if (isHomePageFilename(nameA)) return -1;
+        if (isHomePageFilename(nameB)) return 1;
 
-        const weightA =
-          valA != null && typeof valA === "object" && "weight" in valA
-            ? ((valA as PageNode).weight ?? Infinity)
-            : valA != null && typeof valA === "object" && "_index.md" in valA
-              ? ((valA as Record<string, unknown>)["_index.md"] as PageNode)
-                  ?.weight ?? Infinity
-              : Infinity;
-        const weightB =
-          valB != null && typeof valB === "object" && "weight" in valB
-            ? ((valB as PageNode).weight ?? Infinity)
-            : valB != null && typeof valB === "object" && "_index.md" in valB
-              ? ((valB as Record<string, unknown>)["_index.md"] as PageNode)
-                  ?.weight ?? Infinity
-              : Infinity;
+        const weightA = nodeWeight(valA);
+        const weightB = nodeWeight(valB);
 
         if (weightA !== weightB) return weightA - weightB;
         return nameA.localeCompare(nameB);
@@ -223,15 +218,7 @@ export function mountSidebar(
       if (isPage) {
         const pagePath = path.replace(/\.md$/, "");
         const active = pagePath === current;
-        let label: string;
-        if (name === "_index.md") {
-          label = !prefix ? "Home" : "Index";
-        } else {
-          label = name
-            .replace(/\.md$/, "")
-            .replace(/-/g, " ")
-            .replace(/^\w/, (c) => c.toUpperCase());
-        }
+        const label = pageRepository.getOrCreate(path).name;
         return html` <div
           class="nav-item${pendingClass(name, prefix)}"
           draggable="true"
@@ -242,7 +229,7 @@ export function mountSidebar(
         >
           <a
             href="${buildEditorUrl(basePath, pagePath)}"
-            class="nav-link ${active ? "active" : ""}${name === "_index.md" &&
+            class="nav-link ${active ? "active" : ""}${isHomePageFilename(name) &&
             !prefix
               ? " nav-link-home"
               : ""}${pendingClass(name, prefix)}"
@@ -277,9 +264,7 @@ export function mountSidebar(
         childrenDepth,
         rawChild,
       );
-      const label = name
-        .replace(/-/g, " ")
-        .replace(/^\w/, (c) => c.toUpperCase());
+      const label = pageRepository.getOrCreate(name).name;
       const collapsed = collapsedSections.get(path) ?? false;
       return html` <div
         class="nav-section${collapsed ? " collapsed" : ""}"
@@ -544,7 +529,7 @@ export function mountSidebar(
   function getVisibleItems(): HTMLAnchorElement[] {
     const items = container.querySelectorAll<HTMLAnchorElement>(".nav-link");
     return Array.from(items).filter(
-      (a) => a.offsetParent !== null && a.closest(".nav-item")?.style.display !== "none"
+      (a) => a.offsetParent !== null && (a.closest(".nav-item") as HTMLElement | null)?.style.display !== "none"
     );
   }
 
@@ -594,21 +579,17 @@ export function mountSidebar(
         }}
         @keydown=${handleSidebarKeydown}
       >
-        ${treeEmpty
-          ? html`
-              <div class="sidebar-provider-bar">
-                <span class="provider-label"
-                  >${providerIcon ?? ""} ${providerLabel ?? "No provider"}</span
-                >
-                <button
-                  class="provider-change-btn"
-                  @click=${() => actions.onChangeProvider()}
-                >
-                  Change
-                </button>
-              </div>
-            `
-          : html``}
+        <div class="sidebar-provider-bar">
+          <span class="provider-label"
+            >${providerIcon ?? ""} ${providerLabel ?? "No provider"}</span
+          >
+          <button
+            class="provider-change-btn"
+            @click=${() => actions.onChangeProvider()}
+          >
+            Switch
+          </button>
+        </div>
         ${treeEmpty
           ? html``
           : html`
