@@ -9,8 +9,11 @@ export default class extends Controller {
   async connect() {
     const initialPath = this.data.get("path") || getCurrentPath()
     this.app = new AppController({ initialPath })
-    await this.app.initialize()
-    hideLoadingOverlay()
+    try {
+      await this.app.initialize()
+    } finally {
+      hideLoadingOverlay()
+    }
   }
 
   disconnect() {

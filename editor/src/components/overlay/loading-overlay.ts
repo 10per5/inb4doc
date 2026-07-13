@@ -8,17 +8,19 @@
  * re-fetch); `hideLoadingOverlay()` fades it out once the app is ready.
  */
 
+import { editorSelfBase } from "@/config";
+
 const LOADER_ID = "initial-loader";
 const LOADER_STYLE_ID = "initial-loader-style";
 
 const SKELETON = `
   <div class="il-window">
-    <img class="il-logo" src="inb4doc-256.png" alt="inb4doc" width="256" height="256" />
+    <img class="il-logo" src="${editorSelfBase}inb4doc-256.png" alt="inb4doc" width="256" height="256" />
     <div class="il-titlebar">
       <span class="il-dot"></span>
       <span class="il-dot"></span>
       <span class="il-dot"></span>
-      <img class="il-logo-sm" src="inb4doc-32.png" alt="inb4doc" width="18" height="18" />
+      <img class="il-logo-sm" src="${editorSelfBase}inb4doc-32.png" alt="inb4doc" width="18" height="18" />
       <span class="il-title">inb4doc</span>
     </div>
     <div class="il-body">

@@ -7,14 +7,21 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Load PREDEP SHAs
+      id: predep-shas
+      run: |
+        get_sha() { awk -v k="$1" '$1==k":"{print $2}' .github/predep-shas.yml; }
+        echo "package=$(get_sha package)" >> $GITHUB_OUTPUT
+      shell: bash
+
     - name: Download predep
       shell: bash
       run: |
         curl -sL \
-          https://github.com/10per5/predep/releases/download/v0.0.1/predep-linux-x86_64.tar.gz \
+          https://github.com/10per5/predep/releases/download/v0.0.2/predep-linux-x86_64.tar.gz \
           -o /tmp/predep.tar.gz
         tar xzf /tmp/predep.tar.gz -C /usr/local/bin
 
     - name: Distribute shared assets
       shell: bash
-      run: predep --privileged ${{ steps.predep-sha.outputs.sha }} init
+      run: predep --privileged ${{ steps.predep-shas.outputs.package }} init

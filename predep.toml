@@ -23,13 +23,14 @@ files = [
   ] },
   { source = "root://images/inb4doc-32.png", dests = [
       "root://editor/static/inb4doc-32.png",
+      "root://editor/static/favicon.png",
+      "root://gui/bin/icon.png",
   ] },
   { source = "root://images/inb4doc-256.png", dests = [
       "root://editor/static/inb4doc-256.png",
   ] },
   { source = "root://images/inb4doc-64.png", dests = [
       "root://hugo-view/static/favicon.png",
-      "root://gui/bin/icon.png",
   ] },
 ]
 
@@ -63,7 +64,7 @@ bundle = "inb4doc"
 # depends = ["build"]
 artifacts = [
     { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui", binary = true },
-    { source = "root://images/inb4doc-64.png", dest = "icon.png" },
+    { source = "root://images/inb4doc-32.png", dest = "icon.png" },
     { source = "root://editor/public", dest = "editor" },
 ]
 
@@ -72,7 +73,7 @@ dir = "/opt/inb4doc"
 symlink = true
 artifacts = [
   { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui" },
-  { source = "root://images/inb4doc-64.png", dest = "icon.png" },
+  { source = "root://images/inb4doc-32.png", dest = "icon.png" },
   { source = "root://editor/public/",      dest = "editor" },
   { source = "root://content",            dest = "content" },
 ]
