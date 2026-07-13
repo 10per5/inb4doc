@@ -11,10 +11,34 @@ path = "hugo-view/predep.toml"
 path = "gui/predep.toml"
 
 [[stages]]
+name = "init"
+description = "Distribute shared icons from images/ into each subproject's git-ignored asset folder"
+type = "copy"
+source_dir = "root://images"
+fail_if_missing = true
+files = [
+  { source = "root://images/favicon.ico", dests = [
+      "root://editor/public/favicon.ico",
+      "root://hugo-view/static/favicon.ico",
+  ] },
+  { source = "root://images/inb4doc-32.png", dests = [
+      "root://editor/static/inb4doc-32.png",
+  ] },
+  { source = "root://images/inb4doc-256.png", dests = [
+      "root://editor/static/inb4doc-256.png",
+  ] },
+  { source = "root://images/inb4doc-64.png", dests = [
+      "root://hugo-view/static/favicon.png",
+      "root://gui/bin/icon.png",
+  ] },
+]
+
+[[stages]]
 name = "build"
 description = "Build all subprojects"
 type = "group"
 depends = [
+    "init",
     "editor::build",
     "hugo-view::build",
     "gui::build",
@@ -25,6 +49,7 @@ name = "docker"
 description = "Build all subprojects via Docker"
 type = "group"
 depends = [
+    "init",
     "editor::docker",
     "hugo-view::docker",
     "gui::docker",
@@ -38,6 +63,7 @@ bundle = "inb4doc"
 # depends = ["build"]
 artifacts = [
     { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui", binary = true },
+    { source = "root://images/inb4doc-64.png", dest = "icon.png" },
     { source = "root://editor/public", dest = "editor" },
 ]
 
@@ -46,8 +72,7 @@ dir = "/opt/inb4doc"
 symlink = true
 artifacts = [
   { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui" },
+  { source = "root://images/inb4doc-64.png", dest = "icon.png" },
   { source = "root://editor/public/",      dest = "editor" },
   { source = "root://content",            dest = "content" },
-  { source = "root://hugo-view/themes",   dest = "hugo/themes" },
-  { source = "root://hugo-view/hugo.toml",dest = "hugo/hugo.toml" },
 ]

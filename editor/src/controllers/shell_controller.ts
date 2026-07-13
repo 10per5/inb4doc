@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { AppController } from "@/controllers/app-controller"
 import { getCurrentPath } from "@/utils/url"
+import { hideLoadingOverlay } from "@/components/overlay/loading-overlay"
 
 export default class extends Controller {
   private app!: AppController
@@ -9,6 +10,7 @@ export default class extends Controller {
     const initialPath = this.data.get("path") || getCurrentPath()
     this.app = new AppController({ initialPath })
     await this.app.initialize()
+    hideLoadingOverlay()
   }
 
   disconnect() {

@@ -441,11 +441,14 @@ static std::vector<std::string> find_image_refs(
     if (!fs::exists(scan_dir)) return refs;
 
     auto recurse = [&](const fs::path &dir, auto &self) -> void {
-        for (const auto &e : fs::directory_iterator(dir))
+        std::error_code ec;
+        for (const auto &e : fs::directory_iterator(dir, ec))
         {
             auto ename = e.path().filename().string();
             if (ename[0] == '.') continue;
-            if (fs::is_directory(e.path()))
+            auto estatus = e.status(ec);
+            if (ec) continue;
+            if (fs::is_directory(estatus))
             {
                 if (ename == "image") continue;
                 self(e.path(), self);
@@ -497,9 +500,11 @@ saucer::scheme::response handle_list_images(
     }
 
     std::vector<std::string> names;
-    for (const auto &e : fs::directory_iterator(resolved))
+    std::error_code ec;
+    for (const auto &e : fs::directory_iterator(resolved, ec))
     {
-        if (!fs::is_regular_file(e.path())) continue;
+        auto estatus = e.status(ec);
+        if (ec || !fs::is_regular_file(estatus)) continue;
         auto name = e.path().filename().string();
         if (is_image_ext(name)) names.push_back(name);
     }
@@ -601,9 +606,11 @@ void remove_orphaned_images(
     if (!fs::exists(image_dir) || !fs::is_directory(image_dir)) return;
 
     // Remove unreferenced images
-    for (const auto &e : fs::directory_iterator(image_dir))
+    std::error_code ec;
+    for (const auto &e : fs::directory_iterator(image_dir, ec))
     {
-        if (!fs::is_regular_file(e.path())) continue;
+        auto estatus = e.status(ec);
+        if (ec || !fs::is_regular_file(estatus)) continue;
         auto name = e.path().filename().string();
         if (!is_image_ext(name)) continue;
 

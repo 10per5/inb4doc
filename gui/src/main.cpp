@@ -20,7 +20,18 @@ static std::optional<config> resolve_config(const parsed_args &args)
     cfg.disable_gpu = args.disable_gpu;
     cfg.no_ignore = args.no_ignore;
     cfg.depth = args.depth;
-    cfg.favicon = args.favicon;
+    if (args.favicon.empty())
+    {
+        auto self = fs::path(exe_path());
+        auto beside = self.parent_path() / "icon.png";
+        std::error_code ec;
+        if (!beside.empty() && fs::exists(beside, ec))
+            cfg.favicon = beside.string();
+    }
+    else
+    {
+        cfg.favicon = args.favicon;
+    }
     cfg.live_port = args.live_port;
     cfg.live_url = "http://127.0.0.1:" + std::to_string(args.live_port);
 
@@ -75,35 +86,25 @@ static std::optional<config> resolve_config(const parsed_args &args)
     auto content_root = args.content_root;
     if (content_root.empty())
     {
+        // No content directory was passed. Default to the current directory
+        // and let the editor fall back to local storage (e.g. browser
+        // localStorage) when there are no markdown files to open — this is
+        // no longer a fatal condition.
         content_root = ".";
-        bool has_md = false;
-        if (fs::is_directory(content_root))
+        if (!fs::exists(content_root) || !fs::is_directory(content_root))
+            content_root.clear();
+    }
+
+    if (!content_root.empty())
+    {
+        if (!fs::exists(content_root) || !fs::is_directory(content_root))
         {
-            for (const auto &entry : fs::directory_iterator(content_root))
-            {
-                if (entry.is_regular_file() && entry.path().extension() == ".md")
-                {
-                    has_md = true;
-                    break;
-                }
-            }
-        }
-        if (!has_md)
-        {
-            std::cerr << "error: you must specify a directory "
-                         "with valid markdown files\n";
+            std::cerr << "error: --content-root '" << content_root
+                      << "' is not a valid directory\n";
             return std::nullopt;
         }
+        cfg.content_root = fs::canonical(content_root).string();
     }
-
-    if (!fs::exists(content_root) || !fs::is_directory(content_root))
-    {
-        std::cerr << "error: --content-root '" << content_root
-                  << "' is not a valid directory\n";
-        return std::nullopt;
-    }
-
-    cfg.content_root = fs::canonical(content_root).string();
 
     cfg.editor_url = "app://_/";
     cfg.use_app_scheme = true;

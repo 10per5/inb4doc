@@ -64,10 +64,25 @@ function contentType(path: string): string {
   return MIME[ext] || "application/octet-stream";
 }
 
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function withCors(res: Response): Response {
+  for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
+  return res;
+}
+
 Bun.serve({
   port: PORT,
   hostname: HOST,
   async fetch(req: Request): Promise<Response> {
+    if (req.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     const url = new URL(req.url);
     let path = url.pathname;
 
@@ -83,7 +98,7 @@ Bun.serve({
     };
 
     const apiResult = await handleApiRoutes(req, path, ctx);
-    if (apiResult) return apiResult;
+    if (apiResult) return withCors(apiResult);
 
     function metaInject(html: string): string {
       return interpolateHtml(html);
@@ -106,9 +121,9 @@ Bun.serve({
     const editorPath = join(EDITOR_DIR, path === "/" ? "index.html" : path);
     const result =
       serveFile(editorPath) || serveFile(join(EDITOR_DIR, "index.html"));
-    if (result) return result;
+    if (result) return withCors(result);
 
-    return new Response("Not found", { status: 404 });
+    return withCors(new Response("Not found", { status: 404 }));
   },
 });
 

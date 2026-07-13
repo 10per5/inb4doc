@@ -1,6 +1,6 @@
 import { html } from "lit-html"
 
-export type ButtonVariant = "primary" | "danger" | "success" | "default"
+export type ButtonVariant = "primary" | "danger" | "success" | "warning" | "default"
 
 export const overlayStyles = `
 #inb4doc-dialog-overlay {

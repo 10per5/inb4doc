@@ -13,7 +13,7 @@ struct config
     std::string editor_root;        ///< Path to editor frontend (has public/)
     std::string content_root;       ///< Path to markdown content root
     std::string favicon;            ///< Optional window icon path
-    std::size_t live_port = 5000;   ///< Port for internal_url() whitelist
+    std::size_t live_port = 5000;   ///< Port for live preview server
     std::size_t max_content_size = 10 * 1024 * 1024; ///< Max PUT body / upload file (bytes)
     bool disable_gpu = false;       ///< --disable-gpu
     bool no_ignore = false;         ///< --no-ignore

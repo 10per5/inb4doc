@@ -1,6 +1,7 @@
 #include "app.h"
 #include "platform.h"
 #include "scheme.h"
+#include "security.h"
 #include <saucer/smartview.hpp>
 #include <saucer/icon.hpp>
 #include <saucer/webview.hpp>
@@ -119,19 +120,10 @@ static void save_zoom(const std::filesystem::path &data_dir, float zoom)
         ofs << zoom;
 }
 
-static bool internal_url(std::size_t live_port,
-                         const std::string &scheme,
-                         const std::optional<std::string> &host,
-                         const std::optional<std::size_t> &port)
+static bool is_allowed(const saucer::url &url)
 {
-    if (scheme == "app")
-        return true;
-    if (!host.has_value() || host->empty())
-        return true;
-    if (!port.has_value())
-        return false;
-    return (*host == "localhost" || *host == "127.0.0.1") &&
-           (*port == live_port);
+    return security::check(security::parse_url(url.string()))
+           != security::verdict::block;
 }
 
 int run_app(config cfg)
@@ -216,7 +208,7 @@ int run_app(config cfg)
                             host.value_or("(null)"),
                             port.has_value() ? std::to_string(*port) : "(null)");
 
-                    if (internal_url(safe->live_port, scheme, host, port))
+                    if (is_allowed(nav.url()))
                     {
                         if (nav.new_window())
                         {
@@ -310,11 +302,8 @@ int run_app(config cfg)
                     toast(wv, "Could not open link");
                     return;
                 }
-                auto scheme = parsed->scheme();
-                auto host = parsed->host();
-                auto port = parsed->port();
 
-                if (internal_url(safe->live_port, scheme, host, port))
+                if (is_allowed(*parsed))
                     wv.set_url(url);
                 else
                     toast(wv, "This website is external, open it in your "

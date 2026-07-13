@@ -6,6 +6,7 @@ import type { ProviderType } from "@/providers/index"
 
 export interface ProviderDialogResult {
   type: ProviderType
+  configChanged: boolean
 }
 
 export async function mountProviderDialog(
@@ -30,8 +31,10 @@ export async function mountProviderDialog(
 
     function accept() {
       if (!selectedType) return
+      const cur = connectionStore.getConfig()
+      const configChanged = cur.host !== origHost || cur.port !== origPort
       overlay.remove()
-      resolve({ type: selectedType })
+      resolve({ type: selectedType, configChanged })
     }
 
     const providerBadges: Record<string, { icon: string; label: string }> = {
@@ -42,16 +45,27 @@ export async function mountProviderDialog(
 
     const currentInfo = providerBadges[currentProvider] || { icon: "❓", label: currentProvider }
     const conn = connectionStore.getConfig()
+    const origHost = conn.host
+    const origPort = conn.port
 
     function renderBody() {
       const remoteAvailable = connectionStore.remoteAvailable
+      const remoteAppFallback = providers.find((p) => p.type === "remote")?.appFallback ?? false
+      const remoteGuiFallback = providers.find((p) => p.type === "remote")?.guiFallback ?? false
       const remoteReason = !remoteAvailable
-        ? "Server not reachable — enter host/port and wait"
+        ? (remoteAppFallback
+            ? "inb4doc app://_/ endpoint is used"
+            : remoteGuiFallback
+              ? "ℹ️ inb4doc-gui local API is used"
+              : "Server not reachable — enter host/port and wait")
         : undefined
 
       const mergedProviders = providers.map((p) => ({
         ...p,
-        available: p.type === "remote" ? remoteAvailable || p.type === currentProvider : p.available,
+        // The remote option is selectable when the server is reachable OR the
+        // embedded GUI app:// content API is being used as a fallback.
+        // Otherwise it stays disabled.
+        available: p.type === "remote" ? (remoteAvailable || remoteAppFallback || remoteGuiFallback) : p.available,
         reason: p.type === "remote" ? remoteReason : p.reason,
       }))
 
@@ -74,8 +88,8 @@ export async function mountProviderDialog(
                   <div class="provider-option-info">
                     <div class="provider-option-name">${providerBadges[p.type]?.label || p.type}</div>
                     <div class="provider-option-desc">${p.description}</div>
-                    ${!p.available && p.reason
-                      ? html`<div class="provider-option-reason">⛔ ${p.reason}</div>`
+                    ${p.reason && p.type !== "remote"
+                      ? html`<div class="provider-option-reason ${(p as any).appFallback || (p as any).guiFallback ? "info" : ""}">${(p as any).appFallback || (p as any).guiFallback ? "ℹ️" : "⛔"} ${p.reason}</div>`
                       : ""}
                     ${p.type === currentProvider
                       ? html`<div class="provider-option-current-badge">current</div>`
@@ -126,6 +140,7 @@ export async function mountProviderDialog(
             .provider-option-name { font-weight: 600; font-size: 0.95rem; color: var(--color-text-primary); }
             .provider-option-desc { font-size: 0.8rem; color: var(--color-text-tertiary); margin-top: 0.15rem; }
             .provider-option-reason { font-size: 0.8rem; color: var(--color-error); margin-top: 0.25rem; }
+            .provider-option-reason.info { color: var(--color-info, #3b82f6); }
             .provider-option-current-badge {
               display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.4rem;
               border-radius: 3px; background: var(--color-accent); color: #fff; margin-top: 0.25rem;
@@ -143,6 +158,8 @@ export async function mountProviderDialog(
             .remote-status { font-size: 0.8rem; margin-top: 0.3rem; min-height: 1.2rem; }
             .remote-status.ok { color: var(--color-success, #28a745); }
             .remote-status.err { color: var(--color-error); }
+            .remote-status.warn { color: var(--color-warning, #d9822b); }
+            .remote-status.info { color: var(--color-info, #3b82f6); }
           </style>
           <div class="inb4doc-window" @click=${(e: MouseEvent) => e.stopPropagation()}>
             <div class="inb4doc-window-header">Change Project</div>
@@ -183,31 +200,56 @@ export async function mountProviderDialog(
         probeTimer = setTimeout(() => {
           const host = (document.getElementById(hostId) as HTMLInputElement)?.value.trim() || "localhost"
           const port = parseInt((document.getElementById(portId) as HTMLInputElement)?.value || "3000", 10)
+
+          // An explicit app:// host (app://_/, app://, app://_) uses the
+          // embedded content API directly — no HTTP server to probe.
+          const appFallback =
+            host === "app://" || host === "app://_" || host.startsWith("app://_/")
+
+          const remoteCard = overlay.querySelector('.provider-option[data-type="remote"]') as HTMLElement
+          const acceptBtn = overlay.querySelectorAll(".inb4doc-btn")[1] as HTMLButtonElement
+          const reasonEl = remoteCard?.querySelector(".provider-option-reason")
+
+          if (appFallback) {
+            connectionStore.setConfig(host, port)
+            if (statusEl) {
+              statusEl.textContent = "ℹ️ inb4doc-gui local API is used"
+              statusEl.className = "remote-status info"
+            }
+            remoteCard?.classList.remove("provider-option-disabled")
+            remoteCard && (remoteCard.style.cursor = "pointer")
+            if (selectedType === "remote") acceptBtn.disabled = false
+            return
+          }
+
           connectionStore.setConfig(host, port)
           connectionStore.probe().then((ok) => {
-            if (statusEl) {
-              statusEl.textContent = ok ? "✓ Online" : "✗ Cannot reach server"
-              statusEl.className = "remote-status " + (ok ? "ok" : "err")
-            }
-            // Update remote card disabled state without re-rendering inputs
-            const remoteCard = overlay.querySelector('.provider-option[data-type="remote"]') as HTMLElement
-            if (remoteCard) {
-              if (ok) {
-                remoteCard.classList.remove("provider-option-disabled")
-                remoteCard.style.cursor = "pointer"
-              } else {
-                remoteCard.classList.add("provider-option-disabled")
-                remoteCard.style.cursor = "not-allowed"
-                // Clear selection if remote was selected but is now unreachable
-                if (selectedType === "remote") {
-                  selectedType = null
-                  // Update Accept button disabled state
-                  const acceptBtn = overlay.querySelectorAll(".inb4doc-btn")[1] as HTMLButtonElement
-                  if (acceptBtn) acceptBtn.disabled = true
-                }
+            const inGuiMode = connectionStore.isInsideAppGui()
+            const isDefaultHost = host === "localhost" || host === "127.0.0.1"
+            const guiFallback = !ok && inGuiMode && (isDefaultHost || appFallback)
+
+            if (guiFallback) {
+              if (statusEl) {
+                statusEl.textContent = "ℹ️ inb4doc-gui local API is used"
+                statusEl.className = "remote-status info"
               }
-              const reasonEl = remoteCard.querySelector(".provider-option-reason")
-              if (reasonEl) reasonEl.remove()
+              remoteCard?.classList.remove("provider-option-disabled")
+              remoteCard && (remoteCard.style.cursor = "pointer")
+              if (selectedType === "remote") acceptBtn.disabled = false
+              return
+            }
+
+            if (statusEl) {
+              statusEl.textContent = ok
+                ? "✓ Online"
+                : "ℹ️ Server unavailable, falling back to inb4doc-gui app://_/"
+              statusEl.className = "remote-status " + (ok ? "ok" : "info")
+            }
+            if (remoteCard) {
+              remoteCard.classList.remove("provider-option-disabled")
+              remoteCard.style.cursor = "pointer"
+              if (!ok) reasonEl?.remove()
+              if (selectedType === "remote") acceptBtn.disabled = false
             }
           })
         }, 600)

@@ -85,7 +85,7 @@ RUN groupadd -r builduser && useradd -r -g builduser builduser \
 
 # ── Layer 8: predep (stage-resolver for vendor deps) ──────────────────
 RUN curl -sL \
-    https://github.com/10per5/predep/releases/download/v0.0.1/predep-linux-x86_64.tar.gz \
+    https://github.com/10per5/predep/releases/download/v0.0.2/predep-linux-x86_64.tar.gz \
     -o /tmp/predep.tar.gz \
     && tar xzf /tmp/predep.tar.gz -C /usr/local/bin \
     && predep --help > /dev/null

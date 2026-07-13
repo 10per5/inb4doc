@@ -167,7 +167,9 @@ export class NavigationController {
     const current = getProvider();
     const result = await mountProviderDialog(current.name);
 
-    if (!result || result.type === current.name) return;
+    if (!result) return;
+
+    if (result.type === current.name && !result.configChanged) return;
 
     try {
       pageRepository.save(cacheKeyForProvider(current.name));

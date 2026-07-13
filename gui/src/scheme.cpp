@@ -119,7 +119,8 @@ static void build_tree(const fs::path &dir, std::ostringstream &out,
     std::vector<item> items;
     bool recurse = depth == 0 || current_depth < depth;
 
-    for (auto &e : fs::directory_iterator(dir))
+    std::error_code ec;
+    for (auto &e : fs::directory_iterator(dir, ec))
     {
         auto name = e.path().filename().string();
         auto rel_path = rel_prefix.empty() ? name : rel_prefix + "/" + name;
@@ -127,10 +128,14 @@ static void build_tree(const fs::path &dir, std::ostringstream &out,
         if (name[0] == '.')
             continue;
 
-        if (!no_ignore && is_ignored(rel_path, fs::is_directory(e.path()), gi_patterns))
+        auto estatus = e.status(ec);
+        if (ec) continue;
+        auto is_dir = fs::is_directory(estatus);
+
+        if (!no_ignore && is_ignored(rel_path, is_dir, gi_patterns))
             continue;
 
-        if (fs::is_directory(e.path()))
+        if (is_dir)
         {
             if (!recurse)
                 continue;

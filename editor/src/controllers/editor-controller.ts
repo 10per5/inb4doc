@@ -26,6 +26,7 @@ import type { MentionView } from "@/features/mention";
 
 export class EditorController {
   private editor: Editor | null = null;
+  private host: EditorHost | null = null;
   private editorStates = new Map<string, any>();
   private lastSetContent = new Map<string, string>();
   private mentionView: MentionView | null = null;
@@ -61,6 +62,7 @@ export class EditorController {
       });
     }
     this.currentPath = path;
+    if (this.host) this.host.currentPath = path;
     const dir = this.currentPathDir();
     imageRepository.setCurrentDocDir(dir);
     getProvider()
@@ -82,9 +84,7 @@ export class EditorController {
 
     const host: EditorHost = {
       currentPathDir: () => this.currentPathDir(),
-      get currentPath() {
-        return "";
-      },
+      currentPath: this.currentPath,
       stateCache: {
         getLastSet: (p: string) => this.lastSetContent.get(p) ?? "",
         setLastSet: (p: string, c: string) => {
@@ -95,6 +95,7 @@ export class EditorController {
         this.mentionView = mv;
       },
     };
+    this.host = host;
     this.editor = await createEditor(editorEl, content, host);
   }
 
@@ -228,6 +229,7 @@ export class EditorController {
 
   destroy(): void {
     this.editor = null;
+    this.host = null;
     this.mentionView = null;
     this.editorStates.clear();
     this.lastSetContent.clear();

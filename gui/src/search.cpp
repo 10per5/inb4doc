@@ -209,13 +209,16 @@ saucer::scheme::response handle_search(
     auto walk = [&](const fs::path &dir, const std::string &prefix, auto &self) -> void
     {
         if (!fs::exists(dir)) return;
-        for (const auto &e : fs::directory_iterator(dir))
+        std::error_code ec;
+        for (const auto &e : fs::directory_iterator(dir, ec))
         {
             auto name = e.path().filename().string();
             auto rel = prefix.empty() ? name : prefix + "/" + name;
             if (name[0] == '.') continue;
 
-            if (e.is_directory())
+            auto estatus = e.status(ec);
+            if (ec) continue;
+            if (fs::is_directory(estatus))
             {
                 if (name == "image") continue;
                 self(e.path(), rel, self);

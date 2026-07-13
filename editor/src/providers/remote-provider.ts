@@ -4,12 +4,36 @@ import { connectionStore } from "@/stores/connection-store"
 export class RemoteProvider implements ContentProvider {
   readonly name = "remote"
 
+  /**
+   * True when the embedded `app://` content API should be used instead of a
+   * real HTTP server. This happens when the editor is loaded from the `app://`
+   * scheme (embedded GUI), or when the user explicitly configured an `app://`
+   * host (`app://_/`, `app://`, `app://_`).
+   */
+  get appFallback(): boolean {
+    if (typeof window !== "undefined" && window.location.protocol === "app:") {
+      return !connectionStore.remoteAvailable
+    }
+    const host = connectionStore.getHost()
+    return (
+      host === "app://" ||
+      host === "app://_" ||
+      host.startsWith("app://_/")
+    )
+  }
+
   private url(path: string): string {
+    if (this.appFallback) {
+      return path
+    }
     return `${connectionStore.getBaseUrl()}${path}`
   }
 
   async isAvailable(): Promise<boolean> {
-    return connectionStore.probe()
+    if (await connectionStore.probe()) {
+      return true
+    }
+    return this.appFallback
   }
 
   async getTree(): Promise<TreeNode> {

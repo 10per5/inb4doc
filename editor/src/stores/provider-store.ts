@@ -1,6 +1,8 @@
 import type { ContentProvider } from "@/providers/provider";
 import type { ProviderType } from "@/providers/index";
 import { createProviderByType } from "@/providers/index";
+import { RemoteProvider } from "@/providers/remote-provider";
+import { connectionStore } from "@/stores/connection-store";
 import { treeStore } from "@/stores/tree-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
 
@@ -64,6 +66,7 @@ export async function switchProvider(type: ProviderType): Promise<void> {
   const provider = createProviderByType(type);
   setProvider(provider);
   saveLastProvider(type);
+
   treeStore.setTree({});
 
   try {
@@ -77,24 +80,41 @@ export async function switchProvider(type: ProviderType): Promise<void> {
 }
 
 export async function getAvailableProviders(): Promise<
-  { type: ProviderType; description: string; available: boolean; reason?: string }[]
+  {
+    type: ProviderType;
+    description: string;
+    available: boolean;
+    appFallback?: boolean;
+    guiFallback?: boolean;
+    reason?: string;
+  }[]
 > {
-  const remote = createProviderByType("remote");
+  const remote = createProviderByType("remote") as RemoteProvider;
   const fs = createProviderByType("filesystem");
   const ls = createProviderByType("localStorage");
 
-  const [remoteOk, fsOk, lsOk] = await Promise.all([
-    remote.isAvailable(),
+  const [remoteReachable, fsOk, lsOk] = await Promise.all([
+    connectionStore.probe(),
     fs.isAvailable(),
     ls.isAvailable(),
   ]);
+  const remoteFallback = remote.appFallback;
+  const guiFallback = !remoteReachable && !remoteFallback && connectionStore.isInsideAppGui();
 
   return [
     {
       type: "remote",
       description: "Files served from a backend server via HTTP API",
-      available: remoteOk,
-      reason: remoteOk ? undefined : "No content server detected",
+      available: remoteReachable,
+      appFallback: remoteFallback,
+      guiFallback,
+      reason: remoteReachable
+        ? undefined
+        : remoteFallback
+          ? "inb4doc app://_/ endpoint is used"
+          : guiFallback
+            ? "ℹ️ inb4doc-gui local API is used"
+            : "No content server detected",
     },
     {
       type: "filesystem",
