@@ -133,19 +133,22 @@ export function applyNoConflict(
   const page = pageRepository.get(path)
   const cachedTime = page?.getServerTime() || 0
 
+  // Refresh the baseline from the current committed content. We deliberately do
+  // not clearPath here: setBaseline re-applies any in-progress patch, so an
+  // unflushed edit survives a reload instead of being silently discarded. This
+  // makes all providers behave consistently (localStorage now returns a real
+  // timestamp too) and fixes the asymmetry where only browser-storage pages
+  // appeared "Discard (+0 B)" after a reload.
   if (serverTime && serverTime > cachedTime) {
-    pageRepository.clearPath(path)
-    const fresh = pageRepository.getOrCreate(path)
-    fresh.setBaseline(body)
-    fresh.setServerTime(serverTime)
-    if (frontmatter) onMetaUpdate?.(frontmatter)
-    return body
+    pageRepository.getOrCreate(path).setBaseline(body)
+    pageRepository.getOrCreate(path).setServerTime(serverTime)
+  } else if (page && page.bodyState.baseline === undefined) {
+    pageRepository.getOrCreate(path).setBaseline(body)
   }
 
-  const existing = pageRepository.get(path)
   if (frontmatter) {
-    if (existing?.meta.dirty && existing.getFrontmatter()) {
-      onMetaUpdate?.(existing.getFrontmatter()!)
+    if (page?.meta.dirty && page.getFrontmatter()) {
+      onMetaUpdate?.(page.getFrontmatter()!)
     } else {
       pageRepository.getOrCreate(path).setFrontmatter(frontmatter)
       onMetaUpdate?.(frontmatter)
@@ -154,6 +157,5 @@ export function applyNoConflict(
     pageRepository.getOrCreate(path).removeFrontmatter()
     onMetaUpdate?.({ title: "" })
   }
-  pageRepository.getOrCreate(path).setBaseline(body)
   return pageRepository.get(path)?.bodyState.body ?? body
 }

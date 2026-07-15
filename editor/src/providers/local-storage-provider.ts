@@ -76,7 +76,11 @@ export class LocalStorageProvider implements ContentProvider {
   }
 
   async getServerTime(_path: string): Promise<number | null> {
-    return null
+    // localStorage has no real file mtime, but returning a monotonic timestamp
+    // lets the normal reload/reconcile path (applyNoConflict) treat it like the
+    // other backends. The baseline is refreshed from the stored content while any
+    // in-progress edit is preserved, instead of being discarded on every load.
+    return Date.now()
   }
 
   async search(query: string): Promise<SearchResult[]> {
