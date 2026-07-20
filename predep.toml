@@ -46,6 +46,14 @@ depends = [
 ]
 
 [[stages]]
+name = "copy-images"
+description = "Copy content images into Hugo build output"
+type = "copy"
+files = [
+  { source = "root://content/docs/image/", dests = ["root://hugo-view/build/docs/image/"] },
+]
+
+[[stages]]
 name = "docker"
 description = "Build all subprojects via Docker"
 type = "group"
