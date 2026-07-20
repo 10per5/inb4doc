@@ -4,7 +4,7 @@
 #   docker cp tmp:/output/. ./hugo-view/build/
 #   docker rm tmp
 
-FROM debian:trixie-slim AS builder
+FROM debian:trixie-20260623-slim AS builder
 
 RUN apt-get update && apt-get install -y \
     curl \

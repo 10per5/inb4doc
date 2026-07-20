@@ -11,6 +11,15 @@
   background: var(--color-bg-primary);
 }
 
+/* ── Content Column (toolbar + page) ──────────────────────────────── */
+
+.book-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
 /* ── Sidebar Menu ──────────────────────────────────────────────────── */
 
 .book-menu {
@@ -46,6 +55,8 @@
     position: fixed;
     top: 0;
     left: 0;
+    width: 260px;
+    display: flex;
     height: 100vh;
     z-index: 100;
     transform: translateX(-100%);

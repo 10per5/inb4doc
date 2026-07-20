@@ -1,0 +1,31 @@
+<% if (it.mobileCss) { %>
+/* ── Mobile / Tablet Overrides ──────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .app-toolbar {
+    flex-wrap: nowrap;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 0.5rem;
+    gap: 0;
+  }
+
+  .app-toolbar button {
+    padding: 0 0.2rem;
+    font-size: 0.72rem;
+  }
+
+  .toolbar-section {
+    margin-bottom: 0;
+    gap: 0;
+  }
+
+  .toolbar-sep {
+    margin: 0 0.15rem;
+  }
+
+  .toolbar-spacer {
+    flex-basis: auto;
+  }
+}
+<% } %>

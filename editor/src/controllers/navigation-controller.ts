@@ -8,12 +8,15 @@
 import { createNewItem, deletePage, renamePage, movePage } from "@/services/editor-actions";
 import { setupNavListeners, collectPageList } from "@/features/navigation";
 import { getProvider, switchProvider, cacheKeyForProvider, getProviderDisplayInfo } from "@/stores/provider-store";
-import { mountSidebar, type SidebarActions, type TreeNode } from "@/components/panels/sidebar";
-import { mountProviderDialog } from "@/components/dialogs/provider-dialog";
+import type SidebarController from "@/controllers/sidebar-controller";
+import { type SidebarActions, type TreeNode } from "@/components/panels/sidebar";
+import { openProviderDialog } from "@/components/dialogs/provider-dialog";
 import { showNotification } from "@/components/notification/notification";
 import { pageRepository } from "@/repositories/pageRepository";
 import { pushPath, replacePath } from "@/utils/url";
 import { appEvents, AppEvent } from "@/stores/app-events";
+import { dirtyTrackingService } from "@/services/dirty-tracking-service";
+import { flushSave } from "@/stores/persistence";
 import { PendingOpType } from "@/entities/PendingOps";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
@@ -36,12 +39,16 @@ export class NavigationController {
   private loading: boolean = false;
   private editor: EditorController;
   private cache: FileSyncController;
+  private sidebarEl: HTMLElement;
+  private sidebarController: SidebarController;
   private metaPanel: MetaPanelAPI | undefined;
   private unsubs: (() => void)[] = [];
 
-  constructor(editor: EditorController, cache: FileSyncController) {
+  constructor(editor: EditorController, cache: FileSyncController, sidebarEl: HTMLElement, sidebarController: SidebarController) {
     this.editor = editor;
     this.cache = cache;
+    this.sidebarEl = sidebarEl;
+    this.sidebarController = sidebarController;
 
     this.unsubs.push(
       appEvents.on(AppEvent.Navigate, ({ path }) => this.navigate(path)),
@@ -74,6 +81,11 @@ export class NavigationController {
     this.loading = true;
 
     try {
+      // Persist any pending debounced body edits + flush cache before leaving
+      // the current file, so fast navigation never drops the last edits.
+      dirtyTrackingService.flush();
+      flushSave();
+
       this.currentPath = path;
       appEvents.emit(AppEvent.ViewChanged, { view: "editor" as any });
       this.editor.setCurrentPath(path);
@@ -83,8 +95,8 @@ export class NavigationController {
         pushPath(path);
       }
 
-      const sourceEl = document.getElementById("source-editor");
-      const editorEl = document.getElementById("milkdown-editor");
+      const sourceEl = this.editor.sourceTarget;
+      const editorEl = this.editor.milkdownTarget;
       if (sourceEl && editorEl) {
         sourceEl.style.display = "none";
         editorEl.style.display = "block";
@@ -107,15 +119,14 @@ export class NavigationController {
       }
 
       await this.loadSidebar();
-      this.cache.updateDirtyCounter();
+      dirtyTrackingService.recompute();
     } finally {
       this.loading = false;
     }
   }
 
   async loadSidebar(): Promise<void> {
-    const sidebarEl = document.getElementById("sidebar-nav");
-    if (!sidebarEl) return;
+    if (!this.sidebarEl) return;
 
     try {
       const provider = getProvider();
@@ -153,7 +164,16 @@ export class NavigationController {
       };
 
       const pdi = getProviderDisplayInfo(provider.name);
-      mountSidebar(sidebarEl, mergedTree, this.currentPath, actions, pdi.icon, pdi.label, provider.name, pendingOps, dirtyPaths);
+      this.sidebarController.load({
+        tree: mergedTree,
+        current: this.currentPath,
+        actions,
+        providerIcon: pdi.icon,
+        providerLabel: pdi.label,
+        providerType: provider.name,
+        pendingOps,
+        dirtyPaths,
+      });
       setupNavListeners((path: string) => this.navigate(path));
 
       const pages = collectPageList(mergedTree);
@@ -165,7 +185,7 @@ export class NavigationController {
 
   async changeProvider(): Promise<void> {
     const current = getProvider();
-    const result = await mountProviderDialog(current.name);
+    const result = await openProviderDialog(current.name);
 
     if (!result) return;
 
@@ -180,7 +200,7 @@ export class NavigationController {
       pageRepository.load(cacheKeyForProvider(result.type));
 
       await this.loadSidebar();
-      this.cache.updateDirtyCounter();
+      dirtyTrackingService.recompute();
 
       const pages = collectPageList(treeStore.getTree());
       const home = resolveHomePageFromPaths(pages);
@@ -200,13 +220,13 @@ export class NavigationController {
   async deletePage(pagePath: string): Promise<void> {
     await deletePage(this.cache, pagePath, () => {
       pageRepository.clearPath(pagePath);
-      pageRepository.save();
+      flushSave();
       if (this.currentPath === pagePath) {
         this.navigate(HOME_PATH);
       } else {
         this.loadSidebar();
       }
-      this.cache.updateDirtyCounter();
+      dirtyTrackingService.recompute();
     });
   }
 
@@ -214,13 +234,13 @@ export class NavigationController {
     await renamePage(this.cache, pagePath, (newPath) => {
       if (newPath == null) return;
       pageRepository.clearPath(pagePath);
-      pageRepository.save();
+      flushSave();
       if (this.currentPath === pagePath) {
         this.navigate(newPath);
       } else {
         this.loadSidebar();
       }
-      this.cache.updateDirtyCounter();
+      dirtyTrackingService.recompute();
     }, async (slug, parentDir) => {
       if (slug === HOME_PATH) {
         const tree = treeStore.getTree();
@@ -237,13 +257,13 @@ export class NavigationController {
     await movePage(this.cache, from, to, () => {
       pageRepository.clearPath(from);
       pageRepository.clearPath(to);
-      pageRepository.save();
+      flushSave();
       if (this.currentPath === from) {
         this.navigate(to);
         replacePath(to);
       }
       this.loadSidebar();
-      this.cache.updateDirtyCounter();
+      dirtyTrackingService.recompute();
     });
   }
 }

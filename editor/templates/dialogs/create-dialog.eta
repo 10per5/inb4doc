@@ -1,0 +1,14 @@
+<div class="inb4doc-dialog-box" onclick="event.stopPropagation()" data-controller="create-dialog">
+  <h3><%= it.title %></h3>
+  <label for="<%= it.inputId %>">Name</label>
+  <input id="<%= it.inputId %>" type="text" placeholder="My Page" value="<%= it.defaultValue ?? '' %>" data-action="input->create-dialog#inputChanged keydown->create-dialog#keydown">
+  <div id="<%= it.hintId %>" class="inb4doc-hint"><%= it.hint %></div>
+  <div class="inb4doc-dialog-check">
+    <input id="<%= it.checkId %>" type="checkbox">
+    <label for="<%= it.checkId %>">Create directory</label>
+  </div>
+  <div class="inb4doc-dialog-actions">
+    <button class="inb4doc-dialog-cancel" data-action="click->create-dialog#cancel">Cancel</button>
+    <button class="inb4doc-dialog-confirm" data-action="click->create-dialog#onEnter">Create</button>
+  </div>
+</div>

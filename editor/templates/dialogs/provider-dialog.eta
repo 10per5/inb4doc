@@ -1,0 +1,57 @@
+<div class="inb4doc-window" data-controller="provider-dialog" onclick="event.stopPropagation()">
+  <div class="inb4doc-window-header">Change Project</div>
+  <div class="inb4doc-window-body">
+    <div class="provider-dialog-body">
+      <div class="provider-current">
+        Currently using:
+        <strong><%= it.currentInfo.icon %> <%= it.currentInfo.label %></strong>
+      </div>
+      <div class="provider-options">
+        <% it.providers.forEach(function(p) { %>
+          <div
+            class="provider-option <%= p.available ? '' : 'provider-option-disabled' %> <%= it.selectedType === p.type ? 'provider-option-selected' : '' %> <%= p.type === it.currentProvider ? 'provider-option-active' : '' %>"
+            data-type="<%= p.type %>"
+            <% if (p.available) { %>data-action="click->provider-dialog#selectProvider"<% } %>
+            role="button"
+            tabindex="<%= p.available ? '0' : '-1' %>"
+          >
+            <div class="provider-option-icon"><%= it.badges[p.type]?.icon || '❓' %></div>
+            <div class="provider-option-info">
+              <div class="provider-option-name"><%= it.badges[p.type]?.label || p.type %></div>
+              <div class="provider-option-desc"><%= p.description %></div>
+              <% if (p.reason && p.type !== "remote") { %>
+                <div class="provider-option-reason <%= p.appFallback || p.guiFallback ? 'info' : '' %>">
+                  <%= p.appFallback || p.guiFallback ? 'ℹ️' : '⛔' %> <%= p.reason %>
+                </div>
+              <% } %>
+              <% if (p.type === it.currentProvider) { %>
+                <div class="provider-option-current-badge">current</div>
+              <% } %>
+              <% if (p.type === "remote") { %>
+                <div class="remote-section" data-action="click->provider-dialog#stopPropagation">
+                  <div class="remote-fields">
+                    <div class="remote-field">
+                      <label>Host</label>
+                      <input type="text" value="<%= it.conn.host %>" placeholder="localhost"
+                        data-action="input->provider-dialog#scheduleProbe">
+                    </div>
+                    <div class="remote-field" style="max-width:80px">
+                      <label>Port</label>
+                      <input type="number" value="<%= it.conn.port %>" placeholder="3000"
+                        data-action="input->provider-dialog#scheduleProbe">
+                    </div>
+                  </div>
+                  <div class="remote-status <%= it.initialStatusClass %>"><%= it.initialStatusText %></div>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+  <div class="inb4doc-window-actions">
+    <button class="inb4doc-btn inb4doc-btn-danger" data-action="click->provider-dialog#cancel">Cancel</button>
+    <button class="inb4doc-btn inb4doc-btn-success" <%= !it.selectedType ? 'disabled' : '' %> data-action="click->provider-dialog#accept">Accept</button>
+  </div>
+</div>

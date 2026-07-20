@@ -1,0 +1,4 @@
+<div class="menu-item<%= it.active ? ' active' : '' %><%= it.disabled ? ' disabled' : '' %>"<% if (it.id) { %> id="<%= it.id %>"<% } %> data-action="menu-item">
+  <% if (it.icon) { %><span class="menu-item-icon"><%= it.icon %></span><% } %>
+  <span class="menu-item-label"><%= it.label || '' %></span>
+</div>

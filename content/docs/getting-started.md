@@ -5,6 +5,8 @@ weight: 1
 
 # Getting Started
 
+![1.00](image/image-0he7dh.png)
+
 ## Prerequisites
 
 * [Docker](https://docs.docker.com/engine/install/) — primary build method
@@ -35,7 +37,7 @@ All build recipes are declared in `predep.toml` at each subproject root, the roo
 ### Build Artifacts
 
 ```
-gui/bin/inb4doc-gui             # ~1.2MB — GUI binary (links Qt6 at runtime)
+gui/bin/inb4doc-gui          # ~1.2MB — GUI binary (links Qt6 at runtime)
 editor/public/assets/app.js  # Editor frontend JS (minified)
 editor/public/assets/app.css # Editor frontend CSS (minified)
 editor/public/index.html     # Static HTML shell

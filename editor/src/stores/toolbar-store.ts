@@ -1,8 +1,8 @@
 /**
  * ToolbarStore — manages toolbar visibility and auto-hide behavior.
  *
- * Stores scroll position and sticky preference. Handles scroll/focus
- * event listeners for auto-hide functionality.
+ * The toolbar uses CSS `position: sticky` for scroll tracking (compositor-thread).
+ * This store only handles the auto-hide class toggle based on scroll direction.
  */
 
 export interface ToolbarConfig {
@@ -20,7 +20,7 @@ export class ToolbarStore {
   constructor(config: ToolbarConfig) {
     this.toolbar = document.getElementById("app-toolbar")
     this.editorEl = document.getElementById("milkdown-editor")
-    this.autoHidePref = config.stickyToolbar
+    this.autoHidePref = !config.stickyToolbar
   }
 
   initialize(): void {
@@ -30,20 +30,17 @@ export class ToolbarStore {
     this.showOnFocus = this.createFocusHandler()
 
     const layoutEl = document.querySelector(".book-layout")
-
     layoutEl?.addEventListener("scroll", this.onScroll, { passive: true })
-    window.addEventListener("scroll", this.onScroll, { passive: true })
 
     this.editorEl?.addEventListener("focusin", this.showOnFocus)
     this.editorEl?.addEventListener("click", this.showOnFocus)
   }
 
   setStickyPreference(sticky: boolean): void {
-    this.autoHidePref = sticky
+    this.autoHidePref = !sticky
 
-    if (!sticky) {
+    if (sticky) {
       this.toolbar?.classList.remove("hidden")
-      this.toolbar?.removeAttribute("style")
     }
   }
 
@@ -52,7 +49,6 @@ export class ToolbarStore {
 
     const layoutEl = document.querySelector(".book-layout")
     layoutEl?.removeEventListener("scroll", this.onScroll)
-    window.removeEventListener("scroll", this.onScroll)
 
     this.editorEl?.removeEventListener("focusin", this.showOnFocus)
     this.editorEl?.removeEventListener("click", this.showOnFocus)
@@ -60,16 +56,14 @@ export class ToolbarStore {
 
   private createScrollHandler(): () => void {
     return () => {
-      if (!this.autoHidePref || !this.toolbar) return
+      if (!this.toolbar || !this.autoHidePref) return
 
       const layoutEl = document.querySelector(".book-layout")
-      const sy = layoutEl?.scrollTop ?? window.scrollY
+      const sy = layoutEl?.scrollTop ?? 0
 
       if (sy > 100 && sy > this.lastScrollY) {
-        this.toolbar.style.top = sy + "px"
         this.toolbar.classList.add("hidden")
       } else if (sy < this.lastScrollY) {
-        this.toolbar.style.top = sy + "px"
         this.toolbar.classList.remove("hidden")
       }
 
@@ -81,11 +75,9 @@ export class ToolbarStore {
     return () => {
       if (!this.toolbar) return
 
-      const layoutEl = document.querySelector(".book-layout")
-      const sy = layoutEl?.scrollTop ?? window.scrollY
-
-      this.toolbar.style.top = sy + "px"
-      this.toolbar.classList.remove("hidden")
+      if (this.autoHidePref) {
+        this.toolbar.classList.remove("hidden")
+      }
     }
   }
 }

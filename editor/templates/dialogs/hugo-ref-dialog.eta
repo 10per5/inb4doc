@@ -1,0 +1,11 @@
+<div class="inb4doc-hugoref-box" onclick="event.stopPropagation()" data-controller="hugoref-dialog">
+  <label for="<%= it.pathId %>">Page Path</label>
+  <input id="<%= it.pathId %>" type="text" placeholder="/docs/my-page" value="<%= it.currentPath %>" data-action="keydown->hugoref-dialog#keydown">
+  <label for="<%= it.titleId %>">Display Text</label>
+  <input id="<%= it.titleId %>" type="text" placeholder="My Page" value="<%= it.currentTitle %>" data-action="keydown->hugoref-dialog#keydown">
+  <div class="inb4doc-hugoref-actions">
+    <button class="inb4doc-hugoref-remove" data-action="click->hugoref-dialog#remove">Remove</button>
+    <button class="inb4doc-hugoref-cancel" data-action="click->hugoref-dialog#cancel">Cancel</button>
+    <button class="inb4doc-hugoref-save" data-action="click->hugoref-dialog#save">Save</button>
+  </div>
+</div>

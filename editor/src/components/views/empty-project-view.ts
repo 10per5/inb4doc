@@ -5,10 +5,10 @@
  * Gives the user a clear action: create their first page.
  */
 
-import { html, render } from "lit-html"
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { ProjectAction, PROJECT_ACTION_PREFIX, SidebarAction, SIDEBAR_ACTION_PREFIX } from "@/config/enums"
 
-const styles = html`
+const styles = `
   <style>
     .empty-project {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -39,20 +39,23 @@ const styles = html`
 `
 
 export function mountEmptyProjectView(container: HTMLElement): void {
-  const tmpl = html`
+  const tmpl = `
     ${styles}
     <div class="empty-project">
       <h2>Current project is empty</h2>
       <p>Create your first page to get started. You can always add more from the sidebar.</p>
       <div class="btn-row">
-        <button class="create-btn" @click=${() => {
-          appEvents.emit(AppEvent.CreateFirstPage)
-        }}>Create a page</button>
-        <button class="change-btn" @click=${() => {
-          appEvents.emit(AppEvent.ProviderChangeRequested)
-        }}>Change provider</button>
+        <button class="create-btn" data-action="${PROJECT_ACTION_PREFIX}${ProjectAction.CreatePage}">Create a page</button>
+        <button class="change-btn" data-action="${SIDEBAR_ACTION_PREFIX}${SidebarAction.ChangeProvider}">Change provider</button>
       </div>
     </div>
   `
-  render(tmpl, container)
+  container.innerHTML = tmpl
+
+  container.querySelector(`[data-action="${PROJECT_ACTION_PREFIX}${ProjectAction.CreatePage}"]`)?.addEventListener("click", () => {
+    appEvents.emit(AppEvent.CreateFirstPage)
+  })
+  container.querySelector(`[data-action="${SIDEBAR_ACTION_PREFIX}${SidebarAction.ChangeProvider}"]`)?.addEventListener("click", () => {
+    appEvents.emit(AppEvent.ProviderChangeRequested)
+  })
 }

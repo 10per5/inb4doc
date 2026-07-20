@@ -33,18 +33,18 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
-.ctx-menu [data-action] {
+.ctx-menu .ctx-action {
   padding: 0.4rem 0.8rem;
   cursor: pointer;
   border-radius: 3px;
   font-size: 0.85rem;
 }
 
-.ctx-menu [data-action]:hover {
+.ctx-menu .ctx-action:hover {
   background: var(--color-bg-tertiary);
 }
 
-.ctx-menu [data-action="delete"] {
+.ctx-menu .action-delete {
   color: var(--color-error);
 }
 

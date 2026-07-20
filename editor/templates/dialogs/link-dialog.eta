@@ -1,0 +1,8 @@
+<div class="inb4doc-link-box" onclick="event.stopPropagation()" data-controller="link-dialog">
+  <label for="<%= it.inputId %>">URL</label>
+  <input id="<%= it.inputId %>" type="text" placeholder="https://example.com" value="<%= it.initialUrl %>" data-action="keydown->link-dialog#keydown">
+  <div class="inb4doc-link-actions">
+    <button class="inb4doc-link-cancel" data-action="click->link-dialog#cancel">Cancel</button>
+    <button class="inb4doc-link-save" data-action="click->link-dialog#onEnter">Save</button>
+  </div>
+</div>

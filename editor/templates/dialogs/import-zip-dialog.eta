@@ -1,0 +1,32 @@
+<div class="inb4doc-window" onclick="event.stopPropagation()" data-controller="import-zip-dialog">
+  <div class="inb4doc-window-header">Import from Zip</div>
+  <div class="inb4doc-window-body">
+    <% if (it.newEntries.length > 0) { %>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-tertiary);padding:4px 0 2px;text-transform:uppercase;letter-spacing:0.5px">New files</div>
+      <% it.newEntries.forEach(function(e, i) { %>
+        <label class="import-file-row">
+          <input type="checkbox" checked data-idx="<%= i %>" data-type="new" data-action="change->import-zip-dialog#toggle">
+          <span class="import-file-path"><%= e.relPath %></span>
+          <span class="import-file-badge new">New</span>
+        </label>
+      <% }) %>
+    <% } %>
+    <% if (it.replaceEntries.length > 0) { %>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-tertiary);padding:8px 0 2px;text-transform:uppercase;letter-spacing:0.5px">Will replace</div>
+      <% it.replaceEntries.forEach(function(e, i) { %>
+        <label class="import-file-row">
+          <input type="checkbox" data-idx="<%= i %>" data-type="replace" data-action="change->import-zip-dialog#toggle">
+          <span class="import-file-path"><%= e.relPath %></span>
+          <span class="import-file-badge replace">Replace</span>
+        </label>
+      <% }) %>
+    <% } %>
+  </div>
+  <div class="inb4doc-window-actions">
+    <label style="display:flex;align-items:center;gap:6px;margin-right:auto;font-size:0.85rem;cursor:pointer">
+      <input type="checkbox" id="replace-all-check" data-action="change->import-zip-dialog#replaceAll"> Replace all
+    </label>
+    <button class="inb4doc-btn inb4doc-btn-primary" id="import-btn" disabled data-action="click->import-zip-dialog#import">Import</button>
+    <button class="inb4doc-btn" id="cancel-btn" data-action="click->import-zip-dialog#cancel">Cancel</button>
+  </div>
+</div>

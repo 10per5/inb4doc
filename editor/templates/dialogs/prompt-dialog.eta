@@ -1,0 +1,11 @@
+<div class="inb4doc-dialog-box" onclick="event.stopPropagation()" data-controller="prompt-dialog">
+  <h3><%= it.title %></h3>
+  <% if (it.label) { %>
+    <label for="<%= it.inputId %>"><%= it.label %></label>
+  <% } %>
+  <input id="<%= it.inputId %>" type="text" placeholder="<%= it.placeholder ?? '' %>" value="<%= it.value ?? '' %>" data-action="keydown->prompt-dialog#keydown">
+  <div class="inb4doc-dialog-actions">
+    <button class="inb4doc-dialog-cancel" data-action="click->prompt-dialog#cancel"><%= it.cancelLabel ?? "Cancel" %></button>
+    <button class="inb4doc-dialog-confirm" data-action="click->prompt-dialog#onEnter"><%= it.confirmLabel ?? "Create" %></button>
+  </div>
+</div>

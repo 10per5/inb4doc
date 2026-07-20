@@ -56,3 +56,29 @@ Extract the server into its own package (`server/package.json`) with its own `Do
 | Swipe from right edge     | Open meta-panel                   |
 | Long-press on block       | Select for drag                   |
 | Swipe left/right on block | Quick actions (delete, duplicate) |
+
+## Provider Sidebar Containers
+
+Restyle the sidebar into collapsible provider containers with favorites, stations, and a unified provider panel.
+
+### Key changes
+
+- `provider-store.ts` gains a stations registry (`inb4doc-stations` in `localStorage`)
+- `tree-store.ts` supports per-station tree cache
+- `sidebar.ts` renders one container per favorited station instead of a single provider bar
+- `provider-dialog.ts` becomes a station panel: saved stations list + create-new options
+- Active station is expanded on load; others are collapsed but never auto-collapsed
+
+### Assumptions to revisit
+
+- Provider sidebar plan originally assumed a single active provider with future cross-container DnD. This is still the intent, but station defaults should be seeded based on `BuildMode` (e.g., `web-remote` seeds only `localStorage`, `gui-desktop` seeds the embedded API station).
+- FS Access handles cannot be serialized → `filesystem` station is a single-entry favorite for now.
+
+### Validation
+
+- Sidebar lists favorited stations as collapsible containers
+- Hover star toggles favorite; removing active station is prevented
+- Gear opens provider/station panel; creating a remote station saves and switches
+- Clicking a non-active container header activates it without collapsing others
+- Search, drag/drop, rename/delete still work inside the active container
+- Reload → favorites persist, active container expanded

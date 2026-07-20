@@ -33,26 +33,31 @@ import {
   videoIcon,
 } from "@/components/ui/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
-import { mountVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
+import { openVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
 import { imageRepository } from "@/repositories/imageRepository";
+import {
+  SlashCommand, SLASH_CMD_PREFIX,
+  ImageAction, IMG_ACTION_PREFIX,
+  ProseNodeType, proseNodeTypeByName,
+} from "@/config/enums";
 
 const slash = slashFactory("inb4doc");
 
-type SlashItem = { cmd: string; label: string; icon: string; level?: number };
+type SlashItem = { cmd: SlashCommand; label: string; icon: string; level?: number };
 const SLASH_ITEMS: SlashItem[] = [
-  { cmd: "heading", label: "Heading 1", icon: h1Icon, level: 1 },
-  { cmd: "heading", label: "Heading 2", icon: h2Icon, level: 2 },
-  { cmd: "heading", label: "Heading 3", icon: h3Icon, level: 3 },
-  { cmd: "bullet_list", label: "Bullet List", icon: bulletListIcon },
-  { cmd: "ordered_list", label: "Ordered List", icon: orderedListIcon },
-  { cmd: "todo_list", label: "Task List", icon: todoListIcon },
-  { cmd: "blockquote", label: "Blockquote", icon: quoteIcon },
-  { cmd: "thematic_break", label: "Divider", icon: dividerIcon },
-  { cmd: "code_block", label: "Code Block", icon: codeBlockIcon },
-  { cmd: "math_block", label: "Math Block (LaTeX)", icon: mathIcon },
-  { cmd: "table", label: "Table", icon: tableIcon },
-  { cmd: "image", label: "Image", icon: imageIcon },
-  { cmd: "video", label: "Video", icon: videoIcon },
+  { cmd: SlashCommand.Heading, label: "Heading 1", icon: h1Icon, level: 1 },
+  { cmd: SlashCommand.Heading, label: "Heading 2", icon: h2Icon, level: 2 },
+  { cmd: SlashCommand.Heading, label: "Heading 3", icon: h3Icon, level: 3 },
+  { cmd: SlashCommand.BulletList, label: "Bullet List", icon: bulletListIcon },
+  { cmd: SlashCommand.OrderedList, label: "Ordered List", icon: orderedListIcon },
+  { cmd: SlashCommand.TodoList, label: "Task List", icon: todoListIcon },
+  { cmd: SlashCommand.Blockquote, label: "Blockquote", icon: quoteIcon },
+  { cmd: SlashCommand.ThematicBreak, label: "Divider", icon: dividerIcon },
+  { cmd: SlashCommand.CodeBlock, label: "Code Block", icon: codeBlockIcon },
+  { cmd: SlashCommand.MathBlock, label: "Math Block (LaTeX)", icon: mathIcon },
+  { cmd: SlashCommand.Table, label: "Table", icon: tableIcon },
+  { cmd: SlashCommand.Image, label: "Image", icon: imageIcon },
+  { cmd: SlashCommand.Video, label: "Video", icon: videoIcon },
 ];
 
 class BlockHandleView {
@@ -262,7 +267,7 @@ class SlashView {
           return true;
         }
         const text = (this as any).getContent(view, (node: any) =>
-          ["paragraph", "heading"].includes(node.type.name),
+          [ProseNodeType.Paragraph, ProseNodeType.Heading].includes(proseNodeTypeByName.get(node.type.name)!),
         );
         if (text == null) return false;
         if (!text.startsWith("/")) return false;
@@ -313,7 +318,7 @@ class SlashView {
     this.content.innerHTML = filtered
       .map(
         (it) =>
-          `<div data-cmd="${it.cmd}" data-level="${it.level ?? ""}" class="slash-item">
+          `<div data-cmd="${SLASH_CMD_PREFIX}${it.cmd}" data-level="${it.level ?? ""}" class="slash-item">
             <span class="slash-icon">${it.icon}</span>
             <span class="slash-label">${it.label}</span>
           </div>`,
@@ -322,49 +327,57 @@ class SlashView {
   }
 
   private execute(item: HTMLElement) {
-    const cmd = item.dataset.cmd!;
+    const imgActionStr = item.dataset.imgAction;
+    const cmdStr = item.dataset.cmd;
     const level = parseInt(item.dataset.level || "0");
     const view = this.view;
     const isProgrammatic = this.#programmaticActive;
     this.#programmaticActive = false;
 
-    // Image picker commands
-    if (cmd === "image-select") {
-      const url = item.dataset.url || "";
-      if (url) this.confirmImageUrl(url);
-      return;
-    }
-    if (cmd === "image-url-submit") {
-      const input = this.content.querySelector(
-        ".slash-url-input",
-      ) as HTMLInputElement;
-      const url = input?.value.trim() || "";
-      if (url) this.confirmImageUrl(url);
-      return;
-    }
-    if (cmd === "image-cancel") {
-      this.#editState = null;
-      this.provider.hide();
-      this.view.focus();
-      return;
-    }
-    if (cmd === "image-remove") {
-      if (this.#editState?.type === "edit") {
-        const { state, dispatch } = this.view;
-        const pos = this.#editState.pos;
-        const node = state.doc.nodeAt(pos);
-        if (node) {
-          dispatch(state.tr.delete(pos, pos + node.nodeSize));
-        }
+    // Image picker commands (via data-img-action)
+    if (imgActionStr) {
+      const imgAction = Number(imgActionStr.replace(IMG_ACTION_PREFIX, "")) as ImageAction;
+      if (imgAction === ImageAction.Select) {
+        const url = item.dataset.url || "";
+        if (url) this.confirmImageUrl(url);
+        return;
       }
-      this.#editState = null;
-      this.provider.hide();
-      this.view.focus();
-      return;
+      if (imgAction === ImageAction.UrlSubmit) {
+        const input = this.content.querySelector(
+          ".slash-url-input",
+        ) as HTMLInputElement;
+        const url = input?.value.trim() || "";
+        if (url) this.confirmImageUrl(url);
+        return;
+      }
+      if (imgAction === ImageAction.Cancel) {
+        this.#editState = null;
+        this.provider.hide();
+        this.view.focus();
+        return;
+      }
+      if (imgAction === ImageAction.Remove) {
+        if (this.#editState?.type === "edit") {
+          const { state, dispatch } = this.view;
+          const pos = this.#editState.pos;
+          const node = state.doc.nodeAt(pos);
+          if (node) {
+            dispatch(state.tr.delete(pos, pos + node.nodeSize));
+          }
+        }
+        this.#editState = null;
+        this.provider.hide();
+        this.view.focus();
+        return;
+      }
     }
 
+    // Slash commands (via data-cmd)
+    if (!cmdStr) return;
+    const cmd = Number(cmdStr.replace(SLASH_CMD_PREFIX, "")) as SlashCommand;
+
     // Handle slash image command: show picker instead of inserting empty block
-    if (cmd === "image") {
+    if (cmd === SlashCommand.Image) {
       const { $from } = view.state.selection;
       const textBefore = $from.parent.textBetween(
         Math.max(0, $from.parentOffset - 500),
@@ -380,7 +393,7 @@ class SlashView {
       return;
     }
 
-    if (cmd === "video") {
+    if (cmd === SlashCommand.Video) {
       const { $from } = view.state.selection;
       const textBefore = $from.parent.textBetween(
         Math.max(0, $from.parentOffset - 500),
@@ -425,7 +438,7 @@ class SlashView {
     const { $from: afterDel } = view.state.selection;
 
     if (afterDel.parent.content.size === 0) {
-      let parentType: string | null = null;
+      let parentType: ProseNodeType | null = null;
       let parentDepth = 0;
       for (let d = afterDel.depth; d > 0; d--) {
         const node = afterDel.node(d);
@@ -434,7 +447,7 @@ class SlashView {
           node.type === schema.nodes.ordered_list ||
           node.type === schema.nodes.blockquote
         ) {
-          parentType = node.type.name;
+          parentType = proseNodeTypeByName.get(node.type.name) ?? null;
           parentDepth = d;
           break;
         }
@@ -446,30 +459,30 @@ class SlashView {
       }
     }
 
-    if (cmd === "thematic_break") {
+    if (cmd === SlashCommand.ThematicBreak) {
       this.insertDivider(view);
       view.focus();
       return;
     }
 
     const commands = this.milkdownCtx.get(commandsCtx);
-    if (cmd === "heading") commands.call(wrapInHeadingCommand.key, level);
-    else if (cmd === "bullet_list") commands.call(wrapInBulletListCommand.key);
-    else if (cmd === "ordered_list")
+    if (cmd === SlashCommand.Heading) commands.call(wrapInHeadingCommand.key, level);
+    else if (cmd === SlashCommand.BulletList) commands.call(wrapInBulletListCommand.key);
+    else if (cmd === SlashCommand.OrderedList)
       commands.call(wrapInOrderedListCommand.key);
-    else if (cmd === "blockquote") commands.call(wrapInBlockquoteCommand.key);
-    else if (cmd === "todo_list") this.convertToTodoList(view);
-    else if (cmd === "code_block") this.convertToCodeBlock(view);
-    else if (cmd === "math_block") this.convertToMathBlock(view);
-    else if (cmd === "table") this.insertTable(view);
+    else if (cmd === SlashCommand.Blockquote) commands.call(wrapInBlockquoteCommand.key);
+    else if (cmd === SlashCommand.TodoList) this.convertToTodoList(view);
+    else if (cmd === SlashCommand.CodeBlock) this.convertToCodeBlock(view);
+    else if (cmd === SlashCommand.MathBlock) this.convertToMathBlock(view);
+    else if (cmd === SlashCommand.Table) this.insertTable(view);
     view.focus();
   }
 
   private replaceBlock(
-    cmd: string,
+    cmd: SlashCommand,
     level: number,
     view: EditorView,
-    parentType: string | null,
+    parentType: ProseNodeType | null,
     parentDepth: number,
     isHeading: boolean,
   ) {
@@ -477,11 +490,11 @@ class SlashView {
     const { schema } = state;
     const { $from } = state.selection;
 
-    if (cmd === "thematic_break" || cmd === "image") {
+    if (cmd === SlashCommand.ThematicBreak || cmd === SlashCommand.Image) {
       this.insertBelow(cmd, level, view);
       return;
     }
-    if (parentType === "bullet_list" && cmd === "ordered_list") {
+    if (parentType === ProseNodeType.BulletList && cmd === SlashCommand.OrderedList) {
       const pos = $from.before(parentDepth);
       const node = $from.node(parentDepth);
       dispatch(
@@ -493,7 +506,7 @@ class SlashView {
       );
       return;
     }
-    if (parentType === "ordered_list" && cmd === "bullet_list") {
+    if (parentType === ProseNodeType.OrderedList && cmd === SlashCommand.BulletList) {
       const pos = $from.before(parentDepth);
       const node = $from.node(parentDepth);
       dispatch(
@@ -505,9 +518,9 @@ class SlashView {
       );
       return;
     }
-    if (parentType === "blockquote" && cmd === "blockquote") return;
+    if (parentType === ProseNodeType.Blockquote && cmd === SlashCommand.Blockquote) return;
 
-    if (cmd === "heading") {
+    if (cmd === SlashCommand.Heading) {
       const heading = schema.nodes.heading.create({ level });
       const pos = parentType
         ? $from.before(parentDepth)
@@ -533,12 +546,12 @@ class SlashView {
       : $from.node($from.depth);
     const para = schema.nodes.paragraph.create();
     let newBlock: Node;
-    if (cmd === "bullet_list")
+    if (cmd === SlashCommand.BulletList)
       newBlock = schema.nodes.bullet_list.create(
         null,
         schema.nodes.list_item.create(null, para),
       );
-    else if (cmd === "ordered_list")
+    else if (cmd === SlashCommand.OrderedList)
       newBlock = schema.nodes.ordered_list.create(
         null,
         schema.nodes.list_item.create(null, para),
@@ -547,25 +560,25 @@ class SlashView {
     dispatch(state.tr.replaceWith(pos, pos + block.nodeSize, newBlock));
   }
 
-  private insertBelow(cmd: string, level: number, view: EditorView) {
+  private insertBelow(cmd: SlashCommand, level: number, view: EditorView) {
     const { state, dispatch } = view;
     const { schema } = state;
     const { $from } = state.selection;
     const afterPos = $from.after($from.depth);
-    if (cmd === "heading") {
+    if (cmd === SlashCommand.Heading) {
       const heading = schema.nodes.heading.create({ level });
       const tr = state.tr.insert(afterPos, heading);
       dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 1)));
       return;
     }
-    if (cmd === "thematic_break") {
+    if (cmd === SlashCommand.ThematicBreak) {
       const hr = schema.nodes.hr.create();
       const para = schema.nodes.paragraph.create();
       const tr = state.tr.insert(afterPos, hr).insert(afterPos + 2, para);
       dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
       return;
     }
-    if (cmd === "image") {
+    if (cmd === SlashCommand.Image) {
       const img = schema.nodes["image-block"]?.create({
         src: "",
         caption: "",
@@ -580,19 +593,19 @@ class SlashView {
     }
     const para = schema.nodes.paragraph.create();
     let newBlock: Node;
-    if (cmd === "bullet_list")
+    if (cmd === SlashCommand.BulletList)
       newBlock = schema.nodes.bullet_list.create(
         null,
         schema.nodes.list_item.create(null, para),
       );
-    else if (cmd === "ordered_list")
+    else if (cmd === SlashCommand.OrderedList)
       newBlock = schema.nodes.ordered_list.create(
         null,
         schema.nodes.list_item.create(null, para),
       );
     else newBlock = schema.nodes.blockquote.create(null, para);
     const tr = state.tr.insert(afterPos, newBlock);
-    const selPos = cmd === "blockquote" ? afterPos + 2 : afterPos + 3;
+    const selPos = cmd === SlashCommand.Blockquote ? afterPos + 2 : afterPos + 3;
     dispatch(tr.setSelection(TextSelection.create(tr.doc, selPos)));
   }
 
@@ -627,7 +640,7 @@ class SlashView {
   private openVideoEditor(pos: number, attrs: VideoDialogResult) {
     const view = this.view;
 
-    mountVideoDialog(
+    openVideoDialog(
       attrs,
       (result) => {
         const { state, dispatch } = view;
@@ -658,9 +671,9 @@ class SlashView {
         </div>
         <div class="slash-url-row">
           <input class="slash-url-input" type="text" placeholder="Paste image URL\u2026" value="${currentSrc}">
-          <button class="slash-url-btn" data-cmd="image-url-submit">OK</button>
-          <button class="slash-url-btn slash-cancel-btn" data-cmd="image-cancel">Cancel</button>
-          ${editState?.type === "edit" ? '<button class="slash-url-btn slash-remove-btn" data-cmd="image-remove">Remove</button>' : ""}
+          <button class="slash-url-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.UrlSubmit}">OK</button>
+          <button class="slash-url-btn slash-cancel-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Cancel}">Cancel</button>
+          ${editState?.type === "edit" ? `<button class="slash-url-btn slash-remove-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Remove}">Remove</button>` : ""}
         </div>
         <div class="slash-upload-row">
           <label class="slash-upload-label">
@@ -730,7 +743,7 @@ class SlashView {
         .slice(0, 3)
         .map(
           (img) => `
-      <div class="slash-image-item" data-cmd="image-select" data-url="${img.url}">
+      <div class="slash-image-item" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Select}" data-url="${img.url}">
         <img src="${img.url}" />
         <span>${img.name}</span>
         ${img.pending ? '<span class="slash-image-pending">(pending)</span>' : ""}
@@ -873,7 +886,8 @@ export function configureBlockEdit(ctx: Ctx) {
     filterNodes: (pos) => {
       for (let d = pos.depth; d > 0; d--) {
         const node = pos.node(d);
-        if (node.type.name === "table" || node.type.name === "blockquote")
+        const typeName = proseNodeTypeByName.get(node.type.name);
+        if (typeName === ProseNodeType.Table || typeName === ProseNodeType.Blockquote)
           return false;
       }
       return true;

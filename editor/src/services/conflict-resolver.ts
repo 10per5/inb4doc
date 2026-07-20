@@ -10,7 +10,8 @@ import type { Page } from "@/entities/Page"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
 import { serializeFrontmatter } from "@/utils/frontmatter"
 import { pageRepository } from "@/repositories/pageRepository"
-import { mountExternalChangeDialog } from "@/components/dialogs/external-change-dialog"
+import { openExternalChangeDialog } from "@/components/dialogs/external-change-dialog"
+import { Frontmatter } from "@/entities/Frontmatter"
 
 export type ConflictDecision =
   | { action: "accept-disk"; body: string; fm: MetaPanelData | null; time: number }
@@ -85,6 +86,7 @@ export function executeConflictDecision(
     const fresh = pageRepository.getOrCreate(path)
     fresh.setBaseline(decision.body)
     fresh.setServerTime(decision.time)
+    fresh.originalFrontmatter = decision.fm ? Frontmatter.fromMeta(decision.fm) : undefined
     if (decision.fm) { fresh.setFrontmatter(decision.fm); host.onMetaUpdate?.(decision.fm) }
     return
   }
@@ -94,12 +96,13 @@ export function executeConflictDecision(
     ? `---\n${serializeFrontmatter(decision.localFm)}\n---\n\n${decision.localBody}`
     : decision.localBody
 
-  mountExternalChangeDialog(path, localFull, diskRaw).then((action) => {
+  openExternalChangeDialog(path, localFull, diskRaw).then((action) => {
     if (host.currentPath !== path) return
     pageRepository.clearPath(path)
     const p = pageRepository.getOrCreate(path)
     p.setBaseline(decision.diskBody)
     p.setServerTime(decision.diskTime)
+    p.originalFrontmatter = decision.diskFm ? Frontmatter.fromMeta(decision.diskFm) : undefined
 
     if (action === "discard") {
       if (decision.diskFm) {
@@ -142,9 +145,11 @@ export function applyNoConflict(
   if (serverTime && serverTime > cachedTime) {
     pageRepository.getOrCreate(path).setBaseline(body)
     pageRepository.getOrCreate(path).setServerTime(serverTime)
-  } else if (page && page.bodyState.baseline === undefined) {
+  } else if (pageRepository.getOrCreate(path).bodyState.baseline === undefined) {
     pageRepository.getOrCreate(path).setBaseline(body)
   }
+
+  const diskFm = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined
 
   if (frontmatter) {
     if (page?.meta.dirty && page.getFrontmatter()) {
@@ -157,5 +162,8 @@ export function applyNoConflict(
     pageRepository.getOrCreate(path).removeFrontmatter()
     onMetaUpdate?.({ title: "" })
   }
+
+  pageRepository.getOrCreate(path).originalFrontmatter = diskFm
+
   return pageRepository.get(path)?.bodyState.body ?? body
 }

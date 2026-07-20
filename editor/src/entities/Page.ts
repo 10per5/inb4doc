@@ -13,6 +13,7 @@ export interface PageData {
   patch?: string;
   serverTime?: number;
   frontmatter?: Record<string, string | number | undefined>;
+  originalFrontmatter?: Record<string, string | number | undefined>;
   dirty?: boolean;
 }
 
@@ -27,6 +28,7 @@ export class Page {
   public readonly bodyState: Body;
   public meta: PageMeta;
   public frontmatter?: Frontmatter;
+  public originalFrontmatter?: Frontmatter;
 
   constructor(public readonly path: string) {
     this.bodyState = new Body(path);
@@ -52,7 +54,7 @@ export class Page {
    */
   setBody(body: string): void {
     this.bodyState.setBody(body);
-    this.meta.dirty = this.bodyState.patch !== undefined;
+    this.meta.dirty = this.bodyState.hasPatch();
   }
 
   /**
@@ -104,6 +106,7 @@ export class Page {
       patch: this.bodyState.patch,
       serverTime: this.meta.serverTime,
       frontmatter: this.frontmatter?.toMeta(),
+      originalFrontmatter: this.originalFrontmatter?.toMeta(),
       dirty: this.meta.dirty,
     };
   }
@@ -115,6 +118,7 @@ export class Page {
     if (data.patch !== undefined) page.bodyState.patch = data.patch;
     if (data.serverTime !== undefined) page.meta.serverTime = data.serverTime;
     if (data.frontmatter) page.frontmatter = Frontmatter.fromMeta(data.frontmatter as MetaPanelData);
+    if (data.originalFrontmatter) page.originalFrontmatter = Frontmatter.fromMeta(data.originalFrontmatter as MetaPanelData);
     if (data.dirty) page.meta.dirty = true;
     return page;
   }
@@ -134,6 +138,7 @@ export class Page {
       const { frontmatter, body } = stripFrontmatter(content);
       this.setBaseline(body);
       this.frontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+      this.originalFrontmatter = this.frontmatter;
       const time = await provider.getServerTime(this.path);
       if (time != null) this.meta.serverTime = time;
       return true;
@@ -171,6 +176,7 @@ export class Page {
       await provider.writeFile(this.path, fullContent);
       this.deletePatch();
       this.setBaseline(body);
+      this.originalFrontmatter = this.frontmatter;
       this.bodyState.cacheBody(body);
       const fileTime = await provider.getServerTime(this.path);
       if (fileTime) this.setServerTime(fileTime);

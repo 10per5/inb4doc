@@ -1,0 +1,4 @@
+<div class="menu-item<%= it.active ? ' active' : '' %><%= it.disabled ? ' disabled' : '' %>"<% if (it.id) { %> id="<%= it.id %>"<% } %> data-action="menu-item">
+  <span class="menu-item-label"><%= it.label || '' %></span>
+  <span class="check" style="display:<%= it.checked ? 'inline' : 'none' %>">✓</span>
+</div>

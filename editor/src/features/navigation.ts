@@ -1,5 +1,5 @@
 import type { TreeNode } from "@/components/panels/sidebar"
-import { pushPath, getCurrentPath } from "@/utils/url"
+import { getCurrentPath } from "@/utils/url"
 
 export function collectPageList(tree: TreeNode, prefix = ""): string[] {
   const pages: string[] = []
@@ -10,11 +10,6 @@ export function collectPageList(tree: TreeNode, prefix = ""): string[] {
     else pages.push(...collectPageList(val as TreeNode, path))
   }
   return pages
-}
-
-export function navigateTo(path: string) {
-  pushPath(path)
-  window.dispatchEvent(new CustomEvent("navigate", { detail: { path } }))
 }
 
 let popstateRegistered = false;

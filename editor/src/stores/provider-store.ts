@@ -5,6 +5,7 @@ import { RemoteProvider } from "@/providers/remote-provider";
 import { connectionStore } from "@/stores/connection-store";
 import { treeStore } from "@/stores/tree-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
+import { hasFunc, AppFunc } from "$/build/build-mode";
 
 const LAST_PROVIDER_KEY = "inb4doc-last-provider";
 
@@ -37,9 +38,15 @@ function loadLastProvider(): ProviderType | null {
  */
 export async function initializeProvider(): Promise<void> {
   const last = loadLastProvider();
+
+  const defaultToRemote = hasFunc(AppFunc.DefaultToRemote);
+  const base: ProviderType[] = defaultToRemote
+    ? ["remote", "filesystem", "localStorage"]
+    : ["localStorage", "filesystem"];
+
   const candidates: ProviderType[] = last
-    ? [last, ...(["remote", "filesystem", "localStorage"] as ProviderType[]).filter((t) => t !== last)]
-    : ["remote", "filesystem", "localStorage"];
+    ? [last, ...base.filter((t) => t !== last)]
+    : base;
 
   let provider: ContentProvider | null = null;
   for (const type of candidates) {

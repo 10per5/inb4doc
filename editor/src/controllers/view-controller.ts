@@ -52,6 +52,9 @@ export class ViewController {
   initialize(): void {
     registerEditorView(this.register, {
       sourceMode: () => this.editor.isSourceMode(),
+      milkdownEl: this.editor.milkdownTarget,
+      sourceEl: this.editor.sourceTarget,
+      editorArea: this.editor.element as HTMLElement,
     });
 
     this.setupDiskUsageView();
@@ -64,10 +67,9 @@ export class ViewController {
   }
 
   private setupEmptyProjectView(): void {
-    const editorArea = document.getElementById("editor-area");
-    const milkdownEl = document.getElementById("milkdown-editor");
-    const sourceEl = document.getElementById("source-editor");
-    if (!editorArea || !milkdownEl || !sourceEl) return;
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
 
     this.views.set("empty-project", {
       activate: () => {
@@ -83,11 +85,9 @@ export class ViewController {
   }
 
   private setupDiskUsageView(): void {
-    const editorArea = document.getElementById("editor-area");
-    const milkdownEl = document.getElementById("milkdown-editor");
-    const sourceEl = document.getElementById("source-editor");
-
-    if (!editorArea || !milkdownEl || !sourceEl) return;
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
 
     this.views.set("disk-usage", {
       activate: () => {
@@ -134,8 +134,8 @@ export class ViewController {
         if (st) lastModified.set(leaf, st);
       }
 
-      const editorArea = document.getElementById("editor-area");
-      if (!editorArea || self.current !== "disk-usage") return;
+      const editorArea = self.editor.element as HTMLElement;
+      if (self.current !== "disk-usage") return;
 
       mountDiskUsageView(
         editorArea,

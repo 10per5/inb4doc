@@ -16,7 +16,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 # Stage 1: osxcross toolchain
 # ═══════════════════════════════════════════════════════════════════════
-FROM debian:trixie-slim AS toolchain
+FROM debian:trixie-20260623-slim AS toolchain
 
 RUN apt-get update && apt-get install -y \
     clang \

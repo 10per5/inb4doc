@@ -1,0 +1,122 @@
+<style id="initial-loader-style">
+  #initial-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-primary, #fff);
+    transition: opacity 0.35s ease;
+  }
+  #initial-loader.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .il-window {
+    position: relative;
+    width: min(1100px, 92vw);
+    height: min(720px, 88vh);
+    background: var(--color-bg-secondary, #f8f9fa);
+    border: 1px solid var(--color-border, #d8dee9);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(46, 52, 64, 0.15);
+    display: flex;
+    flex-direction: column;
+  }
+  .il-titlebar {
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    background: var(--color-bg-tertiary, #e5e9f0);
+    border-bottom: 1px solid var(--color-border, #d8dee9);
+  }
+  .il-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #cdd5e3;
+  }
+  .il-title {
+    margin-left: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: var(--color-text-secondary, #4c566a);
+  }
+  .il-logo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 96px;
+    height: 96px;
+    border-radius: 16px;
+    user-select: none;
+    pointer-events: none;
+    box-shadow: 0 10px 30px rgba(46, 52, 64, 0.18);
+    animation: il-logo-pulse 1.6s ease-in-out infinite;
+  }
+  .il-logo-sm {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    flex: 0 0 auto;
+    user-select: none;
+  }
+  @keyframes il-logo-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+    50%      { transform: translate(-50%, -50%) scale(1.08); opacity: 0.85; }
+  }
+  .il-body {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    padding: 18px;
+  }
+  .il-sidebar {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .il-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .il-aside {
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .il-skel {
+    display: block;
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(
+      90deg,
+      #e5e9f0 25%,
+      #eef1f6 37%,
+      #e5e9f0 63%
+    );
+    background-size: 400% 100%;
+    animation: il-shimmer 1.4s ease infinite;
+  }
+  .il-title-line {
+    height: 22px;
+  }
+  @keyframes il-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .il-skel { animation: none; }
+    .il-logo { animation: none; }
+  }
+</style>

@@ -14,10 +14,10 @@ import type { MetaPanelData } from "@/components/panels/meta-panel"
 export enum AppEvent {
   // Navigation
   Navigate = "navigate",
-  SearchNavigate = "search-navigate",
   SidebarReload = "sidebar-reload",
 
   // Dirty / sync
+  EditorChanged = "editor-changed",
   DirtyChanged = "dirty-changed",
   DirtyClicked = "dirty-clicked",
   SingleDiscardRequested = "single-discard-requested",
@@ -26,12 +26,6 @@ export enum AppEvent {
   SaveCurrentFile = "save-current-file",
   FlushAll = "flush-all",
   LoadRequested = "load-requested",
-  EditorDirty = "editor-dirty",
-
-  // Content
-  ContentChanged = "content-changed",
-  ContentNeeded = "content-needed",
-  ContentReady = "content-ready",
 
   // View / provider
   ViewChanged = "view-changed",
@@ -57,10 +51,10 @@ export enum AppEvent {
 
 export interface AppEventPayloads {
   [AppEvent.Navigate]:              { path: string }
-  [AppEvent.SearchNavigate]:        { query: string; matchIndex?: number; snippetText?: string }
   [AppEvent.SidebarReload]:         void
 
-  [AppEvent.DirtyChanged]:          { count: number; bytes: number; pendingCount: number; singleDirtyPath?: string }
+  [AppEvent.EditorChanged]:         { path: string; md: string }
+  [AppEvent.DirtyChanged]:          { count: number; bytes: number; pendingCount: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
   [AppEvent.DirtyClicked]:          void
   [AppEvent.SingleDiscardRequested]:{ path: string }
   [AppEvent.FlushComplete]:         void
@@ -68,11 +62,6 @@ export interface AppEventPayloads {
   [AppEvent.SaveCurrentFile]:       void
   [AppEvent.FlushAll]:              void
   [AppEvent.LoadRequested]:         void
-  [AppEvent.EditorDirty]:           void
-
-  [AppEvent.ContentChanged]:        { path: string; content: string }
-  [AppEvent.ContentNeeded]:         { path: string }
-  [AppEvent.ContentReady]:          { path: string; content: string }
 
   [AppEvent.ViewChanged]:           { view: ViewType }
   [AppEvent.ProviderChanged]:       { type: string; icon: string; label: string }

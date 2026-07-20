@@ -5,11 +5,12 @@
     "moduleResolution": "bundler",
     "strict": true,
     "outDir": "public/assets",
-    "rootDir": "src",
+    "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "$/*": ["lib/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "lib"]
 }

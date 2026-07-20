@@ -6,6 +6,8 @@
  * Tracks whether the remote server is reachable (set by dialog Try probe).
  */
 
+import { hasFunc, AppFunc } from "$/build/build-mode";
+
 const STORAGE_KEY = "inb4doc-connection"
 
 export interface ConnectionConfig {
@@ -69,7 +71,7 @@ class ConnectionStore {
 
   /** Probe the server and update remoteAvailable. Returns the result. */
   async probe(timeout = 3000): Promise<boolean> {
-    if (this.isAppScheme()) {
+    if (this.isAppScheme() || this.isInsideAppGui() || !hasFunc(AppFunc.AllowProbe)) {
       this._remoteAvailable = false
       return false
     }

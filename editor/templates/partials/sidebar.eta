@@ -1,0 +1,16 @@
+<div id="sidebar-nav" data-controller="sidebar" data-shell-target="sidebar" data-action="keydown->sidebar#onKeydown">
+  <div class="sidebar-wrapper">
+    <div class="sidebar-provider-bar">
+      <span class="provider-label" data-sidebar-target="providerLabel"></span>
+      <button class="provider-change-btn" data-action="click->sidebar#onChangeProvider">Switch</button>
+    </div>
+    <div class="sidebar-search-wrapper" data-sidebar-target="searchWrapper">
+      <input class="sidebar-search" type="text" placeholder="Find file…" data-sidebar-target="search" data-action="input->sidebar#onSearchInput" />
+      <button class="search-clear" data-action="click->sidebar#onSearchClear"></button>
+    </div>
+    <div class="sidebar-inner" data-sidebar-target="inner" data-action="dragstart->sidebar#onDragStart dragenter->sidebar#onDragEnter dragleave->sidebar#onDragLeave dragover->sidebar#onDragOver dragend->sidebar#onDragEnd drop->sidebar#onDrop"></div>
+    <div class="sidebar-footer">
+      <button class="nav-new-page" data-sidebar-target="newPageBtn" data-action="click->sidebar#onNewPage">+ New</button>
+    </div>
+  </div>
+</div>

@@ -19,3 +19,6 @@ import "./panels/search.css"
 /* ── App UI ─────────────────────────────────────────────────────── */
 import "./app/toolbar.css"
 import "./app/dialogs.css"
+
+/* ── Mobile (gui-mobile only) ───────────────────────────────────── */
+import "./mobile.css"

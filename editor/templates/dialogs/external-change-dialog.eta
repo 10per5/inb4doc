@@ -1,0 +1,24 @@
+<div class="inb4doc-external-window" onclick="event.stopPropagation()" data-controller="external-change-dialog">
+  <div class="inb4doc-external-header">File changed on disk</div>
+  <div class="inb4doc-external-body">
+    <p class="inb4doc-external-message"><strong><%= it.path %></strong> was updated externally. Your local changes will be lost if you discard.</p>
+    <button class="inb4doc-external-toggle" data-action="click->external-change-dialog#toggleDiff">▸ View diff</button>
+    <div class="inb4doc-external-diff" style="display:none" data-external-change-dialog-target="diffContainer"></div>
+  </div>
+  <div class="inb4doc-external-footer">
+    <button class="inb4doc-btn inb4doc-btn-danger"
+      data-controller="press-twice"
+      data-action="click->press-twice#click press-twice:confirm->external-change-dialog#discard"
+      data-press-twice-idle-text-value="Discard local"
+      data-press-twice-pending-text-value="Press again"
+      data-press-twice-timeout-value="3000"
+    >Discard local</button>
+    <button class="inb4doc-btn inb4doc-btn-success"
+      data-controller="press-twice"
+      data-action="click->press-twice#click press-twice:confirm->external-change-dialog#keep"
+      data-press-twice-idle-text-value="Keep local"
+      data-press-twice-pending-text-value="Press again"
+      data-press-twice-timeout-value="3000"
+    >Keep local</button>
+  </div>
+</div>

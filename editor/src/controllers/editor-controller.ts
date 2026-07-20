@@ -1,13 +1,14 @@
 /**
- * EditorController — manages Milkdown editor lifecycle and state.
+ * EditorController — Stimulus controller managing Milkdown editor lifecycle and state.
  *
  * Editor creation is delegated to config/editor-config.ts.
  * Conflict resolution is delegated to services/conflict-resolver.ts.
  * This class owns: path context, editor state, content loading, source mode.
  */
 
+import { Controller } from "@hotwired/stimulus"
 import { Editor, editorViewCtx, serializerCtx } from "@milkdown/kit/core";
-import { EditorState, Plugin, PluginKey } from "@milkdown/kit/prose/state";
+import { EditorState } from "@milkdown/kit/prose/state";
 import { parserCtx } from "@milkdown/core";
 import { createEditor, type EditorHost } from "@/config/editor-config";
 import { pageRepository } from "@/repositories/pageRepository";
@@ -15,16 +16,22 @@ import { toggleSourceMode, applySourceContent } from "@/features/editor-source";
 import { getProvider } from "@/stores/provider-store";
 import { stripFrontmatter } from "@/utils/frontmatter";
 import { imageRepository } from "@/repositories/imageRepository";
+import { dirtyTrackingService } from "@/services/dirty-tracking-service";
+import { scheduleSave } from "@/stores/persistence";
 import {
   resolveConflict,
   executeConflictDecision,
   applyNoConflict,
 } from "@/services/conflict-resolver";
-import { appEvents, AppEvent } from "@/stores/app-events";
 import { scrollToText } from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
 
-export class EditorController {
+export class EditorController extends Controller {
+  static targets = ["milkdown", "source"]
+
+  declare readonly milkdownTarget: HTMLElement
+  declare readonly sourceTarget: HTMLElement
+
   private editor: Editor | null = null;
   private host: EditorHost | null = null;
   private editorStates = new Map<string, any>();
@@ -43,6 +50,10 @@ export class EditorController {
   }
   isSourceMode(): boolean {
     return this.sourceMode;
+  }
+
+  invalidateState(path: string): void {
+    this.editorStates.delete(path);
   }
 
   currentPathDir(): string {
@@ -79,8 +90,7 @@ export class EditorController {
       return;
     }
 
-    const editorEl = document.getElementById("milkdown-editor");
-    if (!editorEl) throw new Error("Editor container not found");
+    const editorEl = this.milkdownTarget;
 
     const host: EditorHost = {
       currentPathDir: () => this.currentPathDir(),
@@ -96,6 +106,7 @@ export class EditorController {
       },
     };
     this.host = host;
+    this.lastSetContent.set(this.currentPath, "");
     this.editor = await createEditor(editorEl, content, host);
   }
 
@@ -161,14 +172,10 @@ export class EditorController {
   toggleSourceMode(): boolean {
     if (!this.editor) return this.sourceMode;
 
-    const sourceEl = document.getElementById("source-editor");
-    const wysiwygEl = document.getElementById("milkdown-editor");
-    if (!sourceEl || !wysiwygEl) return this.sourceMode;
-
     this.sourceMode = toggleSourceMode(
       this.editor,
-      sourceEl,
-      wysiwygEl,
+      this.sourceTarget,
+      this.milkdownTarget,
       this.sourceMode,
     );
     return this.sourceMode;
@@ -177,9 +184,7 @@ export class EditorController {
   async applySourceContent(): Promise<void> {
     if (!this.editor) return;
 
-    const textarea = document.querySelector(
-      "#source-editor textarea",
-    ) as HTMLTextAreaElement;
+    const textarea = this.sourceTarget.querySelector("textarea") as HTMLTextAreaElement;
     if (!textarea) return;
 
     this.lastSetContent.set(this.currentPath, "");
@@ -193,19 +198,12 @@ export class EditorController {
     });
 
     pageRepository.getOrCreate(this.currentPath).setBody(md);
+    dirtyTrackingService.recompute();
+    scheduleSave();
     this.sourceMode = false;
 
-    const sourceEl = document.getElementById("source-editor");
-    const wysiwygEl = document.getElementById("milkdown-editor");
-    if (sourceEl && wysiwygEl) {
-      sourceEl.style.display = "none";
-      wysiwygEl.style.display = "block";
-    }
-
-    appEvents.emit(AppEvent.ContentChanged, {
-      path: this.currentPath,
-      content: md,
-    });
+    this.sourceTarget.style.display = "none";
+    this.milkdownTarget.style.display = "block";
   }
 
   // ── Content access ──
@@ -227,6 +225,10 @@ export class EditorController {
 
   // ── Cleanup ──
 
+  disconnect() {
+    this.destroy()
+  }
+
   destroy(): void {
     this.editor = null;
     this.host = null;
@@ -242,7 +244,9 @@ export class EditorController {
 
     const cached = this.editorStates.get(this.currentPath);
     if (cached) {
-      this.lastSetContent.set(this.currentPath, "");
+      const page = pageRepository.get(this.currentPath);
+      const persistedBody = page?.bodyState.body ?? page?.bodyState.baseline ?? "";
+      this.lastSetContent.set(this.currentPath, persistedBody);
       this.editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
         view.updateState(cached);
@@ -264,3 +268,5 @@ export class EditorController {
     }
   }
 }
+
+export default EditorController

@@ -1,0 +1,38 @@
+<div class="inb4doc-video-box" onclick="event.stopPropagation()" data-controller="video-dialog">
+  <h3>Edit Video</h3>
+  <label class="block" for="<%= it.inputId %>">Video URL</label>
+  <input id="<%= it.inputId %>" type="text" placeholder="https://example.com/video.mp4" value="<%= it.current.src %>" data-action="keydown->video-dialog#keydown">
+  <div class="inb4doc-video-dimensions">
+    <div>
+      <label class="block" for="<%= it.widthId %>">Width</label>
+      <input id="<%= it.widthId %>" type="text" placeholder="auto" value="<%= it.current.width %>" data-action="keydown->video-dialog#keydown">
+    </div>
+    <div>
+      <label class="block" for="<%= it.heightId %>">Height</label>
+      <input id="<%= it.heightId %>" type="text" placeholder="auto" value="<%= it.current.height %>" data-action="keydown->video-dialog#keydown">
+    </div>
+  </div>
+  <div class="inb4doc-video-checkboxes">
+    <label class="row">
+      <input type="checkbox" data-video-dialog-target="controls" <%= it.current.controls ? 'checked' : '' %>>
+      Controls
+    </label>
+    <label class="row">
+      <input type="checkbox" data-video-dialog-target="loop" <%= it.current.loop ? 'checked' : '' %>>
+      Loop
+    </label>
+    <label class="row">
+      <input type="checkbox" data-video-dialog-target="muted" <%= it.current.muted ? 'checked' : '' %>>
+      Muted
+    </label>
+    <label class="row">
+      <input type="checkbox" data-video-dialog-target="autoplay" <%= it.current.autoplay ? 'checked' : '' %>>
+      Autoplay
+    </label>
+  </div>
+  <div class="inb4doc-video-actions">
+    <button class="video-remove" data-action="click->video-dialog#remove">Remove</button>
+    <button class="video-cancel" data-action="click->video-dialog#cancel">Cancel</button>
+    <button class="video-save" data-action="click->video-dialog#save">Save</button>
+  </div>
+</div>

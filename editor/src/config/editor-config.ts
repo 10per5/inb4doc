@@ -76,7 +76,6 @@ import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createImageEditPlugin } from "@/plugins/image-edit";
 import { imageRepository } from "@/repositories/imageRepository";
 import { getProvider } from "@/stores/provider-store";
-import { appEvents, AppEvent } from "@/stores/app-events";
 import type { MentionView } from "@/features/mention";
 
 /** Callbacks the editor uses to talk back to the controller. */
@@ -185,7 +184,6 @@ export async function createEditor(
             getLastSetContent: (path) => host.stateCache.getLastSet(path),
             setLastSetContent: (path, content) => host.stateCache.setLastSet(path, content),
             getCurrentPath: () => host.currentPath,
-            onDirtyChange: () => appEvents.emit(AppEvent.EditorDirty),
           }),
           createMentionPlugin(ctx, (mv) => { host.onMentionView(mv) }),
           createImagePastePlugin({ uploadImage: (file: File) => imageRepository.uploadImage(file) }),

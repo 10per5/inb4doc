@@ -176,7 +176,7 @@ function removeOrphanedImages(docRelPath: string, ctx: ServerContext): void {
       try {
         const entries = readdirSync(dir);
         if (entries.length > 0) break;
-        rmdirSync(dir);
+        rmSync(dir, { force: true });
       } catch {
         break;
       }
@@ -214,7 +214,7 @@ async function handleContent(req: Request, relPath: string, ctx: ServerContext):
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, text, "utf-8");
     // Remove orphaned images after content update
-    try { removeOrphanedImages(dirname(path), ctx); } catch {}
+    try { removeOrphanedImages(dirname(target), ctx); } catch {}
     return new Response("ok");
   }
 
@@ -226,14 +226,14 @@ async function handleContent(req: Request, relPath: string, ctx: ServerContext):
       try {
         const entries = readdirSync(dir);
         if (entries.length > 0) break;
-        rmdirSync(dir);
+        rmSync(dir, { force: true });
       } catch {
         break;
       }
       dir = dirname(dir);
     }
     // Remove orphaned images
-    try { removeOrphanedImages(dirname(path), ctx); } catch {}
+    try { removeOrphanedImages(dirname(target), ctx); } catch {}
     return new Response("ok");
   }
 
@@ -474,7 +474,7 @@ async function handleMove(req: Request, ctx: ServerContext): Promise<Response | 
     try {
       const entries = readdirSync(dir);
       if (entries.length > 0) break;
-      rmdirSync(dir);
+      rmSync(dir, { force: true });
     } catch {
       break;
     }

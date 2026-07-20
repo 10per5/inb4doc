@@ -1,0 +1,7 @@
+<div class="menu-item menu-item-submenu"<% if (it.id) { %> id="<%= it.id %>"<% } %>>
+  <span class="menu-item-label"><%= it.label || '' %></span>
+  <span class="menu-submenu-arrow">▸</span>
+  <div class="menu-submenu">
+    <%= it.childrenHtml || '' %>
+  </div>
+</div>

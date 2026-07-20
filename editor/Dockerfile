@@ -18,6 +18,7 @@ RUN bun install --frozen-lockfile
 COPY src/ src/
 COPY lib/ lib/
 COPY static/ static/
+COPY templates/ templates/
 COPY *.ts ./
 COPY tsconfig.json ./
 RUN bun run build

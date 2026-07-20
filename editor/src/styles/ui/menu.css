@@ -1,3 +1,7 @@
+.toolbar-relative {
+  position: relative;
+}
+
 .toolbar-menu-trigger {
   cursor: pointer;
   user-select: none;
@@ -79,6 +83,16 @@
 .toolbar-menu .menu-item-submenu:hover .menu-submenu,
 .toolbar-menu .menu-item-submenu .menu-submenu:hover {
   display: block;
+}
+
+.toolbar-menu .menu-item .check {
+  margin-left: auto;
+  opacity: 0;
+}
+
+.toolbar-menu .menu-item.active .check {
+  opacity: 1;
+  color: var(--color-accent);
 }
 
 .toolbar-menu .menu-item-submenu .menu-submenu .menu-item .check {

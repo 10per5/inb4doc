@@ -1,7 +1,10 @@
-/* ── Dialog and Modal Components ────────────────────────────────────────
+/* ── Dialog & Modal Components ─────────────────────────────────────────
  *
- * Styles for dialogs, toasts, and overlay components
+ * All dialog CSS: overlay, window shell, buttons, form fields,
+ * and per-dialog styles. Loaded once via src/styles/index.ts.
  */
+
+/* ── Overlay ───────────────────────────────────────────────────────── */
 
 #inb4doc-dialog-overlay {
   position: fixed;
@@ -12,8 +15,94 @@
   align-items: center;
   justify-content: center;
 }
+#inb4doc-dialog-overlay > * { pointer-events: auto; }
 
-.inb4doc-prefs-box {
+/* ── Window Shell ──────────────────────────────────────────────────── */
+
+.inb4doc-window {
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  min-width: 420px;
+  max-width: 560px;
+}
+.inb4doc-window-header {
+  padding: 1rem 1.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  color: var(--color-text-primary);
+}
+.inb4doc-window-body {
+  padding: 0.5rem 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  color: var(--color-text-primary);
+}
+.inb4doc-window-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding: 0.75rem 1.5rem 1rem;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* ── Shared Buttons ────────────────────────────────────────────────── */
+
+.inb4doc-btn {
+  padding: 0.4rem 1.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  transition: background 0.15s, border-color 0.15s;
+}
+.inb4doc-btn:hover { background: var(--color-bg-tertiary); }
+.inb4doc-btn:disabled { opacity: 0.5; cursor: default; }
+.inb4doc-btn.inb4doc-btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+.inb4doc-btn.inb4doc-btn-primary:hover { background: var(--color-accent-hover); }
+.inb4doc-btn.inb4doc-btn-danger {
+  background: var(--color-error);
+  color: #fff;
+  border-color: var(--color-error);
+}
+.inb4doc-btn.inb4doc-btn-danger:hover { background: #a9444e; }
+.inb4doc-btn.inb4doc-btn-success {
+  background: #28a745;
+  color: #fff;
+  border-color: #28a745;
+}
+.inb4doc-btn.inb4doc-btn-success:hover { background: #218838; }
+
+/* ── Diff Viewer (shared by changes + external-change) ─────────────── */
+
+.inb4doc-diff-container {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.inb4doc-diff-line {
+  padding: 2px 8px;
+  white-space: pre-wrap;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.75rem;
+}
+
+/* ── Confirm / Prompt / Create Dialog (dialog.ts) ─────────────────── */
+
+.inb4doc-dialog-box {
   background: var(--color-bg-primary);
   border-radius: 8px;
   padding: 1.5rem;
@@ -21,62 +110,345 @@
   max-width: 480px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
-
-.inb4doc-prefs-box h3 {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
-  color: var(--color-text-primary);
+.inb4doc-dialog-box h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--color-text-primary); }
+.inb4doc-dialog-box p { margin: 0 0 1rem; color: var(--color-text-secondary); font-size: 0.9rem; }
+.inb4doc-dialog-box label {
+  display: block; margin-bottom: 0.3rem;
+  font-size: 0.85rem; color: var(--color-accent); font-weight: 600;
 }
-
-.inb4doc-prefs-box label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  color: var(--color-text-primary);
+.inb4doc-dialog-box input {
+  width: 100%; padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  font-size: 0.9rem; margin-bottom: 1rem; box-sizing: border-box;
+  background: var(--color-bg-primary); color: var(--color-text-primary);
 }
-
-.inb4doc-prefs-box .prefs-section {
-  margin: 0.75rem 0;
-}
-
-.inb4doc-prefs-box .prefs-section-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 0.4rem;
-  color: var(--color-text-secondary);
-}
-
-.inb4doc-prefs-box .radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding-left: 0.5rem;
-}
-
-.inb4doc-prefs-box .radio-group label {
-  font-size: 0.85rem;
-  color: var(--color-text-primary);
-}
-
-.inb4doc-prefs-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
-.inb4doc-prefs-actions button {
+.inb4doc-dialog-box input:focus { outline: none; border-color: var(--color-accent); }
+.inb4doc-dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.inb4doc-dialog-actions button {
   padding: 0.4rem 1.2rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg-primary);
-  cursor: pointer;
-  font-size: 0.9rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem;
   color: var(--color-text-primary);
 }
-
-.inb4doc-prefs-actions button:hover {
-  background: var(--color-bg-tertiary);
+.inb4doc-dialog-actions button:hover { background: var(--color-bg-tertiary); }
+.inb4doc-dialog-actions .inb4doc-dialog-confirm {
+  background: var(--color-accent); color: #fff; border-color: var(--color-accent);
 }
+.inb4doc-dialog-actions .inb4doc-dialog-confirm:hover { background: var(--color-accent-hover); }
+.inb4doc-dialog-check { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 1rem; }
+.inb4doc-dialog-check input { width: auto; margin: 0; }
+.inb4doc-dialog-check label { margin: 0; cursor: pointer; }
+.inb4doc-hint { font-size: 0.82rem; color: var(--color-text-secondary); margin-top: 0.3rem; min-height: 1.2rem; }
+
+/* ── Link Dialog ───────────────────────────────────────────────────── */
+
+.inb4doc-link-box {
+  background: var(--color-bg-primary); border-radius: 8px; padding: 1rem 1.25rem;
+  min-width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); border: 1px solid var(--color-border);
+}
+.inb4doc-link-box label {
+  display: block;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--color-accent); font-weight: 700; margin-bottom: 0.4rem;
+}
+.inb4doc-link-box input {
+  width: 100%; padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  font-size: 0.9rem; margin-bottom: 0.75rem; box-sizing: border-box;
+  background: var(--color-bg-primary); color: var(--color-text-primary);
+}
+.inb4doc-link-box input:focus { outline: none; border-color: var(--color-accent); }
+.inb4doc-link-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.inb4doc-link-actions button {
+  padding: 0.35rem 1rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-bg-primary); cursor: pointer; font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+.inb4doc-link-actions button:hover { background: var(--color-bg-tertiary); }
+.inb4doc-link-actions .inb4doc-link-save {
+  background: var(--color-accent); color: #fff; border-color: var(--color-accent);
+}
+.inb4doc-link-actions .inb4doc-link-save:hover { background: var(--color-accent-hover); }
+
+/* ── Video Dialog ──────────────────────────────────────────────────── */
+
+.inb4doc-video-box {
+  background: var(--color-bg-primary); border-radius: 8px; padding: 1rem 1.25rem;
+  min-width: 380px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); border: 1px solid var(--color-border);
+}
+.inb4doc-video-box h3 { margin: 0 0 0.75rem; font-size: 1rem; color: var(--color-text-primary); }
+.inb4doc-video-box label.row {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;
+  font-size: 0.85rem; color: var(--color-text-primary);
+}
+.inb4doc-video-box label.row input[type="checkbox"] { margin: 0; }
+.inb4doc-video-box label.block {
+  display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--color-accent); font-weight: 700; margin-bottom: 0.25rem; margin-top: 0.5rem;
+}
+.inb4doc-video-box label.block:first-of-type { margin-top: 0; }
+.inb4doc-video-box input[type="text"],
+.inb4doc-video-box input[type="number"] {
+  width: 100%; padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  font-size: 0.9rem; margin-bottom: 0.5rem; box-sizing: border-box;
+  background: var(--color-bg-primary); color: var(--color-text-primary);
+}
+.inb4doc-video-box input:focus { outline: none; border-color: var(--color-accent); }
+.inb4doc-video-dimensions { display: flex; gap: 0.75rem; }
+.inb4doc-video-dimensions > div { flex: 1; }
+.inb4doc-video-checkboxes { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
+.inb4doc-video-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.inb4doc-video-actions button {
+  padding: 0.35rem 1rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-bg-primary); cursor: pointer; font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+.inb4doc-video-actions button:hover { background: var(--color-bg-tertiary); }
+.inb4doc-video-actions .video-save {
+  background: var(--color-accent); color: #fff; border-color: var(--color-accent);
+}
+.inb4doc-video-actions .video-save:hover { background: var(--color-accent-hover); }
+.inb4doc-video-actions .video-remove {
+  color: var(--color-error); border-color: var(--color-error);
+}
+.inb4doc-video-actions .video-remove:hover { background: var(--color-bg-tertiary); }
+
+/* ── Prefs Dialog ──────────────────────────────────────────────────── */
+
+.inb4doc-prefs-box {
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-border);
+}
+.inb4doc-prefs-box h3 { margin: 0 0 1rem; font-size: 1rem; color: var(--color-text-primary); }
+.inb4doc-prefs-box label {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
+  font-size: 0.9rem; color: var(--color-text-primary); cursor: pointer;
+}
+.inb4doc-prefs-box input[type="checkbox"] { margin: 0; }
+.inb4doc-prefs-box .prefs-section { margin-top: 1rem; }
+.inb4doc-prefs-box .prefs-section-title {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--color-accent); font-weight: 700; margin-bottom: 0.5rem;
+}
+.inb4doc-prefs-box .radio-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.inb4doc-prefs-box .radio-group label {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.85rem; color: var(--color-text-primary);
+}
+.inb4doc-prefs-box .radio-group code {
+  background: var(--color-bg-secondary); padding: 0.1rem 0.3rem; border-radius: 3px;
+  font-size: 0.8rem;
+}
+.inb4doc-prefs-actions { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
+.inb4doc-prefs-close {
+  padding: 0.4rem 1.2rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem;
+  color: var(--color-text-primary);
+}
+.inb4doc-prefs-close:hover { background: var(--color-bg-tertiary); }
+
+/* ── Hugo Ref Dialog ───────────────────────────────────────────────── */
+
+.inb4doc-hugoref-box {
+  background: var(--color-bg-primary); border-radius: 8px; padding: 1rem 1.25rem;
+  min-width: 360px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); border: 1px solid var(--color-border);
+}
+.inb4doc-hugoref-box label {
+  display: block;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--color-accent); font-weight: 700; margin-bottom: 0.4rem; margin-top: 0.6rem;
+}
+.inb4doc-hugoref-box label:first-child { margin-top: 0; }
+.inb4doc-hugoref-box input {
+  width: 100%; padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  font-size: 0.9rem; box-sizing: border-box;
+  background: var(--color-bg-primary); color: var(--color-text-primary);
+}
+.inb4doc-hugoref-box input:focus { outline: none; border-color: var(--color-accent); }
+.inb4doc-hugoref-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.75rem; }
+.inb4doc-hugoref-actions button {
+  padding: 0.35rem 1rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-bg-primary); cursor: pointer; font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+.inb4doc-hugoref-actions button:hover { background: var(--color-bg-tertiary); }
+.inb4doc-hugoref-actions .inb4doc-hugoref-save {
+  background: var(--color-accent); color: #fff; border-color: var(--color-accent);
+}
+.inb4doc-hugoref-actions .inb4doc-hugoref-save:hover { background: var(--color-accent-hover); }
+.inb4doc-hugoref-actions .inb4doc-hugoref-remove {
+  color: var(--color-error); border-color: var(--color-error);
+}
+.inb4doc-hugoref-actions .inb4doc-hugoref-remove:hover { background: var(--color-bg-tertiary); }
+
+/* ── Import Zip Dialog ─────────────────────────────────────────────── */
+
+.import-file-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.import-file-row:last-child { border-bottom: none; }
+.import-file-row input { margin: 0; flex-shrink: 0; }
+.import-file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-primary); }
+.import-file-badge {
+  font-size: 0.7rem; padding: 1px 6px; border-radius: 3px;
+  font-weight: 600; flex-shrink: 0;
+}
+.import-file-badge.new { background: #d4edda; color: #155724; }
+.import-file-badge.replace { background: #fff3cd; color: #856404; }
+
+/* ── Image Manager Dialog ──────────────────────────────────────────── */
+
+.img-row {
+  display: flex; align-items: stretch; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--color-border);
+}
+.img-row:last-child { border-bottom: none; }
+.img-thumb {
+  width: 72px; height: 72px; flex-shrink: 0;
+  border-radius: 4px; overflow: hidden;
+  background: var(--color-bg-secondary); display: flex; align-items: center; justify-content: center;
+}
+.img-thumb img { max-width: 100%; max-height: 100%; object-fit: cover; }
+.img-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.img-name { font-size: 0.85rem; font-weight: 600; color: var(--color-text-primary); word-break: break-all; }
+.img-used { font-size: 0.75rem; color: var(--color-text-tertiary); }
+.img-used ul { margin: 2px 0 0; padding-left: 16px; list-style: disc; }
+.img-used li { line-height: 1.4; }
+.img-actions { display: flex; flex-direction: column; gap: 4px; justify-content: center; flex-shrink: 0; }
+.img-actions button {
+  padding: 3px 10px; font-size: 0.75rem; border: 1px solid var(--color-border);
+  border-radius: 4px; cursor: pointer; background: var(--color-bg-primary); color: var(--color-text-primary);
+  white-space: nowrap;
+}
+.img-actions button:hover { background: var(--color-bg-tertiary); }
+.img-actions button.danger:hover { background: var(--color-error); color: #fff; border-color: var(--color-error); }
+
+/* ── Changes Dialog ────────────────────────────────────────────────── */
+
+.inb4doc-changes-item {
+  margin-bottom: 0.5rem; border: 1px solid var(--color-border);
+  border-radius: 4px; overflow: hidden;
+}
+.inb4doc-changes-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--color-border);
+}
+.inb4doc-changes-path {
+  flex: 1; padding: 0.4rem 0.6rem; cursor: pointer;
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.9rem; user-select: none;
+}
+.inb4doc-changes-preview {
+  display: none; font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.75rem; background: var(--color-bg-primary);
+  border-top: 1px solid var(--color-border); max-height: 300px; overflow-y: auto;
+}
+.inb4doc-changes-preview-line {
+  padding: 2px 8px; white-space: pre-wrap; position: relative;
+}
+.inb4doc-changes-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+.inb4doc-changes-actions button {
+  padding: 0.4rem 1.2rem;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  background: var(--color-bg-primary); cursor: pointer; font-size: 0.9rem;
+  color: var(--color-text-primary);
+}
+.inb4doc-changes-actions button:hover { background: var(--color-bg-tertiary); }
+
+/* ── External Change Dialog ────────────────────────────────────────── */
+
+.inb4doc-external-window {
+  background: var(--color-bg-primary); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  display: flex; flex-direction: column; max-height: 80vh;
+  min-width: 420px; max-width: 560px;
+}
+.inb4doc-external-header {
+  padding: 1rem 1.5rem 0; font-size: 1.1rem; font-weight: 600; flex-shrink: 0;
+  color: var(--color-text-primary);
+}
+.inb4doc-external-body {
+  padding: 0.5rem 1.5rem; overflow-y: auto; flex: 1;
+  color: var(--color-text-primary);
+}
+.inb4doc-external-footer {
+  display: flex; gap: 0.5rem; justify-content: flex-end;
+  padding: 0.75rem 1.5rem 1rem; flex-shrink: 0;
+}
+.inb4doc-external-message {
+  margin: 0 0 0.75rem; color: var(--color-text-secondary); font-size: 0.9rem; line-height: 1.5;
+}
+.inb4doc-external-message strong { color: var(--color-text-primary); }
+.inb4doc-external-toggle {
+  display: block; width: 100%; padding: 0.4rem; margin-bottom: 0.5rem;
+  border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-secondary);
+  cursor: pointer; font-size: 0.85rem; color: var(--color-text-primary);
+}
+.inb4doc-external-toggle:hover { background: var(--color-bg-tertiary); }
+
+/* ── Provider Dialog ───────────────────────────────────────────────── */
+
+.provider-dialog-body { padding: 0.5rem 0; }
+.provider-current {
+  font-size: 0.9rem; margin-bottom: 1rem; padding: 0.5rem 0.75rem;
+  background: var(--color-bg-tertiary); border-radius: 6px; color: var(--color-text-primary);
+}
+.provider-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.provider-option {
+  display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem;
+  border: 1px solid var(--color-border); border-radius: 6px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  color: var(--color-text-primary); position: relative;
+}
+.provider-option:hover:not(.provider-option-disabled):not(.provider-option-active):not(.provider-option-selected) {
+  border-color: var(--color-accent); background: var(--color-bg-tertiary);
+}
+.provider-option-disabled { opacity: 0.5; cursor: not-allowed; }
+.provider-option-active { border-color: var(--color-border); background: var(--color-bg-secondary); opacity: 0.85; }
+.provider-option-active::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 4px; border-radius: 6px 0 0 6px; background: var(--color-success, #28a745);
+}
+.provider-option-selected {
+  border-color: var(--color-accent); background: var(--color-bg-tertiary);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.provider-option-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem; }
+.provider-option-info { flex: 1; min-width: 0; }
+.provider-option-name { font-weight: 600; font-size: 0.95rem; color: var(--color-text-primary); }
+.provider-option-desc { font-size: 0.8rem; color: var(--color-text-tertiary); margin-top: 0.15rem; }
+.provider-option-reason { font-size: 0.8rem; color: var(--color-error); margin-top: 0.25rem; }
+.provider-option-reason.info { color: var(--color-info, #3b82f6); }
+.provider-option-current-badge {
+  display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.4rem;
+  border-radius: 3px; background: var(--color-accent); color: #fff; margin-top: 0.25rem;
+}
+.remote-section { margin-top: 0.5rem; }
+.remote-fields { display: flex; gap: 0.5rem; align-items: end; }
+.remote-field { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+.remote-field label { font-size: 0.75rem; color: var(--color-text-tertiary); }
+.remote-field input {
+  padding: 0.35rem 0.5rem; border: 1px solid var(--color-border); border-radius: 4px;
+  font-size: 0.85rem; background: var(--color-bg-primary); color: var(--color-text-primary);
+  width: 100%; box-sizing: border-box;
+}
+.remote-field input:focus { outline: none; border-color: var(--color-accent); }
+.remote-status { font-size: 0.8rem; margin-top: 0.3rem; min-height: 1.2rem; }
+.remote-status.ok { color: var(--color-success, #28a745); }
+.remote-status.err { color: var(--color-error); }
+.remote-status.warn { color: var(--color-warning, #d9822b); }
+.remote-status.info { color: var(--color-info, #3b82f6); }

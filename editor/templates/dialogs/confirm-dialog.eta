@@ -1,0 +1,8 @@
+<div class="inb4doc-dialog-box" onclick="event.stopPropagation()" data-controller="confirm-dialog" data-confirm-dialog-target="box">
+  <h3><%= it.title %></h3>
+  <p><%= it.message %></p>
+  <div class="inb4doc-dialog-actions">
+    <button class="inb4doc-dialog-cancel" data-action="click->confirm-dialog#cancel"><%= it.cancelLabel ?? "Cancel" %></button>
+    <button class="inb4doc-dialog-confirm <%= it.confirmClass ?? '' %>" data-action="click->confirm-dialog#onEnter"><%= it.confirmLabel ?? "Confirm" %></button>
+  </div>
+</div>

@@ -8,7 +8,6 @@ import {
   copyFileSync,
 } from "fs";
 import { join, extname, dirname } from "path";
-import { interpolateHtml } from "./lib/interpolate";
 import { handleApiRoutes, type ServerContext } from "./lib/endpoints";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -101,7 +100,7 @@ Bun.serve({
     if (apiResult) return withCors(apiResult);
 
     function metaInject(html: string): string {
-      return interpolateHtml(html);
+      return html;
     }
 
     function serveFile(filePath: string): Response | null {

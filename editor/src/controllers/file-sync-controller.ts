@@ -9,7 +9,7 @@
 import { stripFrontmatter, serializeFrontmatter } from "@/utils/frontmatter";
 import { Frontmatter } from "@/entities/Frontmatter";
 import {
-  mountChangesDialog,
+  openChangesDialog,
   type ChangesDialogData,
 } from "@/components/dialogs/changes-dialog";
 import { pageRepository } from "@/repositories/pageRepository";
@@ -23,6 +23,8 @@ import { extractSnippets } from "@/utils/content-search";
 import { imageRepository } from "@/repositories/imageRepository";
 import { pageRepository as repo } from "@/repositories/pageRepository";
 import { appEvents, AppEvent } from "@/stores/app-events";
+import { dirtyTrackingService } from "@/services/dirty-tracking-service";
+import { flushSave } from "@/stores/persistence";
 import type { EditorController } from "@/controllers/editor-controller";
 
 export interface SearchMatch {
@@ -42,9 +44,6 @@ export class FileSyncController {
 
     // Subscribe to events
     this.unsubs.push(
-      appEvents.on(AppEvent.EditorDirty, () => {
-        this.updateDirtyCounter();
-      }),
       appEvents.on(AppEvent.ProviderChanged, () => {
         this.pendingOps = new PendingOps(pendingOpsRepository.load());
       }),
@@ -186,36 +185,15 @@ export class FileSyncController {
     return this.pendingOps.applyToTree(tree);
   }
 
-  // ── Dirty-state counters ──
+  // ── Dirty-state recompute ──
+  //
+  // The authoritative dirty accounting lives in `DirtyTrackingService`, which
+  // listens for body/frontmatter edits and emits `DirtyChanged`. After mutations
+  // performed outside the event stream (flush, discard, provider switch) we ask
+  // it to recompute from the persisted page cache.
 
-  updateDirtyCounter(): void {
-    let totalBytes = 0;
-    const dirtyPaths = repo.getDirtyPaths();
-    for (const path of dirtyPaths) {
-      totalBytes += repo.getOrCreate(path).bodyState.getDelta();
-    }
-    const count = dirtyPaths.length;
-    const pendingCount = this.pendingOps.count;
-
-    const isSingleDirty = count === 1 && pendingCount === 0
-    appEvents.emit(AppEvent.DirtyChanged, {
-      count,
-      bytes: totalBytes,
-      pendingCount,
-      singleDirtyPath: isSingleDirty ? dirtyPaths[0] : undefined,
-    })
-  }
-
-  getDirtyState(): { count: number; bytes: number; pendingCount: number } {
-    let totalBytes = 0;
-    for (const path of repo.getDirtyPaths()) {
-      totalBytes += repo.getOrCreate(path).bodyState.getDelta();
-    }
-    return {
-      count: repo.getDirtyPaths().length,
-      bytes: totalBytes,
-      pendingCount: this.pendingOps.count,
-    };
+  private recomputeDirty(): void {
+    dirtyTrackingService.recompute();
   }
 
   // ── Flush ──
@@ -229,7 +207,7 @@ export class FileSyncController {
     if (ok) {
       treeStore.afterWrite(path);
       repo.save();
-      this.updateDirtyCounter();
+      this.recomputeDirty();
       showNotification("File saved", { type: "success" });
     } else {
       showNotification("Failed to save", { type: "danger" });
@@ -274,7 +252,7 @@ export class FileSyncController {
 
     await this.executePendingOps();
 
-    this.updateDirtyCounter();
+    this.recomputeDirty();
 
     appEvents.emit(AppEvent.FlushComplete);
 
@@ -358,7 +336,8 @@ export class FileSyncController {
   async discardFileChanges(pagePath: string): Promise<void> {
     repo.clearPath(pagePath);
     repo.save();
-    this.updateDirtyCounter();
+    this.recomputeDirty();
+    this.editor.invalidateState(pagePath);
 
     if (pagePath === this.currentPath) {
       const provider = getProvider();
@@ -366,6 +345,7 @@ export class FileSyncController {
       const { frontmatter, body } = stripFrontmatter(raw);
       const page = repo.getOrCreate(pagePath);
       if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+      page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
       page.setBaseline(body);
 
       await this.editor.ensureEditor(body);
@@ -381,7 +361,7 @@ export class FileSyncController {
     if (dirtyPaths.length === 0 && this.pendingOps.count === 0) return;
 
     const provider = getProvider();
-    const changes: ChangesDialogData[] = [];
+    const pendingChanges: { opLabel: string }[] = [];
 
     for (const op of this.pendingOps.all) {
       let label = "";
@@ -399,8 +379,10 @@ export class FileSyncController {
           label = `Move: ${op.from} → ${op.to}`;
           break;
       }
-      changes.push({ isPendingOp: true, opLabel: label });
+      pendingChanges.push({ opLabel: label });
     }
+
+    const dirtyChanges: ChangesDialogData[] = [];
 
     for (const path of dirtyPaths) {
       let md = repo.getOrCreate(path).reconstructContent();
@@ -412,14 +394,16 @@ export class FileSyncController {
       if (!md) {
         const cachedRaw = await provider?.readFile(path);
         if (!cachedRaw) continue;
-        const { body } = stripFrontmatter(cachedRaw);
-        repo.getOrCreate(path).setBaseline(body);
-        md = repo.getOrCreate(path).reconstructContent();
+        const { frontmatter: rawFm, body } = stripFrontmatter(cachedRaw);
+        const fallbackPage = repo.getOrCreate(path);
+        fallbackPage.setBaseline(body);
+        fallbackPage.originalFrontmatter = rawFm ? Frontmatter.fromMeta(rawFm) : undefined;
+        md = fallbackPage.reconstructContent();
       }
 
       if (!md) continue;
 
-      changes.push({
+      dirtyChanges.push({
         path,
         currentPath: path === this.currentPath,
         md,
@@ -427,37 +411,49 @@ export class FileSyncController {
       });
     }
 
-    await mountChangesDialog(
-      changes,
+    await openChangesDialog(
+      dirtyChanges,
+      pendingChanges,
       this.currentPath,
       {
         onDiscard: (path) => {
           repo.clearPath(path);
           repo.save();
-          this.updateDirtyCounter();
+          this.recomputeDirty();
+          this.editor.invalidateState(path);
 
           if (path === this.currentPath) {
             provider?.readFile(path).then((raw) => {
               const { frontmatter, body } = stripFrontmatter(raw || "");
               const page = repo.getOrCreate(path);
               if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+              page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
               page.setBaseline(body);
               this.editor.ensureEditor(body);
             });
           }
         },
-        onNavigate: (path) => appEvents.emit(AppEvent.Navigate, { path }),
-        onReload: async (path) => (await provider?.readFile(path)) || "",
+        onLoadOriginal: async (path) => {
+          const page = repo.getOrCreate(path);
+          if (page.bodyState.baseline !== undefined) {
+            if (page.originalFrontmatter) {
+              return "---\n" + page.originalFrontmatter.serialize() + "\n---\n\n" + page.bodyState.baseline;
+            }
+            return page.bodyState.baseline;
+          }
+          return (await provider?.readFile(path)) || "";
+        },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
           const paths = repo.getDirtyPaths();
           for (const p of paths) {
             repo.clearPath(p);
+            this.editor.invalidateState(p);
           }
           this.clearPendingOps();
           await imageRepository.removeAllForDir(imageRepository.getCurrentDocDir());
           repo.save();
-          this.updateDirtyCounter();
+          this.recomputeDirty();
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
 
@@ -466,6 +462,7 @@ export class FileSyncController {
             const { frontmatter, body } = stripFrontmatter(raw);
             const page = repo.getOrCreate(this.currentPath);
             if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+            page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
             page.setBaseline(body);
             await this.editor.ensureEditor(body);
           }

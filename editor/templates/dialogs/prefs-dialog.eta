@@ -1,0 +1,27 @@
+<div class="inb4doc-prefs-box" onclick="event.stopPropagation()" data-controller="prefs-dialog">
+  <h3>Preferences</h3>
+  <label>
+    <input type="checkbox" id="inb4doc-sticky-checkbox" <%= it.stickyToolbar ? "checked" : "" %> data-action="change->prefs-dialog#stickyChanged">
+    Pin toolbar to top
+  </label>
+  <label>
+    <input type="checkbox" id="inb4doc-dark-checkbox" <%= it.darkMode ? "checked" : "" %> data-action="change->prefs-dialog#darkChanged">
+    Dark mode
+  </label>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Image storage</div>
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="image-mode" value="file" <%= it.imageStorageMode === "file" ? "checked" : "" %> data-action="change->prefs-dialog#imageModeChanged">
+        Save to <code>image/</code> folder
+      </label>
+      <label>
+        <input type="radio" name="image-mode" value="base64" <%= it.imageStorageMode === "base64" ? "checked" : "" %> data-action="change->prefs-dialog#imageModeChanged">
+        Embed as base64 in document
+      </label>
+    </div>
+  </div>
+  <div class="inb4doc-prefs-actions">
+    <button class="inb4doc-prefs-close" data-action="click->prefs-dialog#close">Close</button>
+  </div>
+</div>

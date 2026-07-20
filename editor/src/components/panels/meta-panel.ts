@@ -1,4 +1,4 @@
-import { githubIconStr } from "@/components/ui/icons";
+import { githubIcon } from "@/components/ui/icons";
 import { appEvents, AppEvent } from "@/stores/app-events";
 
 export interface MetaPanelData {
@@ -32,7 +32,7 @@ export function mountMetaPanel(container: HTMLElement): MetaPanelAPI {
       </div>
       <div class="meta-panel-footer">
         <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
-          ${githubIconStr}
+          ${githubIcon}
           <span>View on GitHub</span>
         </a>
       </div>

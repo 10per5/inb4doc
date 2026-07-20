@@ -1,6 +1,6 @@
 import { $node } from "@milkdown/utils"
 import type { EditorView } from "@milkdown/kit/prose/view"
-import { mountHugoRefEditDialog } from "@/components/dialogs/hugo-ref-dialog"
+import { openHugoRefDialog } from "@/components/dialogs/hugo-ref-dialog"
 
 export const hugoRefSchema = $node("hugoRef", () => ({
   group: "inline",
@@ -63,7 +63,7 @@ export function initHugoRefClicks(view: EditorView) {
     e.preventDefault()
     const pos = view.posAtDOM(el, 0)
     if (pos != null) {
-      mountHugoRefEditDialog(view, pos)
+      openHugoRefDialog(view, pos)
     }
   }
   view.dom.addEventListener("click", handler)
