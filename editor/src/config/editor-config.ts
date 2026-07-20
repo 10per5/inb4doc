@@ -174,7 +174,15 @@ export async function createEditor(
           const provider = getProvider();
           const resolved = provider.resolveImageUrl?.(url);
           if (resolved) return resolved;
-          return `/uploads/${host.currentPathDir()}/${url}`;
+          const dir = host.currentPathDir();
+          let relPath = url;
+          if (relPath.startsWith("/")) {
+            relPath = relPath.slice(1);
+            if (dir && relPath.startsWith(dir + "/")) {
+              relPath = relPath.slice(dir.length + 1);
+            }
+          }
+          return `/uploads/${dir}/${relPath}`;
         },
       }));
 

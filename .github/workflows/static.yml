@@ -35,6 +35,11 @@ jobs:
           baseurl: /inb4doc/
           editor-url: /inb4doc/editor-live
 
+      - name: Copy content images into Hugo output
+        working-directory: hugo-view
+        shell: bash
+        run: predep copy-images
+
       - name: Copy editor into site output
         shell: bash
         run: |

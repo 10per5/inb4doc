@@ -5,13 +5,13 @@ weight: 1
 
 # Getting Started
 
-![1.00](image/image-0he7dh.png)
+![1.00](/docs/image/image-0he7dh.png)
 
 ## Prerequisites
 
-* [Docker](https://docs.docker.com/engine/install/) — primary build method
+- [Docker](https://docs.docker.com/engine/install/) — primary build method
 
-* Or [premake5](https://premake.github.io/download) + C++23 compiler + Qt6 + Saucer for native builds
+- Or [premake5](https://premake.github.io/download) + C++23 compiler + Qt6 + Saucer for native builds
 
 Hugo and the Book theme are downloaded automatically by `inb4doc fetch-deps`.
 

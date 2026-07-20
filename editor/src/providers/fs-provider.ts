@@ -206,14 +206,15 @@ export class FileSystemProvider implements ContentProvider {
     await writable.close()
     const blobUrl = URL.createObjectURL(file)
     this.imageUrlCache.set(`${dir}/${relPath}`, blobUrl)
-    return relPath
+    return `/${dir}/${relPath}`
   }
 
   resolveImageUrl(url: string): string | undefined {
-    const exact = this.imageUrlCache.get(url)
+    const normalized = url.startsWith("/") ? url.slice(1) : url
+    const exact = this.imageUrlCache.get(normalized)
     if (exact) return exact
     if (this.currentDir) {
-      return this.imageUrlCache.get(`${this.currentDir}/${url}`)
+      return this.imageUrlCache.get(`${this.currentDir}/${normalized}`)
     }
     return undefined
   }
@@ -261,7 +262,7 @@ export class FileSystemProvider implements ContentProvider {
         }
       }
       const usedIn = refs ? this.findRefsInFiles(name, mdFiles) : []
-      entries.push({ name, url: displayUrl, storageUrl, usedIn })
+      entries.push({ name, url: displayUrl, storageUrl: `/${dir}/${storageUrl}`, usedIn })
     }
 
     return entries

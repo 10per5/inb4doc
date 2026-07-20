@@ -268,7 +268,7 @@ async function handleUpload(req: Request, ctx: ServerContext): Promise<Response 
   const buf = await file.arrayBuffer();
   writeFileSync(targetPath, new Uint8Array(buf));
 
-  const url = docDir ? `image/${name}` : `/uploads/image/${name}`;
+  const url = docDir ? `/${docDir}/image/${name}` : `/image/${name}`;
   return new Response(JSON.stringify({ url }), {
     headers: { "Content-Type": "application/json" },
   });
@@ -393,9 +393,10 @@ function handleListImages(req: Request, ctx: ServerContext): Response | null {
     .sort();
 
   const images = names.map((name) => {
-    const entry: { name: string; url: string; usedIn?: string[] } = {
+    const entry: { name: string; url: string; storageUrl: string; usedIn?: string[] } = {
       name,
       url: `/uploads/${join(docDir, "image", name)}`,
+      storageUrl: `/${docDir}/image/${name}`,
     };
     if (refs) {
       entry.usedIn = findImageRefs(ctx.contentDir, imageDir, name);

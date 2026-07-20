@@ -46,6 +46,14 @@ binary  = "hugo"
 depends = ["hugo-binary", "hugo-theme"]
 outputs = ["root://build/index.html"]
 
+[[stages]]
+name = "copy-images"
+description = "Copy content images into Hugo build output"
+type = "copy"
+files = [
+  { source = "root://content/docs/image/*", dests = ["root://hugo-view/build/docs/image/"] },
+]
+
 [params.binary.build]
 contentDir  = "../content"
 themesDir   = "themes"

@@ -108,7 +108,7 @@ export class RemoteProvider implements ContentProvider {
     return data.images.map((img: any) => ({
       name: img.name,
       url: img.url,
-      storageUrl: `image/${img.name}`,
+      storageUrl: img.storageUrl,
       usedIn: img.usedIn || [],
     }))
   }

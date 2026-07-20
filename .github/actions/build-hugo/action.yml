@@ -20,11 +20,6 @@ runs:
       run: |
         echo "sha=$(sed -n 's/^hugo: //p' .github/predep-shas.yml)" >> $GITHUB_OUTPUT
 
-    - name: Trust cache step
-      working-directory: hugo-view
-      shell: bash
-      run: predep --privileged ${{ steps.predep-sha.outputs.sha }} cache
-
     - name: Cache Hugo binary
       uses: actions/cache@v4
       with:
@@ -34,7 +29,7 @@ runs:
     - name: Hugo binary
       working-directory: hugo-view
       shell: bash
-      run: predep hugo-binary
+      run: predep --privileged ${{ steps.predep-sha.outputs.sha }} hugo-binary
 
     - name: Cache Hugo theme
       uses: actions/cache@v4
@@ -45,7 +40,7 @@ runs:
     - name: Hugo theme
       working-directory: hugo-view
       shell: bash
-      run: predep hugo-theme
+      run: predep --privileged ${{ steps.predep-sha.outputs.sha }} hugo-theme
 
     - name: Cache Hugo resources
       uses: actions/cache@v4
