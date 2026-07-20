@@ -1,10 +1,11 @@
 import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
+import { ProviderType } from "@/providers/index"
 import { stripFrontmatter } from "@/utils/frontmatter"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 import { sanitizeImageName } from "@/utils/sanitize"
 
 export class FileSystemProvider implements ContentProvider {
-  readonly name = "fs"
+  readonly name = ProviderType.Filesystem
   private dirHandle: FileSystemDirectoryHandle | null = null
   private imageUrlCache = new Map<string, string>()
   private currentDir: string = ""

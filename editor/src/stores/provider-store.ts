@@ -1,6 +1,5 @@
 import type { ContentProvider } from "@/providers/provider";
-import type { ProviderType } from "@/providers/index";
-import { createProviderByType } from "@/providers/index";
+import { ProviderType, createProviderByType } from "@/providers/index";
 import { RemoteProvider } from "@/providers/remote-provider";
 import { connectionStore } from "@/stores/connection-store";
 import { treeStore } from "@/stores/tree-store";
@@ -21,42 +20,57 @@ export function getProvider(): ContentProvider {
 }
 
 function saveLastProvider(type: ProviderType) {
-  try { localStorage.setItem(LAST_PROVIDER_KEY, type) } catch {}
+  try { localStorage.setItem(LAST_PROVIDER_KEY, String(type)) } catch {}
 }
 
 function loadLastProvider(): ProviderType | null {
   try {
     const v = localStorage.getItem(LAST_PROVIDER_KEY);
-    if (v === "remote" || v === "filesystem" || v === "localStorage") return v;
+    if (v != null) {
+      const n = Number(v);
+      if (n === ProviderType.Remote) return n as ProviderType;
+    }
   } catch {}
   return null;
 }
 
 /**
- * Initialize the provider: try last-used, then auto-detect, fall back to browser storage.
- * Loads the tree — on failure starts empty. Never throws.
+ * Initialize the provider at app startup.
+ *
+ * Default rules:
+ *   WebLocal / GuiDesktop  →  try remote first, fall back to localStorage
+ *   All others             →  localStorage
+ *
+ * Filesystem is never auto-selected (requires user gesture for showDirectoryPicker).
+ * Remote is tried directly without a probe — no silent network requests.
+ * If getTree() fails the provider falls back to an empty tree; the user can
+ * switch providers explicitly via the provider dialog.
  */
 export async function initializeProvider(): Promise<void> {
   const last = loadLastProvider();
 
   const defaultToRemote = hasFunc(AppFunc.DefaultToRemote);
   const base: ProviderType[] = defaultToRemote
-    ? ["remote", "filesystem", "localStorage"]
-    : ["localStorage", "filesystem"];
+    ? [ProviderType.Remote, ProviderType.LocalStorage]
+    : [ProviderType.LocalStorage];
 
-  const candidates: ProviderType[] = last
+  const candidates: ProviderType[] = last != null
     ? [last, ...base.filter((t) => t !== last)]
     : base;
 
   let provider: ContentProvider | null = null;
   for (const type of candidates) {
+    if (type === ProviderType.Remote) {
+      provider = createProviderByType(type);
+      break;
+    }
     const p = createProviderByType(type);
     if (await p.isAvailable()) {
       provider = p;
       break;
     }
   }
-  if (!provider) provider = createProviderByType("localStorage");
+  if (!provider) provider = createProviderByType(ProviderType.LocalStorage);
 
   setProvider(provider);
 
@@ -96,9 +110,9 @@ export async function getAvailableProviders(): Promise<
     reason?: string;
   }[]
 > {
-  const remote = createProviderByType("remote") as RemoteProvider;
-  const fs = createProviderByType("filesystem");
-  const ls = createProviderByType("localStorage");
+  const remote = createProviderByType(ProviderType.Remote) as RemoteProvider;
+  const fs = createProviderByType(ProviderType.Filesystem);
+  const ls = createProviderByType(ProviderType.LocalStorage);
 
   const [remoteReachable, fsOk, lsOk] = await Promise.all([
     connectionStore.probe(),
@@ -110,7 +124,7 @@ export async function getAvailableProviders(): Promise<
 
   return [
     {
-      type: "remote",
+      type: ProviderType.Remote,
       description: "Files served from a backend server via HTTP API",
       available: remoteReachable,
       appFallback: remoteFallback,
@@ -124,37 +138,32 @@ export async function getAvailableProviders(): Promise<
             : "No content server detected",
     },
     {
-      type: "filesystem",
+      type: ProviderType.Filesystem,
       description: "Access local markdown files via the File System Access API (Chrome/Edge)",
       available: fsOk,
       reason: fsOk ? undefined : "Not supported in this browser (use Chrome or Edge)",
     },
     {
-      type: "localStorage",
+      type: ProviderType.LocalStorage,
       description: "Store files in browser local storage — persists across sessions",
       available: lsOk,
     },
   ];
 }
 
-export function cacheKeyForProvider(name: string): string {
-  const map: Record<string, string> = {
-    remote: "remote",
-    fs: "filesystem",
-    localStorage: "localStorage",
-  };
-  return map[name] || name;
+export function cacheKeyForProvider(type: ProviderType): string {
+  return String(type);
 }
 
-export function getProviderDisplayInfo(name: string): {
+export function getProviderDisplayInfo(type: ProviderType): {
   icon: string;
   label: string;
   type: ProviderType;
 } {
-  const map: Record<string, { icon: string; label: string; type: ProviderType }> = {
-    remote: { icon: "☁️", label: "Server (Remote)", type: "remote" },
-    fs: { icon: "💻", label: "Local Files", type: "filesystem" },
-    localStorage: { icon: "🗄️", label: "Browser Storage", type: "localStorage" },
+  const map: Record<ProviderType, { icon: string; label: string; type: ProviderType }> = {
+    [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)", type: ProviderType.Remote },
+    [ProviderType.Filesystem]: { icon: "💻", label: "Local Files", type: ProviderType.Filesystem },
+    [ProviderType.LocalStorage]: { icon: "🗄️", label: "Browser Storage", type: ProviderType.LocalStorage },
   };
-  return map[name] || { icon: "❓", label: name, type: name as ProviderType };
+  return map[type] ?? { icon: "❓", label: String(type), type };
 }

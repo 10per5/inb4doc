@@ -7,6 +7,7 @@ import { pageRepository } from "@/repositories/pageRepository";
 import { PendingOpType, type PendingOp } from "@/utils/tree";
 import { SidebarAction, sidebarActions } from "@/config/enums";
 import { setContextMenuActions } from "@/controllers/context-menu-controller";
+import { ProviderType } from "@/providers/index";
 import {
   isRootPath,
   isHomePageFilename,
@@ -356,12 +357,12 @@ export function showMenu(
   document.body.appendChild(el);
 }
 
-export function computeLiveUrl(providerType?: string, current?: string): string {
+export function computeLiveUrl(providerType?: ProviderType, current?: string): string {
   const basePath = editorSelfBase;
   const page = (!current || isRootPath(current)) ? "" : `/${current}`;
   const baseUrl = liveUrlBase || (isDev ? "http://localhost:5000" : "");
   return baseUrl
-    ? `${baseUrl}${providerType === "localStorage" ? "" : page}`
+    ? `${baseUrl}${providerType === ProviderType.LocalStorage ? "" : page}`
     : "";
 }
 

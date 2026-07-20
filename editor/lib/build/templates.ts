@@ -8,7 +8,15 @@
  */
 import { Eta } from "eta";
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync } from "fs";
-import { join, relative, basename, dirname } from "path";
+import { join, relative, basename, dirname, sep } from "path";
+
+/**
+ * Returns a POSIX-style relative path (forward slashes) from `base` to `target`.
+ * Used to normalize OS-specific paths so compiled-template IDs are portable.
+ */
+function toPosixRelativePath(base: string, target: string): string {
+  return relative(base, target).split(sep).join("/");
+}
 
 function toPascalCase(str: string): string {
   return str.replace(/-(\w)/g, (_, c) => c.toUpperCase()).replace(/^./, c => c.toUpperCase());
@@ -39,7 +47,7 @@ export function compileAll(srcDir: string, outDir: string): number {
       if (entry.name === "shell.eta") continue; // compile-time only, rendered by build.ts
 
       const etaPath = join(dir, entry.name);
-      const relPath = relative(srcDir, etaPath);
+      const relPath = toPosixRelativePath(srcDir, etaPath);
       const source = readFileSync(etaPath, "utf-8");
 
       const compiled = eta.compile(source);
@@ -48,7 +56,7 @@ export function compileAll(srcDir: string, outDir: string): number {
       const moduleName = basename(entry.name, ".eta");
       const pascalName = toPascalCase(moduleName);
       // strip "partials/" prefix so partials compile to src/eta/menu/ not src/eta/partials/menu/
-      const outRelPath = relPath.replace(/^partials\//, "");
+      const outRelPath = relPath.startsWith("partials/") ? relPath.slice("partials/".length) : relPath;
       const destDir = join(outDir, dirname(outRelPath));
       mkdirSync(destDir, { recursive: true });
       const tsPath = join(destDir, moduleName + ".ts");

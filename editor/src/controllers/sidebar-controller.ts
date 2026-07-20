@@ -13,6 +13,7 @@ import {
   liveIcon,
 } from "@/components/panels/sidebar"
 import type { PendingOp } from "@/utils/tree"
+import { ProviderType } from "@/providers/index"
 import {
   collectPagePaths,
   searchContent,
@@ -61,7 +62,7 @@ export default class extends Controller {
     actions: SidebarActions
     providerIcon?: string
     providerLabel?: string
-    providerType?: string
+    providerType?: ProviderType
     pendingOps?: PendingOp[]
     dirtyPaths?: string[]
     rawTree?: TreeNode
@@ -108,7 +109,7 @@ export default class extends Controller {
     this.resetSearch()
   }
 
-  private renderLiveUrl(providerType?: string, current?: string) {
+  private renderLiveUrl(providerType?: ProviderType, current?: string) {
     const liveUrl = computeLiveUrl(providerType, current)
     const footer = this.innerTarget.parentElement?.querySelector(".sidebar-footer")
     if (!footer) return

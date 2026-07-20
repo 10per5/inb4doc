@@ -1,3 +1,5 @@
+import type { ProviderType } from "@/providers/index"
+
 export interface TreeNode {
   [key: string]: null | { weight: number } | TreeNode
 }
@@ -15,7 +17,7 @@ export interface ImageEntry {
 }
 
 export interface ContentProvider {
-  readonly name: string
+  readonly name: ProviderType
   /** Check if this provider is reachable / supported in the current environment. */
   isAvailable(): Promise<boolean>
   getTree(): Promise<TreeNode>

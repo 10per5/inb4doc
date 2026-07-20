@@ -1,8 +1,9 @@
 import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
+import { ProviderType } from "@/providers/index"
 import { connectionStore } from "@/stores/connection-store"
 
 export class RemoteProvider implements ContentProvider {
-  readonly name = "remote"
+  readonly name = ProviderType.Remote
 
   /**
    * True when the embedded `app://` content API should be used instead of a

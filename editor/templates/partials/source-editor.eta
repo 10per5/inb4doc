@@ -1,9 +1,7 @@
 <div id="source-editor" data-editor-target="source">
   <textarea></textarea>
   <div class="source-actions">
-    <button class="primary" data-action="<%= it.EDITOR_ACTION_PREFIX %><%= it.editorAction.ApplySource %>">
-      Apply
-    </button>
-    <button data-action="<%= it.EDITOR_ACTION_PREFIX %><%= it.editorAction.ToggleSource %>">Cancel</button>
+    <button class="primary" data-action="click->editor#applySourceContent">Apply</button>
+    <button data-action="click->editor#toggleSourceMode">Cancel</button>
   </div>
 </div>

@@ -19,7 +19,7 @@
             <div class="provider-option-info">
               <div class="provider-option-name"><%= it.badges[p.type]?.label || p.type %></div>
               <div class="provider-option-desc"><%= p.description %></div>
-              <% if (p.reason && p.type !== "remote") { %>
+              <% if (p.reason && p.type !== it.ProviderType.Remote) { %>
                 <div class="provider-option-reason <%= p.appFallback || p.guiFallback ? 'info' : '' %>">
                   <%= p.appFallback || p.guiFallback ? 'ℹ️' : '⛔' %> <%= p.reason %>
                 </div>
@@ -27,7 +27,7 @@
               <% if (p.type === it.currentProvider) { %>
                 <div class="provider-option-current-badge">current</div>
               <% } %>
-              <% if (p.type === "remote") { %>
+              <% if (p.type === it.ProviderType.Remote) { %>
                 <div class="remote-section" data-action="click->provider-dialog#stopPropagation">
                   <div class="remote-fields">
                     <div class="remote-field">
@@ -52,6 +52,6 @@
   </div>
   <div class="inb4doc-window-actions">
     <button class="inb4doc-btn inb4doc-btn-danger" data-action="click->provider-dialog#cancel">Cancel</button>
-    <button class="inb4doc-btn inb4doc-btn-success" <%= !it.selectedType ? 'disabled' : '' %> data-action="click->provider-dialog#accept">Accept</button>
+    <button class="inb4doc-btn inb4doc-btn-success" <%= it.selectedType == null ? 'disabled' : '' %> data-action="click->provider-dialog#accept">Accept</button>
   </div>
 </div>

@@ -195,7 +195,7 @@ class SlashView {
 
     this.content.addEventListener("pointerdown", (e) => {
       const item = (e.target as HTMLElement).closest(
-        "[data-cmd]",
+        "[data-cmd], [data-img-action]",
       ) as HTMLElement;
       if (!item) return;
       e.preventDefault();

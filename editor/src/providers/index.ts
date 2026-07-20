@@ -3,15 +3,19 @@ import { RemoteProvider } from "@/providers/remote-provider";
 import { FileSystemProvider } from "@/providers/fs-provider";
 import { LocalStorageProvider } from "@/providers/local-storage-provider";
 
-export type ProviderType = "remote" | "filesystem" | "localStorage";
+export enum ProviderType {
+  Remote = 0,
+  Filesystem = 1,
+  LocalStorage = 2,
+}
 
 export function createProviderByType(type: ProviderType): ContentProvider {
   switch (type) {
-    case "remote":
+    case ProviderType.Remote:
       return new RemoteProvider();
-    case "filesystem":
+    case ProviderType.Filesystem:
       return new FileSystemProvider();
-    case "localStorage":
+    case ProviderType.LocalStorage:
       return new LocalStorageProvider();
   }
 }

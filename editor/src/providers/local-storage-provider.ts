@@ -1,11 +1,12 @@
 import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
+import { ProviderType } from "@/providers/index"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 
 const STORAGE_PREFIX = "inb4doc:"
 const IMAGE_PREFIX = "inb4doc:image:"
 
 export class LocalStorageProvider implements ContentProvider {
-  readonly name = "localStorage"
+  readonly name = ProviderType.LocalStorage
 
   async isAvailable(): Promise<boolean> {
     return true

@@ -1,6 +1,6 @@
 import { getAvailableProviders } from "@/stores/provider-store"
 import { connectionStore } from "@/stores/connection-store"
-import type { ProviderType } from "@/providers/index"
+import { ProviderType } from "@/providers/index"
 import { openHtmlDialog } from "@/services/dialog-service"
 import renderProviderDialog from "@/eta/dialogs/provider-dialog"
 import { ProviderDialogEvent } from "@/controllers/dialog/provider-dialog-controller"
@@ -11,23 +11,23 @@ export interface ProviderDialogResult {
 }
 
 export async function openProviderDialog(
-  currentProvider: string,
+  currentProvider: ProviderType,
 ): Promise<ProviderDialogResult | null> {
   const providers = await getAvailableProviders()
   await connectionStore.probe()
 
-  let selectedType: ProviderType | null = currentProvider as ProviderType
+  let selectedType: ProviderType | null = currentProvider
   const conn = connectionStore.getConfig()
   const origHost = conn.host
   const origPort = conn.port
 
-  const badges: Record<string, { icon: string; label: string }> = {
-    remote: { icon: "☁️", label: "Server (Remote)" },
-    filesystem: { icon: "💻", label: "Local Files" },
-    localStorage: { icon: "🗄️", label: "Browser Storage" },
+  const badges: Record<ProviderType, { icon: string; label: string }> = {
+    [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)" },
+    [ProviderType.Filesystem]: { icon: "💻", label: "Local Files" },
+    [ProviderType.LocalStorage]: { icon: "🗄️", label: "Browser Storage" },
   }
 
-  const currentInfo = badges[currentProvider] || { icon: "❓", label: currentProvider }
+  const currentInfo = badges[currentProvider] ?? { icon: "❓", label: String(currentProvider) }
 
   return new Promise<ProviderDialogResult | null>((resolve) => {
     let currentOverlay: HTMLElement | null = null
@@ -54,8 +54,8 @@ export async function openProviderDialog(
 
       const mergedProviders = providers.map((p) => ({
         ...p,
-        available: p.type === "remote" ? remoteAvailable || remoteAppFallback || remoteGuiFallback : p.available,
-        reason: p.type === "remote" ? remoteReason : p.reason,
+        available: p.type === ProviderType.Remote ? remoteAvailable || remoteAppFallback || remoteGuiFallback : p.available,
+        reason: p.type === ProviderType.Remote ? remoteReason : p.reason,
       }))
 
       const initialStatusClass = remoteAvailable ? "ok"
@@ -66,6 +66,7 @@ export async function openProviderDialog(
         : inGuiMode ? "" : "Server unreachable"
 
       const html = renderProviderDialog({
+        ProviderType,
         currentInfo,
         providers: mergedProviders,
         selectedType,
@@ -80,7 +81,7 @@ export async function openProviderDialog(
       currentOverlay = overlay
 
       overlay.addEventListener(ProviderDialogEvent.Select, ((e: CustomEvent<string>) => {
-        selectedType = e.detail as ProviderType
+        selectedType = Number(e.detail) as ProviderType;
         close()
         render()
       }) as EventListener)
@@ -103,7 +104,7 @@ export async function openProviderDialog(
         const cur = connectionStore.getConfig()
         const configChanged = cur.host !== origHost || cur.port !== origPort
         close()
-        resolve({ type: e.detail as ProviderType, configChanged })
+        resolve({ type: Number(e.detail) as ProviderType, configChanged })
       }) as EventListener)
 
       overlay.addEventListener(ProviderDialogEvent.Cancel, () => {

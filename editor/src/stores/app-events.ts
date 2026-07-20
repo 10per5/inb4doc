@@ -8,6 +8,7 @@
 
 import type { ViewType } from "@/controllers/view-controller"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
+import type { ProviderType } from "@/providers/index"
 
 // ── Event names ──
 
@@ -64,7 +65,7 @@ export interface AppEventPayloads {
   [AppEvent.LoadRequested]:         void
 
   [AppEvent.ViewChanged]:           { view: ViewType }
-  [AppEvent.ProviderChanged]:       { type: string; icon: string; label: string }
+  [AppEvent.ProviderChanged]:       { type: ProviderType; icon: string; label: string }
   [AppEvent.ProviderChangeRequested]: void
 
   [AppEvent.SidebarToggle]:         void

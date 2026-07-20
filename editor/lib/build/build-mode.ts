@@ -31,7 +31,7 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.AllowProbe]:
     BuildMode.WebLocal | BuildMode.GuiDesktop | BuildMode.GuiMobile,
   [AppFunc.DefaultToRemote]:
-    BuildMode.WebLocal | BuildMode.GuiDesktop | BuildMode.GuiMobile,
+    BuildMode.WebLocal | BuildMode.GuiDesktop,
   [AppFunc.MobileCss]:
     BuildMode.WebLocal | BuildMode.GuiMobile,
   [AppFunc.ToolbarMobile]:

@@ -1,21 +1,30 @@
-import { savePendingOps, loadPendingOps, clearPendingOpsStorage } from "@/utils/storage"
-import { getProvider } from "@/stores/provider-store"
-import type { PendingOp } from "@/entities/PendingOps"
+import {
+  savePendingOps,
+  loadPendingOps,
+  clearPendingOpsStorage,
+} from "@/utils/storage";
+import { getProvider } from "@/stores/provider-store";
+import type { PendingOp } from "@/entities/PendingOps";
 
 function providerKey(): string {
-  try { return getProvider().name } catch { return "" }
+  try {
+    const n = getProvider().name;
+    return String(n);
+  } catch {
+    return "";
+  }
 }
 
 export const pendingOpsRepository = {
   load(): PendingOp[] {
-    return loadPendingOps<PendingOp[]>(providerKey())
+    return loadPendingOps<PendingOp[]>(providerKey());
   },
 
   save(ops: PendingOp[]): void {
-    savePendingOps(ops, providerKey())
+    savePendingOps(ops, providerKey());
   },
 
   clear(): void {
-    clearPendingOpsStorage(providerKey())
+    clearPendingOpsStorage(providerKey());
   },
-}
+};
