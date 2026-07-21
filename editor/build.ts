@@ -56,7 +56,6 @@ const html = eta.renderString(shellSource, {
   EDITOR_SELF_BASE: SELF_BASE,
   LIVE_URL_BASE: process.env.LIVE_URL_BASE || "",
   APP_VERSION: process.env.APP_VERSION || "",
-  SSG_MODE: process.env.SSG_MODE || "",
   EDITOR_ACTION_PREFIX,
   editorAction: EditorAction,
   TOOLBAR_ACTION_PREFIX,

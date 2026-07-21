@@ -1,8 +1,8 @@
-import { editorSelfBase, ssgMode } from "@/config";
+import { editorSelfBase, staticSiteGeneration } from "@/config";
 import { isRootPath, HOME_PATH } from "@/utils/hugo-compat";
 
 export function getCurrentPath(): string {
-  if (ssgMode) {
+  if (staticSiteGeneration) {
     return new URLSearchParams(window.location.search).get("path") || HOME_PATH;
   }
   const base = editorSelfBase;
@@ -14,7 +14,7 @@ export function getCurrentPath(): string {
 }
 
 export function pushPath(path: string): void {
-  if (ssgMode) {
+  if (staticSiteGeneration) {
     const url = new URL(window.location.href);
     if (isRootPath(path)) {
       url.searchParams.delete("path");
@@ -32,7 +32,7 @@ export function pushPath(path: string): void {
 }
 
 export function replacePath(path: string): void {
-  if (ssgMode) {
+  if (staticSiteGeneration) {
     const url = new URL(window.location.href);
     if (isRootPath(path)) {
       url.searchParams.delete("path");
@@ -54,7 +54,7 @@ export function buildEditorUrl(base: string, path: string): string {
     return base || "/";
   }
   const norm = base.endsWith("/") ? base : base + "/";
-  if (ssgMode) {
+  if (staticSiteGeneration) {
     return `${norm}?path=${encodeURIComponent(path)}`;
   }
   return norm + path;

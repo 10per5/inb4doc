@@ -29,6 +29,7 @@ jobs:
         with:
           live-url-base: /inb4doc
           editor-self-base: /inb4doc/editor-live/
+          build-mode: web-remote
 
       - uses: ./.github/actions/build-hugo
         with:

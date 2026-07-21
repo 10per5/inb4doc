@@ -49,11 +49,11 @@ The callback is `{outletName}OutletConnected(outlet, element)` on the parent con
 Use `new Application()` → register all controllers → `await app.start()`. Do NOT use `Application.start()` which starts DOM observers before controllers are registered:
 
 ```ts
-const app = new Application()
-app.register("shell", ShellController)
-app.register("editor", EditorController)
+const app = new Application();
+app.register("shell", ShellController);
+app.register("editor", EditorController);
 // ... register all controllers ...
-await app.start()
+await app.start();
 ```
 
 `app.register()` immediately connects controllers if matching DOM elements exist. `app.start()` starts the MutationObserver for future DOM changes.
@@ -107,6 +107,13 @@ bun build.ts          # Full build: Eta render → CSS → Bun bundle → KaTeX 
 bun --bun tsc --noEmit # TypeScript check
 ```
 
+### Build Mode and AppFunc
+
+- `BuildMode` is the deployment target: `web-remote`, `web-local`, `gui-desktop`, `gui-mobile`.
+- `AppFunc` is a bitmask of feature flags derived from the current build mode via `hasFunc()`.
+- **Prefer `hasFunc(AppFunc.X)` over checking `BuildMode` directly.** This keeps runtime behavior decoupled from the deployment target and makes it easy to add new modes without scattering mode-name checks.
+- Meta tags in `templates/partials/head-meta.eta` are the bridge between build-time config and runtime. When adding a new build-time value, add the meta tag there and read it in `src/config/index.ts`.
+
 ## Supported Formatting in WYSIWYG
 
 - **CommonMark** — via `@milkdown/kit/preset/commonmark`
@@ -135,6 +142,7 @@ Shortcodes use `src/plugins/shortcode.ts`:
 Regex (decoration): `/\{\{(<|%)\s*\/?\s*(\w+(?:\.\w+)?)((?:\s+(?:"[^"]*"|\[[^\]]*\]|\S+))*)\s*[>%]\}\}/g`
 
 Supported syntax:
+
 | Part | Class | Style |
 |---|---|---|
 | Shortcode tag | `.shortcode-tag` | gray border, monospace |
@@ -148,8 +156,8 @@ Supported syntax:
 Only backend: **Hugo + Hugo Book theme** (v0.14.0)
 
 - Formatting table in `content/docs/backends.md`
-- Hugo Book shortcode reference: https://book.alxs.dev/docs/content/shortcodes/
-- Hugo shortcode reference: https://gohugo.io/content-management/shortcodes/
+- Hugo Book shortcode reference: <https://book.alxs.dev/docs/content/shortcodes/>
+- Hugo shortcode reference: <https://gohugo.io/content-management/shortcodes/>
 
 ## Inline / Floating Element Patterns
 
@@ -160,14 +168,17 @@ When rendering popups, pickers, or floating UIs that must anchor to a ProseMirro
 Uses `@milkdown/plugin-slash`'s `SlashProvider`. The provider positions itself via `posToDOMRect(view, from, to)` using the current text selection. The positioning happens inside `#onUpdate` which is called by `provider.update(view, prevState)` — debounced at 20ms by default.
 
 **Key flow:**
+
 1. Set a `#programmaticPos` before calling `provider.show()`
 2. In the `shouldShow` callback, read `#programmaticPos`, validate the position node matches the selection node, then return true
 3. The provider calls `posToDOMRect(view, from, to)` to compute position → `computePosition()` via Floating UI → sets `left`/`top` on the element
 
 **Gotchas:**
+
 - `provider.show()` only sets `data-show="true"` — it does NOT position the element. Positioning requires `provider.update()` → `#onUpdate` to fire (debounced).
 - `shouldShow` returns false if `#programmaticPos` resolves to a different node than `selection.from` — important guard against stale positions.
 - For immediate positioning without waiting for the debounce, manually compute coords:
+
   ```ts
   const coords = view.coordsAtPos(pos);
   element.style.left = `${coords.left}px`;
@@ -220,10 +231,10 @@ This generates an LLM-friendly markdown report with largest modules, dependency 
 
 ### Known size issues
 
-| Asset | Size | Cause |
-|-------|------|-------|
-| `app.js` | 1.3 MB initial | Milkdown + ProseMirror + CM core |
-| `app.css` | 1.5 MB | `katex/dist/katex.min.css` has `@font-face` blocks → Bun inlines all woff2/woff/ttf fonts as base64 data URIs (~60 font files, 1.2 MB) |
+| Asset     | Size           | Cause                                                                                                                                  |
+| --------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `app.js`  | 1.3 MB initial | Milkdown + ProseMirror + CM core                                                                                                       |
+| `app.css` | 1.5 MB         | `katex/dist/katex.min.css` has `@font-face` blocks → Bun inlines all woff2/woff/ttf fonts as base64 data URIs (~60 font files, 1.2 MB) |
 
 ### Pending Image Lifecycle
 

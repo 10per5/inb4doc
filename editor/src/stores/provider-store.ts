@@ -54,9 +54,14 @@ export async function initializeProvider(): Promise<void> {
     ? [ProviderType.Remote, ProviderType.LocalStorage]
     : [ProviderType.LocalStorage];
 
-  const candidates: ProviderType[] = last != null
-    ? [last, ...base.filter((t) => t !== last)]
-    : base;
+  const host = connectionStore.getHost();
+  const isLocalhostRemote = last === ProviderType.Remote &&
+    ['localhost', '127.0.0.1', '0.0.0.0'].includes(host.toLowerCase());
+
+  const candidates: ProviderType[] =
+    (last != null && !(isLocalhostRemote && !defaultToRemote))
+      ? [last, ...base.filter((t) => t !== last)]
+      : base;
 
   let provider: ContentProvider | null = null;
   for (const type of candidates) {

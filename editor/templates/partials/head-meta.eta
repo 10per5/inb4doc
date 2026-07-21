@@ -1,8 +1,10 @@
 <% const SELF_BASE = (it.EDITOR_SELF_BASE || "").replace(/\/+$/, ""); %>
 <% const BASE_HREF = SELF_BASE ? `${SELF_BASE}/` : "/"; %>
 <base href="<%= BASE_HREF %>" />
-<meta name="editor-self-base" content="<%= it.EDITOR_SELF_BASE %>" />
-<meta name="live-url-base" content="<%= it.LIVE_URL_BASE %>" />
-<meta name="ssg-mode" content="<%= it.SSG_MODE %>" />
-<meta name="app-version" content="<%= it.APP_VERSION %>" />
-<link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.ico" />
+  <meta name="editor-self-base" content="<%= it.EDITOR_SELF_BASE %>" />
+
+  <meta name="live-url-base" content="<%= it.LIVE_URL_BASE %>" />
+
+  <meta name="app-version" content="<%= it.APP_VERSION %>" />
+
+  <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.ico" />

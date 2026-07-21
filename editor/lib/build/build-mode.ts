@@ -14,6 +14,7 @@ export enum AppFunc {
   MetaPanelCompact = 1 << 5,
   DevOverlay = 1 << 6,
   LivePreview = 1 << 7,
+  StaticSiteGeneration = 1 << 8,
 }
 
 export const BUILD_MODE_NAMES: Record<BuildMode, string> = {
@@ -44,6 +45,7 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
     BuildMode.GuiDesktop,
   [AppFunc.LivePreview]:
     BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiDesktop,
+  [AppFunc.StaticSiteGeneration]: BuildMode.WebRemote,
 };
 
 let _currentMode: BuildMode | null = null;

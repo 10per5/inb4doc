@@ -10,6 +10,10 @@ inputs:
     description: Base URL path where the editor is deployed (e.g. /inb4doc/editor-live/)
     required: false
     default: ""
+  build-mode:
+    description: Editor build mode (web-remote, web-local, gui-desktop, gui-mobile)
+    required: false
+    default: "web-remote"
 
 runs:
   using: composite
@@ -31,9 +35,9 @@ runs:
       working-directory: editor
       shell: bash
       env:
+        BUILD_MODE: ${{ inputs.build-mode }}
         LIVE_URL_BASE: ${{ inputs.live-url-base }}
         EDITOR_SELF_BASE: ${{ inputs.editor-self-base }}
-        SSG_MODE: "true"
       run: |
         bun install --frozen-lockfile
         bun run build
