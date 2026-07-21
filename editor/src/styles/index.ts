@@ -22,3 +22,6 @@ import "./app/dialogs.css"
 
 /* ── Mobile (gui-mobile only) ───────────────────────────────────── */
 import "./mobile.css"
+
+/* ── Views ──────────────────────────────────────────────────────── */
+import "./views/empty-project.css"

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || true)
+
+# fix_shas() {
+#   bash "$ROOT/scripts/check-privilege-shas.sh" --update
+# }
+#
+# fix_pkg_version() {
+#   local target_ver="$1"
+#   if command -v jq &>/dev/null; then
+#     jq --arg v "$target_ver" '.version = $v' editor/package.json > /tmp/pkg.json \
+#       && mv /tmp/pkg.json editor/package.json
+#   else
+#     sed -i "s/\"version\": \".*\"/\"version\": \"$target_ver\"/" editor/package.json
+#   fi
+# }
+
+# --- Check 1: predep SHAs ---
+echo "→ Checking .github/predep-shas.yml against predep.toml files..."
+if bash "$ROOT/scripts/check-privilege-shas.sh" check; then
+  echo "  Predep SHAs OK."
+else
+  echo ""
+  echo "✖ predep SHA mismatch. Run:"
+  echo "  scripts/check-privilege-shas.sh --update"
+  echo "  Then amend/commit and push again."
+  echo ""
+  exit 1
+fi
+
+# --- Check 2: editor/package.json version (version branches only) ---
+# Accept either base version (X.Y.Z) or full patch (X.Y.ZpN)
+expected_base=$(echo "$branch" | sed -n 's/^v\([0-9]\+\.[0-9]\+\.[0-9]\+\)p[0-9]\+$/\1/p')
+expected_full=$(echo "$branch" | sed -n 's/^v\([0-9]\+\.[0-9]\+\.[0-9]\+p[0-9]\+\)$/\1/p')
+
+if [ -z "$expected_base" ]; then
+  echo "→ Not a version branch ($branch), skipping package.json version check."
+  exit 0
+fi
+
+echo "→ Checking editor/package.json version against branch $branch..."
+
+if command -v jq &>/dev/null; then
+  pkg_ver=$(jq -r '.version' editor/package.json 2>/dev/null || true)
+else
+  pkg_ver=$(grep '"version"' editor/package.json | head -1 | sed 's/.*"\([0-9.]*p*[0-9]*\)".*/\1/')
+fi
+
+if [ -z "$pkg_ver" ]; then
+  echo "✖ Could not read version from editor/package.json"
+  exit 1
+fi
+
+if [ "$pkg_ver" != "$expected_base" ] && [ "$pkg_ver" != "$expected_full" ]; then
+  echo "✖ editor/package.json version mismatch!"
+  echo "  Branch $branch accepts version $expected_base or $expected_full"
+  echo "  Package has version $pkg_ver"
+  echo ""
+  echo "  Set editor/package.json to $expected_base or $expected_full before pushing."
+  echo ""
+  exit 1
+fi
+
+echo "  Package version $pkg_ver OK."
+
+exit 0

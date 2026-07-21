@@ -30,6 +30,14 @@ cd hugo-view && python3 -m http.server -d build 8080
 
 Hugo and the Book theme are downloaded automatically on first build by predep.
 
+## Git Hooks
+
+Pre-push hooks validate predep SHAs and package versions. Enable once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## How it Works
 
 Two layers that share the same `content/` directory:
