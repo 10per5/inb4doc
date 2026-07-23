@@ -67,6 +67,7 @@ const html = eta.renderString(shellSource, {
   SidebarAction,
   sidebarActions,
   icons,
+  mobileCss: hasFlag(AppFunc.MobileCss),
 });
 
 writeFileSync(join(publicDir, "index.html"), html);
