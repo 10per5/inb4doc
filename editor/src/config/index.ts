@@ -1,7 +1,7 @@
 import { hasFunc, AppFunc } from "$/build/build-mode";
 
 export const editorSelfBase: string =
-  (document.querySelector('meta[name="editor-self-base"]')?.getAttribute("content") ?? "/").replace(/\/?$/, "/");
+  (document.querySelector('meta[name="editor-self-base"]')?.getAttribute("content") ?? ".").replace(/\/?$/, "/");
 
 export const liveUrlBase: string =
   document.querySelector('meta[name="live-url-base"]')?.getAttribute("content") ?? "";
