@@ -9,14 +9,14 @@
 
   <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.ico" />
 
-  <title>inb4doc - Markdown ExEdit</title>
-  <meta name="description" content="A live WYSIWYG markdown editing with various functionalities.">
+  <title>inb4doc — Multi-Provider Live Markdown Editor for Wikis</title>
+  <meta name="description" content="Edit markdown in a live WYSIWYG editor across browser, desktop, and mobile. Connect multiple providers to export wikis, static sites, or other formats.">
   <meta property="og:site_name" content="inb4doc">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="inb4doc - Live ExEdit">
-  <meta property="og:description" content="A live WYSIWYG markdown editing with various functionalities.">
-  <meta property="og:image" content="<%= it.EDITOR_SELF_BASE %>/inb4doc-512.png">
+  <meta property="og:title" content="inb4doc — Multi-Provider Live Markdown Editor for Wikis">
+  <meta property="og:description" content="Edit markdown in a live WYSIWYG editor across browser, desktop, and mobile. Connect multiple providers to export wikis, static sites, or other formats.">
+  <meta property="og:image" content="<%= it.EDITOR_SELF_BASE %>/inb4doc-256.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="inb4doc - Live ExEdit">
-  <meta name="twitter:description" content="A live WYSIWYG markdown editing with various functionalities.">
-  <meta name="twitter:image" content="<%= it.EDITOR_SELF_BASE %>/inb4doc-512.png">
+  <meta name="twitter:title" content="inb4doc — Multi-Provider Live Markdown Editor for Wikis">
+  <meta name="twitter:description" content="Edit markdown in a live WYSIWYG editor across browser, desktop, and mobile. Connect multiple providers to export wikis, static sites, or other formats.">
+  <meta name="twitter:image" content="<%= it.EDITOR_SELF_BASE %>/inb4doc-256.png">

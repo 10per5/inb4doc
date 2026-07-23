@@ -12,4 +12,4 @@ disableKinds = ["RSS", "sitemap"]
   BookSearch = true
   BookTheme = "auto"
   BookSection = "docs"
-  description = "A markdown wiki with live WYSIWYG editing and static site export via Hugo Book."
+  description = "Edit markdown in a live WYSIWYG editor across browser, desktop, and mobile. Connect multiple providers to export wikis, static sites, or other formats."

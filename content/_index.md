@@ -11,7 +11,7 @@ type: docs
 
 ***
 
-A two-layer wiki: edit markdown in a live WYSIWYG editor, export as a static site via Hugo.
+A two-layer wiki: edit markdown in a live WYSIWYG editor. Connect multiple providers to export wikis, static sites, or other formats. Works in your browser, desktop, or mobile.
 
 * [Getting Started](/docs/getting-started) — set up and make your first edit
 
