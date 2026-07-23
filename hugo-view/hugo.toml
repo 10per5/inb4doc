@@ -12,4 +12,4 @@ disableKinds = ["RSS", "sitemap"]
   BookSearch = true
   BookTheme = "auto"
   BookSection = "docs"
-  description = "Edit markdown in a live WYSIWYG editor across browser, desktop, and mobile. Connect multiple providers to export wikis, static sites, or other formats."
+  description = "Live WYSIWYG markdown editor for browser, desktop, and mobile. Connect providers to export wikis, static sites, and more."

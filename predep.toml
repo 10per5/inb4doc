@@ -32,6 +32,9 @@ files = [
   { source = "root://images/inb4doc-64.png", dests = [
       "root://hugo-view/static/favicon.png",
   ] },
+  { source = "root://images/opengraph.png", dests = [
+      "root://editor/public/opengraph.png",
+  ] },
 ]
 
 [[stages]]
