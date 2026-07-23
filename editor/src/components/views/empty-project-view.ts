@@ -6,7 +6,7 @@
  */
 
 import { ProjectAction, PROJECT_ACTION_PREFIX, SidebarAction, SIDEBAR_ACTION_PREFIX } from "@/config/enums"
-import renderEmptyProject from "@/eta/empty-project"
+import renderEmptyProject from "@/eta/views/empty-project"
 
 export function mountEmptyProjectView(container: HTMLElement): void {
   const existing = container.querySelector(".empty-project")
