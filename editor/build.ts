@@ -67,7 +67,6 @@ const html = eta.renderString(shellSource, {
   SidebarAction,
   sidebarActions,
   icons,
-  showMobileButtons: hasFlag(AppFunc.ToolbarMobile),
 });
 
 writeFileSync(join(publicDir, "index.html"), html);

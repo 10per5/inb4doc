@@ -5,17 +5,16 @@
  * Gives the user a clear action: create their first page.
  */
 
-import { ProjectAction, PROJECT_ACTION_PREFIX, SidebarAction, SIDEBAR_ACTION_PREFIX } from "@/config/enums"
 import renderEmptyProject from "@/eta/views/empty-project"
+
+const ACTIONS = {
+  createPage: "createPage",
+  changeProvider: "changeProvider",
+} as const
 
 export function mountEmptyProjectView(container: HTMLElement): void {
   const existing = container.querySelector(".empty-project")
   if (existing) existing.remove()
 
-  container.insertAdjacentHTML("beforeend", renderEmptyProject({
-    PROJECT_ACTION_PREFIX,
-    SIDEBAR_ACTION_PREFIX,
-    ProjectAction,
-    SidebarAction,
-  }))
+  container.insertAdjacentHTML("beforeend", renderEmptyProject({ actions: ACTIONS }))
 }

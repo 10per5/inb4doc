@@ -1,6 +1,6 @@
 <div id="app-toolbar" class="app-toolbar" data-controller="topbar">
   <div class="toolbar-section toolbar-section-left">
-    <% if (it.showMobileButtons) { %>
+    <% if (it.mobileCss) { %>
       <button class="btn-toggle-sidebar toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleSidebar] %>" title="Toggle Sidebar">☰</button>
       <span class="toolbar-sep toolbar-mobile-only"></span>
     <% } %>
@@ -28,7 +28,7 @@
     <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Link %>" title="Insert Link"><%~ it.icons.linkIcon %></button>
     <span class="toolbar-sep"></span>
     <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.SourceMode] %>" title="Source Mode">{ }</button>
-    <% if (it.showMobileButtons) { %>
+    <% if (it.mobileCss) { %>
       <span class="toolbar-sep toolbar-mobile-only"></span>
       <button class="toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleMetaPanel] %>" title="Meta Panel">🪟️</button>
     <% } %>

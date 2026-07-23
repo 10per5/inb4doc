@@ -9,7 +9,6 @@ export enum AppFunc {
   AllowProbe = 1 << 0,
   DefaultToRemote = 1 << 1,
   MobileCss = 1 << 2,
-  ToolbarMobile = 1 << 3,
   SidebarGestures = 1 << 4,
   MetaPanelCompact = 1 << 5,
   DevOverlay = 1 << 6,
@@ -34,9 +33,7 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.DefaultToRemote]:
     BuildMode.WebLocal | BuildMode.GuiDesktop,
   [AppFunc.MobileCss]:
-    BuildMode.WebLocal | BuildMode.GuiMobile,
-  [AppFunc.ToolbarMobile]:
-    BuildMode.WebLocal | BuildMode.GuiMobile,
+    BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiMobile,
   [AppFunc.SidebarGestures]:
     BuildMode.GuiMobile,
   [AppFunc.MetaPanelCompact]:
