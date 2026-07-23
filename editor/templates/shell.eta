@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>inb4doc</title>
     <%~ include('partials/head-meta', it) %>
     <link rel="stylesheet" href="assets/katex.css" />
     <link rel="stylesheet" href="assets/app.css" />
