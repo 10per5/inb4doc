@@ -21,6 +21,15 @@ name = "docker"
 description = "Build editor static assets via Docker"
 type = "docker"
 outputs = ["root://public/"]
-recipe = "Dockerfile"
+recipe = "images/web.Dockerfile"
 target = "/output/editor/public/"
 dest = "root://public/"
+
+[[stages]]
+name = "android"
+description = "Build Android APK via Docker"
+type = "docker"
+outputs = ["root://android/bin/inb4doc.apk"]
+recipe = "images/android.Dockerfile"
+target = "/output/apk/app-debug.apk"
+dest = "root://android/bin/inb4doc.apk"

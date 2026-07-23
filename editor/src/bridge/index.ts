@@ -17,6 +17,22 @@ function pipeConsole(): void {
   const orig: Record<string, (...args: unknown[]) => void> = {}
   for (const level of methods) orig[level] = (console as any)[level].bind(console)
 
+  const format = (args: unknown[]) =>
+    args.map((a) => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")
+
+  // Android: NativeBridge.log is available immediately (no polling needed)
+  const androidLog = (window as any).NativeBridge?.log as ((msg: string) => void) | undefined
+  if (androidLog) {
+    for (const level of methods) {
+      ;(console as any)[level] = (...args: unknown[]) => {
+        orig[level](...args)
+        try { androidLog(`[${level}] ${format(args)}`) } catch {}
+      }
+    }
+    return
+  }
+
+  // Desktop Saucer: poll until the bridge is injected
   function tryPipe(): void {
     const nativeLog = (window as any).saucer?.exposed?.log
     if (!nativeLog) { setTimeout(tryPipe, 100); return }
@@ -24,9 +40,7 @@ function pipeConsole(): void {
     for (const level of methods) {
       ;(console as any)[level] = (...args: unknown[]) => {
         orig[level](...args)
-        try {
-          nativeLog(`[${level}] ${args.map((a) => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")}`)
-        } catch {}
+        try { nativeLog(`[${level}] ${format(args)}`) } catch {}
       }
     }
   }

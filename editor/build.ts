@@ -45,7 +45,7 @@ const templatesSrc = join(__dir, "templates");
 const eta = new Eta({ views: templatesSrc });
 const shellSource = readFileSync(join(templatesSrc, "shell.eta"), "utf-8");
 
-const SELF_BASE = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "");
+const SELF_BASE = (process.env.EDITOR_SELF_BASE || ".").replace(/\/+$/, "");
 
 const modeStr = process.env.BUILD_MODE || "web-local";
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal;
