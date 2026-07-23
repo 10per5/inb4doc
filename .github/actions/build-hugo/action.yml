@@ -10,6 +10,10 @@ inputs:
     description: Editor URL to inject into the Hugo output menu
     required: false
     default: ""
+  site-url:
+    description: Absolute site URL used for meta tags / OG image fallbacks
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -54,4 +58,5 @@ runs:
       env:
         HUGO_BASEURL: ${{ inputs.baseurl }}
         EDITOR_URL: ${{ inputs.editor-url }}
+        SITE_URL: ${{ inputs.site-url }}
       run: predep --privileged ${{ steps.predep-sha.outputs.sha }} build

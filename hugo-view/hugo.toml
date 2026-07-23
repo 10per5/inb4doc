@@ -6,7 +6,7 @@ disableKinds = ["RSS", "sitemap"]
 
 [security]
   [security.funcs]
-    getenv = ["^EDITOR_URL$", "^HUGO_", "^CI$"]
+    getenv = ["^EDITOR_URL$", "^HUGO_", "^CI$", "^SITE_URL$"]
 
 [params]
   BookSearch = true
