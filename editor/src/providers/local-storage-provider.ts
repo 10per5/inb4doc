@@ -66,6 +66,13 @@ export class LocalStorageProvider implements ContentProvider {
 
   async deleteFile(path: string): Promise<void> {
     localStorage.removeItem(STORAGE_PREFIX + path + ".md")
+    const prefix = STORAGE_PREFIX + path + "/"
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(prefix)) {
+        localStorage.removeItem(key)
+      }
+    }
     this.removeOrphanedImages()
   }
 

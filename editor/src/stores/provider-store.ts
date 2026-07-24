@@ -28,7 +28,7 @@ function loadLastProvider(): ProviderType | null {
     const v = localStorage.getItem(LAST_PROVIDER_KEY);
     if (v != null) {
       const n = Number(v);
-      if (n === ProviderType.Remote) return n as ProviderType;
+      if (n in ProviderType) return n as ProviderType;
     }
   } catch {}
   return null;
@@ -59,7 +59,7 @@ export async function initializeProvider(): Promise<void> {
     ['localhost', '127.0.0.1', '0.0.0.0'].includes(host.toLowerCase());
 
   const candidates: ProviderType[] =
-    (last != null && !(isLocalhostRemote && !defaultToRemote))
+    (last != null && last !== ProviderType.Filesystem && !(isLocalhostRemote && !defaultToRemote))
       ? [last, ...base.filter((t) => t !== last)]
       : base;
 
