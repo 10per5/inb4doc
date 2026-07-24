@@ -1,6 +1,7 @@
 import "@milkdown/theme-nord/style.css"
 
 /* ── Foundation ────────────────────────────────────────────────── */
+import "./loading-overlay.css"
 import "./foundation/base.css"
 
 /* ── Layout ─────────────────────────────────────────────────────── */

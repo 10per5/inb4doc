@@ -6,10 +6,9 @@
     <%~ include('partials/head-meta', it) %>
     <link rel="stylesheet" href="assets/katex.css" />
     <link rel="stylesheet" href="assets/app.css" />
-    <%~ include('partials/loading-overlay-style', it) %>
   </head>
   <body>
-    <%~ include('partials/loading-overlay', it) %>
+    <%~ include('views/loading-overlay', it) %>
     <div id="app" data-controller="shell" data-shell-editor-outlet="#editor-area">
       <div class="book-layout">
         <nav class="book-menu">
