@@ -7,8 +7,12 @@ export function getCurrentPath(): string {
   }
   const base = editorSelfBase;
   const raw = window.location.pathname;
-  if (base && base !== "/" && raw.startsWith(base)) {
-    return raw.slice(base.length).replace(/^\//, "").replace(/\/$/, "") || HOME_PATH;
+  let basePath = base;
+  if (base.startsWith("http://") || base.startsWith("https://")) {
+    basePath = new URL(base).pathname;
+  }
+  if (basePath && basePath !== "/" && raw.startsWith(basePath)) {
+    return raw.slice(basePath.length).replace(/^\//, "").replace(/\/$/, "") || HOME_PATH;
   }
   return raw.replace(/^\//, "").replace(/\/$/, "") || HOME_PATH;
 }
