@@ -1,4 +1,4 @@
-import { Application } from "@hotwired/stimulus"
+import { Application, type Controller } from "@hotwired/stimulus"
 
 import ShellController from "./shell_controller"
 import TopbarController from "./topbar-controller"
@@ -6,7 +6,7 @@ import SidebarController from "./sidebar-controller"
 import EditorController from "./editor-controller"
 import ContextMenuController from "./context-menu-controller"
 import { PressTwiceController } from "./press-twice-controller"
-import EmptyProjectController from "./empty-project-controller"
+import NoFileController from "./no-file-controller"
 
 import { ConfirmDialogController } from "./dialog/confirm-dialog-controller"
 import { PromptDialogController } from "./dialog/prompt-dialog-controller"
@@ -23,7 +23,7 @@ import { ProviderDialogController } from "./dialog/provider-dialog-controller"
 
 export interface ControllerRegistration {
   name: string
-  controller: Constructor<Controller>
+  controller: new (...args: any[]) => Controller
 }
 
 const registrations: ControllerRegistration[] = [
@@ -45,7 +45,7 @@ const registrations: ControllerRegistration[] = [
   { name: "provider-dialog", controller: ProviderDialogController },
   { name: "press-twice", controller: PressTwiceController },
   { name: "context-menu", controller: ContextMenuController },
-  { name: "empty-project", controller: EmptyProjectController },
+  { name: "no-file", controller: NoFileController },
 ]
 
 export function registerControllers(app: Application): void {

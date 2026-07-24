@@ -7,6 +7,7 @@
 
 import { createNewItem, deletePage, renamePage, movePage } from "@/services/editor-actions";
 import { setupNavListeners, collectPageList } from "@/features/navigation";
+import { addRecent } from "@/utils/recent-files";
 import { getProvider, switchProvider, cacheKeyForProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import type SidebarController from "@/controllers/sidebar-controller";
 import { type SidebarActions, type TreeNode } from "@/components/panels/sidebar";
@@ -88,6 +89,7 @@ export class NavigationController {
       flushSave();
 
       this.currentPath = path;
+      (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
       appEvents.emit(AppEvent.ViewChanged, { view: "editor" as any });
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
@@ -109,12 +111,14 @@ export class NavigationController {
         | undefined;
       const effectivePath = moveOp ? moveOp.from : path;
       const rawContent = await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data));
-      const dirIndex = isHugoIndex(path);
-      const content = rawContent ?? (dirIndex ? "" : "# New Page\n\nStart writing...");
 
-      if (dirIndex && !rawContent) {
-        this.metaPanel?.update({ title: "" });
+      if (!rawContent) {
+        appEvents.emit(AppEvent.NoFileView, { lastPath: path });
+        return;
       }
+
+      const content = rawContent;
+      const dirIndex = isHugoIndex(path);
 
       await this.editor.ensureEditor(content);
       this.editor.updateDirIndexOverlay(content);
@@ -126,6 +130,7 @@ export class NavigationController {
 
       await this.loadSidebar();
       dirtyTrackingService.recompute();
+      addRecent(path);
     } finally {
       this.loading = false;
     }
@@ -213,7 +218,7 @@ export class NavigationController {
       if (home) {
         this.navigate(home);
       } else {
-        appEvents.emit(AppEvent.ProjectEmpty);
+        appEvents.emit(AppEvent.NoFileView, {});
       }
 
       const pdi = getProviderDisplayInfo(result.type);
@@ -228,10 +233,9 @@ export class NavigationController {
       pageRepository.clearPath(pagePath);
       flushSave();
       if (this.currentPath === pagePath) {
-        this.navigate(HOME_PATH);
-      } else {
-        this.loadSidebar();
+        (this.editor.element as HTMLElement).classList.add("pending-delete-tint");
       }
+      this.loadSidebar();
       dirtyTrackingService.recompute();
     });
   }

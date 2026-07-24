@@ -137,8 +137,9 @@ export default class extends Controller {
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
       appEvents.on(AppEvent.SaveCurrentFile, () => this.saveCurrentFile()),
       appEvents.on(AppEvent.FlushAll, () => this.cache.flushDirtyFiles()),
-      appEvents.on(AppEvent.ProjectEmpty, () => {
-        this.view.switchTo("empty-project")
+      appEvents.on(AppEvent.NoFileView, ({ lastPath }) => {
+        if (lastPath) this.view.setNoFileLastPath(lastPath);
+        this.view.switchTo("no-file")
       }),
       appEvents.on(AppEvent.CreateFirstPage, () => {
         this.cache.createDraft(HOME_PATH, NEW_PAGE_BODY)
@@ -170,7 +171,7 @@ export default class extends Controller {
     this.nav.setCurrentPath(startPath)
 
     if (isNew) {
-      appEvents.emit(AppEvent.ProjectEmpty)
+      appEvents.emit(AppEvent.NoFileView, {})
     } else {
       replacePath(startPath)
     }

@@ -41,6 +41,7 @@ export enum AppEvent {
   CreateFirstPage = "create-first-page",
   CreateDraftRequested = "create-draft-requested",
   ProjectEmpty = "project-empty",
+  NoFileView = "no-file-view",
 
   // Meta panel
   MetaDataChanged = "meta-data-changed",
@@ -76,6 +77,7 @@ export interface AppEventPayloads {
   [AppEvent.CreateFirstPage]:       void
   [AppEvent.CreateDraftRequested]: { path: string; content: string }
   [AppEvent.ProjectEmpty]:          void
+  [AppEvent.NoFileView]:           { lastPath?: string }
 
   [AppEvent.MetaDataChanged]:       { data: MetaPanelData }
 

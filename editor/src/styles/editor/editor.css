@@ -14,6 +14,20 @@
   }
 }
 
+/* ── Pending Delete Tint ──────────────────────────────────────────── */
+
+#editor-area.pending-delete-tint {
+  background-color: rgba(220, 53, 69, 0.06);
+}
+
+#editor-area.pending-delete-tint #milkdown-editor .ProseMirror {
+  background-color: transparent;
+}
+
+#editor-area.pending-delete-tint #source-editor textarea {
+  background-color: transparent;
+}
+
 /* ── Context Menu ──────────────────────────────────────────────────── */
 
 .ctx-backdrop {

@@ -255,20 +255,30 @@ export class FileSyncController {
 
     repo.save();
 
-    await this.executePendingOps();
+    const deletedPaths = await this.executePendingOps();
 
     this.recomputeDirty();
 
     appEvents.emit(AppEvent.FlushComplete);
+
+    if (deletedPaths.includes(this.currentPath)) {
+      const raw = await provider?.readFile(this.currentPath);
+      if (!raw) {
+        const editorEl = this.editor.element as HTMLElement;
+        editorEl.classList.remove("pending-delete-tint");
+        appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+      }
+    }
 
     showNotification("All files saved", { type: "success" });
 
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
   }
 
-  private async executePendingOps(): Promise<void> {
-    if (this.pendingOps.count === 0) return;
+  private async executePendingOps(): Promise<string[]> {
+    if (this.pendingOps.count === 0) return [];
     const provider = getProvider();
+    const deletedPaths: string[] = [];
 
     for (const op of this.pendingOps.all) {
       try {
@@ -280,6 +290,7 @@ export class FileSyncController {
           case PendingOpType.Delete:
             await provider?.deleteFile?.(op.path);
             treeStore.afterDelete(op.path);
+            deletedPaths.push(op.path);
             break;
           case PendingOpType.Rename:
             if (op.content) {
@@ -312,6 +323,7 @@ export class FileSyncController {
 
     this.pendingOps.clear();
     pendingOpsRepository.clear();
+    return deletedPaths;
   }
 
   private async cleanupOrphanedImages(
@@ -346,16 +358,22 @@ export class FileSyncController {
     this.editor.invalidateState(pagePath);
 
     if (pagePath === this.currentPath) {
+      (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
       const provider = getProvider();
       const raw = (await provider?.readFile(pagePath)) || "";
-      const { frontmatter, body } = stripFrontmatter(raw);
-      const page = repo.getOrCreate(pagePath);
-      if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-      page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
-      page.setBaseline(body);
 
-      await this.editor.ensureEditor(body);
-      this.editor.updateDirIndexOverlay(body);
+      if (!raw) {
+        appEvents.emit(AppEvent.NoFileView, { lastPath: pagePath });
+      } else {
+        const { frontmatter, body } = stripFrontmatter(raw);
+        const page = repo.getOrCreate(pagePath);
+        if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+        page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+        page.setBaseline(body);
+
+        await this.editor.ensureEditor(body);
+        this.editor.updateDirIndexOverlay(body);
+      }
     }
 
     showNotification("Changes discarded", { type: "info" });
@@ -431,14 +449,19 @@ export class FileSyncController {
           this.editor.invalidateState(path);
 
           if (path === this.currentPath) {
+            (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
             provider?.readFile(path).then((raw) => {
-              const { frontmatter, body } = stripFrontmatter(raw || "");
-              const page = repo.getOrCreate(path);
-              if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-              page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
-              page.setBaseline(body);
-              this.editor.ensureEditor(body);
-              this.editor.updateDirIndexOverlay(body);
+              if (!raw) {
+                appEvents.emit(AppEvent.NoFileView, { lastPath: path });
+              } else {
+                const { frontmatter, body } = stripFrontmatter(raw);
+                const page = repo.getOrCreate(path);
+                if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+                page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+                page.setBaseline(body);
+                this.editor.ensureEditor(body);
+                this.editor.updateDirIndexOverlay(body);
+              }
             });
           }
         },
@@ -468,13 +491,18 @@ export class FileSyncController {
 
           if (paths.includes(this.currentPath)) {
             const raw = (await provider?.readFile(this.currentPath)) || "";
-            const { frontmatter, body } = stripFrontmatter(raw);
-            const page = repo.getOrCreate(this.currentPath);
-            if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-            page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
-            page.setBaseline(body);
-            await this.editor.ensureEditor(body);
-            this.editor.updateDirIndexOverlay(body);
+
+            if (!raw) {
+              appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+            } else {
+              const { frontmatter, body } = stripFrontmatter(raw);
+              const page = repo.getOrCreate(this.currentPath);
+              if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+              page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+              page.setBaseline(body);
+              await this.editor.ensureEditor(body);
+              this.editor.updateDirIndexOverlay(body);
+            }
           }
         },
       },

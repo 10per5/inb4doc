@@ -25,4 +25,4 @@ import "./app/dialogs.css"
 import "./mobile.css"
 
 /* ── Views ──────────────────────────────────────────────────────── */
-import "./views/empty-project.css"
+import "./views/no-file.css"

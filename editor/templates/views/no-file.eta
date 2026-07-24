@@ -1,0 +1,35 @@
+<div data-controller="no-file" class="no-file-view">
+<% if (it.isEmpty) { %>
+  <h2>No files yet</h2>
+  <p>Create your first page to get started. You can always add more from the sidebar.</p>
+  <div class="btn-row">
+    <button class="create-btn" data-action="click->no-file#createPage">Create a page</button>
+    <button class="change-btn" data-action="click->no-file#changeProvider">Change provider</button>
+  </div>
+<% } else { %>
+  <h2>No file selected</h2>
+<% if (it.recents.length > 0) { %>
+  <div class="no-file-section">
+    <h3>Recent files</h3>
+    <ul class="no-file-list">
+<% for (const r of it.recents) { %>
+      <li><button class="no-file-link" data-action="click->no-file#open" data-file-path="<%= r %>"><%= r.split("/").pop() %></button><% if (r.includes("/")) { %><span class="no-file-dir"><%= r.split("/").slice(0, -1).join("/") %></span><% } %></li>
+<% } %>
+    </ul>
+  </div>
+<% } %>
+<% if (it.suggestions.length > 0) { %>
+  <div class="no-file-section">
+    <h3>Suggested</h3>
+    <ul class="no-file-list">
+<% for (const s of it.suggestions) { %>
+      <li><button class="no-file-link" data-action="click->no-file#open" data-file-path="<%= s %>"><%= s.split("/").pop() %></button><% if (s.includes("/")) { %><span class="no-file-dir"><%= s.split("/").slice(0, -1).join("/") %></span><% } %></li>
+<% } %>
+    </ul>
+  </div>
+<% } %>
+<% if (it.recents.length === 0 && it.suggestions.length === 0) { %>
+  <p class="no-file-empty">Select a file from the sidebar to start editing.</p>
+<% } %>
+<% } %>
+</div>
