@@ -75,6 +75,11 @@ export class FileSyncController {
     pendingOpsRepository.save(this.pendingOps.all);
   }
 
+  cancelCreate(path: string): void {
+    this.pendingOps.cancelCreate(path);
+    pendingOpsRepository.save(this.pendingOps.all);
+  }
+
   queueRename(from: string, to: string): void {
     const content = repo.getOrCreate(from).reconstructContent() ?? undefined;
     this.pendingOps.queueRename(from, to, content);
@@ -177,8 +182,8 @@ export class FileSyncController {
   createDraft(path: string, content: string): void {
     this.queueCreate(path, content);
     const page = repo.getOrCreate(path);
-    page.bodyState.cacheBody(content);
-    page.bodyState.setBaseline(content);
+    page.setBody(content);
+    page.setBaseline(content);
   }
 
   applyPendingOpsToTree(tree: TreeNode): TreeNode {
@@ -334,6 +339,7 @@ export class FileSyncController {
   // ── Discard ──
 
   async discardFileChanges(pagePath: string): Promise<void> {
+    this.cancelCreate(pagePath);
     repo.clearPath(pagePath);
     repo.save();
     this.recomputeDirty();
@@ -349,6 +355,7 @@ export class FileSyncController {
       page.setBaseline(body);
 
       await this.editor.ensureEditor(body);
+      this.editor.updateDirIndexOverlay(body);
     }
 
     showNotification("Changes discarded", { type: "info" });
@@ -417,6 +424,7 @@ export class FileSyncController {
       this.currentPath,
       {
         onDiscard: (path) => {
+          this.cancelCreate(path);
           repo.clearPath(path);
           repo.save();
           this.recomputeDirty();
@@ -430,6 +438,7 @@ export class FileSyncController {
               page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
               page.setBaseline(body);
               this.editor.ensureEditor(body);
+              this.editor.updateDirIndexOverlay(body);
             });
           }
         },
@@ -465,6 +474,7 @@ export class FileSyncController {
             page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
             page.setBaseline(body);
             await this.editor.ensureEditor(body);
+            this.editor.updateDirIndexOverlay(body);
           }
         },
       },

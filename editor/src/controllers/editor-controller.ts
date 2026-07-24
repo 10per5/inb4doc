@@ -25,6 +25,8 @@ import {
 } from "@/services/conflict-resolver";
 import { scrollToText } from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
+import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
+import { appEvents, AppEvent } from "@/stores/app-events";
 
 export class EditorController extends Controller {
   static targets = ["milkdown", "source"]
@@ -165,6 +167,65 @@ export class EditorController extends Controller {
   ): Promise<void> {
     const content = await this.fetchContent(path, onMetaUpdate);
     return this.ensureEditor(content ?? "");
+  }
+
+  // ── Directory index empty overlay ──
+
+  updateDirIndexOverlay(content: string): void {
+    const el = document.getElementById("dir-index-empty");
+    if (!el) return;
+    const isDirIndex = isHugoIndex(this.currentPath) && !isRootPath(this.currentPath);
+    const isEmpty = !content || !content.trim();
+    el.style.display = isDirIndex && isEmpty ? "flex" : "none";
+    if (isDirIndex && isEmpty && !el.dataset.bound) {
+      el.dataset.bound = "1";
+      el.addEventListener("click", () => {
+        el.style.display = "none";
+        const dirName = this.currentPath
+          .replace(/\/_index$/, "")
+          .split("/")
+          .pop()
+          ?.replace(/-/g, " ")
+          .replace(/^\w/, (c: string) => c.toUpperCase()) ?? "";
+        const placeholder = `# ${dirName}\n\n<desc here>\n\n## Topics\n\n{{< table-of-directory >}}\n\n`;
+        if (this.editor) {
+          this.editor.action((ctx) => {
+            const parser = ctx.get(parserCtx);
+            const view = ctx.get(editorViewCtx);
+            const doc = parser(placeholder);
+            const tr = view.state.tr.replaceWith(
+              0,
+              view.state.doc.content.size,
+              doc.content,
+            );
+            view.dispatch(tr);
+          });
+          const md = this.editor.action((ctx) => {
+            const serializer = ctx.get(serializerCtx);
+            return serializer(ctx.get(editorViewCtx).state.doc)
+              .replace(/\r\n/g, "\n")
+              .replace(/\n+$/, "\n");
+          });
+          appEvents.emit(AppEvent.CreateDraftRequested, { path: this.currentPath, content: md });
+          dirtyTrackingService.recompute();
+          scheduleSave();
+        }
+        this.milkdownTarget.querySelector<HTMLElement>(".ProseMirror")?.focus();
+      });
+    }
+    const prosemirror = this.milkdownTarget.querySelector<HTMLElement>(".ProseMirror");
+    if (prosemirror && !prosemirror.dataset.dirIndexBound) {
+      prosemirror.dataset.dirIndexBound = "1";
+      prosemirror.addEventListener("input", () => {
+        const overlay = document.getElementById("dir-index-empty");
+        if (overlay) overlay.style.display = "none";
+      });
+    }
+  }
+
+  hideDirIndexOverlay(): void {
+    const el = document.getElementById("dir-index-empty");
+    if (el) el.style.display = "none";
   }
 
   // ── Source mode ──

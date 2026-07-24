@@ -162,7 +162,9 @@ export default class extends Controller {
     event.preventDefault()
     const navLink = (event.currentTarget as HTMLElement).closest(".nav-link") as HTMLAnchorElement
     if (!navLink) return
-    const path = navLink.closest(".nav-item")?.getAttribute("data-nav-path")
+    const linkPath = navLink.getAttribute("data-nav-path")
+    const itemPath = navLink.closest(".nav-item")?.getAttribute("data-nav-path")
+    const path = linkPath || itemPath
     if (path) this.actions?.onNavigate(path)
   }
 

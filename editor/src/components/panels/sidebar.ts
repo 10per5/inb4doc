@@ -12,6 +12,8 @@ import {
   isRootPath,
   isHomePageFilename,
   nodeWeight,
+  HOME_FILENAME,
+  HOME_PATH,
 } from "@/utils/hugo-compat";
 
 export const fileIcon = `<svg class="sidebar-icon sidebar-icon-file" viewBox="0 0 24 24" aria-hidden="true">
@@ -98,11 +100,21 @@ export function buildPendingSets(
   };
 }
 
+export function isPendingDelete(pagePath: string, ps: PendingSets): boolean {
+  if (ps.pendingDeleteSet.has(pagePath)) return true;
+  const parts = pagePath.split("/");
+  for (let i = 1; i < parts.length; i++) {
+    const ancestor = parts.slice(0, i).join("/");
+    if (ps.pendingDeleteSet.has(ancestor)) return true;
+  }
+  return false;
+}
+
 export function pendingClass(name: string, prefix: string, ps: PendingSets): string {
   const parts = prefix ? `${prefix}/${name}` : name;
   const pagePath = parts.replace(/\.md$/, "");
   const classes: string[] = [];
-  if (ps.pendingDeleteSet.has(pagePath)) classes.push("pending-delete");
+  if (isPendingDelete(pagePath, ps)) classes.push("pending-delete");
   if (ps.pendingRenameFromSet.has(pagePath)) classes.push("pending-rename");
   if (ps.pendingCreateSet.has(pagePath)) classes.push("pending-create");
   if (ps.pendingMoveToSet.has(pagePath)) classes.push("pending-move");
@@ -158,6 +170,7 @@ export function renderItems(
   const display: TreeNode = { ...items };
   if (ctx.rawSubtree) {
     for (const [name, val] of Object.entries(ctx.rawSubtree)) {
+      if (name === HOME_FILENAME || name === HOME_FILENAME.replace(/\.md$/, "")) continue
       const full = prefix ? `${prefix}/${name}` : name;
       const pagePath = full.replace(/\.md$/, "");
       if (ctx.pendingSets.pendingDeleteSet.has(pagePath)) {
@@ -205,23 +218,57 @@ export function renderItems(
       rawEntry && typeof rawEntry === "object" && !("weight" in rawEntry)
         ? (rawEntry as TreeNode)
         : undefined;
+
+    const filteredRawChild: TreeNode | undefined = rawChild
+      ? Object.fromEntries(
+          Object.entries(rawChild).filter(
+            ([k]) => k !== HOME_FILENAME && k !== HOME_FILENAME.replace(/\.md$/, "")
+          )
+        )
+      : undefined;
+
+    const filteredChildren: TreeNode = {};
+    for (const [childName, childVal] of Object.entries(val as TreeNode)) {
+      if (childName === HOME_FILENAME || childName === HOME_FILENAME.replace(/\.md$/, "")) continue
+      filteredChildren[childName] = childVal
+    }
+
     const children = renderItems(
-      val as TreeNode,
+      filteredChildren,
       path,
       childrenDepth,
-      { ...ctx, rawSubtree: rawChild },
+      { ...ctx, rawSubtree: filteredRawChild },
     );
-    const label = pageRepository.getOrCreate(name).name;
+    const indexPagePath = `${path}/${HOME_PATH}`;
+    const dirChildren = val as TreeNode;
+    const hasIndex = HOME_FILENAME in dirChildren || HOME_FILENAME.replace(/\.md$/, "") in dirChildren;
+    const indexPage = hasIndex ? pageRepository.get(`${path}/${HOME_FILENAME}`) : undefined;
+    const indexTitle = indexPage?.getFrontmatter?.()?.title;
+    const dirBaseName = name.replace(/\.md$/, "").replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
+    const label = indexTitle || dirBaseName;
     const collapsed = ctx.collapsedSections.get(path) ?? false;
+    const isActive = indexPagePath === ctx.current;
+    const dirLinkClasses = [
+      "nav-link",
+      isActive ? "active" : "",
+      isActive ? "dir-active" : "",
+      !hasIndex ? "dir-empty" : "",
+    ].filter(Boolean).join(" ");
+    const dirIcon = !hasIndex
+      ? `<svg class="sidebar-icon sidebar-icon-folder-empty" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" opacity="0.6"/></svg>`
+      : folderIcon;
+    const dirPendingDelete = isPendingDelete(path, ctx.pendingSets);
     return `
-      <div class="nav-section${collapsed ? " collapsed" : ""}" draggable="true" data-nav-path="${path}">
+      <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${path}">
         <span class="nav-section-title depth-${depth}">
           <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
             <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
               <path fill="currentColor" d="M7 10l5 5 5-5z"/>
             </svg>
           </span>
-          ${folderIcon}${label}
+          <a href="${buildEditorUrl(ctx.basePath, indexPagePath)}" class="${dirLinkClasses}" data-nav-path="${indexPagePath}" data-action="click->sidebar#onNavigate">
+            ${dirIcon}${label}${dirPendingDelete ? '<span class="pending-badge pending-badge-delete">delete</span>' : ''}
+          </a>
           <button class="nav-more" data-action="click->sidebar#onShowMenu" data-is-folder tabindex="-1">⋮</button>
         </span>
         <div class="nav-section-children" style="--line-color: ${lineColor}">

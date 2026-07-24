@@ -73,6 +73,11 @@ export class PendingOps {
     return this.ops.some(o => (o.type === PendingOpType.Move || o.type === PendingOpType.Rename) && o.to === path)
   }
 
+  cancelCreate(path: string): void {
+    const idx = this.ops.findIndex(o => o.type === PendingOpType.Create && o.path === path)
+    if (idx !== -1) this.ops.splice(idx, 1)
+  }
+
   applyToTree(tree: TreeNode): TreeNode {
     return applyPendingOps(tree, this.ops)
   }

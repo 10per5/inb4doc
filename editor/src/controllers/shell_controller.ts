@@ -145,6 +145,9 @@ export default class extends Controller {
         this.view.switchTo("editor")
         appEvents.emit(AppEvent.Navigate, { path: HOME_PATH })
       }),
+      appEvents.on(AppEvent.CreateDraftRequested, ({ path, content }) => {
+        this.cache.createDraft(path, content)
+      }),
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.view.switchTo(view)
       }),
@@ -266,6 +269,7 @@ export default class extends Controller {
         }))
         pageRepository.clearAll()
         pageRepository.save()
+        treeStore.setTree(await provider.getTree())
         await this.nav.loadSidebar()
         await this.editor.loadContent(this.initialPath, (data) => this.nav.getMetaPanel()?.update(data))
         showNotification(`Imported ${result.selected.length} file${result.selected.length > 1 ? "s" : ""}`, { type: "info" })

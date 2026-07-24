@@ -1,23 +1,24 @@
 import { BaseDialogController } from "./base-dialog-controller"
 
 export class ImportZipDialogController extends BaseDialogController {
-  toggle() {
-    const importBtn = this.element.querySelector("#import-btn") as HTMLButtonElement
-    const checked = this.element.querySelectorAll<HTMLInputElement>('.import-file-row input[type="checkbox"]:checked')
-    importBtn.disabled = checked.length === 0
+  connect() {
+    this.updateButton()
+  }
 
-    const replaceAll = this.element.querySelector("#replace-all-check") as HTMLInputElement
+  toggle() {
+    const replaceAll = this.element.querySelector("#replace-all-check") as HTMLInputElement | null
     const target = (arguments[0]?.target as HTMLElement)?.closest("input[type='checkbox']") as HTMLInputElement | undefined
-    if (target?.dataset.type === "replace" && !target.checked) {
+    if (target?.dataset.type === "replace" && !target.checked && replaceAll) {
       replaceAll.checked = false
     }
+    this.updateButton()
   }
 
   replaceAll(e: Event) {
     const checked = (e.target as HTMLInputElement).checked
     const replaceCbs = this.element.querySelectorAll<HTMLInputElement>('.import-file-row input[data-type="replace"]')
-    replaceCbs.forEach(cb => { cb.checked = checked })
-    this.toggle()
+    replaceCbs.forEach(cb => { cb.disabled = checked; cb.checked = checked })
+    this.updateButton()
   }
 
   import() {
@@ -31,5 +32,16 @@ export class ImportZipDialogController extends BaseDialogController {
       selected.push({ relPath: cb.closest(".import-file-row")?.querySelector(".import-file-path")?.textContent ?? "" })
     })
     this.confirm({ selected })
+  }
+
+  private updateButton() {
+    const importBtn = this.element.querySelector("#import-btn") as HTMLButtonElement | null
+    const replaceAll = this.element.querySelector("#replace-all-check") as HTMLInputElement | null
+    if (!importBtn) return
+
+    const checked = this.element.querySelectorAll<HTMLInputElement>('.import-file-row input[type="checkbox"]:checked')
+    const hasSelection = checked.length > 0 || (replaceAll?.checked ?? false)
+    importBtn.disabled = !hasSelection
+    importBtn.textContent = replaceAll?.checked ? "Import all (forced)" : "Import"
   }
 }

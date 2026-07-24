@@ -368,7 +368,10 @@ saucer::scheme::response handle_app_request(
                 return {.data = saucer::stash::from_str("Not found"),
                         .mime = "text/plain", .status = 404};
 
-            fs::remove(resolved);
+            if (fs::is_directory(resolved))
+                fs::remove_all(resolved);
+            else
+                fs::remove(resolved);
 
             // Remove orphaned images after document delete
             auto doc_dir = fs::path(spath).parent_path().string();

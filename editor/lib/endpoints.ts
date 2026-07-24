@@ -219,22 +219,40 @@ async function handleContent(req: Request, relPath: string, ctx: ServerContext):
   }
 
   if (req.method === "DELETE") {
-    if (!existsSync(target)) return new Response(null, { status: 404 });
-    rmSync(target, { force: true });
-    let dir = dirname(target);
-    while (dir.startsWith(ctx.contentDir)) {
-      try {
-        const entries = readdirSync(dir);
-        if (entries.length > 0) break;
-        rmSync(dir, { force: true });
-      } catch {
-        break;
+    if (existsSync(target)) {
+      rmSync(target, { force: true });
+      let dir = dirname(target);
+      while (dir.startsWith(ctx.contentDir)) {
+        try {
+          const entries = readdirSync(dir);
+          if (entries.length > 0) break;
+          rmSync(dir, { force: true });
+        } catch {
+          break;
+        }
+        dir = dirname(dir);
       }
-      dir = dirname(dir);
+      try { removeOrphanedImages(dirname(target), ctx); } catch {}
+      return new Response("ok");
     }
-    // Remove orphaned images
-    try { removeOrphanedImages(dirname(target), ctx); } catch {}
-    return new Response("ok");
+    // Directory delete: /content/docs.md → strip .md, check if that path is a directory
+    const dirPath = target.replace(/\.md$/, "");
+    if (existsSync(dirPath) && statSync(dirPath).isDirectory()) {
+      rmSync(dirPath, { recursive: true, force: true });
+      let dir = dirname(dirPath);
+      while (dir.startsWith(ctx.contentDir)) {
+        try {
+          const entries = readdirSync(dir);
+          if (entries.length > 0) break;
+          rmSync(dir, { force: true });
+        } catch {
+          break;
+        }
+        dir = dirname(dir);
+      }
+      return new Response("ok");
+    }
+    return new Response(null, { status: 404 });
   }
 
   return new Response(null, { status: 405 });

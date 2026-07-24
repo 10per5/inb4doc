@@ -39,6 +39,7 @@ export enum AppEvent {
   PrefsOpened = "prefs-opened",
   ImageManagerOpened = "image-manager-opened",
   CreateFirstPage = "create-first-page",
+  CreateDraftRequested = "create-draft-requested",
   ProjectEmpty = "project-empty",
 
   // Meta panel
@@ -73,6 +74,7 @@ export interface AppEventPayloads {
   [AppEvent.PrefsOpened]:           void
   [AppEvent.ImageManagerOpened]:    void
   [AppEvent.CreateFirstPage]:       void
+  [AppEvent.CreateDraftRequested]: { path: string; content: string }
   [AppEvent.ProjectEmpty]:          void
 
   [AppEvent.MetaDataChanged]:       { data: MetaPanelData }

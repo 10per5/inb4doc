@@ -18,6 +18,7 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { flushSave } from "@/stores/persistence";
 import { PendingOpType } from "@/entities/PendingOps";
+import { isHugoIndex } from "@/utils/hugo-compat";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
@@ -107,15 +108,20 @@ export class NavigationController {
         | { type: PendingOpType.Move; from: string; to: string }
         | undefined;
       const effectivePath = moveOp ? moveOp.from : path;
-      const content = (await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data))) ?? "# New Page\n\nStart writing...";
+      const rawContent = await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data));
+      const dirIndex = isHugoIndex(path);
+      const content = rawContent ?? (dirIndex ? "" : "# New Page\n\nStart writing...");
 
-      if (content) {
-        await this.editor.ensureEditor(content);
-        if (searchQuery) {
-          requestAnimationFrame(() => {
-            this.editor.scrollToText(searchQuery, matchIndex, snippetText);
-          });
-        }
+      if (dirIndex && !rawContent) {
+        this.metaPanel?.update({ title: "" });
+      }
+
+      await this.editor.ensureEditor(content);
+      this.editor.updateDirIndexOverlay(content);
+      if (searchQuery) {
+        requestAnimationFrame(() => {
+          this.editor.scrollToText(searchQuery, matchIndex, snippetText);
+        });
       }
 
       await this.loadSidebar();

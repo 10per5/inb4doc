@@ -1,4 +1,5 @@
 <div id="editor-area" data-controller="editor" data-shell-target="editorArea">
   <div id="milkdown-editor" data-editor-target="milkdown"></div>
+  <%~ include('dir-index-empty', it) %>
   <%~ include('source-editor', it) %>
 </div>
