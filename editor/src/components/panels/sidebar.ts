@@ -4,14 +4,13 @@ import { confirmDialog } from "@/components/dialogs/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { buildEditorUrl } from "@/utils/url";
 import { pageRepository } from "@/repositories/pageRepository";
-import { PendingOpType, type PendingOp } from "@/utils/tree";
+import { PendingOpType, type PendingOp, type TreeIndex, type ChildInfo } from "@/utils/tree";
 import { SidebarAction, sidebarActions } from "@/config/enums";
 import { setContextMenuActions } from "@/controllers/context-menu-controller";
 import { ProviderType } from "@/providers/index";
 import {
   isRootPath,
   isHomePageFilename,
-  nodeWeight,
   HOME_FILENAME,
   HOME_PATH,
 } from "@/utils/hugo-compat";
@@ -23,14 +22,6 @@ export const fileIcon = `<svg class="sidebar-icon sidebar-icon-file" viewBox="0 
 export const folderIcon = `<svg class="sidebar-icon sidebar-icon-folder" viewBox="0 0 24 24" aria-hidden="true">
   <path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
 </svg>`;
-
-export interface PageNode {
-  weight?: number;
-}
-
-export interface TreeNode {
-  [key: string]: TreeNode | PageNode | null;
-}
 
 export interface SidebarActions {
   onNavigate: (
@@ -59,9 +50,9 @@ export interface RenderContext {
   current: string;
   basePath: string;
   collapsedSections: Map<string, boolean>;
-  rawSubtree?: TreeNode;
+  rawTree?: TreeIndex;
   pendingSets: PendingSets;
-  pendingOps?: PendingOp[];
+  pendingOps?: readonly PendingOp[];
 }
 
 const LINE_COLORS = [
@@ -75,7 +66,7 @@ const LINE_COLORS = [
 ];
 
 export function buildPendingSets(
-  pendingOps?: PendingOp[],
+  pendingOps?: readonly PendingOp[],
   dirtyPaths?: string[],
 ): PendingSets {
   return {
@@ -126,7 +117,7 @@ export function pendingLabelSuffix(
   name: string,
   prefix: string,
   ps: PendingSets,
-  pendingOps?: PendingOp[],
+  pendingOps?: readonly PendingOp[],
 ): string {
   const parts = prefix ? `${prefix}/${name}` : name;
   const pagePath = parts.replace(/\.md$/, "");
@@ -162,104 +153,100 @@ export function pendingLabelSuffix(
 }
 
 export function renderItems(
-  items: TreeNode,
+  tree: TreeIndex,
   prefix: string,
   depth: number,
   ctx: RenderContext,
 ): string {
-  const display: TreeNode = { ...items };
-  if (ctx.rawSubtree) {
-    for (const [name, val] of Object.entries(ctx.rawSubtree)) {
-      if (name === HOME_FILENAME || name === HOME_FILENAME.replace(/\.md$/, "")) continue
-      const full = prefix ? `${prefix}/${name}` : name;
-      const pagePath = full.replace(/\.md$/, "");
+  const children = tree.children.get(prefix) ?? []
+  const lineColor = LINE_COLORS[depth % LINE_COLORS.length]
+
+  // Build display list: merge tree children with rawTree pending deletes
+  const displayChildren = [...children]
+  if (ctx.rawTree && prefix !== undefined) {
+    const rawChildren = ctx.rawTree.children.get(prefix) ?? []
+    for (const rawChild of rawChildren) {
+      if (isHomePageFilename(rawChild.name)) continue
+      const pagePath = rawChild.path
       if (ctx.pendingSets.pendingDeleteSet.has(pagePath)) {
-        if (!(name in display)) {
-          display[name] = val;
+        if (!displayChildren.some(c => c.path === pagePath)) {
+          displayChildren.push(rawChild)
         }
       }
     }
   }
-  const entries = Object.entries(display).sort(
-    ([nameA, valA], [nameB, valB]) => {
-      if (isHomePageFilename(nameA)) return -1;
-      if (isHomePageFilename(nameB)) return 1;
 
-      const weightA = nodeWeight(valA);
-      const weightB = nodeWeight(valB);
+  // Sort: home page first, then by weight, then name
+  displayChildren.sort((a, b) => {
+    if (isHomePageFilename(a.name)) return -1
+    if (isHomePageFilename(b.name)) return 1
+    if (a.weight !== b.weight) return a.weight - b.weight
+    return a.name.localeCompare(b.name)
+  })
 
-      if (weightA !== weightB) return weightA - weightB;
-      return nameA.localeCompare(nameB);
-    },
-  );
+  return displayChildren.map((child) => {
+    const path = child.path
 
-  const lineColor = LINE_COLORS[depth % LINE_COLORS.length];
-
-  return entries.map(([name, val]) => {
-    const path = prefix ? `${prefix}/${name}` : name;
-    const isPage =
-      val === null || (typeof val === "object" && "weight" in val);
-
-    if (isPage) {
-      const pagePath = path.replace(/\.md$/, "");
-      const active = pagePath === ctx.current;
-      const label = pageRepository.getOrCreate(path).name;
+    if (!child.isDir) {
+      // File (page)
+      const active = path === ctx.current
+      const label = pageRepository.getOrCreate(child.name).name
       return `
-        <div class="nav-item${pendingClass(name, prefix, ctx.pendingSets)}" draggable="true" data-nav-path="${pagePath}">
-          <a href="${buildEditorUrl(ctx.basePath, pagePath)}" class="nav-link ${active ? "active" : ""}${isHomePageFilename(name) && !prefix ? " nav-link-home" : ""}${pendingClass(name, prefix, ctx.pendingSets)}" data-action="click->sidebar#onNavigate">
-            ${fileIcon}${label}${pendingLabelSuffix(name, prefix, ctx.pendingSets, ctx.pendingOps)}
+        <div class="nav-item${pendingClass(child.name, prefix, ctx.pendingSets)}" draggable="true" data-nav-path="${path}">
+          <a href="${buildEditorUrl(ctx.basePath, path)}" class="nav-link ${active ? "active" : ""}${isHomePageFilename(child.name) && !prefix ? " nav-link-home" : ""}${pendingClass(child.name, prefix, ctx.pendingSets)}" data-action="click->sidebar#onNavigate">
+            ${fileIcon}${label}${pendingLabelSuffix(child.name, prefix, ctx.pendingSets, ctx.pendingOps)}
           </a>
           <button class="nav-more" data-action="click->sidebar#onShowMenu" tabindex="-1">⋮</button>
-        </div>`;
-    }
-    const childrenDepth = depth + 1;
-    const rawEntry = ctx.rawSubtree?.[name];
-    const rawChild =
-      rawEntry && typeof rawEntry === "object" && !("weight" in rawEntry)
-        ? (rawEntry as TreeNode)
-        : undefined;
-
-    const filteredRawChild: TreeNode | undefined = rawChild
-      ? Object.fromEntries(
-          Object.entries(rawChild).filter(
-            ([k]) => k !== HOME_FILENAME && k !== HOME_FILENAME.replace(/\.md$/, "")
-          )
-        )
-      : undefined;
-
-    const filteredChildren: TreeNode = {};
-    for (const [childName, childVal] of Object.entries(val as TreeNode)) {
-      if (childName === HOME_FILENAME || childName === HOME_FILENAME.replace(/\.md$/, "")) continue
-      filteredChildren[childName] = childVal
+        </div>`
     }
 
-    const children = renderItems(
-      filteredChildren,
-      path,
+    // Directory
+    const childrenDepth = depth + 1
+    const dirPath = child.path
+
+    // Filter out _index.md from children for rendering
+    const dirChildren = tree.children.get(dirPath) ?? []
+    const filteredDirChildren: ChildInfo[] = dirChildren.filter(
+      (c) => !isHomePageFilename(c.name)
+    )
+
+    // Create a temporary TreeIndex for recursive rendering with filtered children
+    const filteredTree: TreeIndex = {
+      paths: tree.paths,
+      children: new Map(tree.children),
+      folderWeights: tree.folderWeights,
+    }
+    filteredTree.children.set(dirPath, filteredDirChildren)
+
+    const childrenHtml = renderItems(
+      filteredTree,
+      dirPath,
       childrenDepth,
-      { ...ctx, rawSubtree: filteredRawChild },
-    );
-    const indexPagePath = `${path}/${HOME_PATH}`;
-    const dirChildren = val as TreeNode;
-    const hasIndex = HOME_FILENAME in dirChildren || HOME_FILENAME.replace(/\.md$/, "") in dirChildren;
-    const indexPage = hasIndex ? pageRepository.get(`${path}/${HOME_FILENAME}`) : undefined;
-    const indexTitle = indexPage?.getFrontmatter?.()?.title;
-    const dirBaseName = name.replace(/\.md$/, "").replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase());
-    const label = indexTitle || dirBaseName;
-    const collapsed = ctx.collapsedSections.get(path) ?? false;
-    const isActive = indexPagePath === ctx.current;
+      ctx,
+    )
+
+    const indexPagePath = `${dirPath}/${HOME_PATH}`
+    const hasIndex = dirChildren.some(
+      (c) => isHomePageFilename(c.name)
+    )
+    const indexPage = hasIndex ? pageRepository.get(`${dirPath}/${HOME_FILENAME}`) : undefined
+    const indexTitle = indexPage?.getFrontmatter?.()?.title
+    const dirBaseName = child.name.replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase())
+    const label = indexTitle || dirBaseName
+    const collapsed = ctx.collapsedSections.get(dirPath) ?? false
+    const isActive = indexPagePath === ctx.current
     const dirLinkClasses = [
       "nav-link",
       isActive ? "active" : "",
       isActive ? "dir-active" : "",
       !hasIndex ? "dir-empty" : "",
-    ].filter(Boolean).join(" ");
+    ].filter(Boolean).join(" ")
     const dirIcon = !hasIndex
       ? `<svg class="sidebar-icon sidebar-icon-folder-empty" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" opacity="0.6"/></svg>`
-      : folderIcon;
-    const dirPendingDelete = isPendingDelete(path, ctx.pendingSets);
+      : folderIcon
+    const dirPendingDelete = isPendingDelete(dirPath, ctx.pendingSets)
     return `
-      <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${path}">
+      <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${dirPath}">
         <span class="nav-section-title depth-${depth}">
           <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
             <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
@@ -272,10 +259,10 @@ export function renderItems(
           <button class="nav-more" data-action="click->sidebar#onShowMenu" data-is-folder tabindex="-1">⋮</button>
         </span>
         <div class="nav-section-children" style="--line-color: ${lineColor}">
-          ${children}
+          ${childrenHtml}
         </div>
-      </div>`;
-  }).join("");
+      </div>`
+  }).join("")
 }
 
 export function highlightText(

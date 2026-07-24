@@ -1,6 +1,6 @@
 import { colors } from "@/config/theme"
 import { formatBytes } from "@/utils/format"
-import type { TreeNode } from "@/components/panels/sidebar"
+import type { TreeIndex } from "@/utils/tree"
 
 const PIE_COLORS = [
   "#5e81ac", "#bf616a", "#a3be8c", "#ebcb8b",
@@ -16,7 +16,7 @@ interface Segment {
 }
 
 export interface DiskUsageData {
-  tree: TreeNode
+  tree: TreeIndex
   fileSizes: Map<string, number>
   lastModified: Map<string, number>
   providerName: string
@@ -90,28 +90,13 @@ export function mountDiskUsageView(
   renderChart()
 }
 
-function collectLeaves(tree: TreeNode, prefix = ""): { path: string; name: string }[] {
-  const leaves: { path: string; name: string }[] = []
-  for (const [key, val] of Object.entries(tree)) {
-    const fullPath = prefix ? `${prefix}/${key}` : key
-    if (val === null || (typeof val === "object" && "weight" in val)) {
-      const pagePath = fullPath.replace(/\.md$/, "")
-      leaves.push({ path: pagePath, name: key })
-    } else if (typeof val === "object" && val !== null) {
-      leaves.push(...collectLeaves(val as TreeNode, fullPath))
-    }
-  }
-  return leaves
-}
-
 function getDirSegments(data: DiskUsageData): Segment[] {
-  const leaves = collectLeaves(data.tree)
   const dirMap = new Map<string, string[]>()
 
-  for (const leaf of leaves) {
-    const dir = leaf.path.includes("/") ? leaf.path.split("/")[0] : "(root)"
+  for (const pagePath of data.tree.paths) {
+    const dir = pagePath.includes("/") ? pagePath.split("/")[0] : "(root)"
     if (!dirMap.has(dir)) dirMap.set(dir, [])
-    dirMap.get(dir)!.push(leaf.path)
+    dirMap.get(dir)!.push(pagePath)
   }
 
   const entries = Array.from(dirMap.entries()).sort((a, b) => b[1].length - a[1].length)

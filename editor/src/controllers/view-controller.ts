@@ -13,7 +13,7 @@ import { registerEditorView } from "@/components/views/editor-view";
 import { pageRepository } from "@/repositories/pageRepository";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
-import { collectLeaves, getSuggestions } from "@/utils/tree";
+import { getSuggestions } from "@/utils/tree";
 import { getRecents } from "@/utils/recent-files";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { EditorController } from "@/controllers/editor-controller";
@@ -151,7 +151,7 @@ export class ViewController {
     (async () => {
       const fileSizes = new Map<string, number>();
       const lastModified = new Map<string, number>();
-      const leaves = collectLeaves(tree);
+      const leaves = Array.from(tree.paths);
 
       for (const leaf of leaves) {
         const existing = pageRepository.get(leaf);

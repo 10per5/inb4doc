@@ -123,6 +123,14 @@ function isIgnored(
   return ignored;
 }
 
+interface FlatTreeResult {
+  paths: string[];
+  children: Record<string, { name: string; path: string; isDir: boolean; weight: number }[]>;
+  folderWeights: Record<string, number>;
+}
+
+const DEFAULT_WEIGHT = 1_000_000;
+
 function buildTree(
   dir: string,
   giPatterns: GitIgnorePattern[] = [],
@@ -130,32 +138,71 @@ function buildTree(
   currentDepth: number = 0,
   noIgnore: boolean = false,
   relPrefix: string = ""
-): Record<string, any> {
-  const result: Record<string, any> = {};
-  if (!existsSync(dir)) return result;
+): FlatTreeResult {
+  const paths: string[] = [];
+  const folderWeights: Record<string, number> = {};
+  const children: Record<string, { name: string; path: string; isDir: boolean; weight: number }[]> = {};
+  if (!existsSync(dir)) return { paths, children, folderWeights };
   const recurse = depth === 0 || currentDepth < depth;
-  for (const name of readdirSync(dir).sort()) {
-    if (name.startsWith(".")) continue;
-    const full = join(dir, name);
-    const relPath = relPrefix ? `${relPrefix}/${name}` : name;
-    const stat = statSync(full);
-    const isDir = stat.isDirectory();
 
-    if (!noIgnore && isIgnored(relPath, isDir, giPatterns)) continue;
+  function walk(walkDir: string, walkPrefix: string, walkGiPatterns: GitIgnorePattern[], walkDepth: number) {
+    for (const name of readdirSync(walkDir).sort()) {
+      if (name.startsWith(".")) continue;
+      const full = join(walkDir, name);
+      const relPath = walkPrefix ? `${walkPrefix}/${name}` : name;
+      const stat = statSync(full);
+      const isDir = stat.isDirectory();
 
-    if (isDir) {
-      if (!recurse) continue;
-      const childGi = loadGitignore(full);
-      const merged = [...giPatterns, ...childGi];
-      const childRel = relPrefix ? `${relPrefix}/${name}` : name;
-      const children = buildTree(full, merged, depth, currentDepth + 1, noIgnore, childRel);
-      if (Object.keys(children).length > 0) result[name] = children;
-    } else if (name.endsWith(".md")) {
-      const weight = extractWeight(full);
-      result[name] = weight != null ? { weight } : null;
+      if (!noIgnore && isIgnored(relPath, isDir, walkGiPatterns)) continue;
+
+      if (isDir) {
+        if (walkDepth >= depth && depth !== 0) continue;
+        const childGi = loadGitignore(full);
+        const merged = [...walkGiPatterns, ...childGi];
+        walk(full, relPath, merged, walkDepth + 1);
+      } else if (name.endsWith(".md")) {
+        const pagePath = relPath.replace(/\.md$/, "");
+        paths.push(pagePath);
+        const weight = extractWeight(full) ?? DEFAULT_WEIGHT;
+
+        const parentPrefix = walkPrefix;
+        if (!children[parentPrefix]) children[parentPrefix] = [];
+        children[parentPrefix].push({
+          name,
+          path: pagePath,
+          isDir: false,
+          weight,
+        });
+
+        if (name === "_index.md" && walkPrefix) {
+          folderWeights[walkPrefix] = weight;
+        }
+      }
+    }
+
+    // Add directory entries to children
+    for (const name of readdirSync(walkDir).sort()) {
+      if (name.startsWith(".")) continue;
+      const full = join(walkDir, name);
+      const relPath = walkPrefix ? `${walkPrefix}/${name}` : name;
+      const stat = statSync(full);
+      if (!stat.isDirectory()) continue;
+      if (!noIgnore && isIgnored(relPath, true, walkGiPatterns)) continue;
+      if (depth !== 0 && walkDepth >= depth) continue;
+
+      const dirWeight = folderWeights[relPath] ?? DEFAULT_WEIGHT;
+      if (!children[walkPrefix]) children[walkPrefix] = [];
+      children[walkPrefix].push({
+        name,
+        path: relPath,
+        isDir: true,
+        weight: dirWeight,
+      });
     }
   }
-  return result;
+
+  walk(dir, relPrefix, giPatterns, currentDepth);
+  return { paths, children, folderWeights };
 }
 
 function removeOrphanedImages(docRelPath: string, ctx: ServerContext): void {

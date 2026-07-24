@@ -1,5 +1,4 @@
 import { getProvider } from "@/stores/provider-store";
-import type { TreeNode } from "@/components/panels/sidebar";
 import { searchCache, type SearchMatch } from "@/controllers/file-sync-controller";
 import { register as registerHotkey } from "@/utils/hotkeys";
 
@@ -13,22 +12,6 @@ export function focusSidebarSearch(): void {
 
 // Register global hotkey
 registerHotkey("ctrl+shift+f", focusSidebarSearch);
-
-export function collectPagePaths(node: TreeNode): string[] {
-  const paths: string[] = [];
-  function walk(n: TreeNode, prefix: string) {
-    for (const [name, val] of Object.entries(n)) {
-      const full = prefix ? `${prefix}/${name}` : name;
-      if (val === null || (typeof val === "object" && "weight" in val)) {
-        paths.push(full.replace(/\.md$/, ""));
-      } else if (typeof val === "object") {
-        walk(val as TreeNode, full);
-      }
-    }
-  }
-  walk(node, "");
-  return paths;
-}
 
 export async function searchContent(
   allPaths: string[],

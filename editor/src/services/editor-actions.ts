@@ -6,22 +6,22 @@ import type { FileSyncController } from "@/controllers/file-sync-controller"
 import { showNotification } from "@/components/notification/notification"
 import { treeStore } from "@/stores/tree-store"
 import { HOME_PATH, HOME_FILENAME, validateHugoSlug } from "@/utils/hugo-compat"
+import type { TreeIndex } from "@/utils/tree"
 
 function dirIsEmpty(parentDir: string): boolean {
   const tree = treeStore.getTree()
-  const children = parentDir
-    ? (tree[parentDir] as Record<string, unknown> | undefined)
-    : tree
-  if (!children) return true
-  return Object.keys(children).length === 0
+  const entries = tree.children.get(parentDir)
+  return !entries || entries.length === 0
 }
 
-function findCaseInsensitiveFile(tree: Record<string, unknown>, slug: string): string | null {
+function findCaseInsensitiveFile(tree: TreeIndex, parentDir: string, slug: string): string | null {
   const lowerSlug = slug.toLowerCase()
-  for (const key of Object.keys(tree)) {
-    const base = key.replace(/\.md$/, "")
-    if (base.toLowerCase() === lowerSlug && key !== HOME_FILENAME) {
-      return key
+  const entries = tree.children.get(parentDir) ?? []
+  for (const entry of entries) {
+    if (entry.isDir) continue
+    const base = entry.name.replace(/\.md$/, "")
+    if (base.toLowerCase() === lowerSlug && base !== HOME_FILENAME) {
+      return entry.name
     }
   }
   return null
@@ -64,10 +64,8 @@ export async function createNewItem(
       return
     }
 
-    const parentChildren = parentDir
-      ? (treeStore.getTree()[parentDir] as Record<string, unknown> | undefined)
-      : (treeStore.getTree() as Record<string, unknown>)
-    const conflictingFile = parentChildren ? findCaseInsensitiveFile(parentChildren, slug) : null
+    const tree = treeStore.getTree()
+    const conflictingFile = findCaseInsensitiveFile(tree, parentDir, slug)
 
     if (conflictingFile) {
       const existingPath = parentDir ? `${parentDir}/${conflictingFile.replace(/\.md$/, "")}` : conflictingFile.replace(/\.md$/, "")
@@ -237,10 +235,8 @@ export async function createDirectory(
     return
   }
 
-  const parentChildren = parentPath
-    ? (treeStore.getTree()[parentPath] as Record<string, unknown> | undefined)
-    : (treeStore.getTree() as Record<string, unknown>)
-  const conflictingFile = parentChildren ? findCaseInsensitiveFile(parentChildren, slug) : null
+  const tree = treeStore.getTree()
+  const conflictingFile = findCaseInsensitiveFile(tree, parentPath, slug)
 
   if (conflictingFile) {
     const existingPath = parentPath ? `${parentPath}/${conflictingFile.replace(/\.md$/, "")}` : conflictingFile.replace(/\.md$/, "")

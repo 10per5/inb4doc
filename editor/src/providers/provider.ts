@@ -1,8 +1,5 @@
 import type { ProviderType } from "@/providers/index"
-
-export interface TreeNode {
-  [key: string]: null | { weight: number } | TreeNode
-}
+import type { TreeIndex } from "@/utils/tree"
 
 export interface SearchResult {
   path: string;
@@ -20,7 +17,7 @@ export interface ContentProvider {
   readonly name: ProviderType
   /** Check if this provider is reachable / supported in the current environment. */
   isAvailable(): Promise<boolean>
-  getTree(): Promise<TreeNode>
+  getTree(): Promise<TreeIndex>
   readFile(path: string): Promise<string | null>
   writeFile(path: string, content: string): Promise<void>
   deleteFile(path: string): Promise<void>

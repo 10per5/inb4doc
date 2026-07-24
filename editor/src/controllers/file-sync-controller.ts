@@ -18,7 +18,7 @@ import { pendingOpsRepository } from "@/repositories/pendingOpsRepository";
 import { getProvider } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { showNotification } from "@/components/notification/notification";
-import type { TreeNode } from "@/components/panels/sidebar";
+import type { TreeIndex } from "@/utils/tree";
 import { extractSnippets } from "@/utils/content-search";
 import { imageRepository } from "@/repositories/imageRepository";
 import { pageRepository as repo } from "@/repositories/pageRepository";
@@ -142,17 +142,6 @@ export class FileSyncController {
     }
   }
 
-  private existsInTree(tree: TreeNode, path: string): boolean {
-    const parts = path.split("/");
-    let node: TreeNode | null | undefined = tree;
-    for (let i = 0; i < parts.length; i++) {
-      if (!node || typeof node !== "object") return false;
-      const part = parts[i];
-      node = (node[part] ?? node[part + ".md"]) as TreeNode | null | undefined;
-    }
-    return node !== undefined;
-  }
-
   async pathExists(path: string): Promise<boolean> {
     if (this.pendingOps.hasPendingDelete(path)) return false;
     if (this.pendingOps.hasPendingCreate(path)) return true;
@@ -168,7 +157,7 @@ export class FileSyncController {
 
     try {
       const tree = treeStore.getTree();
-      return this.existsInTree(tree, path);
+      return tree.paths.has(path) || tree.paths.has(path + ".md");
     } catch {}
 
     return false;
@@ -186,7 +175,7 @@ export class FileSyncController {
     page.setBaseline(content);
   }
 
-  applyPendingOpsToTree(tree: TreeNode): TreeNode {
+  applyPendingOpsToTree(tree: TreeIndex): TreeIndex {
     return this.pendingOps.applyToTree(tree);
   }
 
@@ -496,8 +485,10 @@ export class FileSyncController {
             const raw = (await provider?.readFile(this.currentPath)) || "";
 
             if (!raw) {
+              (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
               appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
             } else {
+              (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
               const { frontmatter, body } = stripFrontmatter(raw);
               const page = repo.getOrCreate(this.currentPath);
               if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);

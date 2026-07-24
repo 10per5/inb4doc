@@ -148,6 +148,8 @@ jobs:
           echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Build editor
+        env:
+          BUILD_MODE: gui-desktop
         run: |
           predep --privileged ${{ steps.predep-shas.outputs.editor }} build
         working-directory: editor

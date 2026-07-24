@@ -108,15 +108,18 @@ static int extract_weight(const fs::path &file)
     return -1;
 }
 
-static void build_tree(const fs::path &dir, std::ostringstream &out,
-                       const std::string &prefix,
+static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
+                       std::ostringstream &out_children,
+                       std::ostringstream &out_folder_weights,
                        const std::vector<GitIgnorePattern> &gi_patterns,
                        int depth, int current_depth,
                        bool no_ignore,
                        const std::string &rel_prefix = "")
 {
-    struct item { std::string name; std::string json; };
-    std::vector<item> items;
+    struct dir_entry { std::string name; std::string rel_path; int weight; };
+    struct file_entry { std::string name; std::string rel_path; int weight; };
+    std::vector<dir_entry> dirs;
+    std::vector<file_entry> files;
     bool recurse = depth == 0 || current_depth < depth;
 
     std::error_code ec;
@@ -139,37 +142,74 @@ static void build_tree(const fs::path &dir, std::ostringstream &out,
         {
             if (!recurse)
                 continue;
-            std::ostringstream child;
             auto child_gi = load_gitignore(e.path());
             std::vector<GitIgnorePattern> merged = gi_patterns;
             merged.insert(merged.end(), child_gi.begin(), child_gi.end());
-            auto child_rel = rel_prefix.empty() ? name : rel_prefix + "/" + name;
-            build_tree(e.path(), child, prefix + "  ",
-                       merged, depth, current_depth + 1, no_ignore, child_rel);
-            auto child_str = child.str();
-            if (!child_str.empty())
-                items.push_back({name, "{\n" + child_str + "\n" + prefix + "  }"});
+            build_tree(e.path(), out_paths, out_children, out_folder_weights,
+                       merged, depth, current_depth + 1, no_ignore, rel_path);
+
+            // Collect folder weight from _index.md if present
+            int folder_weight = -1;
+            auto index_file = e.path() / "_index.md";
+            if (fs::exists(index_file))
+                folder_weight = extract_weight(index_file);
+
+            dirs.push_back({name, rel_path, folder_weight});
         }
         else if (name.ends_with(".md"))
         {
             auto w = extract_weight(e.path());
-            if (w >= 0)
-                items.push_back({name, "{\"weight\": " + std::to_string(w) + "}"});
-            else
-                items.push_back({name, "null"});
+            files.push_back({name, rel_path, w});
         }
     }
 
-    std::sort(items.begin(), items.end(),
-              [](const item &a, const item &b) { return a.name < b.name; });
-
-    bool first = true;
-    for (auto &it : items)
+    // Emit paths for files in this directory
+    for (auto &f : files)
     {
-        if (!first)
-            out << ",\n";
-        first = false;
-        out << prefix << "  \"" << it.name << "\": " << it.json;
+        auto page_path = f.rel_path;
+        // Strip .md extension
+        if (page_path.size() > 3)
+            page_path = page_path.substr(0, page_path.size() - 3);
+        out_paths << "    \"" << page_path << "\",\n";
+    }
+
+    // Emit folder weights for directories with _index.md
+    for (auto &d : dirs)
+    {
+        if (d.weight >= 0)
+            out_folder_weights << "    \"" << d.rel_path << "\": " << d.weight << ",\n";
+    }
+
+    // Sort and emit children for this prefix
+    std::sort(dirs.begin(), dirs.end(), [](auto &a, auto &b) { return a.name < b.name; });
+    std::sort(files.begin(), files.end(), [](auto &a, auto &b) { return a.name < b.name; });
+
+    if (!dirs.empty() || !files.empty())
+    {
+        out_children << "    \"" << rel_prefix << "\": [\n";
+        bool first = true;
+        for (auto &d : dirs)
+        {
+            if (!first) out_children << ",\n";
+            first = false;
+            int w = d.weight >= 0 ? d.weight : 1000000;
+            out_children << "      {\"name\": \"" << d.name
+                         << "\", \"path\": \"" << d.rel_path
+                         << "\", \"isDir\": true, \"weight\": " << w << "}";
+        }
+        for (auto &f : files)
+        {
+            if (!first) out_children << ",\n";
+            first = false;
+            auto page_path = f.rel_path;
+            if (page_path.size() > 3)
+                page_path = page_path.substr(0, page_path.size() - 3);
+            int w = f.weight >= 0 ? f.weight : 1000000;
+            out_children << "      {\"name\": \"" << f.name
+                         << "\", \"path\": \"" << page_path
+                         << "\", \"isDir\": false, \"weight\": " << w << "}";
+        }
+        out_children << "\n    ],\n";
     }
 }
 
@@ -208,13 +248,33 @@ saucer::scheme::response handle_app_request(
             ? std::vector<GitIgnorePattern>{}
             : load_gitignore(cfg.content_root);
 
-        std::ostringstream out;
-        out << "{\n";
-        build_tree(cfg.content_root, out, "",
+        std::ostringstream out_paths;
+        std::ostringstream out_children;
+        std::ostringstream out_folder_weights;
+        build_tree(cfg.content_root, out_paths, out_children, out_folder_weights,
                    gi_patterns, cfg.depth, 0, cfg.no_ignore);
-        out << "\n}\n";
 
-        return {.data = saucer::stash::from_str(out.str()),
+        // Strip trailing commas and wrap in proper JSON containers
+        auto strip_trail = [](std::ostringstream &ss) -> std::string {
+            auto s = ss.str();
+            // Remove trailing comma (last comma in the string)
+            auto pos = s.rfind(',');
+            if (pos != std::string::npos)
+                s.erase(pos, 1);
+            return s;
+        };
+
+        auto paths_str = strip_trail(out_paths);
+        auto children_str = strip_trail(out_children);
+        auto fw_str = strip_trail(out_folder_weights);
+
+        // Build the flat JSON: { "paths": [...], "children": {...}, "folderWeights": {...} }
+        std::ostringstream result;
+        result << "{\"paths\": [" << paths_str << "]"
+               << ", \"children\": {" << children_str << "}"
+               << ", \"folderWeights\": {" << fw_str << "}}\n";
+
+        return {.data = saucer::stash::from_str(result.str()),
                 .mime = "application/json", .status = 200};
     }
 

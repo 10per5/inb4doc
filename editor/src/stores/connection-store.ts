@@ -58,20 +58,9 @@ class ConnectionStore {
   get remoteAvailable(): boolean { return this._remoteAvailable }
   set remoteAvailable(v: boolean) { this._remoteAvailable = v }
 
-  /** True when the configured host is explicitly an app:// endpoint. */
-  isAppScheme(): boolean {
-    const host = this.config?.host ?? ""
-    return host.startsWith("app://")
-  }
-
-  /** True when the editor is loaded inside the inb4doc GUI (app:// scheme). */
-  isInsideAppGui(): boolean {
-    return typeof window !== "undefined" && window.location.protocol === "app:"
-  }
-
   /** Probe the server and update remoteAvailable. Returns the result. */
   async probe(timeout = 3000): Promise<boolean> {
-    if (this.isAppScheme() || this.isInsideAppGui() || !hasFunc(AppFunc.AllowProbe)) {
+    if (!hasFunc(AppFunc.AllowProbe)) {
       this._remoteAvailable = false
       return false
     }
