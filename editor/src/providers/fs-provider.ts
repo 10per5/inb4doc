@@ -1,4 +1,6 @@
-import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
+import type { ContentProvider, ImageEntry, SearchResult } from "@/providers/provider"
+import type { TreeIndex } from "@/utils/tree"
+import { DEFAULT_WEIGHT, buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { stripFrontmatter } from "@/utils/frontmatter"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
@@ -19,34 +21,39 @@ export class FileSystemProvider implements ContentProvider {
     this.dirHandle = await (window as any).showDirectoryPicker()
   }
 
-  async getTree(): Promise<TreeNode> {
+  async getTree(): Promise<TreeIndex> {
     if (!this.dirHandle) await this.init()
-    const result: TreeNode = {}
-    await this.buildTree(this.dirHandle!, result)
-    return result
+    const paths: string[] = []
+    const folderWeights: Record<string, number> = {}
+    await this.walkDir(this.dirHandle!, paths, folderWeights, "")
+    return buildTreeIndex({ paths, children: {}, folderWeights })
   }
 
-  private async buildTree(dir: FileSystemDirectoryHandle, out: TreeNode): Promise<void> {
+  private async walkDir(
+    dir: FileSystemDirectoryHandle,
+    paths: string[],
+    folderWeights: Record<string, number>,
+    prefix: string,
+  ): Promise<void> {
     for await (const entry of dir.values()) {
       if (entry.name.startsWith(".")) continue
+      const relPath = prefix ? `${prefix}/${entry.name}` : entry.name
       if (entry.kind === "directory") {
-        const children: TreeNode = {}
-        await this.buildTree(entry as FileSystemDirectoryHandle, children)
-        if (Object.keys(children).length > 0) {
-          out[entry.name] = children
-        }
+        await this.walkDir(entry as FileSystemDirectoryHandle, paths, folderWeights, relPath)
       } else if (entry.name.endsWith(".md")) {
-        const file = await (entry as FileSystemFileHandle).getFile()
-        const text = await file.text()
-        const match = text.match(/^---\n([\s\S]*?)\n---/)
-        if (match) {
-          const weightMatch = match[1].match(/^weight:\s*(\d+)/m)
-          if (weightMatch) {
-            out[entry.name] = { weight: parseInt(weightMatch[1], 10) }
-            continue
+        const pagePath = relPath.replace(/\.md$/, "")
+        paths.push(pagePath)
+        if (entry.name === "_index.md") {
+          const file = await (entry as FileSystemFileHandle).getFile()
+          const text = await file.text()
+          const match = text.match(/^---\n([\s\S]*?)\n---/)
+          if (match) {
+            const weightMatch = match[1].match(/^weight:\s*(\d+)/m)
+            if (weightMatch) {
+              folderWeights[pagePath.replace(/\/_index$/, "")] = parseInt(weightMatch[1], 10)
+            }
           }
         }
-        out[entry.name] = null
       }
     }
   }

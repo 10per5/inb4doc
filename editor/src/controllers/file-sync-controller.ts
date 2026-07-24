@@ -18,7 +18,7 @@ import { pendingOpsRepository } from "@/repositories/pendingOpsRepository";
 import { getProvider } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { showNotification } from "@/components/notification/notification";
-import type { TreeNode } from "@/components/panels/sidebar";
+import type { TreeIndex } from "@/utils/tree";
 import { extractSnippets } from "@/utils/content-search";
 import { imageRepository } from "@/repositories/imageRepository";
 import { pageRepository as repo } from "@/repositories/pageRepository";
@@ -72,6 +72,11 @@ export class FileSyncController {
 
   queueDelete(path: string): void {
     this.pendingOps.queueDelete(path);
+    pendingOpsRepository.save(this.pendingOps.all);
+  }
+
+  cancelCreate(path: string): void {
+    this.pendingOps.cancelCreate(path);
     pendingOpsRepository.save(this.pendingOps.all);
   }
 
@@ -137,17 +142,6 @@ export class FileSyncController {
     }
   }
 
-  private existsInTree(tree: TreeNode, path: string): boolean {
-    const parts = path.split("/");
-    let node: TreeNode | null | undefined = tree;
-    for (let i = 0; i < parts.length; i++) {
-      if (!node || typeof node !== "object") return false;
-      const part = parts[i];
-      node = (node[part] ?? node[part + ".md"]) as TreeNode | null | undefined;
-    }
-    return node !== undefined;
-  }
-
   async pathExists(path: string): Promise<boolean> {
     if (this.pendingOps.hasPendingDelete(path)) return false;
     if (this.pendingOps.hasPendingCreate(path)) return true;
@@ -163,7 +157,7 @@ export class FileSyncController {
 
     try {
       const tree = treeStore.getTree();
-      return this.existsInTree(tree, path);
+      return tree.paths.has(path) || tree.paths.has(path + ".md");
     } catch {}
 
     return false;
@@ -177,11 +171,11 @@ export class FileSyncController {
   createDraft(path: string, content: string): void {
     this.queueCreate(path, content);
     const page = repo.getOrCreate(path);
-    page.bodyState.cacheBody(content);
-    page.bodyState.setBaseline(content);
+    page.setBody(content);
+    page.setBaseline(content);
   }
 
-  applyPendingOpsToTree(tree: TreeNode): TreeNode {
+  applyPendingOpsToTree(tree: TreeIndex): TreeIndex {
     return this.pendingOps.applyToTree(tree);
   }
 
@@ -250,20 +244,30 @@ export class FileSyncController {
 
     repo.save();
 
-    await this.executePendingOps();
+    const deletedPaths = await this.executePendingOps();
 
     this.recomputeDirty();
 
     appEvents.emit(AppEvent.FlushComplete);
+
+    if (deletedPaths.includes(this.currentPath)) {
+      const raw = await provider?.readFile(this.currentPath);
+      if (!raw) {
+        const editorEl = this.editor.element as HTMLElement;
+        editorEl.classList.remove("pending-delete-tint");
+        appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+      }
+    }
 
     showNotification("All files saved", { type: "success" });
 
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
   }
 
-  private async executePendingOps(): Promise<void> {
-    if (this.pendingOps.count === 0) return;
+  private async executePendingOps(): Promise<string[]> {
+    if (this.pendingOps.count === 0) return [];
     const provider = getProvider();
+    const deletedPaths: string[] = [];
 
     for (const op of this.pendingOps.all) {
       try {
@@ -275,6 +279,7 @@ export class FileSyncController {
           case PendingOpType.Delete:
             await provider?.deleteFile?.(op.path);
             treeStore.afterDelete(op.path);
+            deletedPaths.push(op.path);
             break;
           case PendingOpType.Rename:
             if (op.content) {
@@ -307,6 +312,7 @@ export class FileSyncController {
 
     this.pendingOps.clear();
     pendingOpsRepository.clear();
+    return deletedPaths;
   }
 
   private async cleanupOrphanedImages(
@@ -334,21 +340,28 @@ export class FileSyncController {
   // ── Discard ──
 
   async discardFileChanges(pagePath: string): Promise<void> {
+    this.cancelCreate(pagePath);
     repo.clearPath(pagePath);
     repo.save();
     this.recomputeDirty();
     this.editor.invalidateState(pagePath);
 
     if (pagePath === this.currentPath) {
+      (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
       const provider = getProvider();
       const raw = (await provider?.readFile(pagePath)) || "";
-      const { frontmatter, body } = stripFrontmatter(raw);
-      const page = repo.getOrCreate(pagePath);
-      if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-      page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
-      page.setBaseline(body);
 
-      await this.editor.ensureEditor(body);
+      if (!raw) {
+        appEvents.emit(AppEvent.NoFileView, { lastPath: pagePath });
+      } else {
+        const { frontmatter, body } = stripFrontmatter(raw);
+        const page = repo.getOrCreate(pagePath);
+        if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+        page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+        page.setBaseline(body);
+
+        await this.editor.ensureEditor(body);
+      }
     }
 
     showNotification("Changes discarded", { type: "info" });
@@ -417,19 +430,25 @@ export class FileSyncController {
       this.currentPath,
       {
         onDiscard: (path) => {
+          this.cancelCreate(path);
           repo.clearPath(path);
           repo.save();
           this.recomputeDirty();
           this.editor.invalidateState(path);
 
           if (path === this.currentPath) {
+            (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
             provider?.readFile(path).then((raw) => {
-              const { frontmatter, body } = stripFrontmatter(raw || "");
-              const page = repo.getOrCreate(path);
-              if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-              page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
-              page.setBaseline(body);
-              this.editor.ensureEditor(body);
+              if (!raw) {
+                appEvents.emit(AppEvent.NoFileView, { lastPath: path });
+              } else {
+                const { frontmatter, body } = stripFrontmatter(raw);
+                const page = repo.getOrCreate(path);
+                if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+                page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+                page.setBaseline(body);
+                this.editor.ensureEditor(body);
+              }
             });
           }
         },
@@ -445,8 +464,13 @@ export class FileSyncController {
         },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
-          const paths = repo.getDirtyPaths();
-          for (const p of paths) {
+          const dirtyPaths = repo.getDirtyPaths();
+          const pendingCreatePaths = this.pendingOps.all
+            .filter(o => o.type === PendingOpType.Create)
+            .map(o => o.path);
+          const allPaths = [...new Set([...dirtyPaths, ...pendingCreatePaths])];
+
+          for (const p of allPaths) {
             repo.clearPath(p);
             this.editor.invalidateState(p);
           }
@@ -457,14 +481,21 @@ export class FileSyncController {
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
 
-          if (paths.includes(this.currentPath)) {
+          if (allPaths.includes(this.currentPath)) {
             const raw = (await provider?.readFile(this.currentPath)) || "";
-            const { frontmatter, body } = stripFrontmatter(raw);
-            const page = repo.getOrCreate(this.currentPath);
-            if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-            page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
-            page.setBaseline(body);
-            await this.editor.ensureEditor(body);
+
+            if (!raw) {
+              (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+              appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+            } else {
+              (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+              const { frontmatter, body } = stripFrontmatter(raw);
+              const page = repo.getOrCreate(this.currentPath);
+              if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+              page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
+              page.setBaseline(body);
+              await this.editor.ensureEditor(body);
+            }
           }
         },
       },

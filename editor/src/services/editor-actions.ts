@@ -5,15 +5,26 @@ import { pageRepository } from "@/repositories/pageRepository"
 import type { FileSyncController } from "@/controllers/file-sync-controller"
 import { showNotification } from "@/components/notification/notification"
 import { treeStore } from "@/stores/tree-store"
-import { HOME_PATH, validateHugoSlug } from "@/utils/hugo-compat"
+import { HOME_PATH, HOME_FILENAME, validateHugoSlug } from "@/utils/hugo-compat"
+import type { TreeIndex } from "@/utils/tree"
 
 function dirIsEmpty(parentDir: string): boolean {
   const tree = treeStore.getTree()
-  const children = parentDir
-    ? (tree[parentDir] as Record<string, unknown> | undefined)
-    : tree
-  if (!children) return true
-  return Object.keys(children).length === 0
+  const entries = tree.children.get(parentDir)
+  return !entries || entries.length === 0
+}
+
+function findCaseInsensitiveFile(tree: TreeIndex, parentDir: string, slug: string): string | null {
+  const lowerSlug = slug.toLowerCase()
+  const entries = tree.children.get(parentDir) ?? []
+  for (const entry of entries) {
+    if (entry.isDir) continue
+    const base = entry.name.replace(/\.md$/, "")
+    if (base.toLowerCase() === lowerSlug && base !== HOME_FILENAME) {
+      return entry.name
+    }
+  }
+  return null
 }
 
 export async function createNewItem(
@@ -52,6 +63,55 @@ export async function createNewItem(
       showNotification(`"${indexPath}" already exists.`, { title: "Duplicate", type: "warning" })
       return
     }
+
+    const tree = treeStore.getTree()
+    const conflictingFile = findCaseInsensitiveFile(tree, parentDir, slug)
+
+    if (conflictingFile) {
+      const existingPath = parentDir ? `${parentDir}/${conflictingFile.replace(/\.md$/, "")}` : conflictingFile.replace(/\.md$/, "")
+      const confirmed = await confirmDialog({
+        title: "Convert to directory?",
+        message: `"${conflictingFile.replace(/\.md$/, "")}" already exists as a file. Convert it to a directory? The file contents will become the directory's index page.`,
+        confirmLabel: "Convert",
+      })
+      if (!confirmed) return
+
+      const existingPage = pageRepository.get(existingPath)
+      let existingBody = existingPage?.bodyState.body ?? existingPage?.bodyState.baseline
+      let existingFm = existingPage?.getFrontmatter()
+
+      if (existingBody === undefined) {
+        const provider = (await import("@/stores/provider-store")).getProvider()
+        const raw = await provider?.readFile(existingPath)
+        if (raw) {
+          const { stripFrontmatter } = await import("@/utils/frontmatter")
+          const parsed = stripFrontmatter(raw)
+          existingBody = parsed.body
+          existingFm = parsed.frontmatter ?? undefined
+        }
+      }
+
+      if (existingBody === undefined) existingBody = ""
+
+      const fmData: MetaPanelData = existingFm
+        ? { ...existingFm, title: (existingFm as MetaPanelData).title ?? result.name, weight: (existingFm as MetaPanelData).weight ?? 100 }
+        : { title: result.name, weight: 100 }
+      const fmStr = serializeFrontmatter(fmData)
+      const content = `---\n${fmStr}\n---\n\n${existingBody}`
+
+      cacheService.queueDelete(existingPath)
+      cacheService.queueCreate(indexPath, content)
+      const idxPage = pageRepository.getOrCreate(indexPath)
+      idxPage.setFrontmatter(fmData)
+      idxPage.bodyState.cacheBody(existingBody)
+      idxPage.setBaseline(existingBody)
+      pageRepository.clearPath(existingPath)
+
+      await loadSidebar()
+      doNavigate(indexPath)
+      return
+    }
+
     const fmData: MetaPanelData = { title: result.name, weight: 100 }
     const fmStr = serializeFrontmatter(fmData)
     const body = `# ${result.name}\n\n`
@@ -168,7 +228,61 @@ export async function createDirectory(
   }
 
   const dirPath = parentPath ? `${parentPath}/${slug}` : slug
-  const indexPath = `${dirPath}/_index`
+  const indexPath = `${dirPath}/${HOME_PATH}`
+
+  if (await cacheService.pathExists(indexPath)) {
+    showNotification(`"${indexPath}" already exists.`, { title: "Duplicate", type: "warning" })
+    return
+  }
+
+  const tree = treeStore.getTree()
+  const conflictingFile = findCaseInsensitiveFile(tree, parentPath, slug)
+
+  if (conflictingFile) {
+    const existingPath = parentPath ? `${parentPath}/${conflictingFile.replace(/\.md$/, "")}` : conflictingFile.replace(/\.md$/, "")
+    const confirmed = await confirmDialog({
+      title: "Convert to directory?",
+      message: `"${conflictingFile.replace(/\.md$/, "")}" already exists as a file. Convert it to a directory? The file contents will become the directory's index page.`,
+      confirmLabel: "Convert",
+    })
+    if (!confirmed) return
+
+    const existingPage = pageRepository.get(existingPath)
+    let existingBody = existingPage?.bodyState.body ?? existingPage?.bodyState.baseline
+    let existingFm = existingPage?.getFrontmatter()
+
+    if (existingBody === undefined) {
+      const provider = (await import("@/stores/provider-store")).getProvider()
+      const raw = await provider?.readFile(existingPath)
+      if (raw) {
+        const { stripFrontmatter } = await import("@/utils/frontmatter")
+        const parsed = stripFrontmatter(raw)
+        existingBody = parsed.body
+        existingFm = parsed.frontmatter ?? undefined
+      }
+    }
+
+    if (existingBody === undefined) existingBody = ""
+
+    const fmData: MetaPanelData = existingFm
+      ? { ...existingFm, title: (existingFm as MetaPanelData).title ?? name, weight: (existingFm as MetaPanelData).weight ?? 100 }
+      : { title: name, weight: 100 }
+    const fmStr = serializeFrontmatter(fmData)
+    const content = `---\n${fmStr}\n---\n\n${existingBody}`
+
+    cacheService.queueDelete(existingPath)
+    cacheService.queueCreate(indexPath, content)
+    const idxPage = pageRepository.getOrCreate(indexPath)
+    idxPage.setFrontmatter(fmData)
+    idxPage.bodyState.cacheBody(existingBody)
+    idxPage.setBaseline(existingBody)
+    pageRepository.clearPath(existingPath)
+
+    await loadSidebar()
+    doNavigate(indexPath)
+    return
+  }
+
   const fmData: MetaPanelData = { title: name, weight: 100 }
   const fmStr = serializeFrontmatter(fmData)
   const body = `# ${name}\n\n`

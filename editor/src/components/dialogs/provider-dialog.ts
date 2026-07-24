@@ -14,7 +14,6 @@ export async function openProviderDialog(
   currentProvider: ProviderType,
 ): Promise<ProviderDialogResult | null> {
   const providers = await getAvailableProviders()
-  await connectionStore.probe()
 
   let selectedType: ProviderType | null = currentProvider
   const conn = connectionStore.getConfig()
@@ -23,6 +22,7 @@ export async function openProviderDialog(
 
   const badges: Record<ProviderType, { icon: string; label: string }> = {
     [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)" },
+    [ProviderType.Mount]: { icon: "📦", label: "Mounted (GUI)" },
     [ProviderType.Filesystem]: { icon: "💻", label: "Local Files" },
     [ProviderType.LocalStorage]: { icon: "🗄️", label: "Browser Storage" },
   }
@@ -38,37 +38,13 @@ export async function openProviderDialog(
       }
 
       const remoteAvailable = connectionStore.remoteAvailable
-      const inGuiMode = connectionStore.isInsideAppGui()
-      const configuredHost = connectionStore.getHost()
-      const remoteAppFallback = inGuiMode
-        ? !remoteAvailable
-        : configuredHost === "app://" || configuredHost === "app://_" || configuredHost.startsWith("app://_/")
-      const remoteGuiFallback = !remoteAvailable && !remoteAppFallback && inGuiMode
-      const remoteReason = !remoteAvailable
-        ? remoteAppFallback
-          ? "inb4doc app://_/ endpoint is used"
-          : remoteGuiFallback
-            ? "ℹ️ Not reachable: local API is used"
-            : "Server not reachable — enter host/port and wait"
-        : undefined
-
-      const mergedProviders = providers.map((p) => ({
-        ...p,
-        available: p.type === ProviderType.Remote ? remoteAvailable || remoteAppFallback || remoteGuiFallback : p.available,
-        reason: p.type === ProviderType.Remote ? remoteReason : p.reason,
-      }))
-
-      const initialStatusClass = remoteAvailable ? "ok"
-        : (remoteAppFallback || remoteGuiFallback) ? "info"
-        : inGuiMode ? "" : "err"
-      const initialStatusText = remoteAvailable ? "✓ Online"
-        : (remoteAppFallback || remoteGuiFallback) ? "ℹ️ inb4doc-gui local API is used"
-        : inGuiMode ? "" : "Server unreachable"
+      const initialStatusClass = remoteAvailable ? "ok" : "err"
+      const initialStatusText = remoteAvailable ? "✓ Online" : "Server unreachable"
 
       const html = renderProviderDialog({
         ProviderType,
         currentInfo,
-        providers: mergedProviders,
+        providers,
         selectedType,
         currentProvider,
         badges,
@@ -88,11 +64,6 @@ export async function openProviderDialog(
 
       overlay.addEventListener(ProviderDialogEvent.Probe, ((e: CustomEvent<{ host: string; port: number }>) => {
         const { host, port } = e.detail
-        if (host === "app://" || host === "app://_" || host.startsWith("app://_/")) {
-          close()
-          render()
-          return
-        }
         connectionStore.setConfig(host, port)
         connectionStore.probe().then(() => {
           close()

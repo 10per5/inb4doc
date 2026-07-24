@@ -1,46 +1,30 @@
-import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
+import type { ContentProvider, ImageEntry, SearchResult } from "@/providers/provider"
+import type { TreeIndex } from "@/utils/tree"
+import { buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { connectionStore } from "@/stores/connection-store"
 
+/**
+ * ServerProvider — connects to a remote HTTP content server.
+ *
+ * For the embedded GUI `app://` scheme handler, see MountProvider.
+ */
 export class RemoteProvider implements ContentProvider {
-  readonly name = ProviderType.Remote
+  readonly name: ProviderType = ProviderType.Remote
 
-  /**
-   * True when the embedded `app://` content API should be used instead of a
-   * real HTTP server. This happens when the editor is loaded from the `app://`
-   * scheme (embedded GUI), or when the user explicitly configured an `app://`
-   * host (`app://_/`, `app://`, `app://_`).
-   */
-  get appFallback(): boolean {
-    if (typeof window !== "undefined" && window.location.protocol === "app:") {
-      return !connectionStore.remoteAvailable
-    }
-    const host = connectionStore.getHost()
-    return (
-      host === "app://" ||
-      host === "app://_" ||
-      host.startsWith("app://_/")
-    )
-  }
-
-  private url(path: string): string {
-    if (this.appFallback) {
-      return path
-    }
+  protected url(path: string): string {
     return `${connectionStore.getBaseUrl()}${path}`
   }
 
   async isAvailable(): Promise<boolean> {
-    if (await connectionStore.probe()) {
-      return true
-    }
-    return this.appFallback
+    return connectionStore.probe()
   }
 
-  async getTree(): Promise<TreeNode> {
+  async getTree(): Promise<TreeIndex> {
     const res = await fetch(this.url("/api/tree"))
-    if (!res.ok) return {}
-    return res.json()
+    if (!res.ok) return buildTreeIndex({ paths: [], children: {}, folderWeights: {} })
+    const data = await res.json()
+    return buildTreeIndex(data)
   }
 
   async readFile(path: string): Promise<string | null> {

@@ -26,6 +26,15 @@ target = "/output/editor/public/"
 dest = "root://public/"
 
 [[stages]]
+name = "docker-desktop"
+description = "Build editor static assets via Docker"
+type = "docker"
+outputs = ["root://public/"]
+recipe = "images/desktop.Dockerfile"
+target = "/output/editor/public/"
+dest = "root://public/"
+
+[[stages]]
 name = "android"
 description = "Build Android APK via Docker"
 type = "docker"

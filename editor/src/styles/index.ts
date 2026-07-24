@@ -1,6 +1,7 @@
 import "@milkdown/theme-nord/style.css"
 
 /* ── Foundation ────────────────────────────────────────────────── */
+import "./loading-overlay.css"
 import "./foundation/base.css"
 
 /* ── Layout ─────────────────────────────────────────────────────── */
@@ -24,4 +25,5 @@ import "./app/dialogs.css"
 import "./mobile.css"
 
 /* ── Views ──────────────────────────────────────────────────────── */
-import "./views/empty-project.css"
+import "./views/no-file.css"
+import "./views/dir-index-empty.css"

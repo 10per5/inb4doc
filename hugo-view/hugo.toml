@@ -6,10 +6,10 @@ disableKinds = ["RSS", "sitemap"]
 
 [security]
   [security.funcs]
-    getenv = ["^EDITOR_URL$", "^HUGO_", "^CI$"]
+    getenv = ["^EDITOR_URL$", "^HUGO_", "^CI$", "^SITE_URL$"]
 
 [params]
   BookSearch = true
   BookTheme = "auto"
   BookSection = "docs"
-  description = "A markdown wiki with live WYSIWYG editing and static site export via Hugo Book."
+  description = "Live markdown editor for browser, desktop, and mobile. Connect providers to export wikis, static sites, and more."

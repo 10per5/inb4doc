@@ -7,16 +7,18 @@
 
 import { stripFrontmatter } from "@/utils/frontmatter";
 import { mountDiskUsageView } from "@/components/views/disk-usage-view";
-import { mountEmptyProjectView } from "@/components/views/empty-project-view";
+import { mountNoFileView, type NoFileViewData } from "@/components/views/no-file-view";
+import { mountDirIndexEmptyView } from "@/components/views/dir-index-empty-view";
 import { registerEditorView } from "@/components/views/editor-view";
 import { pageRepository } from "@/repositories/pageRepository";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
-import { collectLeaves } from "@/utils/tree";
+import { getSuggestions } from "@/utils/tree";
+import { getRecents } from "@/utils/recent-files";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { EditorController } from "@/controllers/editor-controller";
 
-export type ViewType = "editor" | "disk-usage" | "empty-project"
+export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty"
 
 type ViewHandlers = { activate: () => void; deactivate: () => void }
 
@@ -26,10 +28,18 @@ export class ViewController {
   private editor: EditorController
   private sessionStarted: number
   private unsubs: (() => void)[] = [];
+  private noFileLastPath: string = "";
+  private dirIndexEmptyPath: string = "";
 
   constructor(editor: EditorController, sessionStarted: number = 0) {
     this.editor = editor;
     this.sessionStarted = sessionStarted;
+    this.unsubs.push(
+      appEvents.on(AppEvent.DirIndexEmpty, ({ path }) => {
+        this.dirIndexEmptyPath = path;
+        this.switchTo("dir-index-empty");
+      }),
+    );
   }
 
   switchTo(type: ViewType): void {
@@ -38,6 +48,10 @@ export class ViewController {
     this.current = type
     this.views.get(type)?.activate()
     appEvents.emit(AppEvent.ViewChanged, { view: type })
+  }
+
+  setNoFileLastPath(path: string): void {
+    this.noFileLastPath = path;
   }
 
   getCurrent(): ViewType {
@@ -58,7 +72,8 @@ export class ViewController {
     });
 
     this.setupDiskUsageView();
-    this.setupEmptyProjectView();
+    this.setupNoFileView();
+    this.setupDirIndexEmptyView();
   }
 
   destroy(): void {
@@ -66,20 +81,24 @@ export class ViewController {
     this.unsubs = [];
   }
 
-  private setupEmptyProjectView(): void {
+  private setupNoFileView(): void {
     const editorArea = this.editor.element as HTMLElement;
     const milkdownEl = this.editor.milkdownTarget;
     const sourceEl = this.editor.sourceTarget;
 
-    this.views.set("empty-project", {
+    this.views.set("no-file", {
       activate: () => {
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
-        mountEmptyProjectView(editorArea);
+        const tree = treeStore.getTree();
+        const isEmpty = treeStore.isEmpty();
+        const recents = getRecents();
+        const suggestions = getSuggestions(tree, this.noFileLastPath);
+        mountNoFileView(editorArea, { isEmpty, recents, suggestions });
       },
       deactivate: () => {
-        const empty = editorArea.querySelector(".empty-project");
-        if (empty) empty.remove();
+        const el = editorArea.querySelector(".no-file-view");
+        if (el) el.remove();
       },
     });
   }
@@ -102,6 +121,26 @@ export class ViewController {
     });
   }
 
+  private setupDirIndexEmptyView(): void {
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
+
+    this.views.set("dir-index-empty", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        mountDirIndexEmptyView(editorArea, () => {
+          appEvents.emit(AppEvent.DirIndexActivated, { path: this.dirIndexEmptyPath });
+        });
+      },
+      deactivate: () => {
+        const el = editorArea.querySelector(".dir-index-empty-view");
+        if (el) el.remove();
+      },
+    });
+  }
+
   private showDiskUsage(): void {
     const self = this;
     const tree = treeStore.getTree();
@@ -112,7 +151,7 @@ export class ViewController {
     (async () => {
       const fileSizes = new Map<string, number>();
       const lastModified = new Map<string, number>();
-      const leaves = collectLeaves(tree);
+      const leaves = Array.from(tree.paths);
 
       for (const leaf of leaves) {
         const existing = pageRepository.get(leaf);

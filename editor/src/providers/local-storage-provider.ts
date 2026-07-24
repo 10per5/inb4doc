@@ -1,4 +1,6 @@
-import type { ContentProvider, TreeNode, ImageEntry, SearchResult } from "@/providers/provider"
+import type { ContentProvider, ImageEntry, SearchResult } from "@/providers/provider"
+import type { TreeIndex } from "@/utils/tree"
+import { DEFAULT_WEIGHT, buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 
@@ -12,37 +14,31 @@ export class LocalStorageProvider implements ContentProvider {
     return true
   }
 
-  async getTree(): Promise<TreeNode> {
-    const result: TreeNode = {}
+  async getTree(): Promise<TreeIndex> {
+    const paths: string[] = []
+    const folderWeights: Record<string, number> = {}
+
     const mdKeys = this.getAllMdKeys()
     for (const key of mdKeys) {
-      const relPath = key.slice(STORAGE_PREFIX.length)
-      const parts = relPath.split("/")
-      let current = result
-      for (let i = 0; i < parts.length; i++) {
-        const isLeaf = i === parts.length - 1
-        if (isLeaf) {
-          const content = localStorage.getItem(key)
-          if (content) {
-            const match = content.match(/^---\n([\s\S]*?)\n---/)
-            if (match) {
-              const weightMatch = match[1].match(/^weight:\s*(\d+)/m)
-              if (weightMatch) {
-                current[parts[i]] = { weight: parseInt(weightMatch[1], 10) }
-                continue
-              }
+      const relPath = key.slice(STORAGE_PREFIX.length).replace(/\.md$/, "")
+      paths.push(relPath)
+
+      const content = localStorage.getItem(key)
+      if (content) {
+        const match = content.match(/^---\n([\s\S]*?)\n---/)
+        if (match) {
+          const weightMatch = match[1].match(/^weight:\s*(\d+)/m)
+          if (weightMatch) {
+            const weight = parseInt(weightMatch[1], 10)
+            if (relPath.endsWith("/_index")) {
+              folderWeights[relPath.replace(/\/_index$/, "")] = weight
             }
           }
-          current[parts[i]] = null
-        } else {
-          if (!current[parts[i]] || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-            current[parts[i]] = {}
-          }
-          current = current[parts[i]] as TreeNode
         }
       }
     }
-    return result
+
+    return buildTreeIndex({ paths, children: {}, folderWeights })
   }
 
   private getAllMdKeys(): string[] {
@@ -66,6 +62,13 @@ export class LocalStorageProvider implements ContentProvider {
 
   async deleteFile(path: string): Promise<void> {
     localStorage.removeItem(STORAGE_PREFIX + path + ".md")
+    const prefix = STORAGE_PREFIX + path + "/"
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(prefix)) {
+        localStorage.removeItem(key)
+      }
+    }
     this.removeOrphanedImages()
   }
 
@@ -77,10 +80,6 @@ export class LocalStorageProvider implements ContentProvider {
   }
 
   async getServerTime(_path: string): Promise<number | null> {
-    // localStorage has no real file mtime, but returning a monotonic timestamp
-    // lets the normal reload/reconcile path (applyNoConflict) treat it like the
-    // other backends. The baseline is refreshed from the stored content while any
-    // in-progress edit is preserved, instead of being discarded on every load.
     return Date.now()
   }
 

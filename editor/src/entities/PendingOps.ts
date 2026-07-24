@@ -1,4 +1,4 @@
-import type { TreeNode } from "@/components/panels/sidebar"
+import type { TreeIndex } from "@/utils/tree"
 import { applyPendingOps } from "@/utils/tree"
 
 export enum PendingOpType {
@@ -28,7 +28,7 @@ export class PendingOps {
     this.ops = Array.isArray(saved) && saved.length > 0 ? [...saved] : []
   }
 
-  get all(): PendingOp[] { return this.ops }
+  get all(): readonly PendingOp[] { return this.ops }
   get count(): number { return this.ops.length }
 
   queueCreate(path: string, content: string): void {
@@ -73,7 +73,12 @@ export class PendingOps {
     return this.ops.some(o => (o.type === PendingOpType.Move || o.type === PendingOpType.Rename) && o.to === path)
   }
 
-  applyToTree(tree: TreeNode): TreeNode {
+  cancelCreate(path: string): void {
+    const idx = this.ops.findIndex(o => o.type === PendingOpType.Create && o.path === path)
+    if (idx !== -1) this.ops.splice(idx, 1)
+  }
+
+  applyToTree(tree: TreeIndex): TreeIndex {
     return applyPendingOps(tree, this.ops)
   }
 }

@@ -1,5 +1,5 @@
 <div class="inb4doc-window" onclick="event.stopPropagation()" data-controller="image-manager-dialog">
-  <div class="inb4doc-window-header"><%= it.title %></div>
+  <div class="inb4doc-window-header"><%= it.title %><% if (it.dir) { %> <span style="font-weight:400;font-size:0.9rem;color:var(--color-text-tertiary)">— <%= it.dir %></span><% } %></div>
   <div class="inb4doc-window-body">
     <% if (it.loadError) { %>
       <div style="padding:1rem;text-align:center;color:var(--color-error)"><%= it.loadError %></div>

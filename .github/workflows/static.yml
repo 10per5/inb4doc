@@ -28,13 +28,14 @@ jobs:
       - uses: ./.github/actions/build-editor
         with:
           live-url-base: /inb4doc
-          editor-self-base: /inb4doc/editor-live/
+          editor-self-base: https://10per5.github.io/inb4doc/editor-live/
           build-mode: web-remote
 
       - uses: ./.github/actions/build-hugo
         with:
           baseurl: /inb4doc/
           editor-url: /inb4doc/editor-live
+          site-url: https://10per5.github.io/inb4doc
 
       - name: Copy content images into Hugo output
         shell: bash

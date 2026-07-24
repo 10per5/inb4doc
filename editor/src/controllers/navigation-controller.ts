@@ -6,10 +6,11 @@
  */
 
 import { createNewItem, deletePage, renamePage, movePage } from "@/services/editor-actions";
-import { setupNavListeners, collectPageList } from "@/features/navigation";
+import { setupNavListeners } from "@/features/navigation";
+import { addRecent } from "@/utils/recent-files";
 import { getProvider, switchProvider, cacheKeyForProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import type SidebarController from "@/controllers/sidebar-controller";
-import { type SidebarActions, type TreeNode } from "@/components/panels/sidebar";
+import { type SidebarActions } from "@/components/panels/sidebar";
 import { openProviderDialog } from "@/components/dialogs/provider-dialog";
 import { showNotification } from "@/components/notification/notification";
 import { pageRepository } from "@/repositories/pageRepository";
@@ -18,21 +19,12 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { flushSave } from "@/stores/persistence";
 import { PendingOpType } from "@/entities/PendingOps";
+import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
 import type { FileSyncController } from "@/controllers/file-sync-controller";
 import type { MetaPanelAPI } from "@/components/panels/meta-panel";
-
-function existsInTree(tree: TreeNode, mdPath: string): boolean {
-  const parts = mdPath.split("/");
-  let node: TreeNode | null | undefined = tree;
-  for (const part of parts) {
-    if (!node || typeof node !== "object") return false;
-    node = node[part] as TreeNode | null | undefined;
-  }
-  return node !== undefined;
-}
 
 export class NavigationController {
   private currentPath: string = "";
@@ -87,7 +79,8 @@ export class NavigationController {
       flushSave();
 
       this.currentPath = path;
-      appEvents.emit(AppEvent.ViewChanged, { view: "editor" as any });
+      (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+      appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
 
@@ -107,19 +100,40 @@ export class NavigationController {
         | { type: PendingOpType.Move; from: string; to: string }
         | undefined;
       const effectivePath = moveOp ? moveOp.from : path;
-      const content = (await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data))) ?? "# New Page\n\nStart writing...";
+      const rawContent = await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data));
 
-      if (content) {
-        await this.editor.ensureEditor(content);
-        if (searchQuery) {
-          requestAnimationFrame(() => {
-            this.editor.scrollToText(searchQuery, matchIndex, snippetText);
-          });
+      if (!rawContent) {
+        const dirIndex = isHugoIndex(path) && !isRootPath(path);
+        if (dirIndex) {
+          appEvents.emit(AppEvent.DirIndexEmpty, { path });
+          await this.loadSidebar();
+          dirtyTrackingService.recompute();
+        } else {
+          appEvents.emit(AppEvent.NoFileView, { lastPath: path });
         }
+        return;
+      }
+
+      const content = rawContent;
+      const dirIndexEmpty = isHugoIndex(path) && !isRootPath(path) && !content.trim();
+
+      if (dirIndexEmpty) {
+        appEvents.emit(AppEvent.DirIndexEmpty, { path });
+        await this.loadSidebar();
+        dirtyTrackingService.recompute();
+        return;
+      }
+
+      await this.editor.ensureEditor(content);
+      if (searchQuery) {
+        requestAnimationFrame(() => {
+          this.editor.scrollToText(searchQuery, matchIndex, snippetText);
+        });
       }
 
       await this.loadSidebar();
       dirtyTrackingService.recompute();
+      addRecent(path);
     } finally {
       this.loading = false;
     }
@@ -130,28 +144,13 @@ export class NavigationController {
 
     try {
       const provider = getProvider();
-      const sidebarCache: TreeNode = treeStore.getTree();
+      const treeIndex = treeStore.getTree();
 
       const pendingOps = this.cache.getPendingOps().all;
       const dirtyPaths = pageRepository.getDirtyPaths();
 
-      // Merge pending creates into tree so new unflushed files appear in sidebar
-      const mergedTree: TreeNode = { ...sidebarCache };
-      for (const op of pendingOps) {
-        if (op.type === PendingOpType.Create) {
-          const parts = op.path.split("/");
-          let node: any = mergedTree;
-          for (let i = 0; i < parts.length; i++) {
-            const key = i === parts.length - 1 ? parts[i] + ".md" : parts[i];
-            if (i === parts.length - 1) {
-              if (!(key in node)) node[key] = null;
-            } else {
-              if (!(key in node) || typeof node[key] !== "object") node[key] = {};
-              node = node[key];
-            }
-          }
-        }
-      }
+      // Merge pending ops into tree so new unflushed files appear in sidebar
+      const mergedTree = this.cache.getPendingOps().applyToTree(treeIndex);
 
       const actions: SidebarActions = {
         onNavigate: (path, query, matchIndex, snippetText) => this.navigate(path, true, query, matchIndex, snippetText),
@@ -173,10 +172,11 @@ export class NavigationController {
         providerType: provider.name,
         pendingOps,
         dirtyPaths,
+        rawTree: treeIndex,
       });
       setupNavListeners((path: string) => this.navigate(path));
 
-      const pages = collectPageList(mergedTree);
+      const pages = Array.from(mergedTree.paths);
       this.editor.getMentionView()?.setPages(pages, {});
     } catch (error) {
       console.error("Failed to load sidebar:", error);
@@ -202,12 +202,12 @@ export class NavigationController {
       await this.loadSidebar();
       dirtyTrackingService.recompute();
 
-      const pages = collectPageList(treeStore.getTree());
+      const pages = Array.from(treeStore.getTree().paths);
       const home = resolveHomePageFromPaths(pages);
       if (home) {
         this.navigate(home);
       } else {
-        appEvents.emit(AppEvent.ProjectEmpty);
+        appEvents.emit(AppEvent.NoFileView, {});
       }
 
       const pdi = getProviderDisplayInfo(result.type);
@@ -222,10 +222,9 @@ export class NavigationController {
       pageRepository.clearPath(pagePath);
       flushSave();
       if (this.currentPath === pagePath) {
-        this.navigate(HOME_PATH);
-      } else {
-        this.loadSidebar();
+        (this.editor.element as HTMLElement).classList.add("pending-delete-tint");
       }
+      this.loadSidebar();
       dirtyTrackingService.recompute();
     });
   }
@@ -244,8 +243,8 @@ export class NavigationController {
     }, async (slug, parentDir) => {
       if (slug === HOME_PATH) {
         const tree = treeStore.getTree();
-        const targetPath = parentDir ? `${parentDir}/${HOME_PATH}.md` : `${HOME_PATH}.md`;
-        if (existsInTree(tree, targetPath)) {
+        const targetPath = parentDir ? `${parentDir}/${HOME_PATH}` : HOME_PATH;
+        if (tree.paths.has(targetPath)) {
           return `"${HOME_PATH}.md" already exists in this directory.`;
         }
       }

@@ -32,6 +32,9 @@ files = [
   { source = "root://images/inb4doc-64.png", dests = [
       "root://hugo-view/static/favicon.png",
   ] },
+  { source = "root://images/opengraph.png", dests = [
+      "root://editor/public/opengraph.png",
+  ] },
 ]
 
 [[stages]]
@@ -59,7 +62,7 @@ description = "Build all subprojects via Docker"
 type = "group"
 depends = [
     "init",
-    "editor::docker",
+    "editor::docker-desktop",
     "hugo-view::docker",
     "gui::docker",
 ]

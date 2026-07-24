@@ -1,7 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { editorSelfBase } from "@/config"
 import {
-  type TreeNode,
   type SidebarActions,
   type RenderContext,
   buildPendingSets,
@@ -12,10 +11,9 @@ import {
   computeLiveUrl,
   liveIcon,
 } from "@/components/panels/sidebar"
-import type { PendingOp } from "@/utils/tree"
+import type { TreeIndex, PendingOp } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import {
-  collectPagePaths,
   searchContent,
 } from "@/features/search/sidebar-search"
 import { confirmDialog } from "@/components/dialogs/dialog"
@@ -32,7 +30,7 @@ export default class extends Controller {
   declare readonly providerLabelTarget: HTMLElement
 
   private actions: SidebarActions | null = null
-  private tree: TreeNode = {}
+  private tree: TreeIndex | null = null
   private collapsedSections = new Map<string, boolean>()
   private searchTimer: ReturnType<typeof setTimeout> | null = null
   private currentQuery = ""
@@ -57,20 +55,20 @@ export default class extends Controller {
   }
 
   load(opts: {
-    tree: TreeNode
+    tree: TreeIndex
     current: string
     actions: SidebarActions
     providerIcon?: string
     providerLabel?: string
     providerType?: ProviderType
-    pendingOps?: PendingOp[]
+    pendingOps?: readonly PendingOp[]
     dirtyPaths?: string[]
-    rawTree?: TreeNode
+    rawTree?: TreeIndex
   }) {
     this.actions = opts.actions
     this.tree = opts.tree
 
-    const treeEmpty = Object.keys(opts.tree).length === 0
+    const treeEmpty = opts.tree.paths.size === 0
 
     this.providerLabelTarget.textContent = `${opts.providerIcon ?? ""} ${opts.providerLabel ?? "No provider"}`
 
@@ -84,12 +82,12 @@ export default class extends Controller {
       current: opts.current,
       basePath: editorSelfBase,
       collapsedSections: this.collapsedSections,
-      rawSubtree: opts.rawTree,
+      rawTree: opts.rawTree,
       pendingSets: buildPendingSets(opts.pendingOps, opts.dirtyPaths),
       pendingOps: opts.pendingOps,
     }
 
-    this.allPaths = treeEmpty ? [] : collectPagePaths(opts.tree)
+    this.allPaths = treeEmpty ? [] : Array.from(opts.tree.paths)
 
     const prevScroll = this.innerTarget.scrollTop
     this.innerTarget.innerHTML = treeEmpty
@@ -162,7 +160,9 @@ export default class extends Controller {
     event.preventDefault()
     const navLink = (event.currentTarget as HTMLElement).closest(".nav-link") as HTMLAnchorElement
     if (!navLink) return
-    const path = navLink.closest(".nav-item")?.getAttribute("data-nav-path")
+    const linkPath = navLink.getAttribute("data-nav-path")
+    const itemPath = navLink.closest(".nav-item")?.getAttribute("data-nav-path")
+    const path = linkPath || itemPath
     if (path) this.actions?.onNavigate(path)
   }
 
@@ -409,21 +409,8 @@ export default class extends Controller {
         }
         return
       }
-      const parts = destPath.split("/")
-      let node: unknown = this.tree
-      let exists = true
-      for (let i = 0; i < parts.length; i++) {
-        if (!node || typeof node !== "object") {
-          exists = false
-          break
-        }
-        const key = i === parts.length - 1 ? parts[i] + ".md" : parts[i]
-        node = (node as Record<string, unknown>)[key]
-        if (node === undefined) {
-          exists = false
-          break
-        }
-      }
+      // Check if destination exists using flat TreeIndex
+      const exists = this.tree?.paths.has(destPath) ?? false
       if (exists) {
         const confirmed = await confirmDialog({
           title: "Replace file?",

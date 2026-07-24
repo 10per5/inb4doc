@@ -1,8 +1,0 @@
-<div data-controller="empty-project" class="empty-project">
-  <h2>Current project is empty</h2>
-  <p>Create your first page to get started. You can always add more from the sidebar.</p>
-  <div class="btn-row">
-    <button class="create-btn" data-action="click->empty-project#<%= it.actions.createPage %>">Create a page</button>
-    <button class="change-btn" data-action="click->empty-project#<%= it.actions.changeProvider %>">Change provider</button>
-  </div>
-</div>

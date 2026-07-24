@@ -10,8 +10,6 @@
  * To support a different SSG in the future, only this file needs to change.
  */
 
-import type { TreeNode } from "@/components/panels/sidebar"
-
 // ── Constants ──────────────────────────────────────────────────────
 
 /** The filename (with .md) that Hugo treats as the homepage. */
@@ -58,19 +56,7 @@ export function stripMdExt(filename: string): string {
 }
 
 /**
- * Given a list of page paths (with .md extensions, as returned by collectPageList),
- * resolve the best home page. Prefers `_index`, falls back to the first page.
- * Returns `null` if the list is empty.
- */
-export function resolveHomePage(pagePaths: string[]): string | null {
-  for (const p of pagePaths) {
-    if (isRootPath(stripMdExt(p))) return stripMdExt(p)
-  }
-  return pagePaths.length > 0 ? stripMdExt(pagePaths[0]) : null
-}
-
-/**
- * Given a flat list of page paths (without .md, as returned by flattenTree/collectPageList),
+ * Given a flat list of page paths (without .md, as returned by TreeIndex.paths),
  * resolve the best home page. Prefers `_index`, falls back to the first page.
  * Returns `null` if the list is empty.
  */
@@ -79,35 +65,6 @@ export function resolveHomePageFromPaths(paths: string[]): string | null {
     if (isRootPath(p)) return p
   }
   return paths.length > 0 ? paths[0] : null
-}
-
-// ── Weight / sort helpers ──────────────────────────────────────────
-
-/**
- * Extract the weight from a folder's _index.md entry for sorting.
- * Returns Infinity if no _index.md or no weight is set.
- */
-export function homePageWeight(folderNode: TreeNode): number {
-  const indexEntry = (folderNode as Record<string, unknown>)[HOME_FILENAME]
-  if (indexEntry != null && typeof indexEntry === "object" && "weight" in indexEntry) {
-    return (indexEntry as { weight?: number }).weight ?? Infinity
-  }
-  return Infinity
-}
-
-/**
- * Extract the weight from a node for sidebar sorting.
- * For pages, reads `weight` directly. For folders, reads from `_index.md`.
- * Returns Infinity if no weight is set.
- */
-export function nodeWeight(node: unknown): number {
-  if (node != null && typeof node === "object" && "weight" in node) {
-    return (node as { weight?: number }).weight ?? Infinity
-  }
-  if (node != null && typeof node === "object") {
-    return homePageWeight(node as TreeNode)
-  }
-  return Infinity
 }
 
 // ── Validation ─────────────────────────────────────────────────────

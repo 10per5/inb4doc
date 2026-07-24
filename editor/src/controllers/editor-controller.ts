@@ -25,6 +25,7 @@ import {
 } from "@/services/conflict-resolver";
 import { scrollToText } from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
+import { appEvents, AppEvent } from "@/stores/app-events";
 
 export class EditorController extends Controller {
   static targets = ["milkdown", "source"]

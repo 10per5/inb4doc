@@ -1,16 +1,5 @@
-import type { TreeNode } from "@/components/panels/sidebar"
+import type { TreeIndex } from "@/utils/tree"
 import { getCurrentPath } from "@/utils/url"
-
-export function collectPageList(tree: TreeNode, prefix = ""): string[] {
-  const pages: string[] = []
-  for (const [name, val] of Object.entries(tree)) {
-    const path = prefix ? `${prefix}/${name}` : name
-    const isPage = val === null || (typeof val === "object" && "weight" in val)
-    if (isPage) pages.push(path)
-    else pages.push(...collectPageList(val as TreeNode, path))
-  }
-  return pages
-}
 
 let popstateRegistered = false;
 

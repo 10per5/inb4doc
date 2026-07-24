@@ -27,7 +27,7 @@ export function savePrefs(prefs: WikiPrefs) {
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 }
 
-export function savePendingOps(ops: unknown[], providerKey?: string): void {
+export function savePendingOps(ops: readonly unknown[], providerKey?: string): void {
   const key = providerKey ? `${PENDING_OPS_KEY}-${providerKey}` : PENDING_OPS_KEY
   try { localStorage.setItem(key, JSON.stringify(ops)) } catch {}
 }

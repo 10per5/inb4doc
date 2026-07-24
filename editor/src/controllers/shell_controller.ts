@@ -21,7 +21,6 @@ import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { NEW_PAGE_BODY } from "@/utils/constants"
 import { pageRepository } from "@/repositories/pageRepository";
-import type { TreeNode } from "@/providers/provider";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import { exportToZip, pickAndParseZip } from "@/utils/zip";
 import type { ZipEntry, ZipFileEntry } from "@/utils/zip";
@@ -45,16 +44,8 @@ export function setSessionStarted(time: number) {
   sessionStarted = time;
 }
 
-function flattenTree(node: TreeNode, prefix = ""): string[] {
-  const paths: string[] = []
-  for (const [key, value] of Object.entries(node)) {
-    if (value === null || (typeof value === "object" && "weight" in value)) {
-      paths.push(prefix + key.replace(/\.md$/, ""))
-    } else if (typeof value === "object") {
-      paths.push(...flattenTree(value as TreeNode, prefix + key + "/"))
-    }
-  }
-  return paths
+function treePaths(tree: ReturnType<typeof treeStore.getTree>): string[] {
+  return Array.from(tree.paths)
 }
 
 export default class extends Controller {
@@ -137,13 +128,29 @@ export default class extends Controller {
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
       appEvents.on(AppEvent.SaveCurrentFile, () => this.saveCurrentFile()),
       appEvents.on(AppEvent.FlushAll, () => this.cache.flushDirtyFiles()),
-      appEvents.on(AppEvent.ProjectEmpty, () => {
-        this.view.switchTo("empty-project")
+      appEvents.on(AppEvent.NoFileView, ({ lastPath }) => {
+        if (lastPath) this.view.setNoFileLastPath(lastPath);
+        this.view.switchTo("no-file")
       }),
       appEvents.on(AppEvent.CreateFirstPage, () => {
         this.cache.createDraft(HOME_PATH, NEW_PAGE_BODY)
         this.view.switchTo("editor")
         appEvents.emit(AppEvent.Navigate, { path: HOME_PATH })
+      }),
+      appEvents.on(AppEvent.CreateDraftRequested, ({ path, content }) => {
+        this.cache.createDraft(path, content)
+      }),
+      appEvents.on(AppEvent.DirIndexActivated, ({ path }) => {
+        const dirName = path
+          .replace(/\/_index$/, "")
+          .split("/")
+          .pop()
+          ?.replace(/-/g, " ")
+          .replace(/^\w/, (c: string) => c.toUpperCase()) ?? "";
+        const template = `# ${dirName}\n\n<desc here>\n\n## Topics\n\n{{< table-of-directory >}}\n\n`;
+        this.cache.createDraft(path, template)
+        this.view.switchTo("editor")
+        appEvents.emit(AppEvent.Navigate, { path })
       }),
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.view.switchTo(view)
@@ -167,7 +174,7 @@ export default class extends Controller {
     this.nav.setCurrentPath(startPath)
 
     if (isNew) {
-      appEvents.emit(AppEvent.ProjectEmpty)
+      appEvents.emit(AppEvent.NoFileView, {})
     } else {
       replacePath(startPath)
     }
@@ -248,7 +255,7 @@ export default class extends Controller {
 
     const tree = treeStore.getTree()
     const provider = getProvider()
-    const existing = new Set(flattenTree(tree))
+    const existing = new Set(tree.paths)
 
     const entries: ZipFileEntry[] = rawEntries.map((e: ZipEntry) => ({
       ...e,
@@ -266,6 +273,7 @@ export default class extends Controller {
         }))
         pageRepository.clearAll()
         pageRepository.save()
+        treeStore.setTree(await provider.getTree())
         await this.nav.loadSidebar()
         await this.editor.loadContent(this.initialPath, (data) => this.nav.getMetaPanel()?.update(data))
         showNotification(`Imported ${result.selected.length} file${result.selected.length > 1 ? "s" : ""}`, { type: "info" })
@@ -276,7 +284,7 @@ export default class extends Controller {
   private async resolveInitialPath(): Promise<{ path: string; isNew: boolean }> {
     const requested = this.initialPath || HOME_PATH
     const tree = treeStore.getTree()
-    const pages = flattenTree(tree)
+    const pages = treePaths(tree)
 
     if (pages.includes(requested)) {
       return { path: requested, isNew: false }

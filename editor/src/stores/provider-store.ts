@@ -1,8 +1,8 @@
 import type { ContentProvider } from "@/providers/provider";
 import { ProviderType, createProviderByType } from "@/providers/index";
-import { RemoteProvider } from "@/providers/remote-provider";
 import { connectionStore } from "@/stores/connection-store";
 import { treeStore } from "@/stores/tree-store";
+import { createEmptyTreeIndex } from "@/utils/tree";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 
@@ -28,7 +28,7 @@ function loadLastProvider(): ProviderType | null {
     const v = localStorage.getItem(LAST_PROVIDER_KEY);
     if (v != null) {
       const n = Number(v);
-      if (n === ProviderType.Remote) return n as ProviderType;
+      if (n in ProviderType) return n as ProviderType;
     }
   } catch {}
   return null;
@@ -38,34 +38,34 @@ function loadLastProvider(): ProviderType | null {
  * Initialize the provider at app startup.
  *
  * Default rules:
- *   WebLocal / GuiDesktop  →  try remote first, fall back to localStorage
- *   All others             →  localStorage
+ *   GuiDesktop / GuiMobile  →  try Mount first, then localStorage
+ *   WebLocal                →  try Remote first, then localStorage
+ *   All others              →  localStorage
  *
  * Filesystem is never auto-selected (requires user gesture for showDirectoryPicker).
- * Remote is tried directly without a probe — no silent network requests.
  * If getTree() fails the provider falls back to an empty tree; the user can
  * switch providers explicitly via the provider dialog.
  */
 export async function initializeProvider(): Promise<void> {
   const last = loadLastProvider();
-
   const defaultToRemote = hasFunc(AppFunc.DefaultToRemote);
-  const base: ProviderType[] = defaultToRemote
-    ? [ProviderType.Remote, ProviderType.LocalStorage]
-    : [ProviderType.LocalStorage];
+  const useMount = hasFunc(AppFunc.MountProvider);
 
-  const host = connectionStore.getHost();
-  const isLocalhostRemote = last === ProviderType.Remote &&
-    ['localhost', '127.0.0.1', '0.0.0.0'].includes(host.toLowerCase());
+  const base: ProviderType[] = useMount
+    ? [ProviderType.Mount, ProviderType.LocalStorage]
+    : defaultToRemote
+      ? [ProviderType.Remote, ProviderType.LocalStorage]
+      : [ProviderType.LocalStorage];
 
   const candidates: ProviderType[] =
-    (last != null && !(isLocalhostRemote && !defaultToRemote))
+    (last != null && last !== ProviderType.Filesystem)
       ? [last, ...base.filter((t) => t !== last)]
       : base;
 
   let provider: ContentProvider | null = null;
   for (const type of candidates) {
-    if (type === ProviderType.Remote) {
+    if (type === ProviderType.Mount || type === ProviderType.Remote) {
+      // Mount and Remote don't need availability checks at creation time
       provider = createProviderByType(type);
       break;
     }
@@ -83,7 +83,7 @@ export async function initializeProvider(): Promise<void> {
     treeStore.setTree(await provider.getTree());
   } catch (e) {
     console.warn("[content] failed to load tree, starting empty:", e);
-    treeStore.setTree({});
+    treeStore.setTree(createEmptyTreeIndex());
   }
 }
 
@@ -93,7 +93,7 @@ export async function switchProvider(type: ProviderType): Promise<void> {
   setProvider(provider);
   saveLastProvider(type);
 
-  treeStore.setTree({});
+  treeStore.setTree(createEmptyTreeIndex());
 
   try {
     treeStore.setTree(await provider.getTree());
@@ -110,50 +110,59 @@ export async function getAvailableProviders(): Promise<
     type: ProviderType;
     description: string;
     available: boolean;
-    appFallback?: boolean;
-    guiFallback?: boolean;
     reason?: string;
   }[]
 > {
-  const remote = createProviderByType(ProviderType.Remote) as RemoteProvider;
+  const useMount = hasFunc(AppFunc.MountProvider);
+  const remote = createProviderByType(ProviderType.Remote);
+  const mount = createProviderByType(ProviderType.Mount);
   const fs = createProviderByType(ProviderType.Filesystem);
   const ls = createProviderByType(ProviderType.LocalStorage);
 
-  const [remoteReachable, fsOk, lsOk] = await Promise.all([
+  const [remoteReachable, mountAvailable, fsOk, lsOk] = await Promise.all([
     connectionStore.probe(),
+    mount.isAvailable(),
     fs.isAvailable(),
     ls.isAvailable(),
   ]);
-  const remoteFallback = remote.appFallback;
-  const guiFallback = !remoteReachable && !remoteFallback && connectionStore.isInsideAppGui();
 
-  return [
-    {
-      type: ProviderType.Remote,
-      description: "Files served from a backend server via HTTP API",
-      available: remoteReachable,
-      appFallback: remoteFallback,
-      guiFallback,
-      reason: remoteReachable
-        ? undefined
-        : remoteFallback
-          ? "inb4doc app://_/ endpoint is used"
-          : guiFallback
-            ? "ℹ️ inb4doc-gui local API is used"
-            : "No content server detected",
-    },
-    {
-      type: ProviderType.Filesystem,
-      description: "Access local markdown files via the File System Access API (Chrome/Edge)",
-      available: fsOk,
-      reason: fsOk ? undefined : "Not supported in this browser (use Chrome or Edge)",
-    },
-    {
-      type: ProviderType.LocalStorage,
-      description: "Store files in browser local storage — persists across sessions",
-      available: lsOk,
-    },
-  ];
+  const entries: {
+    type: ProviderType;
+    description: string;
+    available: boolean;
+    reason?: string;
+  }[] = [];
+
+  // Mount is only available in GUI Desktop builds
+  if (useMount) {
+    entries.push({
+      type: ProviderType.Mount,
+      description: "Files served by the inb4doc GUI (app:// scheme)",
+      available: mountAvailable,
+    });
+  }
+
+  entries.push({
+    type: ProviderType.Remote,
+    description: "Files served from a backend server via HTTP API",
+    available: remoteReachable,
+    reason: remoteReachable ? undefined : "No content server detected",
+  });
+
+  entries.push({
+    type: ProviderType.Filesystem,
+    description: "Access local markdown files via the File System Access API (Chrome/Edge)",
+    available: fsOk,
+    reason: fsOk ? undefined : "Not supported in this browser (use Chrome or Edge)",
+  });
+
+  entries.push({
+    type: ProviderType.LocalStorage,
+    description: "Store files in browser local storage — persists across sessions",
+    available: lsOk,
+  });
+
+  return entries;
 }
 
 export function cacheKeyForProvider(type: ProviderType): string {
@@ -167,6 +176,7 @@ export function getProviderDisplayInfo(type: ProviderType): {
 } {
   const map: Record<ProviderType, { icon: string; label: string; type: ProviderType }> = {
     [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)", type: ProviderType.Remote },
+    [ProviderType.Mount]: { icon: "📦", label: "Mounted (GUI)", type: ProviderType.Mount },
     [ProviderType.Filesystem]: { icon: "💻", label: "Local Files", type: ProviderType.Filesystem },
     [ProviderType.LocalStorage]: { icon: "🗄️", label: "Browser Storage", type: ProviderType.LocalStorage },
   };

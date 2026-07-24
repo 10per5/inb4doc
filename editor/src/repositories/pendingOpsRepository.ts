@@ -20,7 +20,7 @@ export const pendingOpsRepository = {
     return loadPendingOps<PendingOp[]>(providerKey());
   },
 
-  save(ops: PendingOp[]): void {
+  save(ops: readonly PendingOp[]): void {
     savePendingOps(ops, providerKey());
   },
 
