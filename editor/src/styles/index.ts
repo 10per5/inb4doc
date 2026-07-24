@@ -26,3 +26,4 @@ import "./mobile.css"
 
 /* ── Views ──────────────────────────────────────────────────────── */
 import "./views/no-file.css"
+import "./views/dir-index-empty.css"

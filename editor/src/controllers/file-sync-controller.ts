@@ -372,7 +372,6 @@ export class FileSyncController {
         page.setBaseline(body);
 
         await this.editor.ensureEditor(body);
-        this.editor.updateDirIndexOverlay(body);
       }
     }
 
@@ -460,7 +459,6 @@ export class FileSyncController {
                 page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
                 page.setBaseline(body);
                 this.editor.ensureEditor(body);
-                this.editor.updateDirIndexOverlay(body);
               }
             });
           }
@@ -477,8 +475,13 @@ export class FileSyncController {
         },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
-          const paths = repo.getDirtyPaths();
-          for (const p of paths) {
+          const dirtyPaths = repo.getDirtyPaths();
+          const pendingCreatePaths = this.pendingOps.all
+            .filter(o => o.type === PendingOpType.Create)
+            .map(o => o.path);
+          const allPaths = [...new Set([...dirtyPaths, ...pendingCreatePaths])];
+
+          for (const p of allPaths) {
             repo.clearPath(p);
             this.editor.invalidateState(p);
           }
@@ -489,7 +492,7 @@ export class FileSyncController {
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
 
-          if (paths.includes(this.currentPath)) {
+          if (allPaths.includes(this.currentPath)) {
             const raw = (await provider?.readFile(this.currentPath)) || "";
 
             if (!raw) {
@@ -501,7 +504,6 @@ export class FileSyncController {
               page.originalFrontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
               page.setBaseline(body);
               await this.editor.ensureEditor(body);
-              this.editor.updateDirIndexOverlay(body);
             }
           }
         },

@@ -428,28 +428,6 @@
   fill: currentColor;
 }
 
-/* ── Directory Index Empty Overlay ────────────────────────────────── */
-
-.dir-index-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-  cursor: text;
-}
-
-.dir-index-empty-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: var(--color-text-tertiary);
-  font-size: 0.95rem;
-  user-select: none;
-  pointer-events: none;
-}
-
 #editor-area {
   position: relative;
 }

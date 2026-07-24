@@ -19,7 +19,7 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { flushSave } from "@/stores/persistence";
 import { PendingOpType } from "@/entities/PendingOps";
-import { isHugoIndex } from "@/utils/hugo-compat";
+import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
@@ -90,7 +90,7 @@ export class NavigationController {
 
       this.currentPath = path;
       (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
-      appEvents.emit(AppEvent.ViewChanged, { view: "editor" as any });
+      appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
 
@@ -113,15 +113,28 @@ export class NavigationController {
       const rawContent = await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data));
 
       if (!rawContent) {
-        appEvents.emit(AppEvent.NoFileView, { lastPath: path });
+        const dirIndex = isHugoIndex(path) && !isRootPath(path);
+        if (dirIndex) {
+          appEvents.emit(AppEvent.DirIndexEmpty, { path });
+          await this.loadSidebar();
+          dirtyTrackingService.recompute();
+        } else {
+          appEvents.emit(AppEvent.NoFileView, { lastPath: path });
+        }
         return;
       }
 
       const content = rawContent;
-      const dirIndex = isHugoIndex(path);
+      const dirIndexEmpty = isHugoIndex(path) && !isRootPath(path) && !content.trim();
+
+      if (dirIndexEmpty) {
+        appEvents.emit(AppEvent.DirIndexEmpty, { path });
+        await this.loadSidebar();
+        dirtyTrackingService.recompute();
+        return;
+      }
 
       await this.editor.ensureEditor(content);
-      this.editor.updateDirIndexOverlay(content);
       if (searchQuery) {
         requestAnimationFrame(() => {
           this.editor.scrollToText(searchQuery, matchIndex, snippetText);

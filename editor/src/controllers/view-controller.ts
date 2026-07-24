@@ -8,6 +8,7 @@
 import { stripFrontmatter } from "@/utils/frontmatter";
 import { mountDiskUsageView } from "@/components/views/disk-usage-view";
 import { mountNoFileView, type NoFileViewData } from "@/components/views/no-file-view";
+import { mountDirIndexEmptyView } from "@/components/views/dir-index-empty-view";
 import { registerEditorView } from "@/components/views/editor-view";
 import { pageRepository } from "@/repositories/pageRepository";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
@@ -17,7 +18,7 @@ import { getRecents } from "@/utils/recent-files";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { EditorController } from "@/controllers/editor-controller";
 
-export type ViewType = "editor" | "disk-usage" | "no-file"
+export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty"
 
 type ViewHandlers = { activate: () => void; deactivate: () => void }
 
@@ -28,10 +29,17 @@ export class ViewController {
   private sessionStarted: number
   private unsubs: (() => void)[] = [];
   private noFileLastPath: string = "";
+  private dirIndexEmptyPath: string = "";
 
   constructor(editor: EditorController, sessionStarted: number = 0) {
     this.editor = editor;
     this.sessionStarted = sessionStarted;
+    this.unsubs.push(
+      appEvents.on(AppEvent.DirIndexEmpty, ({ path }) => {
+        this.dirIndexEmptyPath = path;
+        this.switchTo("dir-index-empty");
+      }),
+    );
   }
 
   switchTo(type: ViewType): void {
@@ -65,6 +73,7 @@ export class ViewController {
 
     this.setupDiskUsageView();
     this.setupNoFileView();
+    this.setupDirIndexEmptyView();
   }
 
   destroy(): void {
@@ -108,6 +117,26 @@ export class ViewController {
       deactivate: () => {
         const du = editorArea.querySelector(".disk-usage-wrapper");
         if (du) du.remove();
+      },
+    });
+  }
+
+  private setupDirIndexEmptyView(): void {
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
+
+    this.views.set("dir-index-empty", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        mountDirIndexEmptyView(editorArea, () => {
+          appEvents.emit(AppEvent.DirIndexActivated, { path: this.dirIndexEmptyPath });
+        });
+      },
+      deactivate: () => {
+        const el = editorArea.querySelector(".dir-index-empty-view");
+        if (el) el.remove();
       },
     });
   }

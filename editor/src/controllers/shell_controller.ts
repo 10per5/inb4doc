@@ -149,6 +149,18 @@ export default class extends Controller {
       appEvents.on(AppEvent.CreateDraftRequested, ({ path, content }) => {
         this.cache.createDraft(path, content)
       }),
+      appEvents.on(AppEvent.DirIndexActivated, ({ path }) => {
+        const dirName = path
+          .replace(/\/_index$/, "")
+          .split("/")
+          .pop()
+          ?.replace(/-/g, " ")
+          .replace(/^\w/, (c: string) => c.toUpperCase()) ?? "";
+        const template = `# ${dirName}\n\n<desc here>\n\n## Topics\n\n{{< table-of-directory >}}\n\n`;
+        this.cache.createDraft(path, template)
+        this.view.switchTo("editor")
+        appEvents.emit(AppEvent.Navigate, { path })
+      }),
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.view.switchTo(view)
       }),
