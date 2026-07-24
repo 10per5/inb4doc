@@ -15,11 +15,9 @@ export async function openImageManagerDialog(): Promise<void> {
 
   const allEntries = imageRepository.getAllImages()
 
-  const title = dir
-    ? `Image Manager <span style="font-weight:400;font-size:0.9rem;color:var(--color-text-tertiary)">— ${dir}</span>`
-    : "Image Manager"
+  const title = "Image Manager"
 
-  const html = renderImageManagerDialog({ title, loadError, allEntries })
+  const html = renderImageManagerDialog({ title, dir, loadError, allEntries })
 
   openHtmlDialogPromise({
     html,
