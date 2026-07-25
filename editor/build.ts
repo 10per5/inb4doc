@@ -12,7 +12,7 @@ import {
 import { Eta } from "eta";
 import { parseKatexFormats, processKatexAssets } from "./lib/build/katex";
 import { compileAll } from "./lib/build/templates";
-import { AppFunc, BuildMode, SUPPORTED_MODES, NAME_TO_BUILD_MODE } from "./lib/build/build-mode";
+import { AppFunc, BuildMode, SUPPORTED_MODES, NAME_TO_BUILD_MODE, AppFunc as AppFuncEnum } from "./lib/build/build-mode";
 import { EditorAction, EDITOR_ACTION_PREFIX } from "./src/config/enums/editor-action";
 import { ToolbarAction, TOOLBAR_ACTION_PREFIX, toolbarActions } from "./src/config/enums/toolbar-action";
 import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "./src/config/enums/toolbar-command";
@@ -68,6 +68,7 @@ const html = eta.renderString(shellSource, {
   sidebarActions,
   icons,
   mobileCss: hasFlag(AppFunc.MobileCss),
+  toolbarQuickNav: hasFlag(AppFunc.ToolbarQuickNav),
 });
 
 writeFileSync(join(publicDir, "index.html"), html);

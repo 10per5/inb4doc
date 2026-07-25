@@ -4,8 +4,8 @@
       <button class="btn-toggle-sidebar toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleSidebar] %>" title="Toggle Sidebar">☰</button>
       <span class="toolbar-sep toolbar-mobile-only"></span>
     <% } %>
-    <div class="toolbar-relative" data-menu-name="file"></div>
-    <div class="toolbar-relative" data-menu-name="view"></div>
+    <div class="toolbar-relative" data-menu-name="file" data-menu-mnemonic="f"></div>
+    <div class="toolbar-relative" data-menu-name="view" data-menu-mnemonic="v"></div>
   </div>
   <span class="toolbar-sep"></span>
   <div class="toolbar-section toolbar-section-center">
@@ -35,7 +35,7 @@
   </div>
   <div class="toolbar-spacer"></div>
   <div class="toolbar-section toolbar-section-right">
-    <span class="dirty-counter" data-topbar-target="dirtyCounter" data-action="click->topbar#dirtyClicked"></span>
+    <div class="dirty-counter" role="button" tabindex="0" data-topbar-target="dirtyCounter" data-action="click->topbar#dirtyClicked"></div>
     <button class="flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" disabled>⇅</button>
     <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.OpenPrefs] %>" title="Preferences">⚙</button>
   </div>

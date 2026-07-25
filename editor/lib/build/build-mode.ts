@@ -15,6 +15,7 @@ export enum AppFunc {
   LivePreview = 1 << 7,
   StaticSiteGeneration = 1 << 8,
   MountProvider = 1 << 9,
+  ToolbarQuickNav = 1 << 10,
 }
 
 export const BUILD_MODE_NAMES: Record<BuildMode, string> = {
@@ -30,7 +31,7 @@ export const NAME_TO_BUILD_MODE = Object.fromEntries(
 
 export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.AllowProbe]:
-    BuildMode.WebLocal | BuildMode.GuiDesktop | BuildMode.GuiMobile,
+    BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiDesktop | BuildMode.GuiMobile,
   [AppFunc.DefaultToRemote]:
     BuildMode.WebLocal,
   [AppFunc.MobileCss]:
@@ -45,6 +46,7 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
     BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiDesktop,
   [AppFunc.StaticSiteGeneration]: BuildMode.WebRemote,
   [AppFunc.MountProvider]: BuildMode.GuiDesktop,
+  [AppFunc.ToolbarQuickNav]: BuildMode.GuiDesktop,
 };
 
 let _currentMode: BuildMode | null = null;

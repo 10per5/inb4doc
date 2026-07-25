@@ -149,10 +149,13 @@
   color: var(--color-error);
   margin-right: 0.25rem;
   padding: 0.1rem 0.3rem;
+  border: none;
   border-radius: 3px;
+  background: none;
   line-height: 1.2;
   text-align: center;
   min-width: 0;
+  cursor: default;
 }
 
 .app-toolbar .dirty-counter .dirty-count {

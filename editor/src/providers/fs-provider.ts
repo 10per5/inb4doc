@@ -25,32 +25,37 @@ export class FileSystemProvider implements ContentProvider {
     if (!this.dirHandle) await this.init()
     const paths: string[] = []
     const folderWeights: Record<string, number> = {}
-    await this.walkDir(this.dirHandle!, paths, folderWeights, "")
-    return buildTreeIndex({ paths, children: {}, folderWeights })
+    const fileWeights: Record<string, number> = {}
+    await this.walkDir(this.dirHandle!, paths, folderWeights, fileWeights, "")
+    return buildTreeIndex({ paths, children: {}, folderWeights, fileWeights })
   }
 
   private async walkDir(
     dir: FileSystemDirectoryHandle,
     paths: string[],
     folderWeights: Record<string, number>,
+    fileWeights: Record<string, number>,
     prefix: string,
   ): Promise<void> {
     for await (const entry of dir.values()) {
       if (entry.name.startsWith(".")) continue
       const relPath = prefix ? `${prefix}/${entry.name}` : entry.name
       if (entry.kind === "directory") {
-        await this.walkDir(entry as FileSystemDirectoryHandle, paths, folderWeights, relPath)
+        await this.walkDir(entry as FileSystemDirectoryHandle, paths, folderWeights, fileWeights, relPath)
       } else if (entry.name.endsWith(".md")) {
         const pagePath = relPath.replace(/\.md$/, "")
         paths.push(pagePath)
-        if (entry.name === "_index.md") {
-          const file = await (entry as FileSystemFileHandle).getFile()
-          const text = await file.text()
-          const match = text.match(/^---\n([\s\S]*?)\n---/)
-          if (match) {
-            const weightMatch = match[1].match(/^weight:\s*(\d+)/m)
-            if (weightMatch) {
-              folderWeights[pagePath.replace(/\/_index$/, "")] = parseInt(weightMatch[1], 10)
+        const file = await (entry as FileSystemFileHandle).getFile()
+        const text = await file.text()
+        const match = text.match(/^---\n([\s\S]*?)\n---/)
+        if (match) {
+          const weightMatch = match[1].match(/^weight:\s*(\d+)/m)
+          if (weightMatch) {
+            const weight = parseInt(weightMatch[1], 10)
+            if (entry.name === "_index.md") {
+              folderWeights[pagePath.replace(/\/_index$/, "")] = weight
+            } else {
+              fileWeights[pagePath] = weight
             }
           }
         }

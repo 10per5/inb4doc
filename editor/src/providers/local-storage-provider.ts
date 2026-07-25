@@ -17,6 +17,7 @@ export class LocalStorageProvider implements ContentProvider {
   async getTree(): Promise<TreeIndex> {
     const paths: string[] = []
     const folderWeights: Record<string, number> = {}
+    const fileWeights: Record<string, number> = {}
 
     const mdKeys = this.getAllMdKeys()
     for (const key of mdKeys) {
@@ -32,13 +33,15 @@ export class LocalStorageProvider implements ContentProvider {
             const weight = parseInt(weightMatch[1], 10)
             if (relPath.endsWith("/_index")) {
               folderWeights[relPath.replace(/\/_index$/, "")] = weight
+            } else {
+              fileWeights[relPath] = weight
             }
           }
         }
       }
     }
 
-    return buildTreeIndex({ paths, children: {}, folderWeights })
+    return buildTreeIndex({ paths, children: {}, folderWeights, fileWeights })
   }
 
   private getAllMdKeys(): string[] {

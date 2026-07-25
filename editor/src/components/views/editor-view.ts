@@ -22,5 +22,9 @@ export function registerEditorView(
       opts.milkdownEl.style.display = "none"
       opts.sourceEl.style.display = "none"
     },
+    focus: () => {
+      const pm = opts.milkdownEl.querySelector<HTMLElement>(".ProseMirror");
+      (pm ?? opts.milkdownEl).focus();
+    },
   })
 }

@@ -7,9 +7,10 @@ export interface WikiPrefs {
   stickyToolbar: boolean;
   imageStorageMode: ImageStorageMode;
   darkMode: boolean;
+  hideEmptyFolders: boolean;
 }
 
-const DEFAULTS: WikiPrefs = { stickyToolbar: true, imageStorageMode: "file", darkMode: false };
+const DEFAULTS: WikiPrefs = { stickyToolbar: true, imageStorageMode: "file", darkMode: false, hideEmptyFolders: true };
 
 function systemPrefersDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;

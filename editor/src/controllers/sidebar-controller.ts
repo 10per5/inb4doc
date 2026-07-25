@@ -19,15 +19,17 @@ import {
 import { confirmDialog } from "@/components/dialogs/dialog"
 import { showNotification } from "@/components/notification/notification"
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { loadPrefs, savePrefs } from "@/utils/storage"
 
 export default class extends Controller {
-  static targets = ["inner", "search", "searchWrapper", "newPageBtn", "providerLabel"]
+  static targets = ["inner", "search", "searchWrapper", "newPageBtn", "providerLabel", "hideEmptyToggle"]
 
   declare readonly innerTarget: HTMLElement
   declare readonly searchTarget: HTMLInputElement
   declare readonly searchWrapperTarget: HTMLElement
   declare readonly newPageBtnTarget: HTMLElement
   declare readonly providerLabelTarget: HTMLElement
+  declare readonly hideEmptyToggleTarget: HTMLElement
 
   private actions: SidebarActions | null = null
   private tree: TreeIndex | null = null
@@ -38,8 +40,10 @@ export default class extends Controller {
   private unsubs: (() => void)[] = []
   private itemByPath = new Map<string, HTMLElement>()
   private prevDirty = new Set<string>()
+  private hideEmptyFolders = false
 
   connect() {
+    this.hideEmptyFolders = loadPrefs().hideEmptyFolders
     this.unsubs.push(
       appEvents.on(AppEvent.DirtyChanged, ({ dirtyPaths }) => {
         this.updateDirtyIndicators(dirtyPaths)
@@ -85,6 +89,11 @@ export default class extends Controller {
       rawTree: opts.rawTree,
       pendingSets: buildPendingSets(opts.pendingOps, opts.dirtyPaths),
       pendingOps: opts.pendingOps,
+      hideEmptyFolders: this.hideEmptyFolders,
+    }
+
+    if (this.hideEmptyToggleTarget) {
+      this.hideEmptyToggleTarget.classList.toggle("active", this.hideEmptyFolders)
     }
 
     this.allPaths = treeEmpty ? [] : Array.from(opts.tree.paths)
@@ -140,6 +149,13 @@ export default class extends Controller {
 
   onChangeProvider() {
     this.actions?.onChangeProvider()
+  }
+
+  onToggleEmptyFolders() {
+    this.hideEmptyFolders = !this.hideEmptyFolders
+    savePrefs({ ...loadPrefs(), hideEmptyFolders: this.hideEmptyFolders })
+    this.hideEmptyToggleTarget.classList.toggle("active", this.hideEmptyFolders)
+    appEvents.emit(AppEvent.SidebarReload)
   }
 
   onSearchInput() {

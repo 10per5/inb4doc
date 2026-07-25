@@ -32,6 +32,7 @@ export interface MenuOptions {
   label: string
   title?: string
   items: MenuItem[]
+  mnemonic?: string
 }
 
 export interface MenuRegistry {
@@ -109,11 +110,15 @@ export class Menu {
   private items: MenuItem[]
   private _isOpen = false
   private boundOutsideClick: (e: MouseEvent) => void
+  private boundPanelKeyDown: (e: KeyboardEvent) => void
+  private mnemonic?: string
 
   constructor(opts: MenuOptions) {
     this.mountEl = opts.mountEl
     this.items = opts.items
+    this.mnemonic = opts.mnemonic
     this.boundOutsideClick = this.onOutsideClick.bind(this)
+    this.boundPanelKeyDown = this.onPanelKeyDown.bind(this)
     this.build(opts.label, opts.title)
   }
 
@@ -121,20 +126,42 @@ export class Menu {
 
   toggle() { this._isOpen ? this.close() : this.open() }
 
+  focus() {
+    requestAnimationFrame(() => this.triggerEl.focus())
+  }
+
   open() {
     closeAllMenus(this)
     this.refresh()
     this.panelEl.classList.add("open")
+    this.triggerEl.classList.add("is-open")
     this._isOpen = true
     openMenus.add(this)
+    requestAnimationFrame(() => this.triggerEl.focus())
     document.addEventListener("click", this.boundOutsideClick, true)
+  }
+
+  openAndFocusFirst() {
+    this.open()
+    requestAnimationFrame(() => this.focusFirstItem())
   }
 
   close() {
     this.panelEl.classList.remove("open")
+    this.triggerEl.classList.remove("is-open")
     this._isOpen = false
     openMenus.delete(this)
     document.removeEventListener("click", this.boundOutsideClick, true)
+  }
+
+  focusFirstItem() {
+    const items = this.getFocusableItems()
+    if (items.length) items[0].focus()
+  }
+
+  focusLastItem() {
+    const items = this.getFocusableItems()
+    if (items.length) items[items.length - 1].focus()
   }
 
   refresh() {
@@ -157,6 +184,9 @@ export class Menu {
 
   render() {
     this.panelEl.innerHTML = renderItems(this.items)
+    this.panelEl.querySelectorAll<HTMLElement>(".menu-item").forEach((el) => {
+      el.tabIndex = -1
+    })
   }
 
   destroy() {
@@ -167,9 +197,16 @@ export class Menu {
 
   private build(label: string, title?: string) {
     const id = ++menuCounter
+    let displayLabel = label
+    if (this.mnemonic) {
+      const idx = label.toLowerCase().indexOf(this.mnemonic.toLowerCase())
+      if (idx >= 0) {
+        displayLabel = label.slice(0, idx) + "<u>" + label[idx] + "</u>" + label.slice(idx + 1)
+      }
+    }
     this.mountEl.innerHTML = `
       <button class="toolbar-menu-trigger" title="${title ?? label}">
-        ${label}<span class="arrow">▾</span>
+        ${displayLabel}<span class="arrow">▾</span>
       </button>
       <div class="toolbar-menu" id="menu-panel-${id}"></div>
     `
@@ -179,8 +216,87 @@ export class Menu {
       e.stopPropagation()
       this.toggle()
     })
+    this.panelEl.addEventListener("keydown", this.boundPanelKeyDown)
     this.mountEl.addEventListener("click", this.onItemClick)
     this.render()
+  }
+
+  private getFocusableItems(container?: HTMLElement): HTMLElement[] {
+    const root = container ?? this.panelEl
+    return Array.from(root.querySelectorAll<HTMLElement>(".menu-item"))
+  }
+
+  private onPanelKeyDown = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement
+    if (!target.classList.contains("menu-item")) return
+
+    const items = this.getFocusableItems()
+    const idx = items.indexOf(target)
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault()
+        const next = (idx + 1) % items.length
+        items[next].focus()
+        break
+      }
+      case "ArrowUp": {
+        e.preventDefault()
+        const prev = (idx - 1 + items.length) % items.length
+        items[prev].focus()
+        break
+      }
+      case "ArrowRight": {
+        if (target.classList.contains("menu-item-submenu")) {
+          e.preventDefault()
+          const sub = target.querySelector<HTMLElement>(".menu-submenu")
+          if (sub) {
+            sub.style.display = "block"
+            const subItems = this.getFocusableItems(sub)
+            if (subItems.length) subItems[0].focus()
+          }
+        } else {
+          e.preventDefault()
+          this.close()
+          this.triggerEl.focus()
+          this.mountEl.dispatchEvent(new CustomEvent("menu-arrow", { bubbles: true, detail: { direction: "right" } }))
+        }
+        break
+      }
+      case "ArrowLeft": {
+        const parentSubmenu = target.closest<HTMLElement>(".menu-submenu")
+        if (parentSubmenu) {
+          e.preventDefault()
+          parentSubmenu.style.display = ""
+          const parentItem = parentSubmenu.closest<HTMLElement>(".menu-item")
+          if (parentItem) parentItem.focus()
+        } else {
+          e.preventDefault()
+          this.close()
+          this.triggerEl.focus()
+          this.mountEl.dispatchEvent(new CustomEvent("menu-arrow", { bubbles: true, detail: { direction: "left" } }))
+        }
+        break
+      }
+      case "Escape": {
+        e.preventDefault()
+        e.stopPropagation()
+        this.close()
+        this.triggerEl.focus()
+        this.mountEl.dispatchEvent(new CustomEvent("menu-closed", { bubbles: true }))
+        break
+      }
+      case "Home": {
+        e.preventDefault()
+        if (items.length) items[0].focus()
+        break
+      }
+      case "End": {
+        e.preventDefault()
+        if (items.length) items[items.length - 1].focus()
+        break
+      }
+    }
   }
 
   private onOutsideClick = (e: MouseEvent) => {

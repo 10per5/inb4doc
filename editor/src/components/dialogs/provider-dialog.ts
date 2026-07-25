@@ -16,9 +16,7 @@ export async function openProviderDialog(
   const providers = await getAvailableProviders()
 
   let selectedType: ProviderType | null = currentProvider
-  const conn = connectionStore.getConfig()
-  const origHost = conn.host
-  const origPort = conn.port
+  const origConn = connectionStore.getConfig()
 
   const badges: Record<ProviderType, { icon: string; label: string }> = {
     [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)" },
@@ -31,15 +29,46 @@ export async function openProviderDialog(
 
   return new Promise<ProviderDialogResult | null>((resolve) => {
     let currentOverlay: HTMLElement | null = null
+    let remoteAvailable = connectionStore.remoteAvailable
+    let hasProbed = false
+
+    function updateAcceptBtn() {
+      if (!currentOverlay) return
+      const btn = currentOverlay.querySelector(".inb4doc-btn-success") as HTMLButtonElement | null
+      if (!btn) return
+      const isRemote = selectedType === ProviderType.Remote
+      btn.disabled = selectedType == null || (isRemote && !remoteAvailable)
+    }
+
+    function updateProbeStatus() {
+      if (!currentOverlay) return
+      const el = currentOverlay.querySelector(".remote-status")
+      if (!el) return
+      el.textContent = remoteAvailable ? "✓ Online" : "Server unreachable"
+      el.className = "remote-status " + (remoteAvailable ? "ok" : "err")
+    }
+
+    function doProbe(host: string, port: number) {
+      remoteAvailable = false
+      updateAcceptBtn()
+      connectionStore.setConfig(host, port)
+      connectionStore.probe().then(() => {
+        hasProbed = true
+        remoteAvailable = connectionStore.remoteAvailable
+        updateProbeStatus()
+        updateAcceptBtn()
+      })
+    }
 
     function render() {
       if (currentOverlay) {
         currentOverlay.remove()
       }
 
-      const remoteAvailable = connectionStore.remoteAvailable
-      const initialStatusClass = remoteAvailable ? "ok" : "err"
-      const initialStatusText = remoteAvailable ? "✓ Online" : "Server unreachable"
+      const conn = connectionStore.getConfig()
+      remoteAvailable = connectionStore.remoteAvailable
+      const initialStatusClass = hasProbed ? (remoteAvailable ? "ok" : "err") : ""
+      const initialStatusText = hasProbed ? (remoteAvailable ? "✓ Online" : "Server unreachable") : "Server status unknown"
 
       const html = renderProviderDialog({
         ProviderType,
@@ -51,6 +80,7 @@ export async function openProviderDialog(
         conn,
         initialStatusClass,
         initialStatusText,
+        canAccept: selectedType != null && (selectedType !== ProviderType.Remote || remoteAvailable),
       })
 
       const { el: overlay, close } = openHtmlDialog({ html })
@@ -63,17 +93,12 @@ export async function openProviderDialog(
       }) as EventListener)
 
       overlay.addEventListener(ProviderDialogEvent.Probe, ((e: CustomEvent<{ host: string; port: number }>) => {
-        const { host, port } = e.detail
-        connectionStore.setConfig(host, port)
-        connectionStore.probe().then(() => {
-          close()
-          render()
-        })
+        doProbe(e.detail.host, e.detail.port)
       }) as EventListener)
 
       overlay.addEventListener(ProviderDialogEvent.Accept, ((e: CustomEvent<string>) => {
         const cur = connectionStore.getConfig()
-        const configChanged = cur.host !== origHost || cur.port !== origPort
+        const configChanged = cur.host !== origConn.host || cur.port !== origConn.port
         close()
         resolve({ type: Number(e.detail) as ProviderType, configChanged })
       }) as EventListener)
@@ -82,6 +107,10 @@ export async function openProviderDialog(
         close()
         resolve(null)
       })
+
+      if (selectedType === ProviderType.Remote) {
+        doProbe(conn.host, conn.port)
+      }
     }
 
     render()

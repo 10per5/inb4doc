@@ -20,6 +20,8 @@ export interface TreeIndex {
   children: Map<string, ChildInfo[]>
   /** Folder weights (from _index.md frontmatter) */
   folderWeights: Map<string, number>
+  /** Per-file weights (from individual file frontmatter) */
+  fileWeights: Map<string, number>
 }
 
 export function createEmptyTreeIndex(): TreeIndex {
@@ -27,6 +29,7 @@ export function createEmptyTreeIndex(): TreeIndex {
     paths: new Set(),
     children: new Map(),
     folderWeights: new Map(),
+    fileWeights: new Map(),
   }
 }
 
@@ -55,7 +58,7 @@ function rebuildChildrenForPrefix(tree: TreeIndex, prefix: string): void {
       name: name + ".md",
       path,
       isDir: false,
-      weight: DEFAULT_WEIGHT,
+      weight: tree.fileWeights.get(path) ?? DEFAULT_WEIGHT,
     })
   }
 
@@ -86,19 +89,34 @@ export function buildTreeIndex(data: {
   paths: string[]
   children: Record<string, { name: string; path: string; isDir: boolean; weight: number }[]>
   folderWeights: Record<string, number>
+  fileWeights?: Record<string, number>
 }): TreeIndex {
   const tree = createEmptyTreeIndex()
   for (const p of data.paths) tree.paths.add(p)
   for (const [k, v] of Object.entries(data.folderWeights)) tree.folderWeights.set(k, v)
+  for (const [k, v] of Object.entries(data.fileWeights ?? {})) tree.fileWeights.set(k, v)
 
   // Build children map from server data
   for (const [prefix, entries] of Object.entries(data.children)) {
     tree.children.set(prefix, entries.map(e => ({ ...e })))
   }
 
-  // Ensure root children exist
+  // Client-side providers (LocalStorage, FileSystem) pass empty children{}.
+  // Build children for every directory prefix inferred from paths.
   if (!tree.children.has("")) {
+    const prefixes = new Set<string>()
+    for (const path of tree.paths) {
+      const parts = path.split("/")
+      for (let i = 1; i < parts.length; i++) {
+        prefixes.add(parts.slice(0, i).join("/"))
+      }
+    }
     rebuildChildrenForPrefix(tree, "")
+    for (const prefix of prefixes) {
+      if (!tree.children.has(prefix)) {
+        rebuildChildrenForPrefix(tree, prefix)
+      }
+    }
   }
 
   return tree
@@ -213,6 +231,7 @@ export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): Tre
     paths: new Set(tree.paths),
     children: new Map([...tree.children].map(([k, v]) => [k, [...v]])),
     folderWeights: new Map(tree.folderWeights),
+    fileWeights: new Map(tree.fileWeights),
   }
 
   for (const op of ops) {
@@ -224,8 +243,8 @@ export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): Tre
         // Keep the path in the tree — sidebar renders it with a "pending-delete" badge.
         break
       case PendingOpType.Rename:
-        removePathFromTree(result, op.from)
-        addPathToTree(result, op.to)
+        // Keep old path in tree — sidebar shows it with a "→ new-name" badge.
+        // The actual path change happens on flush via treeStore.afterMove.
         break
       case PendingOpType.Move:
         removePathFromTree(result, op.from)

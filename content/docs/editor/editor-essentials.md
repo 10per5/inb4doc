@@ -1,5 +1,5 @@
 ---
-title: Editor Basics
+title: Editor Essentials
 weight: 20
 ---
 
@@ -23,15 +23,11 @@ Navigation and interaction use [Hotwired](https://hotwired.dev):
 
 * **Stimulus** — Tiny controllers for editor mount/unmount, mode toggle, save buffer, flush
 
-Combined bundle: **~28KB gzip**.
+Combined bundle: **\~28KB gzip**.
 
 ## Flush-Based Writes
 
 Edits accumulate in an in-memory buffer + IndexedDB (crash recovery). The filesystem is only touched on explicit "Flush" or page navigation. This prevents partial writes and reduces I/O.
-
-## Initial Page
-
-When the editor loads at the root URL (`/`), it defaults to `content/_index.md` (the home page). `_index.md` is displayed as "Home" in the sidebar and maps to the `/` URL path.
 
 ## Supported Formatting
 
@@ -59,6 +55,8 @@ Triggered by typing `@` in the editor.
 
 ## See Also
 
-- [Superdoc](https://github.com/superdoc-dev/superdoc) — a modern collaborative DOCX editor. Too heavy for this project ([5.79 MB build](https://sizepanic.com/package/superdoc), [113 MB deps](https://pkg-size.dev/superdoc)), but a nice option if full Office-style editing is needed.
-- [Quill](https://github.com/slab/quill) — a modern rich text editor built for compatibility and extensibility. A lighter-weight alternative if a simpler WYSIWYG is acceptable.
-- [Tiptap](https://tiptap.dev/) — a headless, customizable editor framework built on ProseMirror, well suited for custom editing experiences.
+* [Superdoc](https://github.com/superdoc-dev/superdoc) — a modern collaborative DOCX editor. Too heavy for this project ([5.79 MB build](https://sizepanic.com/package/superdoc), [113 MB deps](https://pkg-size.dev/superdoc)), but a nice option if full Office-style editing is needed.
+
+* [Quill](https://github.com/slab/quill) — a modern rich text editor built for compatibility and extensibility. A lighter-weight alternative if a simpler WYSIWYG is acceptable.
+
+* [Tiptap](https://tiptap.dev/) — a headless, customizable editor framework built on ProseMirror, well suited for custom editing experiences.

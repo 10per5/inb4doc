@@ -43,7 +43,7 @@
 }
 
 .sidebar-inner {
-  padding: 1.5rem 0;
+  padding: 0.25rem 0;
   flex: 1;
   overflow-y: auto;
   min-height: 0;

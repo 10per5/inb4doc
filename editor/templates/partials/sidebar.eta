@@ -8,6 +8,9 @@
       <input class="sidebar-search" type="text" placeholder="Find file…" data-sidebar-target="search" data-action="input->sidebar#onSearchInput" />
       <button class="search-clear" data-action="click->sidebar#onSearchClear"></button>
     </div>
+    <div class="sidebar-toolbar">
+      <button class="sidebar-toggle-btn" data-sidebar-target="hideEmptyToggle" data-action="click->sidebar#onToggleEmptyFolders" title="Hide empty folders"><%~ it.icons.folderToggleIcon %></button>
+    </div>
     <div class="sidebar-inner" data-sidebar-target="inner" data-action="dragstart->sidebar#onDragStart dragenter->sidebar#onDragEnter dragleave->sidebar#onDragLeave dragover->sidebar#onDragOver dragend->sidebar#onDragEnd drop->sidebar#onDrop"></div>
     <div class="sidebar-footer">
       <button class="nav-new-page" data-sidebar-target="newPageBtn" data-action="click->sidebar#onNewPage">+ New</button>

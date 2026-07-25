@@ -28,8 +28,8 @@
                 <div class="provider-option-current-badge">current</div>
               <% } %>
               <% if (p.type === it.ProviderType.Remote) { %>
-                <div class="remote-section" data-action="click->provider-dialog#stopPropagation">
-                  <div class="remote-fields">
+                <div class="remote-section">
+                  <div class="remote-fields" data-action="click->provider-dialog#stopPropagation">
                     <div class="remote-field">
                       <label>Host</label>
                       <input type="text" value="<%= it.conn.host %>" placeholder="localhost"
@@ -52,6 +52,6 @@
   </div>
   <div class="inb4doc-window-actions">
     <button class="inb4doc-btn inb4doc-btn-danger" data-action="click->provider-dialog#cancel">Cancel</button>
-    <button class="inb4doc-btn inb4doc-btn-success" <%= it.selectedType == null ? 'disabled' : '' %> data-action="click->provider-dialog#accept">Accept</button>
+    <button class="inb4doc-btn inb4doc-btn-success" <%= it.canAccept ? '' : 'disabled' %> data-action="click->provider-dialog#accept">Accept</button>
   </div>
 </div>

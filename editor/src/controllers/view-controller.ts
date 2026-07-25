@@ -17,10 +17,11 @@ import { getSuggestions } from "@/utils/tree";
 import { getRecents } from "@/utils/recent-files";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { EditorController } from "@/controllers/editor-controller";
+import * as focusHandler from "@/services/focus-handler";
 
 export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty"
 
-type ViewHandlers = { activate: () => void; deactivate: () => void }
+type ViewHandlers = { activate: () => void; deactivate: () => void; focus?: () => void }
 
 export class ViewController {
   private current: ViewType = "editor"
@@ -58,6 +59,10 @@ export class ViewController {
     return this.current
   }
 
+  focusCurrent(): void {
+    this.views.get(this.current)?.focus?.()
+  }
+
   /** Expose register for editor-view.ts registration. */
   get register(): (type: ViewType, handlers: ViewHandlers) => void {
     return (type, handlers) => this.views.set(type, handlers)
@@ -74,6 +79,8 @@ export class ViewController {
     this.setupDiskUsageView();
     this.setupNoFileView();
     this.setupDirIndexEmptyView();
+
+    focusHandler.setDefaultFocus(() => this.focusCurrent());
   }
 
   destroy(): void {

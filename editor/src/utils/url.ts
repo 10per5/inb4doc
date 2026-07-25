@@ -1,9 +1,15 @@
 import { editorSelfBase, staticSiteGeneration } from "@/config";
+import { hasFunc, AppFunc } from "$/build/build-mode";
 import { isRootPath, HOME_PATH } from "@/utils/hugo-compat";
+
+const isGui = hasFunc(AppFunc.MountProvider);
 
 export function getCurrentPath(): string {
   if (staticSiteGeneration) {
     return new URLSearchParams(window.location.search).get("path") || HOME_PATH;
+  }
+  if (isGui) {
+    return (window.location.pathname.replace(/^\//, "").replace(/\/$/, "") || HOME_PATH);
   }
   const base = editorSelfBase;
   const raw = window.location.pathname;
@@ -26,7 +32,7 @@ export function pushPath(path: string): void {
       url.searchParams.set("path", path);
     }
     window.history.pushState({ path }, "", url.toString());
-  } else {
+  } else if (!isGui) {
     window.history.pushState(
       { path },
       "",
@@ -44,7 +50,7 @@ export function replacePath(path: string): void {
       url.searchParams.set("path", path);
     }
     window.history.replaceState({ path }, "", url.toString());
-  } else {
+  } else if (!isGui) {
     window.history.replaceState(
       { path },
       "",

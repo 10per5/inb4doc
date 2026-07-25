@@ -53,6 +53,7 @@ export interface RenderContext {
   rawTree?: TreeIndex;
   pendingSets: PendingSets;
   pendingOps?: readonly PendingOp[];
+  hideEmptyFolders?: boolean;
 }
 
 const LINE_COLORS = [
@@ -152,6 +153,14 @@ export function pendingLabelSuffix(
   return result.join("");
 }
 
+function isFolderEmpty(tree: TreeIndex, dirPath: string): boolean {
+  const children = tree.children.get(dirPath) ?? []
+  const hasFiles = children.some(c => !c.isDir && !isHomePageFilename(c.name))
+  if (hasFiles) return false
+  const dirs = children.filter(c => c.isDir)
+  return dirs.every(dir => isFolderEmpty(tree, dir.path))
+}
+
 export function renderItems(
   tree: TreeIndex,
   prefix: string,
@@ -201,6 +210,8 @@ export function renderItems(
     }
 
     // Directory
+    if (ctx.hideEmptyFolders && isFolderEmpty(tree, child.path)) return ""
+
     const childrenDepth = depth + 1
     const dirPath = child.path
 
@@ -215,6 +226,7 @@ export function renderItems(
       paths: tree.paths,
       children: new Map(tree.children),
       folderWeights: tree.folderWeights,
+      fileWeights: tree.fileWeights,
     }
     filteredTree.children.set(dirPath, filteredDirChildren)
 

@@ -32,17 +32,17 @@ body {
   /* Spacing */
   --editor-padding-x: 1rem;
   --editor-padding-y: 0.8rem;
-  
+
   /* Panel widths */
   --sidebar-width: 0;
   --sidebar-visibility: none;
   --aside-width: 0;
   --aside-visibility: none;
-  
+
   /* Font sizes */
   --font-size-base: 0.9rem;
   --font-size-small: 0.8rem;
-  
+
   /* Colors (Nord theme) */
   --color-bg-primary: #fff;
   --color-bg-secondary: #f8f9fa;
@@ -57,6 +57,15 @@ body {
   --color-warning: #d08770;
   --color-error: #bf616a;
   --color-info: #5e81ac;
+
+  /* Toggle / icon button states */
+  --color-btn-bg: #edf8fd;
+  --color-btn-text: #4c566a;
+  --color-btn-hover-bg: #404e4d;
+  --color-btn-hover-text: #c9bebb;
+  --color-btn-active-bg: #5e81ac;
+  --color-btn-active-text: #edf8fd;
+  --color-btn-active-hover-text: #a3be8c;
 }
 
 /* ── Dark Mode ──────────────────────────────────────────────────────── */
@@ -71,6 +80,13 @@ body {
   --color-text-tertiary: #9ca0b0;
   --color-accent: #81a1c1;
   --color-accent-hover: #88c0d0;
+
+  --color-btn-bg: #434c5e;
+  --color-btn-text: #d8dee9;
+  --color-btn-hover-bg: #a3be8c;
+  --color-btn-hover-text: #5e81ac;
+  --color-btn-active-bg: #81a1c1;
+  --color-btn-active-text: #2e3440;
 }
 
 /* Tablet (768px and up) */

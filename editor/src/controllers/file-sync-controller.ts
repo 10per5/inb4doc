@@ -244,13 +244,17 @@ export class FileSyncController {
 
     repo.save();
 
-    const deletedPaths = await this.executePendingOps();
+    const { deletedPaths, renamedPaths } = await this.executePendingOps();
 
     this.recomputeDirty();
 
     appEvents.emit(AppEvent.FlushComplete);
 
-    if (deletedPaths.includes(this.currentPath)) {
+    // After flush, navigate to the new path if the current file was renamed
+    const renamedTo = renamedPaths.get(this.currentPath);
+    if (renamedTo) {
+      appEvents.emit(AppEvent.Navigate, { path: renamedTo });
+    } else if (deletedPaths.includes(this.currentPath)) {
       const raw = await provider?.readFile(this.currentPath);
       if (!raw) {
         const editorEl = this.editor.element as HTMLElement;
@@ -264,10 +268,11 @@ export class FileSyncController {
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
   }
 
-  private async executePendingOps(): Promise<string[]> {
-    if (this.pendingOps.count === 0) return [];
+  private async executePendingOps(): Promise<{ deletedPaths: string[]; renamedPaths: Map<string, string> }> {
+    if (this.pendingOps.count === 0) return { deletedPaths: [], renamedPaths: new Map() };
     const provider = getProvider();
     const deletedPaths: string[] = [];
+    const renamedPaths = new Map<string, string>();
 
     for (const op of this.pendingOps.all) {
       try {
@@ -282,6 +287,7 @@ export class FileSyncController {
             deletedPaths.push(op.path);
             break;
           case PendingOpType.Rename:
+            renamedPaths.set(op.from, op.to);
             if (op.content) {
               await provider?.writeFile?.(op.to, op.content);
               await provider?.deleteFile?.(op.from);
@@ -312,7 +318,7 @@ export class FileSyncController {
 
     this.pendingOps.clear();
     pendingOpsRepository.clear();
-    return deletedPaths;
+    return { deletedPaths, renamedPaths };
   }
 
   private async cleanupOrphanedImages(

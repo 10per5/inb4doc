@@ -1,4 +1,4 @@
-import { savePrefs, type ImageStorageMode } from "@/utils/storage"
+import { savePrefs, loadPrefs, type ImageStorageMode } from "@/utils/storage"
 import { BaseDialogController } from "./base-dialog-controller"
 
 export const PrefsDialogEvent = {
@@ -10,6 +10,7 @@ interface PrefsData {
   stickyToolbar: boolean
   darkMode: boolean
   imageStorageMode: ImageStorageMode
+  hideEmptyFolders: boolean
 }
 
 export class PrefsDialogController extends BaseDialogController {
@@ -30,6 +31,7 @@ export class PrefsDialogController extends BaseDialogController {
       stickyToolbar: this.stickyValue,
       darkMode: this.darkValue,
       imageStorageMode: (this.imageModeValue as ImageStorageMode) ?? "file",
+      hideEmptyFolders: loadPrefs().hideEmptyFolders,
     }
   }
 

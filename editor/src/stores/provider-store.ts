@@ -119,8 +119,7 @@ export async function getAvailableProviders(): Promise<
   const fs = createProviderByType(ProviderType.Filesystem);
   const ls = createProviderByType(ProviderType.LocalStorage);
 
-  const [remoteReachable, mountAvailable, fsOk, lsOk] = await Promise.all([
-    connectionStore.probe(),
+  const [mountAvailable, fsOk, lsOk] = await Promise.all([
     mount.isAvailable(),
     fs.isAvailable(),
     ls.isAvailable(),
@@ -145,8 +144,7 @@ export async function getAvailableProviders(): Promise<
   entries.push({
     type: ProviderType.Remote,
     description: "Files served from a backend server via HTTP API",
-    available: remoteReachable,
-    reason: remoteReachable ? undefined : "No content server detected",
+    available: true,
   });
 
   entries.push({

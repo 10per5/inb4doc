@@ -234,11 +234,7 @@ export class NavigationController {
       if (newPath == null) return;
       pageRepository.clearPath(pagePath);
       flushSave();
-      if (this.currentPath === pagePath) {
-        this.navigate(newPath);
-      } else {
-        this.loadSidebar();
-      }
+      this.loadSidebar();
       dirtyTrackingService.recompute();
     }, async (slug, parentDir) => {
       if (slug === HOME_PATH) {
