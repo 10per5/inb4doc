@@ -21,8 +21,8 @@ import "./panels/search.css"
 import "./app/toolbar.css"
 import "./app/dialogs.css"
 
-/* ── Mobile (gui-mobile only) ───────────────────────────────────── */
-import "./mobile.css"
+/* ── Build-conditional styles (mobile / desktop) ──────────────── */
+import "../eta/styles/conditions.css"
 
 /* ── Views ──────────────────────────────────────────────────────── */
 import "./views/no-file.css"

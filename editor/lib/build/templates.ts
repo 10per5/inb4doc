@@ -40,6 +40,7 @@ export function compileAll(srcDir: string, outDir: string): number {
           try { walk(menuDir); } catch { /* no menu partials */ }
           continue;
         }
+        if (entry.name === "styles") continue; // build-time-only CSS templates
         walk(join(dir, entry.name));
         continue;
       }

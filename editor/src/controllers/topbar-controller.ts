@@ -84,7 +84,7 @@ export default class extends Controller {
       this.element.querySelectorAll<HTMLElement>("[data-menu-name]");
     for (const mount of mounts) {
       const name = mount.dataset.menuName!;
-      const mnemonic = mount.dataset.menuMnemonic?.toLowerCase();
+      const mnemonic = hasFunc(AppFunc.ToolbarQuickNav) ? mount.dataset.menuMnemonic?.toLowerCase() : undefined;
       const items = menuRegistry.get(name);
       if (!items) continue;
       const label = name.charAt(0).toUpperCase() + name.slice(1);

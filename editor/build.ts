@@ -79,14 +79,18 @@ const etaFlags = {
   mobileCss: hasFlag(AppFunc.MobileCss),
 };
 
-// Auto-render .eta files in src/styles/ → .css (consumed by Bun bundle)
-const stylesDir = join(__dir, "src", "styles");
-for (const name of readdirSync(stylesDir)) {
+// Auto-render .eta files in templates/styles/ → src/eta/styles/conditions.css (consumed by Bun bundle)
+const stylesEtaDir = join(templatesSrc, "styles");
+const stylesOutDir = join(__dir, "src", "eta", "styles");
+mkdirSync(stylesOutDir, { recursive: true });
+const styleParts: string[] = [];
+for (const name of readdirSync(stylesEtaDir)) {
   if (!name.endsWith(".eta")) continue;
-  const source = readFileSync(join(stylesDir, name), "utf-8");
+  const source = readFileSync(join(stylesEtaDir, name), "utf-8");
   const rendered = eta.renderString(source, etaFlags);
-  writeFileSync(join(stylesDir, name.replace(".eta", ".css")), rendered);
+  if (rendered.trim()) styleParts.push(rendered);
 }
+writeFileSync(join(stylesOutDir, "conditions.css"), styleParts.join("\n"));
 
 // Pre-compile runtime .eta templates → generated .ts modules under src/eta/
 const templateCount = compileAll(templatesSrc, join(__dir, "src", "eta"));

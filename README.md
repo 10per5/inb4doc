@@ -3,8 +3,8 @@
 <div align="center">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
-[![Sponsors](https://img.shields.io/badge/Sponsors-BECOME%20A%20SPONSOR-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/10per5)
-[![Stars](https://img.shields.io/github/stars/10per5/inb4doc?style=for-the-badge&logo=github)](https://github.com/10per5/inb4doc/stargazers)
+[![Sponsors](https://img.shields.io/badge/Sponsors-BECOME%20A%20SPONSOR-ea4aaa?style=for-the-badge\&logo=github-sponsors)](https://github.com/sponsors/10per5)
+[![Stars](https://img.shields.io/github/stars/10per5/inb4doc?style=for-the-badge\&logo=github)](https://github.com/10per5/inb4doc/stargazers)
 
 [Live Demo](https://10per5.github.io/inb4doc/)
 
@@ -16,13 +16,13 @@ A markdown wiki with live WYSIWYG editing and static site export via Hugo Book.
 
 ```bash
 # Build editor assets (bun → npm → Docker)
-predep editor::editor-assets
+predep editor::build
 
 # Live editor with inline markdown editing
 cd editor && bun dev
 
 # Generate static site
-predep hugo-view::hugo-build
+predep hugo-view::build
 
 # Serve the static site
 cd hugo-view && python3 -m http.server -d build 8080
@@ -53,15 +53,15 @@ anywhere (GitHub Pages, Surge, Netlify, etc.). Generate with `predep hugo-fetch`
 
 All build orchestration uses `predep`, the stage-processing engine:
 
-| Command                        | What it does                                   |
-| ------------------------------ | ---------------------------------------------- |
-| `predep`                       | Build everything (main stage = package)        |
-| `predep build`                 | Build all subprojects (editor, hugo site, GUI) |
-| `predep build-docker`          | Build all subprojects via Docker               |
-| `predep package`               | Build everything + assemble release archive    |
-| `predep editor::editor-assets` | Build editor static files only                 |
-| `predep hugo-view::hugo-build` | Generate static site only                      |
-| `predep gui::gui-binary`       | Build native GUI binary only                   |
+| Command                   | What it does                                   |
+| ------------------------- | ---------------------------------------------- |
+| `predep`                  | Build everything (main stage = package)        |
+| `predep build`            | Build all subprojects (editor, hugo site, GUI) |
+| `predep build-docker`     | Build all subprojects via Docker               |
+| `predep package`          | Build everything + assemble release archive    |
+| `predep editor::build`    | Build editor static files only                 |
+| `predep hugo-view::build` | Generate static site only                      |
+| `predep gui::build`       | Build native GUI binary only                   |
 
 See `predep/README.md` for full documentation on the stage engine.
 
@@ -69,14 +69,17 @@ See `predep/README.md` for full documentation on the stage engine.
 
 Each subproject declares its own stages in `predep.toml`:
 
-- `editor/predep.toml` — editor build (bun/npm/Docker auto-detect) → `editor::editor-assets`
-- `hugo-view/predep.toml` — Hugo binary, theme, and site generation → `hugo-view::hugo-build`
-- `gui/predep.toml` — GUI binary build → `gui::gui-binary`
-- `predep.toml` (root) — parent manifest linking subprojects via `[[include]]`
+* `editor/predep.toml` — editor build → `editor::build`
+
+* `hugo-view/predep.toml` — Hugo binary, theme, and site generation → `hugo-view::build`
+
+* `gui/predep.toml` — GUI binary build → `gui::build`
+
+* `predep.toml` (root) — parent manifest linking subprojects via `[[include]]`
 
 ## Tech Stack
 
-| Layer   |                                       |
+| Layer   | <br />                                |
 | ------- | ------------------------------------- |
 | Runtime | Bun (editor), C++23 (predep)          |
 | Editor  | Milkdown, Hotwired (Stimulus + Turbo) |
