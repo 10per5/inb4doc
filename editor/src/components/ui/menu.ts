@@ -2,6 +2,7 @@ import renderMenuItem from "@/eta/menu/item"
 import renderSeparator from "@/eta/menu/separator"
 import renderCheck from "@/eta/menu/check"
 import renderSubmenu from "@/eta/menu/submenu"
+import { check, arrowRight, navArrowDown } from "@/eta/icons"
 
 export enum MenuType {
   Item,
@@ -25,6 +26,7 @@ export interface MenuItem {
 
 export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "active" | "disabled" | "checked"> {
   childrenHtml?: string
+  icons?: { check: string; arrowRight?: string }
 }
 
 export interface MenuOptions {
@@ -52,9 +54,9 @@ function closeAllMenus(except?: Menu) {
 function renderItems(items: MenuItem[]): string {
   return items.map((item) => {
     if (item.type === MenuType.Separator) return renderSeparator(item)
-    if (item.type === MenuType.Check) return renderCheck(item)
+    if (item.type === MenuType.Check) return renderCheck({ ...item, icons: { check } })
     if (item.type === MenuType.Submenu) {
-      return renderSubmenu({ ...item, childrenHtml: renderItems(item.items ?? []) })
+      return renderSubmenu({ ...item, childrenHtml: renderItems(item.items ?? []), icons: { check, arrowRight } })
     }
     return renderMenuItem(item)
   }).join("")
@@ -74,7 +76,7 @@ function findItem(items: MenuItem[], id: string): MenuItem | undefined {
 function patchItem(el: HTMLElement, changes: Partial<MenuItem>) {
   if (changes.icon !== undefined) {
     const iconEl = el.querySelector(".menu-item-icon")
-    if (iconEl) iconEl.textContent = changes.icon
+    if (iconEl) iconEl.innerHTML = changes.icon
   }
   if (changes.label !== undefined) {
     const labelEl = el.querySelector(".menu-item-label")
@@ -206,7 +208,7 @@ export class Menu {
     }
     this.mountEl.innerHTML = `
       <button class="toolbar-menu-trigger" title="${title ?? label}">
-        ${displayLabel}<span class="arrow">▾</span>
+        ${displayLabel}<span class="arrow">${navArrowDown}</span>
       </button>
       <div class="toolbar-menu" id="menu-panel-${id}"></div>
     `

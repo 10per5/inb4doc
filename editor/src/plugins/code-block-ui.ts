@@ -17,6 +17,7 @@ import "prism-code-editor/themes/atom-one-dark.css";
 
 import { renderLatex } from "@/plugins/math";
 import { LANG_IMPORTS } from "@/plugins/code-block-langs";
+import { copy } from "@/eta/icons";
 
 // ---- Language registry ----
 
@@ -336,7 +337,7 @@ class PrismEditorBlock {
     this.copyBtn = document.createElement("button");
     (this.copyBtn as HTMLButtonElement).type = "button";
     this.copyBtn.className = "code-block-copy-btn";
-    this.copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    this.copyBtn.innerHTML = copy;
     this.copyBtn.title = "Copy code";
     this.copyBtn.addEventListener("mousedown", (e) => e.stopPropagation());
     this.copyBtn.addEventListener("click", (e) => {

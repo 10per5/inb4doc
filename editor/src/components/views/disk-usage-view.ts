@@ -1,6 +1,7 @@
 import { colors } from "@/config/theme"
 import { formatBytes } from "@/utils/format"
 import type { TreeIndex } from "@/utils/tree"
+import { x } from "@/eta/icons"
 
 const PIE_COLORS = [
   "#5e81ac", "#bf616a", "#a3be8c", "#ebcb8b",
@@ -40,7 +41,7 @@ export function mountDiskUsageView(
   header.innerHTML = `<span>Disk Usage</span>`
   const closeBtn = document.createElement("button")
   closeBtn.className = "disk-usage-close"
-  closeBtn.textContent = "✕"
+  closeBtn.innerHTML = x
   closeBtn.addEventListener("click", onClose)
   header.appendChild(closeBtn)
   wrapper.appendChild(header)

@@ -1,5 +1,5 @@
 import { editorSelfBase, liveUrlBase, isDev } from "@/config";
-import { liveIcon } from "@/components/ui/icons";
+import { eye, page, folder, folderMinus, menuScale, navArrowDown, folderOpen, folderMinusOpen } from "@/eta/icons";
 import { confirmDialog } from "@/components/dialogs/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { buildEditorUrl } from "@/utils/url";
@@ -15,13 +15,9 @@ import {
   HOME_PATH,
 } from "@/utils/hugo-compat";
 
-export const fileIcon = `<svg class="sidebar-icon sidebar-icon-file" viewBox="0 0 24 24" aria-hidden="true">
-  <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
-</svg>`;
+export const fileIcon = `<span class="sidebar-icon sidebar-icon-file">${page}</span>`;
 
-export const folderIcon = `<svg class="sidebar-icon sidebar-icon-folder" viewBox="0 0 24 24" aria-hidden="true">
-  <path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-</svg>`;
+export const folderIcon = `<span class="sidebar-icon sidebar-icon-folder">${folder}</span>`;
 
 export interface SidebarActions {
   onNavigate: (
@@ -205,7 +201,7 @@ export function renderItems(
           <a href="${buildEditorUrl(ctx.basePath, path)}" class="nav-link ${active ? "active" : ""}${isHomePageFilename(child.name) && !prefix ? " nav-link-home" : ""}${pendingClass(child.name, prefix, ctx.pendingSets)}" data-action="click->sidebar#onNavigate">
             ${fileIcon}${label}${pendingLabelSuffix(child.name, prefix, ctx.pendingSets, ctx.pendingOps)}
           </a>
-          <button class="nav-more" data-action="click->sidebar#onShowMenu" tabindex="-1">⋮</button>
+           <button class="nav-more" data-action="click->sidebar#onShowMenu" tabindex="-1">${menuScale}</button>
         </div>`
     }
 
@@ -254,21 +250,19 @@ export function renderItems(
       !hasIndex ? "dir-empty" : "",
     ].filter(Boolean).join(" ")
     const dirIcon = !hasIndex
-      ? `<svg class="sidebar-icon sidebar-icon-folder-empty" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" opacity="0.6"/></svg>`
-      : folderIcon
+      ? `<span class="sidebar-icon sidebar-icon-folder-empty" style="opacity:0.6">${collapsed ? folderMinus : folderMinusOpen}</span>`
+      : `<span class="sidebar-icon sidebar-icon-folder">${collapsed ? folder : folderOpen}</span>`
     const dirPendingDelete = isPendingDelete(dirPath, ctx.pendingSets)
     return `
       <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${dirPath}">
         <span class="nav-section-title depth-${depth}">
-          <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
-            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-              <path fill="currentColor" d="M7 10l5 5 5-5z"/>
-            </svg>
-          </span>
           <a href="${buildEditorUrl(ctx.basePath, indexPagePath)}" class="${dirLinkClasses}" data-nav-path="${indexPagePath}" data-action="click->sidebar#onNavigate">
             ${dirIcon}${label}${dirPendingDelete ? '<span class="pending-badge pending-badge-delete">delete</span>' : ''}
           </a>
-          <button class="nav-more" data-action="click->sidebar#onShowMenu" data-is-folder tabindex="-1">⋮</button>
+          <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
+            ${navArrowDown}
+          </span>
+          <button class="nav-more" data-action="click->sidebar#onShowMenu" data-is-folder tabindex="-1">${menuScale}</button>
         </span>
         <div class="nav-section-children" style="--line-color: ${lineColor}">
           ${childrenHtml}
@@ -412,4 +406,4 @@ export function computeLiveUrl(providerType?: ProviderType, current?: string): s
     : "";
 }
 
-export { liveIcon };
+export { eye as liveIcon };

@@ -4,6 +4,7 @@ import { ProviderType } from "@/providers/index"
 import { openHtmlDialog } from "@/services/dialog-service"
 import renderProviderDialog from "@/eta/dialogs/provider-dialog"
 import { ProviderDialogEvent } from "@/controllers/dialog/provider-dialog-controller"
+import { cloud, packageIcon, laptop, database, helpCircle, infoCircle, warningCircle } from "@/eta/icons"
 
 export interface ProviderDialogResult {
   type: ProviderType
@@ -19,13 +20,13 @@ export async function openProviderDialog(
   const origConn = connectionStore.getConfig()
 
   const badges: Record<ProviderType, { icon: string; label: string }> = {
-    [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)" },
-    [ProviderType.Mount]: { icon: "📦", label: "Mounted (GUI)" },
-    [ProviderType.Filesystem]: { icon: "💻", label: "Local Files" },
-    [ProviderType.LocalStorage]: { icon: "🗄️", label: "Browser Storage" },
+    [ProviderType.Remote]: { icon: cloud, label: "Server (Remote)" },
+    [ProviderType.Mount]: { icon: packageIcon, label: "Mounted (GUI)" },
+    [ProviderType.Filesystem]: { icon: laptop, label: "Local Files" },
+    [ProviderType.LocalStorage]: { icon: database, label: "Browser Storage" },
   }
 
-  const currentInfo = badges[currentProvider] ?? { icon: "❓", label: String(currentProvider) }
+  const currentInfo = badges[currentProvider] ?? { icon: helpCircle, label: String(currentProvider) }
 
   return new Promise<ProviderDialogResult | null>((resolve) => {
     let currentOverlay: HTMLElement | null = null
@@ -44,7 +45,7 @@ export async function openProviderDialog(
       if (!currentOverlay) return
       const el = currentOverlay.querySelector(".remote-status")
       if (!el) return
-      el.textContent = remoteAvailable ? "✓ Online" : "Server unreachable"
+      el.innerHTML = remoteAvailable ? `${infoCircle} Online` : "Server unreachable"
       el.className = "remote-status " + (remoteAvailable ? "ok" : "err")
     }
 
@@ -68,7 +69,7 @@ export async function openProviderDialog(
       const conn = connectionStore.getConfig()
       remoteAvailable = connectionStore.remoteAvailable
       const initialStatusClass = hasProbed ? (remoteAvailable ? "ok" : "err") : ""
-      const initialStatusText = hasProbed ? (remoteAvailable ? "✓ Online" : "Server unreachable") : "Server status unknown"
+      const initialStatusText = hasProbed ? (remoteAvailable ? `${infoCircle} Online` : "Server unreachable") : "Server status unknown"
 
       const html = renderProviderDialog({
         ProviderType,
@@ -81,6 +82,7 @@ export async function openProviderDialog(
         initialStatusClass,
         initialStatusText,
         canAccept: selectedType != null && (selectedType !== ProviderType.Remote || remoteAvailable),
+        icons: { infoCircle, warningCircle },
       })
 
       const { el: overlay, close } = openHtmlDialog({ html })

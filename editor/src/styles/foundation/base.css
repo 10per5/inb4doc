@@ -87,6 +87,7 @@ body {
   --color-btn-hover-text: #5e81ac;
   --color-btn-active-bg: #81a1c1;
   --color-btn-active-text: #2e3440;
+  --color-btn-active-hover-text: #2e3440;
 }
 
 /* Tablet (768px and up) */

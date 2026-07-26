@@ -13,6 +13,7 @@ import {
 } from "@/components/panels/sidebar"
 import type { TreeIndex, PendingOp } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
+import { folder, folderOpen, folderMinus, folderMinusOpen } from "@/eta/icons"
 import {
   searchContent,
 } from "@/features/search/sidebar-search"
@@ -74,7 +75,7 @@ export default class extends Controller {
 
     const treeEmpty = opts.tree.paths.size === 0
 
-    this.providerLabelTarget.textContent = `${opts.providerIcon ?? ""} ${opts.providerLabel ?? "No provider"}`
+    this.providerLabelTarget.innerHTML = `<span class="provider-icon">${opts.providerIcon ?? ""}</span><span>${opts.providerLabel ?? "No provider"}</span>`
 
     if (treeEmpty) {
       this.searchWrapperTarget.style.display = "none"
@@ -207,6 +208,13 @@ export default class extends Controller {
     const wasCollapsed = this.collapsedSections.get(path) ?? false
     this.collapsedSections.set(path, !wasCollapsed)
     section.classList.toggle("collapsed")
+    const iconEl = section.querySelector(".sidebar-icon-folder, .sidebar-icon-folder-empty") as HTMLElement | null
+    if (iconEl) {
+      const isFolderEmpty = iconEl.classList.contains("sidebar-icon-folder-empty")
+      iconEl.innerHTML = wasCollapsed
+        ? (isFolderEmpty ? folderMinusOpen : folderOpen)
+        : (isFolderEmpty ? folderMinus : folder)
+    }
   }
 
   // --- Keyboard navigation ---

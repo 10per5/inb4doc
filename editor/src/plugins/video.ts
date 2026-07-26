@@ -2,6 +2,7 @@ import { $remark, $nodeSchema, $view } from "@milkdown/utils"
 import type { Node } from "@milkdown/transformer"
 import type { NodeView } from "@milkdown/kit/prose/view"
 import { visitParents } from "unist-util-visit-parents"
+import { editPencil } from "@/eta/icons"
 
 export interface VideoAttrs {
   src: string
@@ -221,7 +222,7 @@ export const videoView = $view(videoSchema.node, () => {
     const editBtn = document.createElement("button")
     editBtn.className = "video-edit-btn"
     editBtn.title = "Edit video properties"
-    editBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M14.06 9.02L14.98 9.94L5.92 19H5V18.08L14.06 9.02ZM17.66 3C17.41 3 17.15 3.1 16.96 3.29L15.13 5.12L18.88 8.87L20.71 7.04C21.1 6.65 21.1 6.02 20.71 5.63L18.37 3.29C18.17 3.09 17.92 3 17.66 3Z"/></svg>`
+    editBtn.innerHTML = editPencil
     editBtn.addEventListener("mousedown", (e) => {
       e.preventDefault()
       e.stopPropagation()

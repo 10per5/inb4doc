@@ -1,5 +1,6 @@
 import { openHtmlDialogPromise } from "@/services/dialog-service"
 import renderExternalChangeDialog from "@/eta/dialogs/external-change-dialog"
+import { navArrowRight } from "@/eta/icons"
 
 export type ExternalChangeAction = "discard" | "keep"
 
@@ -8,7 +9,7 @@ export function openExternalChangeDialog(
   localContent: string,
   diskContent: string,
 ): Promise<ExternalChangeAction> {
-  const html = renderExternalChangeDialog({ path })
+  const html = renderExternalChangeDialog({ path, icons: { navArrowRight } })
 
   return openHtmlDialogPromise<ExternalChangeAction>({
     html,

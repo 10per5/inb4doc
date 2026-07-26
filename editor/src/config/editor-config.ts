@@ -43,11 +43,18 @@ import {
 } from "@milkdown/kit/component/image-block";
 import { createKeymap } from "@/plugins/keyboard";
 import {
-  copyIcon,
-  editIcon,
-  removeIcon,
-  confirmIcon,
-} from "@/components/ui/icons";
+  copy,
+  editPencil,
+  trash,
+  check,
+  plus,
+  x,
+  alignLeft,
+  alignCenter,
+  alignRight,
+  menuScale,
+  table,
+} from "@/eta/icons";
 import { alertRemarkPlugin, alertSchema } from "@/plugins/alert";
 import { shortcodeDecoration } from "@/plugins/shortcode";
 import { hugoRefSchema, initHugoRefClicks } from "@/plugins/hugo-ref";
@@ -123,10 +130,10 @@ export async function createEditor(
       configureLinkTooltip(ctx);
       ctx.update(linkTooltipConfig.key, (prev) => ({
         ...prev,
-        linkIcon: copyIcon,
-        editButton: editIcon,
-        removeButton: removeIcon,
-        confirmButton: confirmIcon,
+        linkIcon: copy,
+        editButton: editPencil,
+        removeButton: trash,
+        confirmButton: check,
         inputPlaceholder: "Paste link...",
       }));
 
@@ -135,23 +142,23 @@ export async function createEditor(
         renderButton: (renderType) => {
           switch (renderType) {
             case "add_row":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Row`;
+              return `${plus} Row`;
             case "add_col":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Col`;
+              return `${plus} Col`;
             case "delete_row":
-              return `<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
+              return x;
             case "delete_col":
-              return `<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
+              return x;
             case "align_col_left":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z"/></svg>`;
+              return alignLeft;
             case "align_col_center":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg>`;
+              return alignCenter;
             case "align_col_right":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z"/></svg>`;
+              return alignRight;
             case "col_drag_handle":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 15h18v-2H3v2zm0-4h18V9H3v2zm0-6v2h18V5H3zm0 12h18v-2H3v2z"/></svg>`;
+              return menuScale;
             case "row_drag_handle":
-              return `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M21 3H3v18h18V3zm-2 16H5V5h14v14zm-7-3h2V8h-2v8z"/></svg>`;
+              return table;
           }
         },
       }));

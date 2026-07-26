@@ -16,22 +16,20 @@ import { createTable } from "@milkdown/kit/preset/gfm";
 import type { Node } from "@milkdown/kit/prose/model";
 import { menuAPI, type MenuAPI } from "@/features/menu-api";
 import {
-  plusIcon,
-  menuIcon,
-  h1Icon,
-  h2Icon,
-  h3Icon,
-  bulletListIcon,
-  orderedListIcon,
-  quoteIcon,
-  dividerIcon,
-  codeBlockIcon,
-  mathIcon,
-  tableIcon,
-  todoListIcon,
-  imageIcon,
-  videoIcon,
-} from "@/components/ui/icons";
+  plus,
+  menuScale,
+  text,
+  list,
+  numberedListLeft,
+  quote,
+  minus,
+  codeBrackets,
+  mathBook,
+  table,
+  checkSquare,
+  mediaImage,
+  videoCamera,
+} from "@/eta/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { openVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
 import { imageRepository } from "@/repositories/imageRepository";
@@ -45,19 +43,19 @@ const slash = slashFactory("inb4doc");
 
 type SlashItem = { cmd: SlashCommand; label: string; icon: string; level?: number };
 const SLASH_ITEMS: SlashItem[] = [
-  { cmd: SlashCommand.Heading, label: "Heading 1", icon: h1Icon, level: 1 },
-  { cmd: SlashCommand.Heading, label: "Heading 2", icon: h2Icon, level: 2 },
-  { cmd: SlashCommand.Heading, label: "Heading 3", icon: h3Icon, level: 3 },
-  { cmd: SlashCommand.BulletList, label: "Bullet List", icon: bulletListIcon },
-  { cmd: SlashCommand.OrderedList, label: "Ordered List", icon: orderedListIcon },
-  { cmd: SlashCommand.TodoList, label: "Task List", icon: todoListIcon },
-  { cmd: SlashCommand.Blockquote, label: "Blockquote", icon: quoteIcon },
-  { cmd: SlashCommand.ThematicBreak, label: "Divider", icon: dividerIcon },
-  { cmd: SlashCommand.CodeBlock, label: "Code Block", icon: codeBlockIcon },
-  { cmd: SlashCommand.MathBlock, label: "Math Block (LaTeX)", icon: mathIcon },
-  { cmd: SlashCommand.Table, label: "Table", icon: tableIcon },
-  { cmd: SlashCommand.Image, label: "Image", icon: imageIcon },
-  { cmd: SlashCommand.Video, label: "Video", icon: videoIcon },
+  { cmd: SlashCommand.Heading, label: "Heading 1", icon: text, level: 1 },
+  { cmd: SlashCommand.Heading, label: "Heading 2", icon: text, level: 2 },
+  { cmd: SlashCommand.Heading, label: "Heading 3", icon: text, level: 3 },
+  { cmd: SlashCommand.BulletList, label: "Bullet List", icon: list },
+  { cmd: SlashCommand.OrderedList, label: "Ordered List", icon: numberedListLeft },
+  { cmd: SlashCommand.TodoList, label: "Task List", icon: checkSquare },
+  { cmd: SlashCommand.Blockquote, label: "Blockquote", icon: quote },
+  { cmd: SlashCommand.ThematicBreak, label: "Divider", icon: minus },
+  { cmd: SlashCommand.CodeBlock, label: "Code Block", icon: codeBrackets },
+  { cmd: SlashCommand.MathBlock, label: "Math Block (LaTeX)", icon: mathBook },
+  { cmd: SlashCommand.Table, label: "Table", icon: table },
+  { cmd: SlashCommand.Image, label: "Image", icon: mediaImage },
+  { cmd: SlashCommand.Video, label: "Video", icon: videoCamera },
 ];
 
 class BlockHandleView {
@@ -70,8 +68,8 @@ class BlockHandleView {
     const content = document.createElement("div");
     content.className = "milkdown-block-handle";
     content.innerHTML = `
-      <button class="block-handle-add" title="Add paragraph below">${plusIcon}</button>
-      <button class="block-handle-drag" title="Drag to move">${menuIcon}</button>
+      <button class="block-handle-add" title="Add paragraph below">${plus}</button>
+      <button class="block-handle-drag" title="Drag to move">${menuScale}</button>
     `;
     content
       .querySelector(".block-handle-add")

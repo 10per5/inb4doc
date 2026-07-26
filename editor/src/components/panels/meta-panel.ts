@@ -1,4 +1,4 @@
-import { githubIcon } from "@/components/ui/icons";
+import { github, x } from "@/eta/icons";
 import { appEvents, AppEvent } from "@/stores/app-events";
 
 export interface MetaPanelData {
@@ -32,7 +32,7 @@ export function mountMetaPanel(container: HTMLElement): MetaPanelAPI {
       </div>
       <div class="meta-panel-footer">
         <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
-          ${githubIcon}
+          ${github}
           <span>View on GitHub</span>
         </a>
       </div>
@@ -53,7 +53,7 @@ export function mountMetaPanel(container: HTMLElement): MetaPanelAPI {
     row.innerHTML = `
       <input class="meta-extra-key" placeholder="key" />
       <input class="meta-extra-val" placeholder="value" />
-      <button class="meta-extra-remove">×</button>
+      <button class="meta-extra-remove">${x}</button>
     `;
     row.querySelector(".meta-extra-remove")!.addEventListener("click", () => {
       row.remove();
@@ -99,7 +99,7 @@ export function mountMetaPanel(container: HTMLElement): MetaPanelAPI {
       row.innerHTML = `
         <input class="meta-extra-key" value="${key}" placeholder="key" />
         <input class="meta-extra-val" value="${val}" placeholder="value" />
-        <button class="meta-extra-remove">×</button>
+        <button class="meta-extra-remove">${x}</button>
       `;
       row.querySelector(".meta-extra-remove")!.addEventListener("click", () => {
         row.remove();

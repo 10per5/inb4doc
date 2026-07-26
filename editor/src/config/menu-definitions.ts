@@ -3,14 +3,15 @@ import type { MenuItem } from "@/components/ui/menu"
 import { MenuType } from "@/components/ui/menu"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import type { ViewType } from "@/controllers/view-controller"
+import { mediaImage, floppyDisk, folder } from "@/eta/icons"
 
 export const menuRegistry = createRegistry()
 
 menuRegistry.register("file", () => [
-  { type: MenuType.Item, id: "img-mgr", icon: "🖼", label: "Image Manager", onClick: () => appEvents.emit(AppEvent.ImageManagerOpened) },
+  { type: MenuType.Item, id: "img-mgr", icon: mediaImage, label: "Image Manager", onClick: () => appEvents.emit(AppEvent.ImageManagerOpened) },
   { type: MenuType.Separator },
-  { type: MenuType.Item, id: "save", icon: "💾", label: "Save as Zip", onClick: () => appEvents.emit(AppEvent.SaveRequested) },
-  { type: MenuType.Item, id: "load", icon: "📂", label: "Load from Zip", onClick: () => appEvents.emit(AppEvent.LoadRequested) },
+  { type: MenuType.Item, id: "save", icon: floppyDisk, label: "Save as Zip", onClick: () => appEvents.emit(AppEvent.SaveRequested) },
+  { type: MenuType.Item, id: "load", icon: folder, label: "Load from Zip", onClick: () => appEvents.emit(AppEvent.LoadRequested) },
 ])
 
 let currentView = "editor"

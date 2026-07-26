@@ -18,6 +18,7 @@
 .dir-index-empty-view svg {
   margin-bottom: 1rem;
   opacity: 0.6;
+  display: inline;
 }
 
 .dir-index-empty-view:hover svg {

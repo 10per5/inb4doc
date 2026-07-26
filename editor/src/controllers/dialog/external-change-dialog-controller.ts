@@ -1,5 +1,6 @@
 import { computeDiff, renderDiffHtml } from "@/components/ui/diff-viewer"
 import { BaseDialogController } from "./base-dialog-controller"
+import { navArrowRight, navArrowDown } from "@/eta/icons"
 
 export class ExternalChangeDialogController extends BaseDialogController {
   static targets = ["diffContainer"]
@@ -21,7 +22,7 @@ export class ExternalChangeDialogController extends BaseDialogController {
     const btn = this.element.querySelector(".inb4doc-external-toggle") as HTMLButtonElement
     const visible = this.diffContainerTarget.style.display === "block"
     this.diffContainerTarget.style.display = visible ? "none" : "block"
-    btn.textContent = visible ? "▸ View diff" : "▾ Hide diff"
+    btn.innerHTML = visible ? `${navArrowRight} View diff` : `${navArrowDown} Hide diff`
 
     if (!visible && !this.diffLoaded) {
       const diff = computeDiff(this.localValue, this.diskValue)

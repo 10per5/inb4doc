@@ -12,16 +12,20 @@ import {
 import { Eta } from "eta";
 import { parseKatexFormats, processKatexAssets } from "./lib/build/katex";
 import { compileAll } from "./lib/build/templates";
+import { buildIcons } from "./lib/build/iconoir";
 import { AppFunc, BuildMode, SUPPORTED_MODES, NAME_TO_BUILD_MODE, AppFunc as AppFuncEnum } from "./lib/build/build-mode";
 import { EditorAction, EDITOR_ACTION_PREFIX } from "./src/config/enums/editor-action";
 import { ToolbarAction, TOOLBAR_ACTION_PREFIX, toolbarActions } from "./src/config/enums/toolbar-action";
 import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "./src/config/enums/toolbar-command";
 import { SidebarAction, SIDEBAR_ACTION_PREFIX, sidebarActions } from "./src/config/enums/sidebar-action";
-import * as icons from "./src/components/ui/icons";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
 process.env.APP_VERSION ??= pkg.version;
+
+// Generate icons before importing (file may not exist yet)
+buildIcons();
+const icons = await import("./src/eta/icons");
 const watch = process.argv.includes("--watch");
 process.env.NODE_ENV = watch ? "development" : "production";
 process.env.BUILD_MODE ??= "web-local";

@@ -1,4 +1,5 @@
 import { colors } from "@/config/theme";
+import { x, warningCircle, infoCircle, checkCircle } from "@/eta/icons";
 
 export type NotificationType = "danger" | "info" | "warning" | "success";
 
@@ -19,10 +20,10 @@ const NOTIFICATION_BG: Record<NotificationType, string> = {
 };
 
 const NOTIFICATION_ICONS: Record<NotificationType, string> = {
-  danger: "✕",
-  warning: "⚠",
-  info: "ℹ",
-  success: "✓",
+  danger: x,
+  warning: warningCircle,
+  info: infoCircle,
+  success: checkCircle,
 };
 
 let container: HTMLElement | null = null;
@@ -59,7 +60,7 @@ export function showNotification(msg: string, opts?: NotificationOptions): void 
 
   const closeEl = document.createElement("button");
   closeEl.className = "prdc-notif-close";
-  closeEl.textContent = "✕";
+  closeEl.innerHTML = x;
   closeEl.addEventListener("click", (e) => {
     e.stopPropagation();
     el.remove();
@@ -68,7 +69,7 @@ export function showNotification(msg: string, opts?: NotificationOptions): void 
 
   const iconEl = document.createElement("span");
   iconEl.className = "prdc-notif-icon";
-  iconEl.textContent = NOTIFICATION_ICONS[type];
+  iconEl.innerHTML = NOTIFICATION_ICONS[type];
   el.appendChild(iconEl);
 
   const bodyEl = document.createElement("div");
@@ -144,6 +145,7 @@ export function initNotifications(): void {
   background: rgba(0,0,0,.2);
   margin-top: 1px;
 }
+.prdc-notif-icon svg { width: 100%; height: 100%; }
 .prdc-notif-body {
   flex: 1; min-width: 0;
 }

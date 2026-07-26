@@ -3,6 +3,7 @@ import { ProviderType, createProviderByType } from "@/providers/index";
 import { connectionStore } from "@/stores/connection-store";
 import { treeStore } from "@/stores/tree-store";
 import { createEmptyTreeIndex } from "@/utils/tree";
+import { cloud, packageIcon, laptop, database, helpCircle } from "@/eta/icons";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 
@@ -173,10 +174,10 @@ export function getProviderDisplayInfo(type: ProviderType): {
   type: ProviderType;
 } {
   const map: Record<ProviderType, { icon: string; label: string; type: ProviderType }> = {
-    [ProviderType.Remote]: { icon: "☁️", label: "Server (Remote)", type: ProviderType.Remote },
-    [ProviderType.Mount]: { icon: "📦", label: "Mounted (GUI)", type: ProviderType.Mount },
-    [ProviderType.Filesystem]: { icon: "💻", label: "Local Files", type: ProviderType.Filesystem },
-    [ProviderType.LocalStorage]: { icon: "🗄️", label: "Browser Storage", type: ProviderType.LocalStorage },
+    [ProviderType.Remote]: { icon: cloud, label: "Server (Remote)", type: ProviderType.Remote },
+    [ProviderType.Mount]: { icon: packageIcon, label: "Mounted (GUI)", type: ProviderType.Mount },
+    [ProviderType.Filesystem]: { icon: laptop, label: "Local Files", type: ProviderType.Filesystem },
+    [ProviderType.LocalStorage]: { icon: database, label: "Browser Storage", type: ProviderType.LocalStorage },
   };
-  return map[type] ?? { icon: "❓", label: String(type), type };
+  return map[type] ?? { icon: helpCircle, label: String(type), type };
 }

@@ -2,7 +2,7 @@
   <div class="inb4doc-external-header">File changed on disk</div>
   <div class="inb4doc-external-body">
     <p class="inb4doc-external-message"><strong><%= it.path %></strong> was updated externally. Your local changes will be lost if you discard.</p>
-    <button class="inb4doc-external-toggle" data-action="click->external-change-dialog#toggleDiff">▸ View diff</button>
+    <button class="inb4doc-external-toggle" data-action="click->external-change-dialog#toggleDiff"><%~ it.icons?.navArrowRight || '▸' %> View diff</button>
     <div class="inb4doc-external-diff" style="display:none" data-external-change-dialog-target="diffContainer"></div>
   </div>
   <div class="inb4doc-external-footer">
