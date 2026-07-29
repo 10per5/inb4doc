@@ -1,22 +1,11 @@
 import { Controller } from "@hotwired/stimulus";
-import type { Editor } from "@milkdown/kit/core";
-import { commandsCtx, editorViewCtx } from "@milkdown/kit/core";
-import {
-  toggleStrongCommand,
-  toggleEmphasisCommand,
-  toggleInlineCodeCommand,
-  wrapInHeadingCommand,
-  insertHrCommand,
-} from "@milkdown/kit/preset/commonmark";
-import { toggleStrikethroughCommand } from "@milkdown/kit/preset/gfm";
-import { openLinkDialog } from "@/components/dialogs/link-dialog";
+import { appEvents, AppEvent } from "@/stores/app-events";
+import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "@/config/enums";
 import { formatBytes } from "@/utils/format";
 import { colors } from "@/config/theme";
-import { appEvents, AppEvent } from "@/stores/app-events";
 import { pressTwiceButton } from "@/components/ui/press-twice-button";
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
-import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "@/config/enums";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import * as focusHandler from "@/services/focus-handler";
 
@@ -26,16 +15,11 @@ export default class extends Controller {
   declare readonly dirtyCounterTarget: HTMLElement;
   declare readonly flushBtnTarget: HTMLButtonElement;
 
-  private getEditor: (() => Editor | null) | null = null;
   private unsubs: (() => void)[] = [];
   private menus: Menu[] = [];
   private menusByMnemonic = new Map<string, Menu>();
   private boundKeyDown = (e: KeyboardEvent) => {};
   private boundKeyUp = (e: KeyboardEvent) => {};
-
-  setEditorGetter(getter: () => Editor | null) {
-    this.getEditor = getter;
-  }
 
   connect() {
     this.createMenus();
@@ -258,37 +242,7 @@ export default class extends Controller {
     ) as ToolbarCommand;
     if (isNaN(cmd)) return;
 
-    const milkdown = this.getEditor?.();
-    if (!milkdown) return;
-
-    milkdown.action((ctx) => {
-      const view = ctx.get(editorViewCtx);
-      view.focus();
-      const commands = ctx.get(commandsCtx);
-      switch (cmd) {
-        case ToolbarCommand.Bold:
-          commands.call(toggleStrongCommand.key);
-          break;
-        case ToolbarCommand.Italic:
-          commands.call(toggleEmphasisCommand.key);
-          break;
-        case ToolbarCommand.Strike:
-          commands.call(toggleStrikethroughCommand.key);
-          break;
-        case ToolbarCommand.Code:
-          commands.call(toggleInlineCodeCommand.key);
-          break;
-        case ToolbarCommand.Link:
-          openLinkDialog(this.getEditor!);
-          break;
-        case ToolbarCommand.Heading:
-          commands.call(wrapInHeadingCommand.key);
-          break;
-        case ToolbarCommand.Hr:
-          commands.call(insertHrCommand.key);
-          break;
-      }
-    });
+    appEvents.emit(AppEvent.ToolbarCommandExec, { command: cmd });
   }
 
   execHeading(e: Event) {
@@ -298,15 +252,7 @@ export default class extends Controller {
     if (!target) return;
     const level = parseInt(target.dataset.level || "1");
 
-    const milkdown = this.getEditor?.();
-    if (!milkdown) return;
-
-    milkdown.action((ctx) => {
-      const view = ctx.get(editorViewCtx);
-      view.focus();
-      const commands = ctx.get(commandsCtx);
-      commands.call(wrapInHeadingCommand.key, level);
-    });
+    appEvents.emit(AppEvent.ToolbarCommandExec, { command: ToolbarCommand.Heading, level });
 
     this.closeHeadingDropdown();
   }

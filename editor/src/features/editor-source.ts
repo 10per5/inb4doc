@@ -1,46 +1,28 @@
-import type { Editor } from "@milkdown/kit/core";
-import { editorViewCtx, serializerCtx } from "@milkdown/kit/core";
-import { parserCtx } from "@milkdown/core";
-import { autoResize } from "@/utils/text";
+/**
+ * editor-source — DOM toggling for source mode.
+ *
+ * Pure DOM — no Milkdown or editorContext imports.
+ * Milkdown operations (parse/serialize) are injected by the caller.
+ */
 
-export function setEditorContent(milkdown: Editor, content: string) {
-  milkdown.action((ctx) => {
-    const parser = ctx.get(parserCtx);
-    const view = ctx.get(editorViewCtx);
-    const doc = parser(content);
-    const tr = view.state.tr.replaceWith(
-      0,
-      view.state.doc.content.size,
-      doc.content,
-    );
-    view.dispatch(tr);
-  });
-}
-
-export function getEditorMarkdown(milkdown: Editor): string {
-  return milkdown.action((ctx) => {
-    const serializer = ctx.get(serializerCtx);
-    return serializer(ctx.get(editorViewCtx).state.doc);
-  });
-}
+import { autoResize } from "@/utils/text"
 
 export function toggleSourceMode(
-  milkdown: Editor,
   sourceEl: HTMLElement,
   wysiwygEl: HTMLElement,
   sourceMode: boolean,
+  getMarkdown: () => string,
+  setEditorContent: (content: string) => void,
 ): boolean {
   const newMode = !sourceMode;
   if (newMode) {
-    milkdown.action((ctx) => {
-      const md = getEditorMarkdown(milkdown);
-      sourceEl.style.display = "flex";
-      wysiwygEl.style.display = "none";
-      const ta = sourceEl.querySelector("textarea") as HTMLTextAreaElement;
-      ta.value = md;
-      ta.oninput = () => autoResize(ta);
-      autoResize(ta);
-    });
+    const md = getMarkdown();
+    sourceEl.style.display = "flex";
+    wysiwygEl.style.display = "none";
+    const ta = sourceEl.querySelector("textarea") as HTMLTextAreaElement;
+    ta.value = md;
+    ta.oninput = () => autoResize(ta);
+    autoResize(ta);
   } else {
     sourceEl.style.display = "none";
     wysiwygEl.style.display = "block";
@@ -49,10 +31,10 @@ export function toggleSourceMode(
 }
 
 export function applySourceContent(
-  milkdown: Editor,
   textarea: HTMLTextAreaElement,
+  setEditorContent: (content: string) => void,
 ): boolean {
-  if (!milkdown) return false;
-  setEditorContent(milkdown, textarea.value);
+  if (!textarea) return false;
+  setEditorContent(textarea.value);
   return true;
 }

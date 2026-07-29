@@ -526,6 +526,7 @@ async function handleMove(req: Request, ctx: ServerContext): Promise<Response | 
   const src = resolveWithin(join(ctx.contentDir, from.replace(/^\//, "")), ctx.contentDir);
   const dst = resolveWithin(join(ctx.contentDir, to.replace(/^\//, "")), ctx.contentDir);
   if (!src || !dst) return new Response("Forbidden", { status: 403 });
+  if (src === dst) return new Response("ok");
   if (!src.endsWith(".md") || !dst.endsWith(".md"))
     return new Response("Forbidden", { status: 403 });
   if (!existsSync(src)) return new Response("Source not found", { status: 404 });

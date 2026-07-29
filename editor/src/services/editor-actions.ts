@@ -99,8 +99,7 @@ export async function createNewItem(
       const fmStr = serializeFrontmatter(fmData)
       const content = `---\n${fmStr}\n---\n\n${existingBody}`
 
-      cacheService.queueDelete(existingPath)
-      cacheService.queueCreate(indexPath, content)
+      cacheService.queueMove(existingPath, indexPath, content)
       const idxPage = pageRepository.getOrCreate(indexPath)
       idxPage.setFrontmatter(fmData)
       idxPage.bodyState.cacheBody(existingBody)
@@ -270,8 +269,7 @@ export async function createDirectory(
     const fmStr = serializeFrontmatter(fmData)
     const content = `---\n${fmStr}\n---\n\n${existingBody}`
 
-    cacheService.queueDelete(existingPath)
-    cacheService.queueCreate(indexPath, content)
+    cacheService.queueMove(existingPath, indexPath, content)
     const idxPage = pageRepository.getOrCreate(indexPath)
     idxPage.setFrontmatter(fmData)
     idxPage.bodyState.cacheBody(existingBody)

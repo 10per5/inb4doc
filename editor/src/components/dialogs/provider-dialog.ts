@@ -44,7 +44,7 @@ export async function openProviderDialog(
     function updateProbeStatus() {
       if (!currentOverlay) return
       const el = currentOverlay.querySelector(".remote-status")
-      if (!el) return
+      if (!el || !el.isConnected) return
       el.innerHTML = remoteAvailable ? `${infoCircle} Online` : "Server unreachable"
       el.className = "remote-status " + (remoteAvailable ? "ok" : "err")
     }

@@ -1,7 +1,7 @@
 <div id="app-toolbar" class="app-toolbar" data-controller="topbar">
   <div class="toolbar-section toolbar-section-left">
     <% if (it.mobileCss) { %>
-      <button class="btn-toggle-sidebar toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleSidebar] %>" title="Toggle Sidebar"><%~ it.icons.menuScale %></button>
+      <button class="btn btn-icon btn-toggle-sidebar toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleSidebar] %>" title="Toggle Sidebar"><%~ it.icons.menuScale %></button>
       <span class="toolbar-sep toolbar-mobile-only"></span>
     <% } %>
     <div class="toolbar-relative" data-menu-name="file" data-menu-mnemonic="f"></div>
@@ -10,7 +10,7 @@
   <span class="toolbar-sep"></span>
   <div class="toolbar-section toolbar-section-center">
     <span class="toolbar-heading-wrap">
-      <button class="toolbar-heading-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleHeadingDropdown] %>" title="Heading">
+      <button class="btn btn-icon toolbar-heading-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleHeadingDropdown] %>" title="Heading">
         <span class="heading-label">H</span>
       </button>
       <div class="toolbar-heading-dropdown">
@@ -19,24 +19,24 @@
         <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecHeading] %>" data-level="3" data-h="3">H3</button>
       </div>
     </span>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Bold %>" title="Bold (Ctrl+B)"><%~ it.icons.bold %></button>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Italic %>" title="Italic (Ctrl+I)"><%~ it.icons.italic %></button>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Strike %>" title="Strikethrough"><%~ it.icons.strikethrough %></button>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Code %>" title="Inline Code"><%~ it.icons.code %></button>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Hr %>" title="Insert Horizontal Rule"><%~ it.icons.minus %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Bold %>" title="Bold (Ctrl+B)"><%~ it.icons.bold %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Italic %>" title="Italic (Ctrl+I)"><%~ it.icons.italic %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Strike %>" title="Strikethrough"><%~ it.icons.strikethrough %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Code %>" title="Inline Code"><%~ it.icons.code %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Hr %>" title="Insert Horizontal Rule"><%~ it.icons.minus %></button>
     <span class="toolbar-sep"></span>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Link %>" title="Insert Link"><%~ it.icons.link %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Link %>" title="Insert Link"><%~ it.icons.link %></button>
     <span class="toolbar-sep"></span>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.SourceMode] %>" title="Source Mode"><%~ it.icons.codeBrackets %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.SourceMode] %>" title="Source Mode"><%~ it.icons.codeBrackets %></button>
     <% if (it.mobileCss) { %>
       <span class="toolbar-sep toolbar-mobile-only"></span>
-      <button class="toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleMetaPanel] %>" title="Meta Panel"><%~ it.icons.viewColumns2 %></button>
+      <button class="btn btn-icon toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleMetaPanel] %>" title="Meta Panel"><%~ it.icons.viewColumns2 %></button>
     <% } %>
   </div>
   <div class="toolbar-spacer"></div>
   <div class="toolbar-section toolbar-section-right">
     <div class="dirty-counter" role="button" tabindex="0" data-topbar-target="dirtyCounter" data-action="click->topbar#dirtyClicked"></div>
-    <button class="flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" disabled><%~ it.icons.sort %></button>
-    <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.OpenPrefs] %>" title="Preferences"><%~ it.icons.settings %></button>
+    <button class="btn btn-accent flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" disabled><%~ it.icons.sort %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.OpenPrefs] %>" title="Preferences"><%~ it.icons.settings %></button>
   </div>
 </div>

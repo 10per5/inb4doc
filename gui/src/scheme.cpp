@@ -306,6 +306,10 @@ saucer::scheme::response handle_app_request(
             return {.data = saucer::stash::from_str("Invalid path"),
                     .mime = "text/plain", .status = 403};
 
+        if (src == dst)
+            return {.data = saucer::stash::from_str("ok"),
+                    .mime = "text/plain", .status = 200};
+
         if (!fs::exists(src))
             return {.data = saucer::stash::from_str("Source not found"),
                     .mime = "text/plain", .status = 404};

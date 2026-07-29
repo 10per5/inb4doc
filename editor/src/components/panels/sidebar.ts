@@ -39,6 +39,7 @@ export interface PendingSets {
   pendingRenameToMap: Map<string, string>;
   pendingCreateSet: Set<string>;
   pendingMoveToSet: Set<string>;
+  pendingMoveFromSet: Set<string>;
   dirtySet: Set<string>;
 }
 
@@ -84,6 +85,11 @@ export function buildPendingSets(
         ?.filter((o) => o.type === PendingOpType.Move || o.type === PendingOpType.Rename)
         .map((o) => o.to) ?? [],
     ),
+    pendingMoveFromSet: new Set(
+      pendingOps
+        ?.filter((o) => o.type === PendingOpType.Move)
+        .map((o) => o.from) ?? [],
+    ),
     dirtySet: new Set(dirtyPaths ?? []),
   };
 }
@@ -98,6 +104,27 @@ export function isPendingDelete(pagePath: string, ps: PendingSets): boolean {
   return false;
 }
 
+export function isDirPendingCreate(dirPath: string, ps: PendingSets): boolean {
+  const indexPath = `${dirPath}/${HOME_PATH.replace(/\.md$/, "")}`;
+  return ps.pendingCreateSet.has(indexPath);
+}
+
+export function isDirPendingMove(dirPath: string, ps: PendingSets): boolean {
+  const indexPath = `${dirPath}/${HOME_PATH.replace(/\.md$/, "")}`;
+  return ps.pendingMoveToSet.has(indexPath);
+}
+
+export function isFileConvertToDir(pagePath: string, ps: PendingSets, ops?: readonly PendingOp[]): boolean {
+  if (!ps.pendingMoveFromSet.has(pagePath)) return false;
+  if (!ops) return false;
+  const moveOp = ops.find(
+    (o): o is Extract<PendingOp, { type: PendingOpType.Move }> => o.type === PendingOpType.Move && o.from === pagePath,
+  );
+  if (!moveOp) return false;
+  const toBase = moveOp.to.replace(/\.md$/, "");
+  return toBase.endsWith(`/${HOME_PATH}`) || toBase === HOME_PATH;
+}
+
 export function pendingClass(name: string, prefix: string, ps: PendingSets): string {
   const parts = prefix ? `${prefix}/${name}` : name;
   const pagePath = parts.replace(/\.md$/, "");
@@ -106,6 +133,7 @@ export function pendingClass(name: string, prefix: string, ps: PendingSets): str
   if (ps.pendingRenameFromSet.has(pagePath)) classes.push("pending-rename");
   if (ps.pendingCreateSet.has(pagePath)) classes.push("pending-create");
   if (ps.pendingMoveToSet.has(pagePath)) classes.push("pending-move");
+  if (ps.pendingMoveFromSet.has(pagePath)) classes.push("pending-move");
   if (ps.dirtySet.has(pagePath)) classes.push("pending-unsaved");
   return classes.length > 0 ? " " + classes.join(" ") : "";
 }
@@ -119,8 +147,23 @@ export function pendingLabelSuffix(
   const parts = prefix ? `${prefix}/${name}` : name;
   const pagePath = parts.replace(/\.md$/, "");
   const result: string[] = [];
+
   if (ps.pendingDeleteSet.has(pagePath)) {
     result.push(`<span class="pending-badge pending-badge-delete">delete</span>`);
+  }
+  if (ps.pendingMoveFromSet.has(pagePath)) {
+    if (isFileConvertToDir(pagePath, ps, pendingOps)) {
+      result.push(`<span class="pending-badge pending-badge-move">→ DIRECTORY</span>`);
+    } else {
+      const moveOp = pendingOps?.find(
+        (o): o is Extract<PendingOp, { type: PendingOpType.Move }> => o.type === PendingOpType.Move && o.from === pagePath,
+      );
+      if (moveOp) {
+        result.push(
+          `<span class="pending-badge pending-badge-move">→ ${moveOp.to.split("/").pop()}</span>`,
+        );
+      }
+    }
   }
   if (ps.pendingRenameFromSet.has(pagePath)) {
     const to = ps.pendingRenameToMap.get(pagePath);
@@ -153,6 +196,8 @@ function isFolderEmpty(tree: TreeIndex, dirPath: string): boolean {
   const children = tree.children.get(dirPath) ?? []
   const hasFiles = children.some(c => !c.isDir && !isHomePageFilename(c.name))
   if (hasFiles) return false
+  const hasIndex = children.some(c => isHomePageFilename(c.name))
+  if (hasIndex) return false
   const dirs = children.filter(c => c.isDir)
   return dirs.every(dir => isFolderEmpty(tree, dir.path))
 }
@@ -166,14 +211,14 @@ export function renderItems(
   const children = tree.children.get(prefix) ?? []
   const lineColor = LINE_COLORS[depth % LINE_COLORS.length]
 
-  // Build display list: merge tree children with rawTree pending deletes
+  // Build display list: merge tree children with rawTree pending deletes and pending moves
   const displayChildren = [...children]
   if (ctx.rawTree && prefix !== undefined) {
     const rawChildren = ctx.rawTree.children.get(prefix) ?? []
     for (const rawChild of rawChildren) {
       if (isHomePageFilename(rawChild.name)) continue
       const pagePath = rawChild.path
-      if (ctx.pendingSets.pendingDeleteSet.has(pagePath)) {
+      if (ctx.pendingSets.pendingDeleteSet.has(pagePath) || ctx.pendingSets.pendingMoveFromSet.has(pagePath)) {
         if (!displayChildren.some(c => c.path === pagePath)) {
           displayChildren.push(rawChild)
         }
@@ -253,11 +298,29 @@ export function renderItems(
       ? `<span class="sidebar-icon sidebar-icon-folder-empty" style="opacity:0.6">${collapsed ? folderMinus : folderMinusOpen}</span>`
       : `<span class="sidebar-icon sidebar-icon-folder">${collapsed ? folder : folderOpen}</span>`
     const dirPendingDelete = isPendingDelete(dirPath, ctx.pendingSets)
+    const dirPendingCreate = isDirPendingCreate(dirPath, ctx.pendingSets)
+    const dirPendingMove = isDirPendingMove(dirPath, ctx.pendingSets)
+    const dirBadges: string[] = []
+    if (dirPendingDelete) {
+      dirBadges.push('<span class="pending-badge pending-badge-delete">delete</span>')
+    }
+    if (dirPendingMove) {
+      const fromOp = ctx.pendingOps?.find(
+        (o) => (o.type === PendingOpType.Move || o.type === PendingOpType.Rename) && o.to === `${dirPath}/${HOME_PATH.replace(/\.md$/, "")}`,
+      )
+      if (fromOp && "from" in fromOp) {
+        dirBadges.push(
+          `<span class="pending-badge pending-badge-move">from ${fromOp.from.split("/").pop()}</span>`,
+        )
+      }
+    } else if (dirPendingCreate) {
+      dirBadges.push('<span class="pending-badge pending-badge-create">new</span>')
+    }
     return `
       <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${dirPath}">
         <span class="nav-section-title depth-${depth}">
           <a href="${buildEditorUrl(ctx.basePath, indexPagePath)}" class="${dirLinkClasses}" data-nav-path="${indexPagePath}" data-action="click->sidebar#onNavigate">
-            ${dirIcon}${label}${dirPendingDelete ? '<span class="pending-badge pending-badge-delete">delete</span>' : ''}
+            ${dirIcon}${label}${dirBadges.join("")}
           </a>
           <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
             ${navArrowDown}

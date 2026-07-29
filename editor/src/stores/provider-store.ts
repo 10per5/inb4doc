@@ -10,6 +10,15 @@ import { hasFunc, AppFunc } from "$/build/build-mode";
 const LAST_PROVIDER_KEY = "inb4doc-last-provider";
 
 let globalProvider: ContentProvider | null = null;
+let _providerReady: Promise<void> | null = null;
+
+export function setProviderReady(p: Promise<void>): void {
+  _providerReady = p;
+}
+
+export function waitProviderReady(): Promise<void> {
+  return _providerReady ?? Promise.resolve();
+}
 
 export function setProvider(provider: ContentProvider) {
   globalProvider = provider;

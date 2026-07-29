@@ -125,22 +125,28 @@ export function buildTreeIndex(data: {
 export function addPathToTree(tree: TreeIndex, path: string): void {
   if (tree.paths.has(path)) return
   tree.paths.add(path)
-  rebuildChildrenForPrefix(tree, getParentPrefix(path))
 
-  // Ensure ancestor directories have children entries
+  // Rebuild all ancestor directories including root — a prior removePathFromTree
+  // may have rebuilt them with stale data (before this path was added to tree.paths).
   const parts = path.split("/")
-  for (let i = 1; i < parts.length; i++) {
+  for (let i = 0; i < parts.length; i++) {
     const prefix = parts.slice(0, i).join("/")
-    if (!tree.children.has(prefix)) {
-      rebuildChildrenForPrefix(tree, prefix)
-    }
+    rebuildChildrenForPrefix(tree, prefix)
   }
 }
 
 export function removePathFromTree(tree: TreeIndex, path: string): void {
   if (!tree.paths.has(path)) return
   tree.paths.delete(path)
-  rebuildChildrenForPrefix(tree, getParentPrefix(path))
+
+  // Rebuild all ancestor directories including root — removing a nested path
+  // may eliminate an intermediate directory entry (e.g. deleting the last file
+  // in a directory should remove that directory from its parent's children).
+  const parts = path.split("/")
+  for (let i = 0; i < parts.length; i++) {
+    const prefix = parts.slice(0, i).join("/")
+    rebuildChildrenForPrefix(tree, prefix)
+  }
 }
 
 /**

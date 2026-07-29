@@ -1,7 +1,4 @@
-import type { EditorController } from "@/controllers/editor-controller"
-import { scrollToText } from "@/features/search/scroll-to-text"
-
-let editorController: EditorController | null = null
+import { appEvents, AppEvent } from "@/stores/app-events"
 
 let bar: HTMLDivElement | null = null
 let input: HTMLInputElement | null = null
@@ -13,12 +10,6 @@ let totalMatches = 0
 
 // source-mode positions cached from an indexOf sweep over textarea.value
 let srcPositions: { start: number; end: number }[] = []
-
-// ── registered by AppOrchestrator at startup ──
-
-export function setEditorService(es: EditorController): void {
-  editorController = es
-}
 
 // ── public API exposed on inb4docUI ──
 
@@ -119,6 +110,11 @@ function updateCounter(): void {
   matchLabel.style.color = "#888"
 }
 
+function isSourceMode(): boolean {
+  const sourceEl = document.querySelector<HTMLElement>("#source-editor")
+  return sourceEl ? getComputedStyle(sourceEl).display !== "none" : false
+}
+
 function search(q: string): void {
   const trimmed = q.trim()
   if (!trimmed) {
@@ -132,7 +128,7 @@ function search(q: string): void {
   currentQuery = trimmed
   currentIdx = -1
 
-  if (editorController?.isSourceMode()) {
+  if (isSourceMode()) {
     searchSource(trimmed)
   } else {
     searchProseMirror(trimmed)
@@ -197,10 +193,10 @@ function prevMatch(): void {
 function applyMatch(idx: number): void {
   if (!currentQuery) return
 
-  if (editorController?.isSourceMode()) {
+  if (isSourceMode()) {
     showSourceMatch(idx)
   } else {
-    editorController && scrollToText(editorController.getEditor()!, currentQuery, idx)
+    appEvents.emit(AppEvent.ScrollToText, { query: currentQuery, matchIndex: idx })
   }
   // scrollToText focuses ProseMirror — restore focus to find input
   setTimeout(() => input?.focus(), 0)

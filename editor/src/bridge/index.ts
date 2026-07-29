@@ -10,8 +10,6 @@
 import { showToast } from "@/components/notification/toast"
 import { openFind, findNext, findPrev } from "./find"
 
-export { setEditorService } from "./find"
-
 function pipeConsole(): void {
   const methods = ["log", "warn", "error", "debug"] as const
   const orig: Record<string, (...args: unknown[]) => void> = {}

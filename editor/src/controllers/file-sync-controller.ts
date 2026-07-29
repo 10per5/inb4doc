@@ -91,9 +91,9 @@ export class FileSyncController {
     }
   }
 
-  queueMove(from: string, to: string): void {
-    const content = repo.getOrCreate(from).reconstructContent() ?? undefined;
-    this.pendingOps.queueMove(from, to, content);
+  queueMove(from: string, to: string, content?: string): void {
+    const finalContent = content ?? repo.getOrCreate(from).reconstructContent() ?? undefined;
+    this.pendingOps.queueMove(from, to, finalContent);
 
     const fromPage = repo.getOrCreate(from);
     repo.clearPath(to);
@@ -146,14 +146,6 @@ export class FileSyncController {
     if (this.pendingOps.hasPendingDelete(path)) return false;
     if (this.pendingOps.hasPendingCreate(path)) return true;
     if (this.pendingOps.hasPendingMoveTo(path)) return true;
-
-    const existing = repo.get(path)
-    if (
-      existing?.bodyState.body !== undefined ||
-      existing?.frontmatter !== undefined
-    ) {
-      return true;
-    }
 
     try {
       const tree = treeStore.getTree();
@@ -274,7 +266,14 @@ export class FileSyncController {
     const deletedPaths: string[] = [];
     const renamedPaths = new Map<string, string>();
 
-    for (const op of this.pendingOps.all) {
+    // Sort ops: Creates first (ensure target dirs exist), then Moves/Renames, then Deletes.
+    // This prevents a Delete from removing a directory before a Create writes into it.
+    const sorted = [...this.pendingOps.all].sort((a, b) => {
+      const order: Record<string, number> = { create: 0, move: 1, rename: 1, delete: 2 };
+      return (order[a.type] ?? 1) - (order[b.type] ?? 1);
+    });
+
+    for (const op of sorted) {
       try {
         switch (op.type) {
           case PendingOpType.Create:

@@ -7,10 +7,12 @@
  */
 
 import { Controller } from "@hotwired/stimulus"
-import { Editor, editorViewCtx, serializerCtx } from "@milkdown/kit/core";
-import { EditorState } from "@milkdown/kit/prose/state";
-import { parserCtx } from "@milkdown/core";
-import { createEditor, type EditorHost } from "@/config/editor-config";
+import type { Editor } from "@milkdown/kit/core";
+import type { EditorHost } from "@/config/editor-config";
+import { editorContext, getMarkdown, getView } from "@/services/editor-context";
+import { initToolbarHandler } from "@/features/toolbar-handler";
+import { initLinkHandler } from "@/features/link-handler";
+import { appEvents, AppEvent } from "@/stores/app-events";
 import { pageRepository } from "@/repositories/pageRepository";
 import { toggleSourceMode, applySourceContent } from "@/features/editor-source";
 import { getProvider } from "@/stores/provider-store";
@@ -23,9 +25,8 @@ import {
   executeConflictDecision,
   applyNoConflict,
 } from "@/services/conflict-resolver";
-import { scrollToText } from "@/features/search/scroll-to-text";
+import { findTextMatch, flashHighlight, centerOnRect } from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
-import { appEvents, AppEvent } from "@/stores/app-events";
 
 export class EditorController extends Controller {
   static targets = ["milkdown", "source"]
@@ -40,6 +41,7 @@ export class EditorController extends Controller {
   private mentionView: MentionView | null = null;
   private currentPath: string = "";
   private sourceMode: boolean = false;
+  private unsubs: (() => void)[] = [];
 
   // ── Accessors ──
 
@@ -68,10 +70,8 @@ export class EditorController extends Controller {
   setCurrentPath(path: string): void {
     const prev = this.currentPath;
     if (prev && prev !== path && this.editor) {
-      this.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        this.editorStates.set(prev, view.state);
-      });
+      const view = getView(this.editor);
+      this.editorStates.set(prev, view.state);
     }
     this.currentPath = path;
     if (this.host) this.host.currentPath = path;
@@ -80,6 +80,20 @@ export class EditorController extends Controller {
     getProvider()
       .listImages?.(dir, false)
       .catch(() => {});
+  }
+
+  // ── Skeleton ──
+
+  showSkeleton(): void {
+    const el = document.getElementById("editor-skeleton");
+    el?.classList.remove("is-hidden");
+    this.milkdownTarget.style.visibility = "hidden";
+  }
+
+  hideSkeleton(): void {
+    const el = document.getElementById("editor-skeleton");
+    el?.classList.add("is-hidden");
+    this.milkdownTarget.style.visibility = "";
   }
 
   // ── Editor lifecycle ──
@@ -108,6 +122,8 @@ export class EditorController extends Controller {
     };
     this.host = host;
     this.lastSetContent.set(this.currentPath, "");
+    await editorContext.load();
+    const { createEditor } = await import("@/config/editor-config");
     this.editor = await createEditor(editorEl, content, host);
   }
 
@@ -174,10 +190,11 @@ export class EditorController extends Controller {
     if (!this.editor) return this.sourceMode;
 
     this.sourceMode = toggleSourceMode(
-      this.editor,
       this.sourceTarget,
       this.milkdownTarget,
       this.sourceMode,
+      () => getMarkdown(this.editor!),
+      (content) => this.setEditorContent(content),
     );
     return this.sourceMode;
   }
@@ -189,14 +206,9 @@ export class EditorController extends Controller {
     if (!textarea) return;
 
     this.lastSetContent.set(this.currentPath, "");
-    applySourceContent(this.editor, textarea);
+    applySourceContent(textarea, (content) => this.setEditorContent(content));
 
-    const md = this.editor.action((ctx) => {
-      const serializer = ctx.get(serializerCtx);
-      return serializer(ctx.get(editorViewCtx).state.doc)
-        .replace(/\r\n/g, "\n")
-        .replace(/\n+$/, "\n");
-    });
+    const md = getMarkdown(this.editor);
 
     pageRepository.getOrCreate(this.currentPath).setBody(md);
     dirtyTrackingService.recompute();
@@ -212,8 +224,8 @@ export class EditorController extends Controller {
   getCurrentContent(): string {
     if (!this.editor) return "";
     return this.editor.action((ctx) => {
-      const serializer = ctx.get(serializerCtx);
-      return serializer(ctx.get(editorViewCtx).state.doc)
+      const serializer = ctx.get(editorContext.serializerCtx);
+      return serializer(ctx.get(editorContext.editorViewCtx).state.doc)
         .replace(/\r\n/g, "\n")
         .replace(/\n+$/, "\n");
     });
@@ -221,12 +233,44 @@ export class EditorController extends Controller {
 
   scrollToText(query: string, matchIndex?: number, snippetText?: string): void {
     if (!this.editor) return;
-    scrollToText(this.editor, query, matchIndex, snippetText);
+    const match = findTextMatch(query, matchIndex, snippetText);
+    if (!match) return;
+
+    const proseMirror = document.querySelector(".ProseMirror");
+    if (proseMirror) (proseMirror as HTMLElement).focus();
+
+    requestAnimationFrame(() => {
+      this.editor!.action((ctx) => {
+        const view = ctx.get(editorContext.editorViewCtx);
+        const pos = view.posAtDOM(match.node, match.offset);
+        if (pos == null) return;
+        const tr = view.state.tr.setSelection(
+          editorContext.TextSelection.create(view.state.doc, pos, pos + match.length),
+        );
+        view.dispatch(tr);
+      });
+      if (match.rect) {
+        centerOnRect(match.rect);
+        flashHighlight(match.rect);
+      }
+    });
   }
 
-  // ── Cleanup ──
+  // ── Lifecycle ──
+
+  connect() {
+    this.unsubs.push(
+      initToolbarHandler(() => this.editor),
+      initLinkHandler(() => this.editor),
+      appEvents.on(AppEvent.ScrollToText, ({ query, matchIndex, snippetText }) => {
+        this.scrollToText(query, matchIndex, snippetText);
+      }),
+    );
+  }
 
   disconnect() {
+    this.unsubs.forEach((u) => u());
+    this.unsubs = [];
     this.destroy()
   }
 
@@ -249,16 +293,16 @@ export class EditorController extends Controller {
       const persistedBody = page?.bodyState.body ?? page?.bodyState.baseline ?? "";
       this.lastSetContent.set(this.currentPath, persistedBody);
       this.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
+        const view = ctx.get(editorContext.editorViewCtx);
         view.updateState(cached);
       });
     } else {
       this.lastSetContent.set(this.currentPath, "");
       this.editor.action((ctx) => {
-        const parser = ctx.get(parserCtx);
-        const view = ctx.get(editorViewCtx);
+        const parser = ctx.get(editorContext.parserCtx);
+        const view = ctx.get(editorContext.editorViewCtx);
         const doc = parser(content);
-        const newState = EditorState.create({
+        const newState = editorContext.EditorState.create({
           schema: view.state.schema,
           doc,
           plugins: view.state.plugins,
@@ -268,6 +312,22 @@ export class EditorController extends Controller {
       });
     }
   }
+
+  private setEditorContent(content: string): void {
+    if (!this.editor) return;
+    this.editor.action((ctx) => {
+      const parser = ctx.get(editorContext.parserCtx);
+      const view = ctx.get(editorContext.editorViewCtx);
+      const doc = parser(content);
+      const newState = editorContext.EditorState.create({
+        schema: view.state.schema,
+        doc,
+        plugins: view.state.plugins,
+      });
+      view.updateState(newState);
+    });
+  }
 }
 
 export default EditorController
+

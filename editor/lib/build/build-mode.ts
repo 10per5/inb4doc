@@ -9,13 +9,13 @@ export enum AppFunc {
   AllowProbe = 1 << 0,
   DefaultToRemote = 1 << 1,
   MobileCss = 1 << 2,
-  SidebarGestures = 1 << 4,
-  MetaPanelCompact = 1 << 5,
-  DevOverlay = 1 << 6,
-  LivePreview = 1 << 7,
-  StaticSiteGeneration = 1 << 8,
-  MountProvider = 1 << 9,
-  ToolbarQuickNav = 1 << 10,
+  SidebarGestures = 1 << 3,
+  MetaPanelCompact = 1 << 4,
+  DevOverlay = 1 << 5,
+  LivePreview = 1 << 6,
+  StaticSiteGeneration = 1 << 7,
+  MountProvider = 1 << 8,
+  ToolbarQuickNav = 1 << 9,
 }
 
 export const BUILD_MODE_NAMES: Record<BuildMode, string> = {

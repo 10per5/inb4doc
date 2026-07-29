@@ -17,7 +17,7 @@ import { FileSyncController } from "@/controllers/file-sync-controller";
 import { ViewController } from "@/controllers/view-controller";
 import { NavigationController } from "@/controllers/navigation-controller";
 import type SidebarController from "@/controllers/sidebar-controller";
-import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
+import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { NEW_PAGE_BODY } from "@/utils/constants"
 import { pageRepository } from "@/repositories/pageRepository";
@@ -31,7 +31,6 @@ import { loadPrefs } from "@/utils/storage";
 import { getCurrentPath, replacePath } from "@/utils/url";
 import { imageRepository } from "@/repositories/imageRepository";
 import * as hotkeys from "@/utils/hotkeys";
-import { setEditorService } from "@/bridge/index";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { flushSave } from "@/stores/persistence";
@@ -78,17 +77,7 @@ export default class extends Controller {
     this.appInitialized = true
 
     this.editor = outlet
-    this.wireTopbar()
     this.initializeApp()
-  }
-
-  private wireTopbar() {
-    const el = this.element.querySelector(".app-toolbar")
-    if (!el) return
-    const topbar = this.application.getControllerForElementAndIdentifier(el, "topbar") as
-      | unknown as { setEditorGetter: (getter: () => Editor | null) => void }
-      | undefined
-    topbar?.setEditorGetter(() => this.editor.getEditor())
   }
 
   private async initializeApp() {
@@ -105,8 +94,6 @@ export default class extends Controller {
 
     dirtyTrackingService.setPathResolver(() => this.nav.getCurrentPath())
     dirtyTrackingService.start()
-
-    setEditorService(this.editor as any)
 
     this.unsubs.push(
       appEvents.on(AppEvent.FlushComplete, () => this.nav.loadSidebar()),
@@ -160,12 +147,29 @@ export default class extends Controller {
       }),
     )
 
-    try { await imageRepository.restoreFromStorage() } catch {}
+    try { imageRepository.restoreFromStorage() } catch {}
 
     this.toolbarStore = new ToolbarStore({ stickyToolbar: loadPrefs().stickyToolbar })
     this.toolbarStore.initialize()
 
     this.view.initialize()
+
+    const metaPanel = mountMetaPanel(this.metaPanelTarget)
+    this.nav.setMetaPanel(metaPanel)
+
+    this.onBeforeUnload = () => { dirtyTrackingService.flush(); flushSave() }
+    window.addEventListener("beforeunload", this.onBeforeUnload)
+
+    hotkeys.register("ctrl+s", () => appEvents.emit(AppEvent.SaveCurrentFile))
+    hotkeys.attach()
+
+    hideLoadingOverlay()
+
+    this.loadBackground()
+  }
+
+  private async loadBackground() {
+    await waitProviderReady()
 
     const { path: startPath, isNew } = await this.resolveInitialPath()
     this.initialPath = startPath
@@ -186,21 +190,11 @@ export default class extends Controller {
       label: providerInfo.label,
     })
 
-    const metaPanel = mountMetaPanel(this.metaPanelTarget)
-    this.nav.setMetaPanel(metaPanel)
-
     await this.cache.afterRestore()
     await this.editor.loadContent(startPath, (data) => this.nav.getMetaPanel()?.update(data))
     await this.nav.loadSidebar()
+    this.editor.hideSkeleton()
     dirtyTrackingService.recompute()
-
-    this.onBeforeUnload = () => { dirtyTrackingService.flush(); flushSave() }
-    window.addEventListener("beforeunload", this.onBeforeUnload)
-
-    hotkeys.register("ctrl+s", () => appEvents.emit(AppEvent.SaveCurrentFile))
-    hotkeys.attach()
-
-    hideLoadingOverlay()
   }
 
   disconnect() {

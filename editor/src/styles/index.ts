@@ -3,6 +3,7 @@ import "@milkdown/theme-nord/style.css"
 /* ── Foundation ────────────────────────────────────────────────── */
 import "./loading-overlay.css"
 import "./foundation/base.css"
+import "./app/buttons.css"
 
 /* ── Layout ─────────────────────────────────────────────────────── */
 import "./layout/layout.css"
@@ -12,6 +13,7 @@ import "./layout/responsive.css"
 import "./editor/editor.css"
 import "./editor/math.css"
 import "./editor/milkdown.css"
+import "./editor/skeleton.css"
 
 /* ── Panels ─────────────────────────────────────────────────────── */
 import "./panels/panels.css"

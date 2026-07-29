@@ -9,6 +9,7 @@
 import type { ViewType } from "@/controllers/view-controller"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
 import type { ProviderType } from "@/providers/index"
+import type { ToolbarCommand } from "@/config/enums"
 
 // ── Event names ──
 
@@ -50,6 +51,9 @@ export enum AppEvent {
 
   // Editor
   SourceModeToggled = "source-mode-toggled",
+  ToolbarCommandExec = "toolbar-command-exec",
+  ScrollToText = "scroll-to-text",
+  LinkDialogRequested = "link-dialog-requested",
 }
 
 // ── Strict payload map ──
@@ -86,6 +90,9 @@ export interface AppEventPayloads {
   [AppEvent.MetaDataChanged]:       { data: MetaPanelData }
 
   [AppEvent.SourceModeToggled]:     void
+  [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
+  [AppEvent.ScrollToText]:          { query: string; matchIndex: number; snippetText?: string }
+  [AppEvent.LinkDialogRequested]:   void
 }
 
 // ── EventBus ──

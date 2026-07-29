@@ -41,7 +41,7 @@
                         data-action="input->provider-dialog#scheduleProbe">
                     </div>
                   </div>
-                  <div class="remote-status <%= it.initialStatusClass %>"><%= it.initialStatusText %></div>
+                  <div class="remote-status <%= it.initialStatusClass %>"><%~ it.initialStatusText %></div>
                 </div>
               <% } %>
             </div>

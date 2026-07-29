@@ -83,6 +83,7 @@ export class NavigationController {
       appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
+      this.editor.showSkeleton();
 
       if (pushHistory) {
         pushPath(path);
@@ -125,13 +126,14 @@ export class NavigationController {
       }
 
       await this.editor.ensureEditor(content);
+      this.editor.hideSkeleton();
       if (searchQuery) {
         requestAnimationFrame(() => {
           this.editor.scrollToText(searchQuery, matchIndex, snippetText);
         });
       }
 
-      await this.loadSidebar();
+      this.sidebarController.setActive(path);
       dirtyTrackingService.recompute();
       addRecent(path);
     } finally {
