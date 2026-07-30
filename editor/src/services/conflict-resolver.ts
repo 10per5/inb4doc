@@ -1,17 +1,10 @@
-/**
- * ConflictResolver — handles external-change detection and resolution.
- *
- * Extracted from EditorController.fetchContent. Owns the entire flow:
- * detect conflict → execute decision → show dialog if needed.
- * Uses event bus for dialog callbacks so it has no UI dependencies.
- */
-
 import type { Page } from "@/entities/Page"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
 import { serializeFrontmatter } from "@/utils/frontmatter"
-import { pageRepository } from "@/repositories/pageRepository"
+import { pagesStore } from "@/stores/page-store"
 import { openExternalChangeDialog } from "@/components/dialogs/external-change-dialog"
 import { Frontmatter } from "@/entities/Frontmatter"
+import type { PendingOps } from "@/entities/PendingOps"
 
 export type ConflictDecision =
   | { action: "accept-disk"; body: string; fm: MetaPanelData | null; time: number }
@@ -25,14 +18,12 @@ export type ConflictDecision =
       diskTime: number
     }
 
-/**
- * Determine whether a conflict exists between the cached page and the disk version.
- */
 export function resolveConflict(
   page: Page | undefined,
   diskBody: string,
   diskFm: MetaPanelData | null,
   serverTime: number | null,
+  pendingOps?: PendingOps,
 ): ConflictDecision | null {
   if (!page) return null
 
@@ -40,7 +31,9 @@ export function resolveConflict(
   if (baseline === undefined) return null
   if (baseline === diskBody) return null
 
-  if (page.meta.dirty) {
+  const hasDirty = pendingOps?.hasPendingEdit(page.path) ?? false
+
+  if (hasDirty) {
     const localBody = page.bodyState.body ?? diskBody
     const localFm = page.getFrontmatter()
     return {
@@ -62,28 +55,24 @@ export function resolveConflict(
   }
 }
 
-/** Callback interface for the host to apply conflict results. */
 export interface ConflictHost {
   currentPath: string
   ensureEditor(content: string): Promise<void>
   onMetaUpdate?: (data: MetaPanelData) => void
 }
 
-/**
- * Execute a conflict decision.
- * For "accept-disk", applies immediately.
- * For "show-dialog", mounts the dialog and applies when the user decides.
- */
 export function executeConflictDecision(
   decision: ConflictDecision,
   path: string,
   diskRaw: string,
   serverTime: number | null,
   host: ConflictHost,
+  pendingOps?: PendingOps,
 ): void {
   if (decision.action === "accept-disk") {
-    pageRepository.clearPath(path)
-    const fresh = pageRepository.getOrCreate(path)
+    pagesStore.clearPath(path)
+    pendingOps?.cancelEdit(path)
+    const fresh = pagesStore.getOrCreate(path)
     fresh.setBaseline(decision.body)
     fresh.setServerTime(decision.time)
     fresh.originalFrontmatter = decision.fm ? Frontmatter.fromMeta(decision.fm) : undefined
@@ -91,15 +80,15 @@ export function executeConflictDecision(
     return
   }
 
-  // show-dialog
   const localFull = decision.localFm
     ? `---\n${serializeFrontmatter(decision.localFm)}\n---\n\n${decision.localBody}`
     : decision.localBody
 
   openExternalChangeDialog(path, localFull, diskRaw).then((action) => {
     if (host.currentPath !== path) return
-    pageRepository.clearPath(path)
-    const p = pageRepository.getOrCreate(path)
+    pagesStore.clearPath(path)
+    pendingOps?.cancelEdit(path)
+    const p = pagesStore.getOrCreate(path)
     p.setBaseline(decision.diskBody)
     p.setServerTime(decision.diskTime)
     p.originalFrontmatter = decision.diskFm ? Frontmatter.fromMeta(decision.diskFm) : undefined
@@ -120,50 +109,50 @@ export function executeConflictDecision(
     }
   })
 
-  pageRepository.get(path)?.setServerTime(serverTime ?? Date.now())
+  pagesStore.get(path)?.setServerTime(serverTime ?? Date.now())
 }
 
-/**
- * Handle the no-conflict path: update baselines and frontmatter.
- */
 export function applyNoConflict(
   path: string,
   body: string,
   frontmatter: MetaPanelData | null,
   serverTime: number | null,
   onMetaUpdate?: (data: MetaPanelData) => void,
+  pendingOps?: PendingOps,
 ): string {
-  const page = pageRepository.get(path)
+  const page = pagesStore.get(path)
   const cachedTime = page?.getServerTime() || 0
 
-  // Refresh the baseline from the current committed content. We deliberately do
-  // not clearPath here: setBaseline re-applies any in-progress patch, so an
-  // unflushed edit survives a reload instead of being silently discarded. This
-  // makes all providers behave consistently (localStorage now returns a real
-  // timestamp too) and fixes the asymmetry where only browser-storage pages
-  // appeared "Discard (+0 B)" after a reload.
   if (serverTime && serverTime > cachedTime) {
-    pageRepository.getOrCreate(path).setBaseline(body)
-    pageRepository.getOrCreate(path).setServerTime(serverTime)
-  } else if (pageRepository.getOrCreate(path).bodyState.baseline === undefined) {
-    pageRepository.getOrCreate(path).setBaseline(body)
+    pagesStore.getOrCreate(path).setBaseline(body)
+    pagesStore.getOrCreate(path).setServerTime(serverTime)
+    pendingOps?.cancelEdit(path)
+  } else if (pagesStore.getOrCreate(path).bodyState.baseline === undefined) {
+    pagesStore.getOrCreate(path).setBaseline(body)
+  }
+
+  const editOp = pendingOps?.findEdit(path)
+  if (editOp && editOp.patch) {
+    const page = pagesStore.getOrCreate(path)
+    page.bodyState.body = editOp.patch
   }
 
   const diskFm = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined
 
   if (frontmatter) {
-    if (page?.meta.dirty && page.getFrontmatter()) {
+    const isDirty = pendingOps?.hasPendingEdit(path) ?? false
+    if (isDirty && page?.getFrontmatter()) {
       onMetaUpdate?.(page.getFrontmatter()!)
     } else {
-      pageRepository.getOrCreate(path).setFrontmatter(frontmatter)
+      pagesStore.getOrCreate(path).setFrontmatter(frontmatter)
       onMetaUpdate?.(frontmatter)
     }
   } else {
-    pageRepository.getOrCreate(path).removeFrontmatter()
+    pagesStore.getOrCreate(path).removeFrontmatter()
     onMetaUpdate?.({ title: "" })
   }
 
-  pageRepository.getOrCreate(path).originalFrontmatter = diskFm
+  pagesStore.getOrCreate(path).originalFrontmatter = diskFm
 
-  return pageRepository.get(path)?.bodyState.body ?? body
+  return pagesStore.get(path)?.bodyState.body ?? body
 }

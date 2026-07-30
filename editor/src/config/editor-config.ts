@@ -81,8 +81,9 @@ import { createMentionPlugin } from "@/plugins/mention";
 import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createImageEditPlugin } from "@/plugins/image-edit";
-import { imageRepository } from "@/repositories/imageRepository";
+import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
+import { imageStore } from "@/stores/image-store";
 import type { MentionView } from "@/features/mention";
 
 /** Callbacks the editor uses to talk back to the controller. */
@@ -165,17 +166,17 @@ export async function createEditor(
 
       ctx.update(imageBlockConfig.key, (prev) => ({
         ...prev,
-        onUpload: (file: File) => imageRepository.uploadImage(file),
+        onUpload: (file: File) => imageService.uploadImage(file),
         proxyDomURL: (url: string) => {
           if (!url) return url;
           if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
           if (url.startsWith("/uploads/")) return url;
           if (url.startsWith("inb4doc-image:")) {
             const name = url.slice("inb4doc-image:".length);
-            return localStorage.getItem("inb4doc:image:" + name) || url;
+            return imageStore.getImage(name) || url;
           }
           if (url.startsWith("pending-image:")) {
-            const blobUrl = imageRepository.getBlobUrl(url.slice("pending-image:".length));
+            const blobUrl = imageService.getBlobUrl(url.slice("pending-image:".length));
             if (blobUrl) return blobUrl;
           }
           const provider = getProvider();
@@ -201,7 +202,7 @@ export async function createEditor(
             getCurrentPath: () => host.currentPath,
           }),
           createMentionPlugin(ctx, (mv) => { host.onMentionView(mv) }),
-          createImagePastePlugin({ uploadImage: (file: File) => imageRepository.uploadImage(file) }),
+          createImagePastePlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createLinkBoundaryPlugin(),
           createImageEditPlugin(),
           createKeymap(),

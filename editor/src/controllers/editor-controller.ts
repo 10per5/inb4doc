@@ -13,13 +13,14 @@ import { editorContext, getMarkdown, getView } from "@/services/editor-context";
 import { initToolbarHandler } from "@/features/toolbar-handler";
 import { initLinkHandler } from "@/features/link-handler";
 import { appEvents, AppEvent } from "@/stores/app-events";
-import { pageRepository } from "@/repositories/pageRepository";
+import { pagesStore } from "@/stores/page-store";
+import { pendingOpsStore } from "@/stores/pending-ops-store";
+import { PendingOps, PendingOpType } from "@/entities/PendingOps";
 import { toggleSourceMode, applySourceContent } from "@/features/editor-source";
 import { getProvider } from "@/stores/provider-store";
 import { stripFrontmatter } from "@/utils/frontmatter";
-import { imageRepository } from "@/repositories/imageRepository";
+import { imageService } from "@/services/image-service";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
-import { scheduleSave } from "@/stores/persistence";
 import {
   resolveConflict,
   executeConflictDecision,
@@ -76,7 +77,7 @@ export class EditorController extends Controller {
     this.currentPath = path;
     if (this.host) this.host.currentPath = path;
     const dir = this.currentPathDir();
-    imageRepository.setCurrentDocDir(dir);
+    imageService.setCurrentDocDir(dir);
     getProvider()
       .listImages?.(dir, false)
       .catch(() => {});
@@ -137,20 +138,38 @@ export class EditorController extends Controller {
       const provider = getProvider();
       const raw = await provider?.readFile(path);
       if (raw === null) {
-        const cached = pageRepository.get(path);
-        const cachedBody = cached?.bodyState.body;
+        const cached = pagesStore.get(path);
+        const cachedBody = cached?.bodyState.body ?? cached?.bodyState.baseline;
         if (cachedBody !== undefined) {
           const fm = cached!.getFrontmatter();
           if (fm) onMetaUpdate?.(fm);
           return cachedBody;
+        }
+        const ops = pendingOpsStore.load();
+        const createOp = ops.find(
+          (o) => o.type === PendingOpType.Create && o.path === path,
+        ) as { content?: string } | undefined;
+        if (createOp?.content) {
+          const { frontmatter, body } = stripFrontmatter(createOp.content);
+          const page = pagesStore.getOrCreate(path);
+          if (frontmatter) {
+            const { Frontmatter } = await import("@/entities/Frontmatter");
+            page.frontmatter = Frontmatter.fromMeta(frontmatter);
+            onMetaUpdate?.(page.getFrontmatter());
+          }
+          page.bodyState.cacheBody(body);
+          page.setBaseline(body);
+          return body;
         }
         return null;
       }
 
       const { frontmatter, body } = stripFrontmatter(raw);
       const serverTime = await provider?.getServerTime(path);
-      const page = pageRepository.get(path);
-      const decision = resolveConflict(page, body, frontmatter, serverTime);
+      const page = pagesStore.get(path);
+      const savedOps = pendingOpsStore.load();
+      const localPendingOps = new PendingOps(savedOps);
+      const decision = resolveConflict(page, body, frontmatter, serverTime, localPendingOps);
 
       if (!decision) {
         return applyNoConflict(
@@ -159,6 +178,7 @@ export class EditorController extends Controller {
           frontmatter,
           serverTime,
           onMetaUpdate,
+          localPendingOps,
         );
       }
 
@@ -166,10 +186,15 @@ export class EditorController extends Controller {
         currentPath: this.currentPath,
         ensureEditor: (c) => this.ensureEditor(c),
         onMetaUpdate,
-      });
+      }, localPendingOps);
 
       this.editorStates.delete(path);
       if (frontmatter) onMetaUpdate?.(frontmatter);
+
+      const editOp = localPendingOps.findEdit(path);
+      if (editOp && editOp.patch) {
+        return editOp.patch;
+      }
       return body;
     } catch {
       return null;
@@ -210,9 +235,8 @@ export class EditorController extends Controller {
 
     const md = getMarkdown(this.editor);
 
-    pageRepository.getOrCreate(this.currentPath).setBody(md);
+    pagesStore.getOrCreate(this.currentPath).setBody(md);
     dirtyTrackingService.recompute();
-    scheduleSave();
     this.sourceMode = false;
 
     this.sourceTarget.style.display = "none";
@@ -289,7 +313,7 @@ export class EditorController extends Controller {
 
     const cached = this.editorStates.get(this.currentPath);
     if (cached) {
-      const page = pageRepository.get(this.currentPath);
+      const page = pagesStore.get(this.currentPath);
       const persistedBody = page?.bodyState.body ?? page?.bodyState.baseline ?? "";
       this.lastSetContent.set(this.currentPath, persistedBody);
       this.editor.action((ctx) => {

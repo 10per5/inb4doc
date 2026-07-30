@@ -2,7 +2,7 @@
  * ShellController — Stimulus composition root (merged from AppController).
  *
  * Finds child Stimulus controllers (editor, sidebar, topbar) via targets/outlets,
- * creates plain-class sub-controllers (NavigationController, FileSyncController,
+ * creates plain-class sub-services (NavigationService, FileSyncService,
  * ViewController), and wires event subscriptions.
  */
 
@@ -13,29 +13,30 @@ import { mountMetaPanel } from "@/components/panels/meta-panel";
 import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";
 import { EditorController } from "@/controllers/editor-controller";
-import { FileSyncController } from "@/controllers/file-sync-controller";
+import { FileSyncService } from "@/services/file-sync-service";
 import { ViewController } from "@/controllers/view-controller";
-import { NavigationController } from "@/controllers/navigation-controller";
+import { NavigationService } from "@/services/navigation-service";
 import type SidebarController from "@/controllers/sidebar-controller";
 import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { NEW_PAGE_BODY } from "@/utils/constants"
-import { pageRepository } from "@/repositories/pageRepository";
-import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
+import { pagesStore } from "@/stores/page-store";
+import { HOME_PATH, isRootPath, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import { exportToZip, pickAndParseZip } from "@/utils/zip";
 import type { ZipEntry, ZipFileEntry } from "@/utils/zip";
 import { openImportZipDialog } from "@/components/dialogs/import-zip-dialog";
 import { openImageManagerDialog } from "@/components/dialogs/image-manager-dialog";
 import { showNotification } from "@/components/notification/notification";
-import { loadPrefs } from "@/utils/storage";
+import { prefsStore } from "@/stores/preferences-store";
 import { getCurrentPath, replacePath } from "@/utils/url";
-import { imageRepository } from "@/repositories/imageRepository";
+import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
-import { flushSave } from "@/stores/persistence";
 import { PendingOpType } from "@/entities/PendingOps";
 import { hideLoadingOverlay } from "@/components/overlay/loading-overlay";
+import { updateEditorTint } from "@/services/file-status-tint";
+import { storageService } from "@/services/storage";
 
 let sessionStarted = 0;
 
@@ -56,8 +57,8 @@ export default class extends Controller {
   declare readonly metaPanelTarget: HTMLElement
 
   private editor!: EditorController
-  private cache!: FileSyncController
-  private nav!: NavigationController
+  private cache!: FileSyncService
+  private nav!: NavigationService
   private view!: ViewController
 
   private initialPath: string = ""
@@ -68,7 +69,6 @@ export default class extends Controller {
   private appInitialized = false
 
   connect() {
-    applyThemeFromPrefs()
     this.initialPath = this.data.get("path") || getCurrentPath()
   }
 
@@ -81,12 +81,15 @@ export default class extends Controller {
   }
 
   private async initializeApp() {
-    this.cache = new FileSyncController(this.editor as any)
+    storageService.initialize()
+    applyThemeFromPrefs()
+
+    this.cache = new FileSyncService(this.editor as any)
     this.view = new ViewController(this.editor as any, sessionStarted)
     const sidebarController = this.application.getControllerForElementAndIdentifier(
       this.sidebarTarget, "sidebar"
     ) as unknown as SidebarController
-    this.nav = new NavigationController(this.editor as any, this.cache, this.sidebarTarget, sidebarController)
+    this.nav = new NavigationService(this.editor as any, this.cache, this.sidebarTarget, sidebarController)
 
     this.editor.setCurrentPath(this.initialPath)
     this.cache.setCurrentPath(this.initialPath)
@@ -128,13 +131,17 @@ export default class extends Controller {
         this.cache.createDraft(path, content)
       }),
       appEvents.on(AppEvent.DirIndexActivated, ({ path }) => {
-        const dirName = path
-          .replace(/\/_index$/, "")
-          .split("/")
-          .pop()
-          ?.replace(/-/g, " ")
-          .replace(/^\w/, (c: string) => c.toUpperCase()) ?? "";
-        const template = `# ${dirName}\n\n<desc here>\n\n## Topics\n\n{{< table-of-directory >}}\n\n`;
+        const template = isRootPath(path)
+          ? `# Home\n\n<desc here>\n\n`
+          : (() => {
+              const dirName = path
+                .replace(/\/_index$/, "")
+                .split("/")
+                .pop()
+                ?.replace(/-/g, " ")
+                .replace(/^\w/, (c: string) => c.toUpperCase()) ?? "";
+              return `# ${dirName}\n\n<desc here>\n\n## Topics\n\n{{< table-of-directory >}}\n\n`;
+            })();
         this.cache.createDraft(path, template)
         this.view.switchTo("editor")
         appEvents.emit(AppEvent.Navigate, { path })
@@ -147,9 +154,9 @@ export default class extends Controller {
       }),
     )
 
-    try { imageRepository.restoreFromStorage() } catch {}
+    try { imageService.restoreFromStorage() } catch {}
 
-    this.toolbarStore = new ToolbarStore({ stickyToolbar: loadPrefs().stickyToolbar })
+    this.toolbarStore = new ToolbarStore({ stickyToolbar: prefsStore.stickyToolbar })
     this.toolbarStore.initialize()
 
     this.view.initialize()
@@ -157,7 +164,7 @@ export default class extends Controller {
     const metaPanel = mountMetaPanel(this.metaPanelTarget)
     this.nav.setMetaPanel(metaPanel)
 
-    this.onBeforeUnload = () => { dirtyTrackingService.flush(); flushSave() }
+    this.onBeforeUnload = () => { dirtyTrackingService.flush() }
     window.addEventListener("beforeunload", this.onBeforeUnload)
 
     hotkeys.register("ctrl+s", () => appEvents.emit(AppEvent.SaveCurrentFile))
@@ -178,6 +185,7 @@ export default class extends Controller {
     this.nav.setCurrentPath(startPath)
 
     if (isNew) {
+      this.editor.hideSkeleton()
       appEvents.emit(AppEvent.NoFileView, {})
     } else {
       replacePath(startPath)
@@ -192,6 +200,7 @@ export default class extends Controller {
 
     await this.cache.afterRestore()
     await this.editor.loadContent(startPath, (data) => this.nav.getMetaPanel()?.update(data))
+    updateEditorTint(this.editor.element as HTMLElement, startPath, this.cache.getPendingOps())
     await this.nav.loadSidebar()
     this.editor.hideSkeleton()
     dirtyTrackingService.recompute()
@@ -218,23 +227,20 @@ export default class extends Controller {
     const path = this.nav.getCurrentPath()
     if (!path) return
 
-    const pendingCreate = this.cache.getPendingOps().all.find(
-      (e) => e.type === PendingOpType.Create && e.path === path
+    const ops = this.cache.getPendingOps().all
+    const hasPendingOp = ops.some(
+      (e) =>
+        (e.type === PendingOpType.Create && e.path === path) ||
+        (e.type === PendingOpType.Delete && (e.path === path || path.startsWith(e.path + "/"))) ||
+        (e.type === PendingOpType.Rename && (e.from === path || e.to === path || path.startsWith(e.from + "/"))) ||
+        (e.type === PendingOpType.Move && (e.from === path || e.to === path || path.startsWith(e.from + "/")))
     )
-    if (pendingCreate) {
+    if (hasPendingOp) {
       await this.cache.flushDirtyFiles()
       return
     }
 
-    const pendingDelete = this.cache.getPendingOps().all.find(
-      (e) => e.type === PendingOpType.Delete && e.path === path
-    )
-    if (pendingDelete) {
-      await this.cache.flushDirtyFiles()
-      return
-    }
-
-    const dirtyPaths = pageRepository.getDirtyPaths()
+    const dirtyPaths = this.cache.getPendingOps().getDirtyPaths()
     if (!dirtyPaths.includes(path)) {
       showNotification("No changes to save", { type: "info" })
       return
@@ -265,8 +271,7 @@ export default class extends Controller {
           const entry = rawEntries.find((r: ZipEntry) => r.relPath.replace(/\.md$/, "") === path)
           return entry ? provider.writeFile(path, entry.content) : Promise.resolve()
         }))
-        pageRepository.clearAll()
-        pageRepository.save()
+        pagesStore.clearAll()
         treeStore.setTree(await provider.getTree())
         await this.nav.loadSidebar()
         await this.editor.loadContent(this.initialPath, (data) => this.nav.getMetaPanel()?.update(data))

@@ -32,7 +32,7 @@ import {
 } from "@/eta/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { openVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
-import { imageRepository } from "@/repositories/imageRepository";
+import { imageService } from "@/services/image-service";
 import {
   SlashCommand, SLASH_CMD_PREFIX,
   ImageAction, IMG_ACTION_PREFIX,
@@ -725,7 +725,7 @@ class SlashView {
       urlInput.select();
     }
 
-    imageRepository.listImages()
+    imageService.listImages()
       .catch(() => {})
       .then(() => {
         this.renderImageSuggestions();
@@ -735,7 +735,7 @@ class SlashView {
   private renderImageSuggestions() {
     const el = this.content.querySelector("[data-area='suggestions']");
     if (!el) return;
-    const allImages = imageRepository.getAllImages();
+    const allImages = imageService.getAllImages();
     el.innerHTML =
       allImages
         .slice(0, 3)
@@ -798,7 +798,7 @@ class SlashView {
   }
 
   private triggerImageUpload(file: File) {
-    imageRepository.uploadImage(file).then((url) => {
+    imageService.uploadImage(file).then((url) => {
       this.confirmImageUrl(url);
     });
   }

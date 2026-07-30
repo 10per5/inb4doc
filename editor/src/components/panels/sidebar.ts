@@ -3,7 +3,7 @@ import { eye, page, folder, folderMinus, menuScale, navArrowDown, folderOpen, fo
 import { confirmDialog } from "@/components/dialogs/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { buildEditorUrl } from "@/utils/url";
-import { pageRepository } from "@/repositories/pageRepository";
+import { pagesStore } from "@/stores/page-store";
 import { PendingOpType, type PendingOp, type TreeIndex, type ChildInfo } from "@/utils/tree";
 import { SidebarAction, sidebarActions } from "@/config/enums";
 import { setContextMenuActions } from "@/controllers/context-menu-controller";
@@ -101,6 +101,8 @@ export function isPendingDelete(pagePath: string, ps: PendingSets): boolean {
     const ancestor = parts.slice(0, i).join("/");
     if (ps.pendingDeleteSet.has(ancestor)) return true;
   }
+  const indexPath = `${pagePath}/${HOME_PATH}`;
+  if (ps.pendingDeleteSet.has(indexPath)) return true;
   return false;
 }
 
@@ -148,7 +150,7 @@ export function pendingLabelSuffix(
   const pagePath = parts.replace(/\.md$/, "");
   const result: string[] = [];
 
-  if (ps.pendingDeleteSet.has(pagePath)) {
+  if (isPendingDelete(pagePath, ps)) {
     result.push(`<span class="pending-badge pending-badge-delete">delete</span>`);
   }
   if (ps.pendingMoveFromSet.has(pagePath)) {
@@ -240,7 +242,7 @@ export function renderItems(
     if (!child.isDir) {
       // File (page)
       const active = path === ctx.current
-      const label = pageRepository.getOrCreate(child.name).name
+      const label = pagesStore.getOrCreate(child.name).name
       return `
         <div class="nav-item${pendingClass(child.name, prefix, ctx.pendingSets)}" draggable="true" data-nav-path="${path}">
           <a href="${buildEditorUrl(ctx.basePath, path)}" class="nav-link ${active ? "active" : ""}${isHomePageFilename(child.name) && !prefix ? " nav-link-home" : ""}${pendingClass(child.name, prefix, ctx.pendingSets)}" data-action="click->sidebar#onNavigate">
@@ -282,7 +284,7 @@ export function renderItems(
     const hasIndex = dirChildren.some(
       (c) => isHomePageFilename(c.name)
     )
-    const indexPage = hasIndex ? pageRepository.get(`${dirPath}/${HOME_FILENAME}`) : undefined
+    const indexPage = hasIndex ? pagesStore.get(`${dirPath}/${HOME_FILENAME}`) : undefined
     const indexTitle = indexPage?.getFrontmatter?.()?.title
     const dirBaseName = child.name.replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase())
     const label = indexTitle || dirBaseName
@@ -328,7 +330,7 @@ export function renderItems(
           <button class="nav-more" data-action="click->sidebar#onShowMenu" data-is-folder tabindex="-1">${menuScale}</button>
         </span>
         <div class="nav-section-children" style="--line-color: ${lineColor}">
-          ${childrenHtml}
+          ${childrenHtml || '<span class="nav-empty">&lt;empty&gt;</span>'}
         </div>
       </div>`
   }).join("")

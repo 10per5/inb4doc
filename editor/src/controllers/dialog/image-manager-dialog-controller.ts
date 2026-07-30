@@ -11,11 +11,11 @@ export class ImageManagerDialogController extends BaseDialogController {
     if (!name) return
     if (!confirm(`Delete "${name}"?`)) return
 
-    const { imageRepository } = await import("@/repositories/imageRepository")
+    const { imageService } = await import("@/services/image-service")
     const { showNotification } = await import("@/components/notification/notification")
 
     try {
-      await imageRepository.deleteImage(name)
+      await imageService.deleteImage(name)
       const row = (e.currentTarget as HTMLElement).closest(".img-row") as HTMLElement
       row.remove()
       const remaining = this.element.querySelectorAll(".img-row").length

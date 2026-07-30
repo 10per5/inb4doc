@@ -1,4 +1,6 @@
-<div class="inb4doc-external-window" onclick="event.stopPropagation()" data-controller="external-change-dialog">
+<div class="inb4doc-external-window" onclick="event.stopPropagation()" data-controller="external-change-dialog"
+  data-external-change-dialog-local-value="<%= it.local %>"
+  data-external-change-dialog-disk-value="<%= it.disk %>">
   <div class="inb4doc-external-header">File changed on disk</div>
   <div class="inb4doc-external-body">
     <p class="inb4doc-external-message"><strong><%= it.path %></strong> was updated externally. Your local changes will be lost if you discard.</p>

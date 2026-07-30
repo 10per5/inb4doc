@@ -29,6 +29,11 @@ export function getProvider(): ContentProvider {
   return globalProvider;
 }
 
+/** Active provider's numeric ID as a string — used in storage keys (meta, recents, entity IDs). */
+export function activeProviderId(): string {
+  try { return String(getProvider().name) } catch { return String(ProviderType.LocalStorage) }
+}
+
 function saveLastProvider(type: ProviderType) {
   try { localStorage.setItem(LAST_PROVIDER_KEY, String(type)) } catch {}
 }

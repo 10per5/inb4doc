@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <%~ include('partials/head-meta', it) %>
-    <link rel="stylesheet" href="assets/katex.css" />
-    <link rel="stylesheet" href="assets/app.css" />
+    <link rel="stylesheet" href="assets/katex.css?ver=<%= it.APP_VERSION %>" />
+    <link rel="stylesheet" href="assets/app.css?ver=<%= it.APP_VERSION %>" />
   </head>
   <body>
     <%~ include('views/loading-overlay', it) %>
@@ -25,6 +25,6 @@
         <aside class="book-aside" id="meta-panel-mount" data-shell-target="metaPanel"></aside>
       </div>
     </div>
-    <script type="module" src="assets/app.js"></script>
+    <script type="module" src="assets/app.js?ver=<%= it.APP_VERSION %>"></script>
   </body>
 </html>

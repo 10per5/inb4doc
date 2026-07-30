@@ -28,6 +28,20 @@
   background-color: transparent;
 }
 
+/* ── Pending Create Tint ──────────────────────────────────────────── */
+
+#editor-area.pending-create-tint {
+  background-color: rgba(13, 110, 253, 0.06);
+}
+
+#editor-area.pending-create-tint #milkdown-editor .ProseMirror {
+  background-color: transparent;
+}
+
+#editor-area.pending-create-tint #source-editor textarea {
+  background-color: transparent;
+}
+
 /* ── Context Menu ──────────────────────────────────────────────────── */
 
 .ctx-backdrop {

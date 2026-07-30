@@ -10,7 +10,7 @@
  * Run via: bun lib/build/iconoir.ts
  * Or called automatically from build.ts.
  */
-import { readFileSync, writeFileSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { customIcons } from "./iconoir-custom";
@@ -139,6 +139,7 @@ export function buildIcons(): void {
   }
 
   lines.push("");
+  mkdirSync(dirname(OUTPUT_FILE), { recursive: true });
   writeFileSync(OUTPUT_FILE, lines.join("\n"), "utf-8");
   console.log(
     `[iconoir] Generated ${files.length} icons + ${customNames.length} custom → ${OUTPUT_FILE}`,

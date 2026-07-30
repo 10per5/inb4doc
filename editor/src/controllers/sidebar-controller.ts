@@ -18,7 +18,8 @@ import { searchContent } from "@/features/search/sidebar-search";
 import { confirmDialog } from "@/components/dialogs/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { appEvents, AppEvent } from "@/stores/app-events";
-import { loadPrefs, savePrefs } from "@/utils/storage";
+
+import { prefsStore } from "@/stores/preferences-store";
 
 export default class extends Controller {
   static targets = [
@@ -49,7 +50,7 @@ export default class extends Controller {
   private hideEmptyFolders = false;
 
   connect() {
-    this.hideEmptyFolders = loadPrefs().hideEmptyFolders;
+    this.hideEmptyFolders = prefsStore.hideEmptyFolders;
     this.unsubs.push(
       appEvents.on(AppEvent.DirtyChanged, ({ dirtyPaths }) => {
         this.updateDirtyIndicators(dirtyPaths);
@@ -178,7 +179,7 @@ export default class extends Controller {
 
   onToggleEmptyFolders() {
     this.hideEmptyFolders = !this.hideEmptyFolders;
-    savePrefs({ ...loadPrefs(), hideEmptyFolders: this.hideEmptyFolders });
+    prefsStore.setHideEmptyFolders(this.hideEmptyFolders);
     this.hideEmptyToggleTarget.classList.toggle(
       "active",
       this.hideEmptyFolders,

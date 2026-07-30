@@ -1,55 +1,41 @@
-/**
- * ConnectionStore — holds remote server connection config.
- *
- * Persists to localStorage so the connection survives session restarts.
- * RemoteProvider reads from here to build its base URL.
- * Tracks whether the remote server is reachable (set by dialog Try probe).
- */
+import { hasFunc, AppFunc } from "$/build/build-mode"
+import { storageService } from "@/services/storage"
+import type { ConnectionConfig } from "@/services/storage"
+import { ProviderType } from "@/providers"
+import { STORE_CONNECTIONS } from "@/config/storage-keys"
 
-import { hasFunc, AppFunc } from "$/build/build-mode";
-
-const STORAGE_KEY = "inb4doc-connection"
-
-export interface ConnectionConfig {
-  host: string
-  port: number
-}
+const REMOTE_ID = String(ProviderType.Remote)
 
 const DEFAULTS: ConnectionConfig = {
   host: "localhost",
   port: 3000,
 }
 
-function load(): ConnectionConfig | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) }
-  } catch {}
-  return null
-}
-
-function save(config: ConnectionConfig): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
-  } catch {}
-}
-
 class ConnectionStore {
-  private config: ConnectionConfig | null = load()
+  private config: ConnectionConfig | null = null
+
+  private tryLoadConfig(): void {
+    if (this.config) return
+    const stored = storageService.getJSON<{ host: string; port: number }>(STORE_CONNECTIONS, REMOTE_ID)
+    if (stored && typeof stored.host === "string" && typeof stored.port === "number") {
+      this.config = { host: stored.host, port: stored.port }
+    }
+  }
+
   private _remoteAvailable = false
 
-  getHost(): string { return this.config?.host ?? DEFAULTS.host }
-  getPort(): number { return this.config?.port ?? DEFAULTS.port }
+  getHost(): string { this.tryLoadConfig(); return this.config?.host ?? DEFAULTS.host }
+  getPort(): number { this.tryLoadConfig(); return this.config?.port ?? DEFAULTS.port }
 
-  getConfig(): ConnectionConfig { return this.config ? { ...this.config } : { ...DEFAULTS } }
+  getConfig(): ConnectionConfig { this.tryLoadConfig(); return this.config ? { ...this.config } : { ...DEFAULTS } }
 
   setConfig(host: string, port: number): void {
     this.config = { host, port }
-    save(this.config)
+    storageService.setJSON(STORE_CONNECTIONS, REMOTE_ID, { host, port })
     this._remoteAvailable = false
   }
 
-  isCustom(): boolean { return this.config !== null }
+  isCustom(): boolean { this.tryLoadConfig(); return this.config !== null }
 
   getBaseUrl(): string {
     return `http://${this.getHost()}:${this.getPort()}`
@@ -58,7 +44,6 @@ class ConnectionStore {
   get remoteAvailable(): boolean { return this._remoteAvailable }
   set remoteAvailable(v: boolean) { this._remoteAvailable = v }
 
-  /** Probe the server and update remoteAvailable. Returns the result. */
   async probe(timeout = 3000): Promise<boolean> {
     if (!hasFunc(AppFunc.AllowProbe)) {
       this._remoteAvailable = false

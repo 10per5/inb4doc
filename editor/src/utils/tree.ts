@@ -14,13 +14,9 @@ export interface ChildInfo {
 }
 
 export interface TreeIndex {
-  /** All known page paths (without .md extension) */
   paths: Set<string>
-  /** Parent prefix → children sorted by weight (dirs first, then files) */
   children: Map<string, ChildInfo[]>
-  /** Folder weights (from _index.md frontmatter) */
   folderWeights: Map<string, number>
-  /** Per-file weights (from individual file frontmatter) */
   fileWeights: Map<string, number>
 }
 
@@ -38,51 +34,99 @@ function getParentPrefix(path: string): string {
   return slash === -1 ? "" : path.slice(0, slash)
 }
 
-function sortChildren(children: ChildInfo[]): ChildInfo[] {
+export function sortChildren(children: ChildInfo[]): ChildInfo[] {
   return children.sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
     return a.weight - b.weight || a.name.localeCompare(b.name)
   })
 }
 
-function rebuildChildrenForPrefix(tree: TreeIndex, prefix: string): void {
-  const children: ChildInfo[] = []
+function upsertChildForPath(tree: TreeIndex, path: string): void {
+  const parent = getParentPrefix(path)
+  const name = path.slice(parent.length ? parent.length + 1 : 0)
+  const weight = tree.fileWeights.get(path) ?? DEFAULT_WEIGHT
 
-  // Collect files in this directory
-  for (const path of tree.paths) {
-    const parent = getParentPrefix(path)
-    if (parent !== prefix) continue
-    const name = path.slice(prefix.length ? prefix.length + 1 : 0)
-    if (name.includes("/")) continue // nested path, not a direct child
-    children.push({
-      name: name + ".md",
-      path,
-      isDir: false,
-      weight: tree.fileWeights.get(path) ?? DEFAULT_WEIGHT,
-    })
+  let children = tree.children.get(parent)
+  if (!children) {
+    tree.children.set(parent, [{ name: name + ".md", path, isDir: false, weight }])
+    return
   }
 
-  // Collect subdirectories
-  const seenDirs = new Set<string>()
-  for (const path of tree.paths) {
-    if (!path.startsWith(prefix ? prefix + "/" : "")) continue
-    const rel = path.slice(prefix ? prefix.length + 1 : 0)
-    const slash = rel.indexOf("/")
-    if (slash === -1) continue // direct child file, already handled
-    const dirName = rel.slice(0, slash)
-    if (seenDirs.has(dirName)) continue
-    seenDirs.add(dirName)
-    const dirPath = prefix ? `${prefix}/${dirName}` : dirName
+  const idx = children.findIndex(c => c.path === path)
+  if (idx !== -1) {
+    if (children[idx].weight === weight) return
+    children[idx] = { name: name + ".md", path, isDir: false, weight }
+  } else {
+    children.push({ name: name + ".md", path, isDir: false, weight })
+  }
+  sortChildren(children)
+}
+
+function ensureAncestorDirectories(tree: TreeIndex, path: string): void {
+  const parts = path.split("/")
+  for (let i = 1; i < parts.length; i++) {
+    const dirPath = parts.slice(0, i).join("/")
+    const parentPrefix = parts.slice(0, i - 1).join("/")
+    const dirName = parts[i - 1]
+
+    let children = tree.children.get(parentPrefix)
+    if (!children) {
+      const weight = tree.folderWeights.get(dirPath) ?? DEFAULT_WEIGHT
+      tree.children.set(parentPrefix, [{ name: dirName, path: dirPath, isDir: true, weight }])
+      continue
+    }
+
+    if (children.some(c => c.isDir && c.path === dirPath)) continue
+
     const weight = tree.folderWeights.get(dirPath) ?? DEFAULT_WEIGHT
-    children.push({
-      name: dirName,
-      path: dirPath,
-      isDir: true,
-      weight,
-    })
+    children.push({ name: dirName, path: dirPath, isDir: true, weight })
+    sortChildren(children)
+  }
+}
+
+export function addPathToTree(tree: TreeIndex, path: string): void {
+  if (!tree.paths.has(path)) {
+    tree.paths.add(path)
+  }
+  upsertChildForPath(tree, path)
+  ensureAncestorDirectories(tree, path)
+}
+
+export function removePathFromTree(tree: TreeIndex, path: string): void {
+  // Remove all descendant paths
+  const descendants = [...tree.paths].filter(p => p === path || p.startsWith(path + "/"))
+  if (descendants.length === 0 && !tree.paths.has(path)) return
+
+  for (const p of descendants) {
+    tree.paths.delete(p)
+    const parent = getParentPrefix(p)
+    const children = tree.children.get(parent)
+    if (children) {
+      const idx = children.findIndex(c => c.path === p)
+      if (idx !== -1) children.splice(idx, 1)
+      if (children.length === 0) tree.children.delete(parent)
+    }
   }
 
-  tree.children.set(prefix, sortChildren(children))
+  // Clean up empty ancestor directories
+  const parts = (descendants.length > 0 ? descendants[0] : path).split("/")
+  for (let i = parts.length - 1; i > 0; i--) {
+    const dirPath = parts.slice(0, i).join("/")
+    const grandParent = parts.slice(0, i - 1).join("/")
+
+    const hasAny = [...tree.paths].some(p => {
+      const pParent = getParentPrefix(p)
+      return pParent === dirPath || p.startsWith(dirPath + "/")
+    })
+    if (hasAny) break
+
+    const gpChildren = tree.children.get(grandParent)
+    if (gpChildren) {
+      const dirIdx = gpChildren.findIndex(c => c.isDir && c.path === dirPath)
+      if (dirIdx !== -1) gpChildren.splice(dirIdx, 1)
+      if (gpChildren.length === 0) tree.children.delete(grandParent)
+    }
+  }
 }
 
 export function buildTreeIndex(data: {
@@ -96,57 +140,19 @@ export function buildTreeIndex(data: {
   for (const [k, v] of Object.entries(data.folderWeights)) tree.folderWeights.set(k, v)
   for (const [k, v] of Object.entries(data.fileWeights ?? {})) tree.fileWeights.set(k, v)
 
-  // Build children map from server data
   for (const [prefix, entries] of Object.entries(data.children)) {
     tree.children.set(prefix, entries.map(e => ({ ...e })))
   }
 
   // Client-side providers (LocalStorage, FileSystem) pass empty children{}.
-  // Build children for every directory prefix inferred from paths.
+  // Build children incrementally from paths.
   if (!tree.children.has("")) {
-    const prefixes = new Set<string>()
     for (const path of tree.paths) {
-      const parts = path.split("/")
-      for (let i = 1; i < parts.length; i++) {
-        prefixes.add(parts.slice(0, i).join("/"))
-      }
-    }
-    rebuildChildrenForPrefix(tree, "")
-    for (const prefix of prefixes) {
-      if (!tree.children.has(prefix)) {
-        rebuildChildrenForPrefix(tree, prefix)
-      }
+      addPathToTree(tree, path)
     }
   }
 
   return tree
-}
-
-export function addPathToTree(tree: TreeIndex, path: string): void {
-  if (tree.paths.has(path)) return
-  tree.paths.add(path)
-
-  // Rebuild all ancestor directories including root — a prior removePathFromTree
-  // may have rebuilt them with stale data (before this path was added to tree.paths).
-  const parts = path.split("/")
-  for (let i = 0; i < parts.length; i++) {
-    const prefix = parts.slice(0, i).join("/")
-    rebuildChildrenForPrefix(tree, prefix)
-  }
-}
-
-export function removePathFromTree(tree: TreeIndex, path: string): void {
-  if (!tree.paths.has(path)) return
-  tree.paths.delete(path)
-
-  // Rebuild all ancestor directories including root — removing a nested path
-  // may eliminate an intermediate directory entry (e.g. deleting the last file
-  // in a directory should remove that directory from its parent's children).
-  const parts = path.split("/")
-  for (let i = 0; i < parts.length; i++) {
-    const prefix = parts.slice(0, i).join("/")
-    rebuildChildrenForPrefix(tree, prefix)
-  }
 }
 
 /**
@@ -190,7 +196,6 @@ export function getSuggestions(tree: TreeIndex, lastPath: string, max = 3): stri
     return [...dirs.slice(0, max), ...files.slice(0, max - dirs.length)].slice(0, max)
   }
 
-  // Check if lastPath is a directory
   const dirChildren = tree.children.get(lastPath)
   if (dirChildren && dirChildren.length > 0) {
     const dirs = dirChildren.filter(c => c.isDir).map(c => c.path)
@@ -198,12 +203,10 @@ export function getSuggestions(tree: TreeIndex, lastPath: string, max = 3): stri
     return [...dirs.slice(0, max), ...files.slice(0, max - dirs.length)].slice(0, max)
   }
 
-  // lastPath is a file — get the containing directory
   const fileParts = lastPath.split("/")
   const parentPrefix = fileParts.slice(0, -1).join("/")
   const result: string[] = []
 
-  // 1. Children of the containing directory (dirs first, then files)
   const parentChildren = tree.children.get(parentPrefix) ?? []
   const filteredDirs = parentChildren.filter(c => c.isDir && c.path !== lastPath)
   const filteredFiles = parentChildren.filter(c => !c.isDir && c.path !== lastPath)
@@ -214,7 +217,6 @@ export function getSuggestions(tree: TreeIndex, lastPath: string, max = 3): stri
 
   if (result.length >= max) return result.slice(0, max)
 
-  // 2. Parent directory's other children
   if (fileParts.length > 1) {
     const grandParentPrefix = fileParts.slice(0, -2).join("/")
     const currentDirName = fileParts[fileParts.length - 2]
@@ -232,7 +234,6 @@ export function getSuggestions(tree: TreeIndex, lastPath: string, max = 3): stri
 export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): TreeIndex {
   if (ops.length === 0) return tree
 
-  // Create a shallow clone of the tree with copied Sets/Maps
   const result: TreeIndex = {
     paths: new Set(tree.paths),
     children: new Map([...tree.children].map(([k, v]) => [k, [...v]])),
@@ -246,11 +247,8 @@ export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): Tre
         addPathToTree(result, op.path)
         break
       case PendingOpType.Delete:
-        // Keep the path in the tree — sidebar renders it with a "pending-delete" badge.
         break
       case PendingOpType.Rename:
-        // Keep old path in tree — sidebar shows it with a "→ new-name" badge.
-        // The actual path change happens on flush via treeStore.afterMove.
         break
       case PendingOpType.Move:
         removePathFromTree(result, op.from)

@@ -1,7 +1,7 @@
 import { Image } from "@/entities/Image"
 import type { ImageEntry } from "@/providers/provider"
 import { getProvider } from "@/stores/provider-store"
-import { loadPrefs } from "@/utils/storage"
+import { prefsStore } from "@/stores/preferences-store"
 import { readFileAsBase64 } from "@/utils/file"
 
 const DB_NAME = "inb4doc-pending-images"
@@ -55,13 +55,11 @@ async function removeRecordById(id: string): Promise<void> {
   })
 }
 
-class ImageRepository {
+class ImageService {
   private pendingByDir = new Map<string, Image[]>()
   private knownByDir = new Map<string, Image[]>()
   private counter = 0
   private currentDocDir = ""
-
-  // ── Current directory ──
 
   setCurrentDocDir(dir: string): void {
     this.currentDocDir = dir
@@ -70,8 +68,6 @@ class ImageRepository {
   getCurrentDocDir(): string {
     return this.currentDocDir
   }
-
-  // ── Storage restore ──
 
   async restoreFromStorage(): Promise<void> {
     const records = await loadAllRecords()
@@ -87,10 +83,8 @@ class ImageRepository {
     }
   }
 
-  // ── Upload / commit ──
-
   private isBase64Mode(): boolean {
-    return loadPrefs().imageStorageMode === "base64"
+    return prefsStore.imageStorageMode === "base64"
   }
 
   async uploadImage(file: File): Promise<string> {
@@ -139,7 +133,7 @@ class ImageRepository {
     return combined
   }
 
-  async commitPending(dir: string, upload: (file: File, dir: string) => Promise<string>): Promise<Map<string, string>> {
+  private async commitPending(dir: string, upload: (file: File, dir: string) => Promise<string>): Promise<Map<string, string>> {
     const list = this.pendingByDir.get(dir) || []
     const urlMap = new Map<string, string>()
     for (const img of list) {
@@ -151,8 +145,6 @@ class ImageRepository {
     this.pendingByDir.delete(dir)
     return urlMap
   }
-
-  // ── Pending queries ──
 
   getPending(dir: string): Image[] {
     return this.pendingByDir.get(dir) || []
@@ -173,8 +165,6 @@ class ImageRepository {
     }
     return undefined
   }
-
-  // ── Remove pending ──
 
   async removePending(id: string): Promise<boolean> {
     for (const [dir, list] of this.pendingByDir) {
@@ -215,8 +205,6 @@ class ImageRepository {
     this.pendingByDir.delete(oldDir)
   }
 
-  // ── Known (committed) images ──
-
   setKnown(dir: string, entries: ImageEntry[]): void {
     this.knownByDir.set(dir, entries.map(e => Image.fromEntry(e, dir)))
   }
@@ -233,8 +221,6 @@ class ImageRepository {
     list.splice(idx, 1)
     return true
   }
-
-  // ── Provider-backed operations ──
 
   async listImages(refs?: boolean): Promise<ImageEntry[]> {
     const provider = getProvider()
@@ -275,4 +261,4 @@ class ImageRepository {
   }
 }
 
-export const imageRepository = new ImageRepository()
+export const imageService = new ImageService()

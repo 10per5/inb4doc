@@ -9,7 +9,7 @@ export function openExternalChangeDialog(
   localContent: string,
   diskContent: string,
 ): Promise<ExternalChangeAction> {
-  const html = renderExternalChangeDialog({ path, icons: { navArrowRight } })
+  const html = renderExternalChangeDialog({ path, local: localContent, disk: diskContent, icons: { navArrowRight } })
 
   return openHtmlDialogPromise<ExternalChangeAction>({
     html,

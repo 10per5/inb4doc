@@ -10,7 +10,7 @@ import { mountDiskUsageView } from "@/components/views/disk-usage-view";
 import { mountNoFileView, type NoFileViewData } from "@/components/views/no-file-view";
 import { mountDirIndexEmptyView } from "@/components/views/dir-index-empty-view";
 import { registerEditorView } from "@/components/views/editor-view";
-import { pageRepository } from "@/repositories/pageRepository";
+import { pagesStore } from "@/stores/page-store";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { getSuggestions } from "@/utils/tree";
@@ -95,6 +95,7 @@ export class ViewController {
 
     this.views.set("no-file", {
       activate: () => {
+        this.editor.hideSkeleton();
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
         const tree = treeStore.getTree();
@@ -135,6 +136,7 @@ export class ViewController {
 
     this.views.set("dir-index-empty", {
       activate: () => {
+        this.editor.hideSkeleton();
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
         mountDirIndexEmptyView(editorArea, () => {
@@ -161,7 +163,7 @@ export class ViewController {
       const leaves = Array.from(tree.paths);
 
       for (const leaf of leaves) {
-        const existing = pageRepository.get(leaf);
+        const existing = pagesStore.get(leaf);
         const body = existing?.bodyState.body || existing?.bodyState.baseline;
         if (body) {
           fileSizes.set(leaf, body.length);
@@ -176,7 +178,7 @@ export class ViewController {
           }
         }
 
-        const st = pageRepository.get(leaf)?.getServerTime();
+        const st = pagesStore.get(leaf)?.getServerTime();
         if (st) lastModified.set(leaf, st);
       }
 

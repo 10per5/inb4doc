@@ -1,19 +1,19 @@
-import { imageRepository } from "@/repositories/imageRepository"
+import { imageService } from "@/services/image-service"
 import { openHtmlDialogPromise } from "@/services/dialog-service"
 import renderImageManagerDialog from "@/eta/dialogs/image-manager-dialog"
 
 export async function openImageManagerDialog(): Promise<void> {
-  const dir = imageRepository.getCurrentDocDir()
+  const dir = imageService.getCurrentDocDir()
 
-  let entries: Awaited<ReturnType<typeof imageRepository.listImages>> = []
+  let entries: Awaited<ReturnType<typeof imageService.listImages>> = []
   let loadError: string | null = null
   try {
-    entries = await imageRepository.listImages(true)
+    entries = await imageService.listImages(true)
   } catch (e: any) {
     loadError = e.message
   }
 
-  const allEntries = imageRepository.getAllImages()
+  const allEntries = imageService.getAllImages()
 
   const title = "Image Manager"
 

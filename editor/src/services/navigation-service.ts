@@ -1,42 +1,36 @@
-/**
- * NavigationController — manages page navigation and content loading.
- *
- * Navigation state (path, loading) and content orchestration.
- * Sidebar mounting and page CRUD are delegated to their respective modules.
- */
-
 import { createNewItem, deletePage, renamePage, movePage } from "@/services/editor-actions";
 import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
-import { getProvider, switchProvider, cacheKeyForProvider, getProviderDisplayInfo } from "@/stores/provider-store";
+import { storageService } from "@/services/storage";
+import { getProvider, switchProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import type SidebarController from "@/controllers/sidebar-controller";
 import { type SidebarActions } from "@/components/panels/sidebar";
 import { openProviderDialog } from "@/components/dialogs/provider-dialog";
 import { showNotification } from "@/components/notification/notification";
-import { pageRepository } from "@/repositories/pageRepository";
+import { pagesStore } from "@/stores/page-store";
 import { pushPath, replacePath } from "@/utils/url";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
-import { flushSave } from "@/stores/persistence";
 import { PendingOpType } from "@/entities/PendingOps";
+import { updateEditorTint, clearEditorTint } from "@/services/file-status-tint";
 import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
-import type { FileSyncController } from "@/controllers/file-sync-controller";
+import type { FileSyncService } from "@/services/file-sync-service";
 import type { MetaPanelAPI } from "@/components/panels/meta-panel";
 
-export class NavigationController {
+export class NavigationService {
   private currentPath: string = "";
   private loading: boolean = false;
   private editor: EditorController;
-  private cache: FileSyncController;
+  private cache: FileSyncService;
   private sidebarEl: HTMLElement;
   private sidebarController: SidebarController;
   private metaPanel: MetaPanelAPI | undefined;
   private unsubs: (() => void)[] = [];
 
-  constructor(editor: EditorController, cache: FileSyncController, sidebarEl: HTMLElement, sidebarController: SidebarController) {
+  constructor(editor: EditorController, cache: FileSyncService, sidebarEl: HTMLElement, sidebarController: SidebarController) {
     this.editor = editor;
     this.cache = cache;
     this.sidebarEl = sidebarEl;
@@ -73,13 +67,11 @@ export class NavigationController {
     this.loading = true;
 
     try {
-      // Persist any pending debounced body edits + flush cache before leaving
-      // the current file, so fast navigation never drops the last edits.
       dirtyTrackingService.flush();
-      flushSave();
 
       this.currentPath = path;
-      (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+      clearEditorTint(this.editor.element as HTMLElement);
+      updateEditorTint(this.editor.element as HTMLElement, path, this.cache.getPendingOps());
       appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
@@ -103,20 +95,22 @@ export class NavigationController {
       const effectivePath = moveOp ? moveOp.from : path;
       const rawContent = await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data));
 
-      if (!rawContent) {
-        const dirIndex = isHugoIndex(path) && !isRootPath(path);
+      if (rawContent === null) {
+        const dirIndex = isHugoIndex(path);
         if (dirIndex) {
+          this.editor.hideSkeleton()
           appEvents.emit(AppEvent.DirIndexEmpty, { path });
           await this.loadSidebar();
           dirtyTrackingService.recompute();
         } else {
+          this.editor.hideSkeleton()
           appEvents.emit(AppEvent.NoFileView, { lastPath: path });
         }
         return;
       }
 
       const content = rawContent;
-      const dirIndexEmpty = isHugoIndex(path) && !isRootPath(path) && !content.trim();
+      const dirIndexEmpty = isHugoIndex(path) && !content.trim();
 
       if (dirIndexEmpty) {
         appEvents.emit(AppEvent.DirIndexEmpty, { path });
@@ -149,9 +143,8 @@ export class NavigationController {
       const treeIndex = treeStore.getTree();
 
       const pendingOps = this.cache.getPendingOps().all;
-      const dirtyPaths = pageRepository.getDirtyPaths();
+      const dirtyPaths = this.cache.getPendingOps().getDirtyPaths();
 
-      // Merge pending ops into tree so new unflushed files appear in sidebar
       const mergedTree = this.cache.getPendingOps().applyToTree(treeIndex);
 
       const actions: SidebarActions = {
@@ -194,12 +187,12 @@ export class NavigationController {
     if (result.type === current.name && !result.configChanged) return;
 
     try {
-      pageRepository.save(cacheKeyForProvider(current.name));
-      pageRepository.clearAll();
-      pageRepository.save();
+      pagesStore.clearAll();
 
       await switchProvider(result.type);
-      pageRepository.load(cacheKeyForProvider(result.type));
+      const providerId = String(getProvider().name)
+      const files = storageService.loadProviderFiles(providerId)
+      appEvents.emit(AppEvent.ProviderFilesLoaded, files)
 
       await this.loadSidebar();
       dirtyTrackingService.recompute();
@@ -220,11 +213,19 @@ export class NavigationController {
   }
 
   async deletePage(pagePath: string): Promise<void> {
+    const indexPath = pagePath + "/" + HOME_PATH;
+    const openPath = this.currentPath;
+    const isRecursive = openPath === pagePath || openPath.startsWith(pagePath + "/");
+    const openHadPendingCreate = isRecursive && this.cache.getPendingOps().all.some(
+      o => o.type === PendingOpType.Create && o.path === openPath
+    );
     await deletePage(this.cache, pagePath, () => {
-      pageRepository.clearPath(pagePath);
-      flushSave();
-      if (this.currentPath === pagePath) {
-        (this.editor.element as HTMLElement).classList.add("pending-delete-tint");
+      pagesStore.clearPath(pagePath);
+      if (indexPath !== pagePath) pagesStore.clearPath(indexPath);
+      if (openHadPendingCreate) {
+        appEvents.emit(AppEvent.NoFileView, { lastPath: pagePath });
+      } else if (isRecursive) {
+        updateEditorTint(this.editor.element as HTMLElement, openPath, this.cache.getPendingOps());
       }
       this.loadSidebar();
       dirtyTrackingService.recompute();
@@ -234,8 +235,7 @@ export class NavigationController {
   async renamePage(pagePath: string): Promise<void> {
     await renamePage(this.cache, pagePath, (newPath) => {
       if (newPath == null) return;
-      pageRepository.clearPath(pagePath);
-      flushSave();
+      pagesStore.clearPath(pagePath);
       this.loadSidebar();
       dirtyTrackingService.recompute();
     }, async (slug, parentDir) => {
@@ -252,9 +252,8 @@ export class NavigationController {
 
   async movePage(from: string, to: string): Promise<void> {
     await movePage(this.cache, from, to, () => {
-      pageRepository.clearPath(from);
-      pageRepository.clearPath(to);
-      flushSave();
+      pagesStore.clearPath(from);
+      pagesStore.clearPath(to);
       if (this.currentPath === from) {
         this.navigate(to);
         replacePath(to);

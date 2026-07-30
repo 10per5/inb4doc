@@ -1,30 +1,25 @@
-/**
- * FileSyncController
- *
- * Application-level orchestration for file synchronization.
- * Coordinates PendingOps, Page.flushOut/flushIn, ImageRegistry,
- * provider IO, dirty counters, and UI callbacks.
- */
-
 import { stripFrontmatter, serializeFrontmatter } from "@/utils/frontmatter";
 import { Frontmatter } from "@/entities/Frontmatter";
 import {
   openChangesDialog,
   type ChangesDialogData,
 } from "@/components/dialogs/changes-dialog";
-import { pageRepository } from "@/repositories/pageRepository";
+import { pagesStore } from "@/stores/page-store";
 import { PendingOps, PendingOpType, type PendingOp } from "@/entities/PendingOps";
-import { pendingOpsRepository } from "@/repositories/pendingOpsRepository";
-import { getProvider } from "@/stores/provider-store";
+import { pendingOpsStore } from "@/stores/pending-ops-store";
+import { getProvider, activeProviderId } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { showNotification } from "@/components/notification/notification";
 import type { TreeIndex } from "@/utils/tree";
 import { extractSnippets } from "@/utils/content-search";
-import { imageRepository } from "@/repositories/imageRepository";
-import { pageRepository as repo } from "@/repositories/pageRepository";
+import { imageService } from "@/services/image-service";
+import { storageService } from "@/services/storage";
+import { STORE_FILES } from "@/config/storage-keys";
+import { pagesStore as repo } from "@/stores/page-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
-import { flushSave } from "@/stores/persistence";
+import { clearEditorTint, updateEditorTint } from "@/services/file-status-tint";
+
 import type { EditorController } from "@/controllers/editor-controller";
 
 export interface SearchMatch {
@@ -32,7 +27,7 @@ export interface SearchMatch {
   snippets: string[];
 }
 
-export class FileSyncController {
+export class FileSyncService {
   private editor: EditorController;
   private currentPath: string = "";
   private pendingOps: PendingOps;
@@ -40,14 +35,8 @@ export class FileSyncController {
 
   constructor(editor: EditorController) {
     this.editor = editor;
-    this.pendingOps = new PendingOps(pendingOpsRepository.load());
-
-    // Subscribe to events
-    this.unsubs.push(
-      appEvents.on(AppEvent.ProviderChanged, () => {
-        this.pendingOps = new PendingOps(pendingOpsRepository.load());
-      }),
-    );
+    this.pendingOps = new PendingOps(pendingOpsStore.load());
+    dirtyTrackingService.setPendingOps(this.pendingOps);
   }
 
   setCurrentPath(path: string): void {
@@ -67,27 +56,27 @@ export class FileSyncController {
 
   queueCreate(path: string, content: string): void {
     this.pendingOps.queueCreate(path, content);
-    pendingOpsRepository.save(this.pendingOps.all);
+    pendingOpsStore.save(this.pendingOps.all);
   }
 
   queueDelete(path: string): void {
     this.pendingOps.queueDelete(path);
-    pendingOpsRepository.save(this.pendingOps.all);
+    pendingOpsStore.save(this.pendingOps.all);
   }
 
   cancelCreate(path: string): void {
     this.pendingOps.cancelCreate(path);
-    pendingOpsRepository.save(this.pendingOps.all);
+    pendingOpsStore.save(this.pendingOps.all);
   }
 
   queueRename(from: string, to: string): void {
     const content = repo.getOrCreate(from).reconstructContent() ?? undefined;
     this.pendingOps.queueRename(from, to, content);
-    pendingOpsRepository.save(this.pendingOps.all);
+    pendingOpsStore.save(this.pendingOps.all);
     const fromDir = from.includes("/") ? from.substring(0, from.lastIndexOf("/")) : "";
     const toDir = to.includes("/") ? to.substring(0, to.lastIndexOf("/")) : "";
     if (fromDir !== toDir) {
-      imageRepository.remapDir(fromDir, toDir).catch(() => {});
+      imageService.remapDir(fromDir, toDir).catch(() => {});
     }
   }
 
@@ -95,19 +84,21 @@ export class FileSyncController {
     const finalContent = content ?? repo.getOrCreate(from).reconstructContent() ?? undefined;
     this.pendingOps.queueMove(from, to, finalContent);
 
-    const fromPage = repo.getOrCreate(from);
     repo.clearPath(to);
     const toPage = repo.getOrCreate(to);
-    if (fromPage.bodyState.body !== undefined) toPage.bodyState.cacheBody(fromPage.bodyState.body);
-    if (fromPage.bodyState.baseline !== undefined) toPage.bodyState.setBaseline(fromPage.bodyState.baseline);
-    if (fromPage.frontmatter) toPage.frontmatter = fromPage.frontmatter;
-    repo.save();
+    const fromPage = repo.get(from);
+    if (fromPage) {
+      if (fromPage.bodyState.body !== undefined) toPage.bodyState.cacheBody(fromPage.bodyState.body);
+      if (fromPage.bodyState.baseline !== undefined) toPage.bodyState.setBaseline(fromPage.bodyState.baseline);
+      if (fromPage.frontmatter) toPage.frontmatter = fromPage.frontmatter;
+    }
+    repo.clearPath(from);
 
-    pendingOpsRepository.save(this.pendingOps.all);
+    pendingOpsStore.save(this.pendingOps.all);
     const fromDir = from.includes("/") ? from.substring(0, from.lastIndexOf("/")) : "";
     const toDir = to.includes("/") ? to.substring(0, to.lastIndexOf("/")) : "";
     if (fromDir !== toDir) {
-      imageRepository.remapDir(fromDir, toDir).catch(() => {});
+      imageService.remapDir(fromDir, toDir).catch(() => {});
     }
   }
 
@@ -117,14 +108,14 @@ export class FileSyncController {
 
   async afterRestore(): Promise<void> {
     const blobToRef = new Map<string, string>()
-    for (const dir of imageRepository.getAllPendingDirs()) {
-      for (const p of imageRepository.getPending(dir)) {
+    for (const dir of imageService.getAllPendingDirs()) {
+      for (const p of imageService.getPending(dir)) {
         if (p.blobUrl) blobToRef.set(p.blobUrl, `pending-image:${p.id}`)
       }
     }
     if (blobToRef.size === 0) return
 
-    for (const path of repo.getDirtyPaths()) {
+    for (const path of this.pendingOps.getDirtyPaths()) {
       const page = repo.getOrCreate(path)
       if (!page.bodyState.body) continue
       let modified = false
@@ -136,8 +127,13 @@ export class FileSyncController {
         }
       }
       if (modified) {
-        page.setBody(newBody)
-        repo.save()
+        const editOp = this.pendingOps.findEdit(path)
+        if (editOp) {
+          editOp.patch = newBody
+        } else {
+          this.pendingOps.queueEdit(path, newBody)
+        }
+        pendingOpsStore.save(this.pendingOps.all)
       }
     }
   }
@@ -157,26 +153,21 @@ export class FileSyncController {
 
   clearPendingOps(): void {
     this.pendingOps.clear();
-    pendingOpsRepository.clear();
+    pendingOpsStore.clear();
   }
 
   createDraft(path: string, content: string): void {
     this.queueCreate(path, content);
     const page = repo.getOrCreate(path);
-    page.setBody(content);
-    page.setBaseline(content);
+    const { frontmatter, body } = stripFrontmatter(content);
+    if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+    page.setBody(body);
+    page.setBaseline(body);
   }
 
   applyPendingOpsToTree(tree: TreeIndex): TreeIndex {
     return this.pendingOps.applyToTree(tree);
   }
-
-  // ── Dirty-state recompute ──
-  //
-  // The authoritative dirty accounting lives in `DirtyTrackingService`, which
-  // listens for body/frontmatter edits and emits `DirtyChanged`. After mutations
-  // performed outside the event stream (flush, discard, provider switch) we ask
-  // it to recompute from the persisted page cache.
 
   private recomputeDirty(): void {
     dirtyTrackingService.recompute();
@@ -185,14 +176,15 @@ export class FileSyncController {
   // ── Flush ──
 
   async flushCurrentFile(path: string, content: string): Promise<void> {
-    const imageUrlMap = await imageRepository.commitAllPendingImages();
+    const imageUrlMap = await imageService.commitAllPendingImages();
     const page = repo.getOrCreate(path);
     page.setBody(content);
 
     const ok = await page.flushOut(imageUrlMap);
     if (ok) {
-      treeStore.afterWrite(path);
-      repo.save();
+      treeStore.afterWrite(path, page.reconstructContent());
+      this.pendingOps.cancelEdit(path);
+      pendingOpsStore.save(this.pendingOps.all);
       this.recomputeDirty();
       showNotification("File saved", { type: "success" });
     } else {
@@ -201,23 +193,31 @@ export class FileSyncController {
   }
 
   async flushDirtyFiles(): Promise<void> {
-    const dirtyPaths = repo.getDirtyPaths();
+    const dirtyPaths = this.pendingOps.getDirtyPaths();
     if (dirtyPaths.length === 0 && this.pendingOps.count === 0) return;
 
     const currentMd = this.editor.getCurrentContent();
     const provider = getProvider();
 
-    const imageUrlMap = await imageRepository.commitAllPendingImages();
+    const imageUrlMap = await imageService.commitAllPendingImages();
 
     for (const path of dirtyPaths) {
       const page = repo.getOrCreate(path);
+      const editOp = this.pendingOps.findEdit(path);
+
+      let bodyToWrite: string;
+      if (editOp) {
+        bodyToWrite = editOp.patch || page.bodyState.body || "";
+      } else {
+        bodyToWrite = page.bodyState.body || "";
+      }
 
       if (path === this.currentPath) {
-        page.setBody(currentMd);
-      } else if (page.bodyState.body == null) {
+        bodyToWrite = currentMd;
+      } else if (!bodyToWrite) {
         const cachedRaw = await provider?.readFile(path);
         if (!cachedRaw) continue;
-        page.setBody(stripFrontmatter(cachedRaw).body);
+        bodyToWrite = stripFrontmatter(cachedRaw).body;
       }
 
       if (path === this.currentPath) {
@@ -231,28 +231,33 @@ export class FileSyncController {
         }
       }
 
+      page.setBody(bodyToWrite);
       await page.flushOut(imageUrlMap);
+      this.pendingOps.cancelEdit(path);
     }
 
-    repo.save();
+    const flushedPaths = new Set(dirtyPaths);
+    const { deletedPaths, renamedPaths } = await this.executePendingOps(flushedPaths);
 
-    const { deletedPaths, renamedPaths } = await this.executePendingOps();
+    pendingOpsStore.save(this.pendingOps.all);
 
     this.recomputeDirty();
 
     appEvents.emit(AppEvent.FlushComplete);
 
-    // After flush, navigate to the new path if the current file was renamed
     const renamedTo = renamedPaths.get(this.currentPath);
     if (renamedTo) {
       appEvents.emit(AppEvent.Navigate, { path: renamedTo });
     } else if (deletedPaths.includes(this.currentPath)) {
       const raw = await provider?.readFile(this.currentPath);
       if (!raw) {
-        const editorEl = this.editor.element as HTMLElement;
-        editorEl.classList.remove("pending-delete-tint");
+        clearEditorTint(this.editor.element as HTMLElement);
         appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+      } else {
+        updateEditorTint(this.editor.element as HTMLElement, this.currentPath, this.pendingOps);
       }
+    } else {
+      updateEditorTint(this.editor.element as HTMLElement, this.currentPath, this.pendingOps);
     }
 
     showNotification("All files saved", { type: "success" });
@@ -260,63 +265,89 @@ export class FileSyncController {
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
   }
 
-  private async executePendingOps(): Promise<{ deletedPaths: string[]; renamedPaths: Map<string, string> }> {
+  private async executePendingOps(flushedPaths?: Set<string>): Promise<{ deletedPaths: string[]; renamedPaths: Map<string, string> }> {
     if (this.pendingOps.count === 0) return { deletedPaths: [], renamedPaths: new Map() };
     const provider = getProvider();
     const deletedPaths: string[] = [];
     const renamedPaths = new Map<string, string>();
 
-    // Sort ops: Creates first (ensure target dirs exist), then Moves/Renames, then Deletes.
-    // This prevents a Delete from removing a directory before a Create writes into it.
     const sorted = [...this.pendingOps.all].sort((a, b) => {
-      const order: Record<string, number> = { create: 0, move: 1, rename: 1, delete: 2 };
+      const order: Record<PendingOpType, number> = {
+        [PendingOpType.Create]: 0,
+        [PendingOpType.Edit]: 0,
+        [PendingOpType.Move]: 1,
+        [PendingOpType.Rename]: 1,
+        [PendingOpType.Delete]: 2,
+      };
       return (order[a.type] ?? 1) - (order[b.type] ?? 1);
     });
 
+    const providerId = activeProviderId()
     for (const op of sorted) {
       try {
         switch (op.type) {
-          case PendingOpType.Create:
-            await provider?.writeFile(op.path, op.content);
-            treeStore.afterWrite(op.path);
-            break;
-          case PendingOpType.Delete:
-            await provider?.deleteFile?.(op.path);
-            treeStore.afterDelete(op.path);
-            deletedPaths.push(op.path);
-            break;
-          case PendingOpType.Rename:
-            renamedPaths.set(op.from, op.to);
-            if (op.content) {
-              await provider?.writeFile?.(op.to, op.content);
-              await provider?.deleteFile?.(op.from);
-              treeStore.afterMove(op.from, op.to);
-            } else {
-              await provider?.moveFile?.(op.from, op.to);
-              treeStore.afterMove(op.from, op.to);
+          case PendingOpType.Create: {
+            const latest = repo.get(op.path)?.reconstructContent() ?? op.content
+            await provider?.writeFile(op.path, latest)
+            treeStore.afterWrite(op.path, latest)
+            const page = repo.get(op.path)
+            if (page && page.bodyState.body !== undefined) {
+              page.setBaseline(page.bodyState.body)
             }
-            break;
+            break
+          }
+          case PendingOpType.Delete: {
+            await provider?.deleteFile?.(op.path)
+            storageService.removeEntity(STORE_FILES, `${providerId}/${op.path}`)
+            if (!op.path.endsWith("/_index")) {
+              const indexPath = op.path + "/_index"
+              await provider?.deleteFile?.(indexPath).catch(() => {})
+              storageService.removeEntity(STORE_FILES, `${providerId}/${indexPath}`)
+            }
+            treeStore.afterDelete(op.path)
+            deletedPaths.push(op.path)
+            break
+          }
+          case PendingOpType.Rename:
+            renamedPaths.set(op.from, op.to)
+            if (op.content) {
+              await provider?.deleteFile?.(op.from)
+              if (!flushedPaths?.has(op.to)) {
+                const latest = repo.get(op.to)?.reconstructContent() ?? op.content
+                await provider?.writeFile?.(op.to, latest)
+              }
+            } else {
+              await provider?.moveFile?.(op.from, op.to)
+            }
+            treeStore.afterMove(op.from, op.to, op.content)
+            storageService.removeEntity(STORE_FILES, `${providerId}/${op.from}`)
+            break
           case PendingOpType.Move:
             if (op.content) {
-              await provider?.writeFile?.(op.to, op.content);
-              await provider?.deleteFile?.(op.from);
-              treeStore.afterMove(op.from, op.to);
+              await provider?.deleteFile?.(op.from)
+              if (!flushedPaths?.has(op.to)) {
+                const latest = repo.get(op.to)?.reconstructContent() ?? op.content
+                await provider?.writeFile?.(op.to, latest)
+              }
             } else {
-              await provider?.moveFile?.(op.from, op.to);
-              treeStore.afterMove(op.from, op.to);
+              await provider?.moveFile?.(op.from, op.to)
             }
-            break;
+            treeStore.afterMove(op.from, op.to, op.content)
+            storageService.removeEntity(STORE_FILES, `${providerId}/${op.from}`)
+            break
+          case PendingOpType.Edit:
+            break
         }
       } catch (error) {
         console.error(
           `Failed to execute pending op ${op.type} ${"path" in op ? op.path : op.from}:`,
           error,
-        );
+        )
       }
     }
 
     this.pendingOps.clear();
-    pendingOpsRepository.clear();
+    pendingOpsStore.clear();
     return { deletedPaths, renamedPaths };
   }
 
@@ -346,13 +377,14 @@ export class FileSyncController {
 
   async discardFileChanges(pagePath: string): Promise<void> {
     this.cancelCreate(pagePath);
+    this.pendingOps.cancelEdit(pagePath);
+    pendingOpsStore.save(this.pendingOps.all);
     repo.clearPath(pagePath);
-    repo.save();
     this.recomputeDirty();
     this.editor.invalidateState(pagePath);
 
     if (pagePath === this.currentPath) {
-      (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+      clearEditorTint(this.editor.element as HTMLElement);
       const provider = getProvider();
       const raw = (await provider?.readFile(pagePath)) || "";
 
@@ -375,7 +407,7 @@ export class FileSyncController {
   // ── Changes dialog ──
 
   async handleDirtyClick(): Promise<void> {
-    const dirtyPaths = repo.getDirtyPaths();
+    const dirtyPaths = this.pendingOps.getDirtyPaths();
     if (dirtyPaths.length === 0 && this.pendingOps.count === 0) return;
 
     const provider = getProvider();
@@ -396,6 +428,9 @@ export class FileSyncController {
         case PendingOpType.Move:
           label = `Move: ${op.from} → ${op.to}`;
           break;
+        case PendingOpType.Edit:
+          label = `Edit: ${op.path}`;
+          break;
       }
       pendingChanges.push({ opLabel: label });
     }
@@ -403,7 +438,14 @@ export class FileSyncController {
     const dirtyChanges: ChangesDialogData[] = [];
 
     for (const path of dirtyPaths) {
-      let md = repo.getOrCreate(path).reconstructContent();
+      const editOp = this.pendingOps.findEdit(path);
+      const page = repo.getOrCreate(path);
+
+      if (editOp && editOp.patch) {
+        page.bodyState.body = editOp.patch;
+      }
+
+      let md = page.reconstructContent();
 
       if (!md && path === this.currentPath) {
         md = this.editor.getCurrentContent();
@@ -421,11 +463,15 @@ export class FileSyncController {
 
       if (!md) continue;
 
+      const changeSize = editOp
+        ? editOp.patch.length - (page.bodyState.baseline?.length ?? 0)
+        : page.bodyState.getDelta();
+
       dirtyChanges.push({
         path,
         currentPath: path === this.currentPath,
         md,
-        changeSize: repo.getOrCreate(path).bodyState.getDelta(),
+        changeSize,
       });
     }
 
@@ -436,13 +482,14 @@ export class FileSyncController {
       {
         onDiscard: (path) => {
           this.cancelCreate(path);
+          this.pendingOps.cancelEdit(path);
+          pendingOpsStore.save(this.pendingOps.all);
           repo.clearPath(path);
-          repo.save();
           this.recomputeDirty();
           this.editor.invalidateState(path);
 
           if (path === this.currentPath) {
-            (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+            clearEditorTint(this.editor.element as HTMLElement);
             provider?.readFile(path).then((raw) => {
               if (!raw) {
                 appEvents.emit(AppEvent.NoFileView, { lastPath: path });
@@ -469,19 +516,17 @@ export class FileSyncController {
         },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
-          const dirtyPaths = repo.getDirtyPaths();
-          const pendingCreatePaths = this.pendingOps.all
-            .filter(o => o.type === PendingOpType.Create)
+          const dirtyPaths = this.pendingOps.getDirtyPaths();
+          const allPaths = this.pendingOps.all
+            .filter(o => o.type === PendingOpType.Create || o.type === PendingOpType.Edit)
             .map(o => o.path);
-          const allPaths = [...new Set([...dirtyPaths, ...pendingCreatePaths])];
 
           for (const p of allPaths) {
             repo.clearPath(p);
             this.editor.invalidateState(p);
           }
           this.clearPendingOps();
-          await imageRepository.removeAllForDir(imageRepository.getCurrentDocDir());
-          repo.save();
+          await imageService.removeAllForDir(imageService.getCurrentDocDir());
           this.recomputeDirty();
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
@@ -490,10 +535,10 @@ export class FileSyncController {
             const raw = (await provider?.readFile(this.currentPath)) || "";
 
             if (!raw) {
-              (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+              clearEditorTint(this.editor.element as HTMLElement);
               appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
             } else {
-              (this.editor.element as HTMLElement).classList.remove("pending-delete-tint");
+              clearEditorTint(this.editor.element as HTMLElement);
               const { frontmatter, body } = stripFrontmatter(raw);
               const page = repo.getOrCreate(this.currentPath);
               if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
@@ -501,6 +546,8 @@ export class FileSyncController {
               page.setBaseline(body);
               await this.editor.ensureEditor(body);
             }
+          } else {
+            updateEditorTint(this.editor.element as HTMLElement, this.currentPath, this.pendingOps);
           }
         },
       },

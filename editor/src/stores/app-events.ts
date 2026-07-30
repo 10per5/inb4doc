@@ -10,6 +10,8 @@ import type { ViewType } from "@/controllers/view-controller"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
 import type { ProviderType } from "@/providers/index"
 import type { ToolbarCommand } from "@/config/enums"
+import type { FileEntry } from "@/config/storage-keys"
+
 
 // ── Event names ──
 
@@ -54,6 +56,9 @@ export enum AppEvent {
   ToolbarCommandExec = "toolbar-command-exec",
   ScrollToText = "scroll-to-text",
   LinkDialogRequested = "link-dialog-requested",
+
+  // Storage
+  ProviderFilesLoaded = "provider-files-loaded",
 }
 
 // ── Strict payload map ──
@@ -93,6 +98,8 @@ export interface AppEventPayloads {
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
   [AppEvent.ScrollToText]:          { query: string; matchIndex: number; snippetText?: string }
   [AppEvent.LinkDialogRequested]:   void
+
+  [AppEvent.ProviderFilesLoaded]:  Record<string, FileEntry>
 }
 
 // ── EventBus ──

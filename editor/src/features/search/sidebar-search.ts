@@ -1,8 +1,8 @@
 import { getProvider } from "@/stores/provider-store";
-import { searchCache, type SearchMatch } from "@/controllers/file-sync-controller";
+import { searchCache, type SearchMatch } from "@/services/file-sync-service";
 import { register as registerHotkey } from "@/utils/hotkeys";
 
-export type { SearchMatch } from "@/controllers/file-sync-controller";
+export type { SearchMatch } from "@/services/file-sync-service";
 
 export function focusSidebarSearch(): void {
   const input = document.querySelector<HTMLInputElement>(".sidebar-search");

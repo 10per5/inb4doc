@@ -41,6 +41,16 @@
   position: relative;
 }
 
+.nav-section-children .nav-empty {
+  display: block;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  font-style: italic;
+  opacity: 0.45;
+  font-size: 0.8em;
+  user-select: none;
+}
+
 .sidebar-inner > .nav-item {
   display: flex;
   flex-wrap: wrap;

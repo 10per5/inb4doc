@@ -1,30 +1,15 @@
 import { appEvents, AppEvent } from "@/stores/app-events";
-import { pageRepository } from "@/repositories/pageRepository";
-import { pendingOpsRepository } from "@/repositories/pendingOpsRepository";
+import { pagesStore } from "@/stores/page-store";
+import { pendingOpsStore } from "@/stores/pending-ops-store";
+import { PendingOps, PendingOpType, type PendingOp } from "@/entities/PendingOps";
 import { Frontmatter } from "@/entities/Frontmatter";
 import type { MetaPanelData } from "@/components/panels/meta-panel";
-import { scheduleSave } from "@/stores/persistence";
 
-/**
- * DirtyTrackingService — single sink for all dirty-state changes.
- *
- * Every edit (ProseMirror body change, frontmatter edit, flush, discard,
- * provider switch, …) funnels through here. It owns:
- *   - per-path debouncing of body edits,
- *   - baseline comparison via `Page`/`Body`,
- *   - the `meta.dirty` flag,
- *   - debounced cache persistence (via `persistence`),
- *   - emission of the authoritative `DirtyChanged` event.
- *
- * The counter is always recomputed from `pageRepository.getDirtyPaths()`, so the
- * displayed count can never diverge from the true dirty set — regardless of which
- * editor instance or code path produced the change.
- */
 export class DirtyTrackingService {
   private unsubs: (() => void)[] = [];
   private pathResolver: () => string = () => "";
+  private pendingOps?: PendingOps;
 
-  /** Latest pending body edit per path, flushed on the trailing debounce. */
   private pendingBodies = new Map<string, string>();
   private bodyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -32,6 +17,10 @@ export class DirtyTrackingService {
 
   setPathResolver(resolver: () => string): void {
     this.pathResolver = resolver;
+  }
+
+  setPendingOps(ops: PendingOps): void {
+    this.pendingOps = ops;
   }
 
   start(): void {
@@ -53,9 +42,8 @@ export class DirtyTrackingService {
     this.pendingBodies.clear();
   }
 
-  // ── Event handlers ──
-
   private onEditorChanged(path: string, md: string): void {
+    if (!this.pendingOps) return;
     const existing = this.bodyTimers.get(path);
     if (existing !== undefined) clearTimeout(existing);
 
@@ -68,59 +56,122 @@ export class DirtyTrackingService {
         if (body === undefined) return;
         this.pendingBodies.delete(path);
 
-        pageRepository.getOrCreate(path).setBody(body);
+        const createOp = this.pendingOps!.findCreate(path);
+        if (createOp) {
+          const page = pagesStore.getOrCreate(path);
+          page.bodyState.setBody(body);
+          const full = page.reconstructContent() ?? body;
+          this.pendingOps!.queueCreate(path, full);
+          pendingOpsStore.save(this.pendingOps!.all);
+          return;
+        }
+
+        const editOp = this.pendingOps!.findEdit(path);
+        if (editOp) {
+          editOp.patch = body;
+        } else {
+          this.pendingOps!.queueEdit(path, body);
+        }
+        pendingOpsStore.save(this.pendingOps!.all);
+
         this.recomputeAndEmit();
-        scheduleSave();
       }, DirtyTrackingService.BODY_DEBOUNCE_MS),
     );
   }
 
   private onMetaDataChanged(data: MetaPanelData): void {
+    if (!this.pendingOps) return;
     const path = this.pathResolver();
     if (!path) return;
 
-    const page = pageRepository.getOrCreate(path);
+    const page = pagesStore.getOrCreate(path);
     page.frontmatter = Frontmatter.fromMeta(data);
-    page.markDirty();
+
+    const createOp = this.pendingOps.findCreate(path);
+    if (createOp) {
+      const full = page.reconstructContent() ?? "";
+      this.pendingOps.queueCreate(path, full);
+      pendingOpsStore.save(this.pendingOps.all);
+      return;
+    }
+
+    const editOp = this.pendingOps.findEdit(path);
+    if (editOp) {
+      const original = page.originalFrontmatter?.toMeta();
+      const changed: Record<string, string | number | undefined> = {}
+      for (const key of Object.keys({ ...data, ...original })) {
+        if (data[key as keyof MetaPanelData] !== original?.[key as keyof MetaPanelData]) {
+          changed[key] = data[key as keyof MetaPanelData]
+        }
+      }
+      editOp.frontmatterPatch = Object.keys(changed).length > 0 ? changed : undefined
+    } else {
+      const original = page.originalFrontmatter?.toMeta();
+      const changed: Record<string, string | number | undefined> = {}
+      for (const key of Object.keys({ ...data, ...original })) {
+        if (data[key as keyof MetaPanelData] !== original?.[key as keyof MetaPanelData]) {
+          changed[key] = data[key as keyof MetaPanelData]
+        }
+      }
+      this.pendingOps.queueEdit(path, page.bodyState.body ?? "", Object.keys(changed).length > 0 ? changed : undefined)
+    }
+    pendingOpsStore.save(this.pendingOps.all);
 
     this.recomputeAndEmit();
-    scheduleSave();
   }
 
-  // ── Public API for callers outside the event stream ──
-
-  /** Recompute and emit the authoritative dirty state immediately. */
   recompute(): void {
     this.recomputeAndEmit();
   }
 
-  /** Force any pending debounced body edits to flush now. */
   flush(): void {
+    if (!this.pendingOps) return;
     for (const [path, timer] of this.bodyTimers) {
       clearTimeout(timer);
       const body = this.pendingBodies.get(path);
-      if (body !== undefined) {
-        this.pendingBodies.delete(path);
-        pageRepository.getOrCreate(path).setBody(body);
+      if (body === undefined) continue;
+      this.pendingBodies.delete(path);
+
+      const createOp = this.pendingOps.findCreate(path);
+      if (createOp) {
+        const page = pagesStore.getOrCreate(path);
+        page.bodyState.setBody(body);
+        const full = page.reconstructContent() ?? body;
+        this.pendingOps.queueCreate(path, full);
+        pendingOpsStore.save(this.pendingOps.all);
+        continue;
       }
+
+      const editOp = this.pendingOps.findEdit(path);
+      if (editOp) {
+        editOp.patch = body;
+      } else {
+        this.pendingOps.queueEdit(path, body);
+      }
+      pendingOpsStore.save(this.pendingOps.all);
     }
     this.bodyTimers.clear();
     this.recomputeAndEmit();
-    scheduleSave();
   }
 
-  // ── Recompute ──
-
   private recomputeAndEmit(): void {
+    if (!this.pendingOps) return;
     let totalBytes = 0;
-    const dirtyPaths = pageRepository.getDirtyPaths();
+    const dirtyPaths = this.pendingOps.getDirtyPaths();
     for (const p of dirtyPaths) {
-      totalBytes += pageRepository.getOrCreate(p).bodyState.getDelta();
+      const editOp = this.pendingOps.findEdit(p);
+      if (editOp) {
+        totalBytes += editOp.patch.length;
+      } else {
+        const page = pagesStore.get(p);
+        const baseline = page?.bodyState.baseline;
+        if (baseline) totalBytes += baseline.length;
+      }
     }
 
     const count = dirtyPaths.length;
-    const pendingCount = pendingOpsRepository.load().length;
-    const isSingleDirty = count === 1 && pendingCount === 0;
+    const pendingCount = this.pendingOps.all.filter(o => o.type !== PendingOpType.Edit).length;
+    const isSingleDirty = count === 1 && pendingCount <= 1;
 
     appEvents.emit(AppEvent.DirtyChanged, {
       count,

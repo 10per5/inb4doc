@@ -1,19 +1,30 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate"
 import { showNotification } from "@/components/notification/notification"
+import { storageService } from "@/services/storage"
+import { IMAGE_PREFIX } from "@/config/storage-keys"
 
-const STORAGE_PREFIX = "inb4doc:"
+const IMAGE_DATA_PREFIX = "inb4doc:image:"
 
 export async function exportToZip(): Promise<void> {
   const files: Record<string, Uint8Array> = {}
   let count = 0
 
+  storageService.forEachFile((_providerId, path, entry) => {
+    if (entry.content) {
+      files[`${path}.md`] = strToU8(entry.content)
+      count++
+    }
+  })
+
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i)
-    if (key && key.startsWith(STORAGE_PREFIX)) {
-      const relPath = key.slice(STORAGE_PREFIX.length)
+    if (!key) continue
+
+    if (key.startsWith(IMAGE_DATA_PREFIX)) {
+      const name = key.slice(IMAGE_DATA_PREFIX.length)
       const content = localStorage.getItem(key)
       if (content) {
-        files[relPath] = strToU8(content)
+        files[`images/${name}`] = strToU8(content)
         count++
       }
     }

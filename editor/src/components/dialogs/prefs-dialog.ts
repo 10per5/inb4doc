@@ -1,12 +1,11 @@
-import { loadPrefs, savePrefs } from "@/utils/storage"
-import type { ImageStorageMode } from "@/utils/storage"
+import type { ImageStorageMode } from "@/services/storage"
+import { prefsStore } from "@/stores/preferences-store"
 import { openHtmlDialog } from "@/services/dialog-service"
 import renderPrefsDialog from "@/eta/dialogs/prefs-dialog"
 import { PrefsDialogEvent } from "@/controllers/dialog/prefs-dialog-controller"
 
 export function applyThemeFromPrefs() {
-  const prefs = loadPrefs()
-  if (prefs.darkMode) {
+  if (prefsStore.darkMode) {
     document.documentElement.setAttribute("data-theme", "dark")
   } else {
     document.documentElement.removeAttribute("data-theme")
@@ -19,12 +18,10 @@ export interface PrefsDialogActions {
 }
 
 export function openPrefsDialog(actions: PrefsDialogActions) {
-  const prefs = loadPrefs()
-
   const html = renderPrefsDialog({
-    stickyToolbar: prefs.stickyToolbar,
-    darkMode: prefs.darkMode,
-    imageStorageMode: prefs.imageStorageMode,
+    stickyToolbar: prefsStore.stickyToolbar,
+    darkMode: prefsStore.darkMode,
+    imageStorageMode: prefsStore.imageStorageMode,
   })
 
   const { el: overlay, close } = openHtmlDialog({ html })

@@ -1,8 +1,8 @@
 import { confirmDialog, promptDialog, promptCreateDialog } from "@/components/dialogs/dialog"
 import { serializeFrontmatter } from "@/utils/frontmatter"
 import type { MetaPanelData } from "@/components/panels/meta-panel"
-import { pageRepository } from "@/repositories/pageRepository"
-import type { FileSyncController } from "@/controllers/file-sync-controller"
+import { pagesStore } from "@/stores/page-store"
+import type { FileSyncService } from "@/services/file-sync-service"
 import { showNotification } from "@/components/notification/notification"
 import { treeStore } from "@/stores/tree-store"
 import { HOME_PATH, HOME_FILENAME, validateHugoSlug } from "@/utils/hugo-compat"
@@ -28,7 +28,7 @@ function findCaseInsensitiveFile(tree: TreeIndex, parentDir: string, slug: strin
 }
 
 export async function createNewItem(
-  cacheService: FileSyncController,
+  cacheService: FileSyncService,
   pagePath: string,
   doNavigate: (path: string) => void,
   loadSidebar: () => Promise<void>,
@@ -76,7 +76,7 @@ export async function createNewItem(
       })
       if (!confirmed) return
 
-      const existingPage = pageRepository.get(existingPath)
+      const existingPage = pagesStore.get(existingPath)
       let existingBody = existingPage?.bodyState.body ?? existingPage?.bodyState.baseline
       let existingFm = existingPage?.getFrontmatter()
 
@@ -100,11 +100,11 @@ export async function createNewItem(
       const content = `---\n${fmStr}\n---\n\n${existingBody}`
 
       cacheService.queueMove(existingPath, indexPath, content)
-      const idxPage = pageRepository.getOrCreate(indexPath)
+      const idxPage = pagesStore.getOrCreate(indexPath)
       idxPage.setFrontmatter(fmData)
       idxPage.bodyState.cacheBody(existingBody)
       idxPage.setBaseline(existingBody)
-      pageRepository.clearPath(existingPath)
+      pagesStore.clearPath(existingPath)
 
       await loadSidebar()
       doNavigate(indexPath)
@@ -117,7 +117,7 @@ export async function createNewItem(
     const content = `---\n${fmStr}\n---\n\n${body}`
 
     cacheService.queueCreate(indexPath, content)
-    const idxPage = pageRepository.getOrCreate(indexPath)
+    const idxPage = pagesStore.getOrCreate(indexPath)
     idxPage.setFrontmatter(fmData)
     idxPage.bodyState.cacheBody(body)
     idxPage.setBaseline(body)
@@ -136,7 +136,7 @@ export async function createNewItem(
     const content = `---\n${fmStr}\n---\n\n${body}`
 
     cacheService.queueCreate(fullPath, content)
-    const fp = pageRepository.getOrCreate(fullPath)
+    const fp = pagesStore.getOrCreate(fullPath)
     fp.setFrontmatter(fmData)
     fp.bodyState.cacheBody(body)
     fp.setBaseline(body)
@@ -147,7 +147,7 @@ export async function createNewItem(
 }
 
 export async function deletePage(
-  cacheService: FileSyncController,
+  cacheService: FileSyncService,
   pagePath: string,
   afterDelete: () => void
 ): Promise<boolean> {
@@ -165,15 +165,22 @@ export async function deletePage(
 }
 
 export async function renamePage(
-  cacheService: FileSyncController,
+  cacheService: FileSyncService,
   pagePath: string,
   afterRename: (newPath: string | null) => void,
   validateSlug?: (slug: string, parentDir: string) => string | null | Promise<string | null>,
 ): Promise<void> {
-  const name = prompt("New name:")
-  if (!name) return
+  const currentTitle = pagePath.split("/").pop() || ""
+  const result = await promptDialog({
+    title: "Rename page",
+    label: "New name:",
+    placeholder: "My Page",
+    value: currentTitle,
+    confirmLabel: "Rename",
+  })
+  if (!result) return
 
-  const slug = name
+  const slug = result
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9_-]/g, "")
@@ -202,7 +209,7 @@ export async function renamePage(
 }
 
 export async function createDirectory(
-  cacheService: FileSyncController,
+  cacheService: FileSyncService,
   parentPath: string,
   doNavigate: (path: string) => void,
   loadSidebar: () => Promise<void>
@@ -246,7 +253,7 @@ export async function createDirectory(
     })
     if (!confirmed) return
 
-    const existingPage = pageRepository.get(existingPath)
+    const existingPage = pagesStore.get(existingPath)
     let existingBody = existingPage?.bodyState.body ?? existingPage?.bodyState.baseline
     let existingFm = existingPage?.getFrontmatter()
 
@@ -270,11 +277,11 @@ export async function createDirectory(
     const content = `---\n${fmStr}\n---\n\n${existingBody}`
 
     cacheService.queueMove(existingPath, indexPath, content)
-    const idxPage = pageRepository.getOrCreate(indexPath)
+    const idxPage = pagesStore.getOrCreate(indexPath)
     idxPage.setFrontmatter(fmData)
     idxPage.bodyState.cacheBody(existingBody)
     idxPage.setBaseline(existingBody)
-    pageRepository.clearPath(existingPath)
+    pagesStore.clearPath(existingPath)
 
     await loadSidebar()
     doNavigate(indexPath)
@@ -287,7 +294,7 @@ export async function createDirectory(
   const content = `---\n${fmStr}\n---\n\n${body}`
 
   cacheService.queueCreate(indexPath, content)
-  const idp = pageRepository.getOrCreate(indexPath)
+  const idp = pagesStore.getOrCreate(indexPath)
   idp.setFrontmatter(fmData)
   idp.bodyState.cacheBody(body)
   idp.setBaseline(body)
@@ -297,7 +304,7 @@ export async function createDirectory(
 }
 
 export async function movePage(
-  cacheService: FileSyncController,
+  cacheService: FileSyncService,
   from: string,
   to: string,
   afterMove: () => void
