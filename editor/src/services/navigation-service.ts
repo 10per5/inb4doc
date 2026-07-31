@@ -3,9 +3,7 @@ import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
 import { storageService } from "@/services/storage";
 import { getProvider, switchProvider, getProviderDisplayInfo } from "@/stores/provider-store";
-import type SidebarController from "@/controllers/sidebar-controller";
-import { type SidebarActions } from "@/components/panels/sidebar";
-import { openProviderDialog } from "@/components/dialogs/provider-dialog";
+import { openProviderDialog } from "@/controllers/dialog/provider-dialog";
 import { showNotification } from "@/components/notification/notification";
 import { pagesStore } from "@/stores/page-store";
 import { pushPath, replacePath } from "@/utils/url";
@@ -18,35 +16,29 @@ import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
 import type { FileSyncService } from "@/services/file-sync-service";
-import type { MetaPanelAPI } from "@/components/panels/meta-panel";
 
 export class NavigationService {
   private currentPath: string = "";
   private loading: boolean = false;
   private editor: EditorController;
   private cache: FileSyncService;
-  private sidebarEl: HTMLElement;
-  private sidebarController: SidebarController;
-  private metaPanel: MetaPanelAPI | undefined;
   private unsubs: (() => void)[] = [];
 
-  constructor(editor: EditorController, cache: FileSyncService, sidebarEl: HTMLElement, sidebarController: SidebarController) {
+  constructor(editor: EditorController, cache: FileSyncService) {
     this.editor = editor;
     this.cache = cache;
-    this.sidebarEl = sidebarEl;
-    this.sidebarController = sidebarController;
 
     this.unsubs.push(
-      appEvents.on(AppEvent.Navigate, ({ path }) => this.navigate(path)),
+      appEvents.on(AppEvent.Navigate, ({ path, query, matchIndex, snippetText }) =>
+        this.navigate(path, true, query, matchIndex, snippetText),
+      ),
+      appEvents.on(AppEvent.SidebarNewItemRequested, ({ parentPath, isFolder }) =>
+        createNewItem(this.cache, parentPath, (p) => this.navigate(p), () => this.loadSidebar(), isFolder),
+      ),
+      appEvents.on(AppEvent.SidebarDeleteRequested, ({ path }) => this.deletePage(path)),
+      appEvents.on(AppEvent.SidebarRenameRequested, ({ path }) => this.renamePage(path)),
+      appEvents.on(AppEvent.SidebarMoveRequested, ({ from, to }) => this.movePage(from, to)),
     );
-  }
-
-  setMetaPanel(panel: MetaPanelAPI): void {
-    this.metaPanel = panel;
-  }
-
-  getMetaPanel(): MetaPanelAPI | undefined {
-    return this.metaPanel;
   }
 
   getCurrentPath(): string {
@@ -93,7 +85,7 @@ export class NavigationService {
         | { type: PendingOpType.Move; from: string; to: string }
         | undefined;
       const effectivePath = moveOp ? moveOp.from : path;
-      const rawContent = await this.editor.fetchContent(effectivePath, (data) => this.metaPanel?.update(data));
+      const rawContent = await this.editor.fetchContent(effectivePath, () => appEvents.emit(AppEvent.MetaPanelReload));
 
       if (rawContent === null) {
         const dirIndex = isHugoIndex(path);
@@ -127,7 +119,7 @@ export class NavigationService {
         });
       }
 
-      this.sidebarController.setActive(path);
+      appEvents.emit(AppEvent.SidebarActive, { path });
       dirtyTrackingService.recompute();
       addRecent(path);
     } finally {
@@ -136,43 +128,15 @@ export class NavigationService {
   }
 
   async loadSidebar(): Promise<void> {
-    if (!this.sidebarEl) return;
-
     try {
-      const provider = getProvider();
       const treeIndex = treeStore.getTree();
-
-      const pendingOps = this.cache.getPendingOps().all;
-      const dirtyPaths = this.cache.getPendingOps().getDirtyPaths();
-
       const mergedTree = this.cache.getPendingOps().applyToTree(treeIndex);
 
-      const actions: SidebarActions = {
-        onNavigate: (path, query, matchIndex, snippetText) => this.navigate(path, true, query, matchIndex, snippetText),
-        onNewItem: (parentPath, isFolder) =>
-          createNewItem(this.cache, parentPath, (p) => this.navigate(p), () => this.loadSidebar(), isFolder),
-        onDelete: (path) => this.deletePage(path),
-        onRename: (path) => this.renamePage(path),
-        onMove: (from, to) => this.movePage(from, to),
-        onChangeProvider: () => this.changeProvider(),
-      };
-
-      const pdi = getProviderDisplayInfo(provider.name);
-      this.sidebarController.load({
-        tree: mergedTree,
-        current: this.currentPath,
-        actions,
-        providerIcon: pdi.icon,
-        providerLabel: pdi.label,
-        providerType: provider.name,
-        pendingOps,
-        dirtyPaths,
-        rawTree: treeIndex,
-      });
       setupNavListeners((path: string) => this.navigate(path));
 
       const pages = Array.from(mergedTree.paths);
       this.editor.getMentionView()?.setPages(pages, {});
+      appEvents.emit(AppEvent.SidebarReload);
     } catch (error) {
       console.error("Failed to load sidebar:", error);
     }

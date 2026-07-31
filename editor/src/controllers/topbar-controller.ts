@@ -1,6 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "@/config/enums";
+import { ToolbarAction, toolbarActions } from "@/config/enums/toolbar-action";
+import * as icons from "@/eta/icons";
+import renderTopbar from "@/eta/views/controller/topbar";
 import { formatBytes } from "@/utils/format";
 import { colors } from "@/config/theme";
 import { pressTwiceButton } from "@/components/ui/press-twice-button";
@@ -22,6 +25,14 @@ export default class extends Controller {
   private boundKeyUp = (e: KeyboardEvent) => {};
 
   connect() {
+    this.element.innerHTML = renderTopbar({
+      mobileCss: hasFunc(AppFunc.MobileCss),
+      toolbarActions,
+      ToolbarAction,
+      TOOLBAR_CMD_PREFIX,
+      ToolbarCommand,
+      icons: icons as Record<string, string>,
+    });
     this.createMenus();
     if (hasFunc(AppFunc.ToolbarQuickNav)) {
       this.boundKeyDown = this.onKeyDown.bind(this);

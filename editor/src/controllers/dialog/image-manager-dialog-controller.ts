@@ -1,6 +1,21 @@
+import type { ImageEntry } from "@/providers/provider"
 import { BaseDialogController } from "./base-dialog-controller"
+import renderImageManagerDialog from "@/eta/views/dialog/image-manager-dialog"
 
 export class ImageManagerDialogController extends BaseDialogController {
+  static values = { payload: Object }
+
+  declare payloadValue: {
+    title: string
+    dir?: string
+    loadError?: string | null
+    allEntries: (ImageEntry & { pending?: boolean })[]
+  }
+
+  connect() {
+    this.element.innerHTML = renderImageManagerDialog(this.payloadValue)
+  }
+
   review(e: Event) {
     const url = (e.currentTarget as HTMLElement).dataset.url
     if (url) window.open(url, "_blank")

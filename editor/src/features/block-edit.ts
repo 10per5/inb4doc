@@ -31,7 +31,7 @@ import {
   videoCamera,
 } from "@/eta/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
-import { openVideoDialog, type VideoDialogResult } from "@/components/dialogs/video-dialog";
+import { openVideoDialog, type VideoDialogResult } from "@/controllers/dialog/video-dialog";
 import { imageService } from "@/services/image-service";
 import {
   SlashCommand, SLASH_CMD_PREFIX,

@@ -4,27 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <%~ include('partials/head-meta', it) %>
+    <style><%~ it.criticalCss %></style>
     <link rel="stylesheet" href="assets/katex.css?ver=<%= it.APP_VERSION %>" />
-    <link rel="stylesheet" href="assets/app.css?ver=<%= it.APP_VERSION %>" />
+    <link rel="stylesheet" href="assets/theme-nord.css?ver=<%= it.APP_VERSION %>" />
   </head>
   <body>
-    <%~ include('views/loading-overlay', it) %>
     <div id="app" data-controller="shell" data-shell-editor-outlet="#editor-area">
       <div class="book-layout">
         <nav class="book-menu">
-          <%~ include('partials/sidebar', it) %>
+          <div id="sidebar-nav" data-controller="sidebar" data-shell-target="sidebar" data-action="keydown->sidebar#onKeydown">
+            <%~ include('partials/skeleton-sidebar', it) %>
+          </div>
         </nav>
         <div class="book-content">
-          <%~ include('partials/topbar', it) %>
+          <div id="app-toolbar" class="app-toolbar toolbar-skeleton" data-controller="topbar">
+            <%~ include('partials/skeleton-topbar', it) %>
+          </div>
           <div class="book-page">
             <div class="book-page-main">
               <%~ include('partials/editor-area', it) %>
             </div>
           </div>
         </div>
-        <aside class="book-aside" id="meta-panel-mount" data-shell-target="metaPanel"></aside>
+        <aside class="book-aside" id="meta-panel-mount" data-controller="meta-panel">
+          <%~ include('partials/skeleton-meta', it) %>
+        </aside>
       </div>
     </div>
+    <div data-controller="update"></div>
     <script type="module" src="assets/app.js?ver=<%= it.APP_VERSION %>"></script>
   </body>
 </html>

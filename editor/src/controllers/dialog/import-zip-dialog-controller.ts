@@ -1,13 +1,22 @@
 import { BaseDialogController } from "./base-dialog-controller"
+import renderImportZipDialog from "@/eta/views/dialog/import-zip-dialog"
 
 export class ImportZipDialogController extends BaseDialogController {
+  static values = { payload: Object }
+
+  declare payloadValue: {
+    newEntries: Array<{ relPath: string }>
+    replaceEntries: Array<{ relPath: string }>
+  }
+
   connect() {
+    this.element.innerHTML = renderImportZipDialog(this.payloadValue)
     this.updateButton()
   }
 
-  toggle() {
+  toggle(e: Event) {
     const replaceAll = this.element.querySelector("#replace-all-check") as HTMLInputElement | null
-    const target = (arguments[0]?.target as HTMLElement)?.closest("input[type='checkbox']") as HTMLInputElement | undefined
+    const target = (e.target as HTMLElement).closest("input[type='checkbox']") as HTMLInputElement | null
     if (target?.dataset.type === "replace" && !target.checked && replaceAll) {
       replaceAll.checked = false
     }

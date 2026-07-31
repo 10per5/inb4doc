@@ -1,29 +1,11 @@
-import { DialogEvent } from "@/controllers/dialog/dialog-events"
+import { DialogEvent } from "@/config/dialog-events"
+import { appState, type DialogState } from "@/stores/app-state"
 
 const OVERLAY_ID = "inb4doc-dialog-overlay"
-
-const overlayCss = `
-#${OVERLAY_ID} {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-  z-index: 1000; display: flex; align-items: center; justify-content: center;
-}
-#${OVERLAY_ID} > * { pointer-events: auto; }
-`
-
-let styleInjected = false
-
-function injectStyles() {
-  if (styleInjected) return
-  styleInjected = true
-  const s = document.createElement("style")
-  s.textContent = overlayCss
-  document.head.appendChild(s)
-}
 
 function createOverlay(classname?: string): HTMLDivElement {
   const existing = document.getElementById(OVERLAY_ID)
   if (existing) existing.remove()
-  injectStyles()
   const overlay = document.createElement("div")
   overlay.id = OVERLAY_ID
   if (classname) overlay.className = classname
@@ -31,46 +13,144 @@ function createOverlay(classname?: string): HTMLDivElement {
   return overlay
 }
 
-// ── Legacy API (render callback) ─────────────────────────────────────
+// ── Dialog host (state-driven) ──────────────────────────────────────
+//
+// The host tracks the open dialog in AppState. openDialog() sets
+// appState.dialog; the host's subscription mounts a `<div data-controller=
+// "<id>" data-<id>-payload-value="…" data-dialog-session="…">` wrapper whose
+// controller injects its own paired-eta view in connect(). dialog:confirm /
+// dialog:cancel (bubbled from the controller) resolve the per-session promise
+// and clear the state, so the next open self-mounts fresh (swapped) code.
 
-export interface DialogOptions {
-  class?: string
+interface DialogSession {
+  id: string
+  sessionId: string
+  resolve: (value: unknown) => void
+  listeners?: Record<string, (e: Event) => void>
   onClose?: () => void
-  render: (overlay: HTMLDivElement) => (void | (() => void))
+  cleanup: () => void
 }
+
+const sessions = new Map<string, DialogSession>()
+
+let hostReady = false
+
+export interface DialogHostOptions {
+  onClose?: () => void
+  listeners?: Record<string, (e: Event) => void>
+}
+
+export interface DialogOpenResult<T> {
+  promise: Promise<T | null>
+  overlay: HTMLDivElement
+  close: (value?: T) => void
+}
+
+function finishSession(sessionId: string, value: unknown): void {
+  const session = sessions.get(sessionId)
+  if (!session) return
+  sessions.delete(sessionId)
+  session.cleanup()
+  session.onClose?.()
+  session.resolve(value)
+  if (appState.get("dialog")?.sessionId === sessionId) {
+    appState.set("dialog", null)
+  }
+}
+
+function mountDialog(state: DialogState): void {
+  const session = sessions.get(state.sessionId)
+  if (!session) return
+
+  // Opening a new dialog while one is open silently closes the previous one.
+  const current = appState.get("dialog")
+  if (current && current.sessionId !== state.sessionId) {
+    finishSession(current.sessionId, null)
+  }
+
+  const overlay = createOverlay()
+
+  const wrapper = document.createElement("div")
+  wrapper.dataset.controller = state.id
+  wrapper.dataset.dialogSession = state.sessionId
+  wrapper.setAttribute(`data-${state.id}-payload-value`, JSON.stringify(state.payload ?? {}))
+  overlay.appendChild(wrapper)
+
+  if (session.listeners) {
+    for (const [event, fn] of Object.entries(session.listeners)) {
+      overlay.addEventListener(event, fn as EventListener)
+    }
+  }
+
+  const finish = (value: unknown) => finishSession(state.sessionId, value)
+  const onResolve = ((e: CustomEvent) => finish(e.detail)) as EventListener
+  const onCancel = () => finish(null)
+  const onBackdrop = (e: Event) => {
+    if (e.target === overlay) finish(null)
+  }
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") finish(null)
+  }
+
+  overlay.addEventListener(DialogEvent.Confirm, onResolve)
+  overlay.addEventListener(DialogEvent.Cancel, onCancel)
+  overlay.addEventListener("click", onBackdrop)
+  document.addEventListener("keydown", onKeydown)
+
+  session.cleanup = () => {
+    overlay.removeEventListener(DialogEvent.Confirm, onResolve)
+    overlay.removeEventListener(DialogEvent.Cancel, onCancel)
+    overlay.removeEventListener("click", onBackdrop)
+    document.removeEventListener("keydown", onKeydown)
+    if (session.listeners) {
+      for (const event of Object.keys(session.listeners)) {
+        overlay.removeEventListener(event, session.listeners[event] as EventListener)
+      }
+    }
+    overlay.remove()
+  }
+}
+
+function ensureHost(): void {
+  if (hostReady) return
+  hostReady = true
+  appState.on("dialog", (state) => {
+    if (state) mountDialog(state)
+  })
+}
+
+export function openDialog<T = unknown>(
+  id: string,
+  payload?: unknown,
+  options: DialogHostOptions = {}
+): DialogOpenResult<T> {
+  ensureHost()
+  const sessionId = Math.random().toString(36).slice(2)
+
+  const result = {} as DialogOpenResult<T>
+  const promise = new Promise<T | null>((resolve) => {
+    sessions.set(sessionId, {
+      id,
+      sessionId,
+      resolve: resolve as (value: unknown) => void,
+      listeners: options.listeners,
+      onClose: options.onClose,
+      cleanup: () => {},
+    })
+    appState.set("dialog", { id, sessionId, payload })
+  })
+  result.promise = promise
+  result.overlay = document.getElementById(OVERLAY_ID) as HTMLDivElement
+  result.close = (value?: T) => finishSession(sessionId, (value ?? null) as unknown)
+  return result
+}
+
+// ── Legacy API (html string + Stimulus) ─────────────────────────────
 
 export interface DialogHandle {
   close: () => void
   el: HTMLDivElement
 }
-
-export function openDialog(opts: DialogOptions): DialogHandle {
-  const overlay = createOverlay(opts.class)
-
-  let cleanup: (() => void) | void
-
-  const close = () => {
-    cleanup?.()
-    opts.onClose?.()
-    document.removeEventListener("keydown", onKeydown)
-    overlay.remove()
-  }
-
-  const onKeydown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") close()
-  }
-  document.addEventListener("keydown", onKeydown)
-
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) close()
-  })
-
-  cleanup = opts.render(overlay)
-
-  return { close, el: overlay }
-}
-
-// ── New API (html string + Stimulus) ─────────────────────────────────
 
 export interface HtmlDialogOptions {
   class?: string
@@ -146,33 +226,4 @@ export function openHtmlDialogPromise<T = void>(opts: HtmlDialogPromiseOptions<T
   })
 }
 
-// ── Legacy promise API (render callback) ─────────────────────────────
-
-export function openDialogPromise<T>(opts: {
-  class?: string
-  render: (overlay: HTMLDivElement, resolve: (value: T) => void) => void | (() => void)
-}): Promise<T> {
-  return new Promise<T>((resolve) => {
-    const overlay = createOverlay(opts.class)
-
-    let cleanup: (() => void) | void
-
-    const finish = (value: T) => {
-      cleanup?.()
-      document.removeEventListener("keydown", onKeydown)
-      overlay.remove()
-      resolve(value)
-    }
-
-    const onKeydown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") finish(null as T)
-    }
-    document.addEventListener("keydown", onKeydown)
-
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) finish(null as T)
-    })
-
-    cleanup = opts.render(overlay, finish)
-  })
-}
+// ── Legacy promise API (html string + Stimulus) ─────────────────────

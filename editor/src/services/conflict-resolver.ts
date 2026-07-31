@@ -1,8 +1,8 @@
 import type { Page } from "@/entities/Page"
-import type { MetaPanelData } from "@/components/panels/meta-panel"
+import type { MetaPanelData } from "@/entities/Frontmatter"
 import { serializeFrontmatter } from "@/utils/frontmatter"
 import { pagesStore } from "@/stores/page-store"
-import { openExternalChangeDialog } from "@/components/dialogs/external-change-dialog"
+import { openExternalChangeDialog } from "@/controllers/dialog/external-change-dialog"
 import { Frontmatter } from "@/entities/Frontmatter"
 import type { PendingOps } from "@/entities/PendingOps"
 

@@ -1,0 +1,376 @@
+import { resolve } from "path";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "fs";
+import {
+  resolveConfig,
+  createCompiler,
+  createBundleHandler,
+  NoopLogger,
+} from "@farmfe/core";
+
+export interface BundleOptions {
+  cwd: string;
+  dev: boolean;
+  withMeta: boolean;
+  onUpdate?: () => void;
+}
+
+export interface BundleResult {
+  exitCode: number;
+}
+
+const CTRL_SUFFIX_RE = /[-_]controller$/;
+const EXT_TS = ".ts";
+const DIALOG_SUBDIR = "dialog";
+const CTRL_TEMPLATE_DIR = "eta/views/controller";
+const DIALOG_TEMPLATE_DIR = "eta/views/dialog";
+// Controllers never registered in app.ts (e.g. the abstract base class) get no
+// chunk-map entry, no prune target, and no swap rule.
+const EXCLUDED_CONTROLLER_IDS = new Set(["base-dialog"]);
+
+interface ControllerReg {
+  id: string;
+  rel: string;
+  isDialog: boolean;
+  templateRel: string | null;
+}
+
+// Each Stimulus controller becomes its own chunk. A controller paired with a
+// compiled template (src/eta/views/controller/<id>.ts for non-dialogs,
+// src/eta/views/dialog/<id>.ts for dialogs) is bundled together with that
+// template. Dialog controllers additionally pull their facade helper
+// (src/controllers/dialog/<id>.ts) into the same chunk so controller + helper +
+// template reload as one unit.
+function discoverControllers(
+  controllersDir: string,
+  srcDir: string
+): ControllerReg[] {
+  const result: ControllerReg[] = [];
+
+  function walk(dir: string): void {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.name.endsWith(EXT_TS)) continue;
+      const name = entry.name.slice(0, -EXT_TS.length);
+      const id = name.replace(CTRL_SUFFIX_RE, "");
+      if (id === name) continue;
+      const rel = full.replace(srcDir + "/", "").replace(EXT_TS, "");
+      const isDialog = rel.startsWith(`controllers/${DIALOG_SUBDIR}/`);
+      const templateRel = pairedTemplate(id, srcDir, isDialog);
+      result.push({ id, rel, isDialog, templateRel });
+    }
+  }
+
+  walk(controllersDir);
+  return result;
+}
+
+function pairedTemplate(
+  id: string,
+  srcDir: string,
+  isDialog: boolean
+): string | null {
+  const rel = `${isDialog ? DIALOG_TEMPLATE_DIR : CTRL_TEMPLATE_DIR}/${id}`;
+  return existsSync(resolve(srcDir, `${rel}.ts`)) ? rel : null;
+}
+
+function controllerRules(
+  controllers: ControllerReg[]
+): Array<{ name: string; test: string[] }> {
+  return controllers
+    .filter((c) => !EXCLUDED_CONTROLLER_IDS.has(c.id))
+    .map((c) => {
+      // A controller in its own subfolder (e.g. src/controllers/meta-panel/)
+      // claims the whole folder so helper modules reload with it. Only treat
+      // controllers with a real subfolder this way — a flat controller's rel
+      // still starts with "controllers/", which must not become a folder rule.
+      const folder = !c.isDialog && c.rel.split("/").length > 2
+        ? c.rel.slice(0, c.rel.lastIndexOf("/"))
+        : null;
+      const test = c.isDialog
+        ? [
+            `.*src/controllers/dialog/${c.id}(?:-controller)?\\.ts`,
+            `.*src/eta/views/dialog/${c.id}\\.ts`,
+          ]
+        : folder
+          ? [
+              `.*src/${folder}/.*`,
+              ...(c.templateRel ? [`.*${c.templateRel}\\.ts`] : []),
+            ]
+          : c.templateRel
+            ? [`.*${c.rel}\\.ts`, `.*${c.templateRel}\\.ts`]
+            : [`.*${c.rel}\\.ts`];
+      return { name: c.id, test };
+    });
+}
+
+const SRC_DOMAIN_RULES: Array<{ name: string; test: string[] }> = [
+  // NOTE: listed after the per-controller rules so a controller's paired
+  // template (src/eta/views/controller/<id>.ts) is claimed by its controller.
+  { name: "eta", test: [".*src/eta/.*"] },
+  { name: "components", test: [".*src/components/.*"] },
+  { name: "config", test: [".*src/config/.*"] },
+  { name: "stores", test: [".*src/stores/.*"] },
+  { name: "services", test: [".*src/services/.*"] },
+  { name: "features", test: [".*src/features/.*"] },
+  { name: "plugins", test: [".*src/plugins/.*"] },
+  { name: "providers", test: [".*src/providers/.*"] },
+  { name: "entities", test: [".*src/entities/.*"] },
+  { name: "utils", test: [".*src/utils/.*"] },
+  { name: "bridge", test: [".*src/bridge/.*"] },
+  { name: "migrations", test: [".*src/migrations/.*"] },
+  { name: "styles", test: [".*src/styles/.*"] },
+];
+
+function findChunkFile(assetsDir: string, id: string): string | null {
+  const candidates = readdirSync(assetsDir).filter(
+    (f) => f.endsWith(".js") && (f === `${id}.js` || f.startsWith(`${id}-`))
+  );
+  if (candidates.length === 0) return null;
+  candidates.sort(
+    (a, b) =>
+      statSync(resolve(assetsDir, b)).mtimeMs - statSync(resolve(assetsDir, a)).mtimeMs
+  );
+  return candidates[0];
+}
+
+// Farm dev keeps `clean: false`, so every rebuild leaves the previous chunk
+// versions on disk. That accumulation lets findChunkFile mis-pick a stale
+// controller chunk (and a stale sw.js activation would then swap it back in,
+// regressing a freshly-loaded page). Keep only the newest chunk per controller
+// id so the chunkMap is unambiguous and a stale sw.js chunk request 404s safely.
+function pruneStaleControllerChunks(
+  assetsDir: string,
+  controllers: ControllerReg[]
+): void {
+  const keep = new Set<string>();
+  for (const { id } of controllers) {
+    const current = findChunkFile(assetsDir, id);
+    if (current) keep.add(current);
+  }
+  for (const file of readdirSync(assetsDir)) {
+    if (!file.endsWith(".js")) continue;
+    const base = file.replace(/\.js$/, "");
+    const id = base.replace(/-[a-f0-9]+$/, "");
+    if (!controllers.some((c) => c.id === id)) continue;
+    if (keep.has(file)) continue;
+    rmSync(resolve(assetsDir, file), { force: true });
+    rmSync(resolve(assetsDir, `${file}.map`), { force: true });
+  }
+}
+
+// Farm's runtime register() refuses to re-register an already-known module id
+// (it warns and keeps the OLD factory), and require() then serves the cached
+// stale exports — so a swapped-in controller chunk silently keeps the old code.
+// Each emitted chunk is patched to evict its own module ids (ms.delete clears
+// the cache and unregisters) right before registering them. Because every chunk
+// knows its own module map, this stays correct regardless of how the chunk was
+// loaded (native import, script tag) or which chunk hash came before it.
+function injectSelfEvicting(assetsDir: string): void {
+  if (!existsSync(assetsDir)) return;
+  const loop =
+    /for\(var r in _\)\{_\[r\]\.__farm_resource_pot__=filename;window\[([^\]]+)\]\.__farm_module_system__\.register\(r,_\[r\]\)\}/;
+  for (const file of readdirSync(assetsDir)) {
+    if (!file.endsWith(".js")) continue;
+    const full = resolve(assetsDir, file);
+    const text = readFileSync(full, "utf8");
+    if (!loop.test(text) || text.includes("__farm_self_evict")) continue;
+    const m = text.match(loop)!;
+    const evict = `for(var __farm_self_evict in _){var __farm_ms=window[${m[1]}].__farm_module_system__;if(__farm_ms&&__farm_ms.delete){__farm_ms.delete(__farm_self_evict)}}`;
+    writeFileSync(full, text.replace(loop, `${evict}${m[0]}`));
+    console.log(`[bundle] injected self-evict into ${file}`);
+  }
+}
+
+export function getControllerRegs(
+  projectRoot: string
+): ControllerReg[] {
+  const srcDir = resolve(projectRoot, "src");
+  return discoverControllers(resolve(srcDir, "controllers"), srcDir);
+}
+
+export function pruneStaleChunks(
+  projectRoot: string,
+  assetsDir: string
+): void {
+  pruneStaleControllerChunks(assetsDir, getControllerRegs(projectRoot));
+}
+
+export function getChunkMap(
+  projectRoot: string,
+  assetsPrefix: string
+): Record<string, string> {
+  const controllers = getControllerRegs(projectRoot);
+  const assetsDir = resolve(projectRoot, "public/assets");
+  const map: Record<string, string> = {};
+
+  // Non-editor controllers hot-swap individually, dialogs included. The editor
+  // controller is excluded: swapping it re-runs its lifecycle (disconnect →
+  // new instance → ensureEditor → createEditor) on a container whose Milkdown
+  // DOM is still mounted, mounting a second .milkdown div. Keeping it out of
+  // the swap map preserves the live editor across SW activations. Re-enable
+  // once EditorController.destroy() is safe to re-create.
+  for (const { id } of controllers) {
+    if (EXCLUDED_CONTROLLER_IDS.has(id) || id === "editor") continue;
+    const file = findChunkFile(assetsDir, id);
+    if (file) map[id] = `${assetsPrefix}/${file}`;
+  }
+  return map;
+}
+
+function makeEnforceResources(
+  cwd: string
+): Array<{ name: string; test: string[] }> {
+  const srcDir = resolve(cwd, "src");
+  const controllers = discoverControllers(
+    resolve(srcDir, "controllers"),
+    srcDir
+  );
+  return [
+    { name: "app", test: [".*src/app\\.ts", ".*src/controllers/index\\.ts"] },
+    { name: "node_imports", test: [".*node_modules.*"] },
+    // Per-controller rules first so each controller claims its own chunk (and a
+    // dialog controller claims its facade + compiled template). The trailing
+    // dialog-common catch-all absorbs base-dialog-controller and stragglers.
+    ...controllerRules(controllers),
+    { name: "dialog-common", test: [".*src/controllers/dialog/.*"] },
+    ...SRC_DOMAIN_RULES,
+  ];
+}
+
+async function makeConfig(cwd: string, dev: boolean): Promise<any> {
+  // The live site is deployed under a subpath (e.g. /inb4doc/editor-live/),
+  // so chunk URLs must be prefixed with the editor base rather than root-
+  // absolute. Locally EDITOR_SELF_BASE is unset and this stays "/assets/".
+  const selfBase = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "");
+  return {
+    root: cwd,
+    configPath: undefined as string | undefined,
+    publicDir: "/tmp/farm-public-empty",
+    // HMR is Farm's own full-page reload mechanism (its runtime hmr client
+    // opens a WebSocket and calls location.reload() on close). We ship our own
+    // service-worker-based swap instead, so disable Farm's HMR to avoid two
+    // competing reload paths. Note: compilation.hmr is not a real switch;
+    // Farm gates its runtime hmr plugin on server.hmr, which defaults to on.
+    server: { hmr: false },
+    compilation: {
+      input: {
+        app: resolve(cwd, "src/app.ts"),
+      },
+      output: {
+        path: resolve(cwd, "public/assets"),
+        publicPath: `${selfBase}/assets/`,
+        entryFilename: "[entryName].[ext]",
+        filename: "[name]-[hash].[ext]",
+        assetsFilename: "[name]-[hash].[ext]",
+        clean: !dev,
+        targetEnv: "browser-esnext",
+        format: "esm",
+      },
+      resolve: {
+        alias: {
+          "@": resolve(cwd, "src"),
+          "$/": resolve(cwd, "lib") + "/",
+        },
+      },
+      define: {
+        "process.env.NODE_ENV": dev ? "'development'" : "'production'",
+        __VUE_OPTIONS_API__: "true",
+        __VUE_PROD_DEVTOOLS__: "false",
+        __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: "false",
+      },
+      mode: dev ? "development" : "production",
+      lazyCompilation: false,
+      minify: !dev,
+      sourcemap: dev ? true : false,
+      treeShaking: true,
+      progress: false,
+      // Dev persistent cache hits a Farm bug (`resource_cache.rs` unwrap panic)
+      // once the cache dir grows stale, aborting the whole watch build. Dev
+      // rebuilds are fast enough without it.
+      persistentCache: false,
+      script: { target: "esnext" },
+      partialBundling: {
+        targetConcurrentRequests: 1,
+        targetMinSize: 100000000,
+        enforceResources: makeEnforceResources(cwd),
+      },
+    },
+  };
+}
+
+export async function runBundle(options: BundleOptions): Promise<BundleResult> {
+  const { cwd, dev } = options;
+  const mode = dev ? "development" : "production";
+  const logger = new NoopLogger();
+
+  try {
+    const inlineConfig = await makeConfig(cwd, dev);
+    const resolvedConfig = await resolveConfig(inlineConfig, mode);
+    const compiler = await createCompiler(resolvedConfig, logger);
+    if (!dev) compiler.removeOutputPathDir();
+    await compiler.compile();
+    compiler.writeResourcesToDisk();
+    injectSelfEvicting(resolve(cwd, "public/assets"));
+    options.onUpdate?.();
+    return { exitCode: 0 };
+  } catch (err) {
+    console.error("[bundle] Farm compile failed:", err);
+    return { exitCode: 1 };
+  }
+}
+
+export async function runBundleWatch(
+  cwd: string,
+  onUpdate: () => void
+): Promise<void> {
+  const mode = "development";
+  const logger = new NoopLogger();
+
+  try {
+    const inlineConfig = await makeConfig(cwd, true);
+    const resolvedConfig = await resolveConfig(inlineConfig, mode);
+    const assetsDir = resolve(cwd, "public/assets");
+    // Farm's compiler.onUpdateFinish() only drains a one-shot queue, so sw.js
+    // would refresh at most once after startup and then go stale. Instead hook
+    // the writeResources JS plugin hook: writeResourcesToDisk() invokes it on
+    // the initial compile AND after every watch rebuild, after the new chunk
+    // files are already on disk. That's where we re-inject the self-evict
+    // prelude and regenerate sw.js from the freshly written chunks.
+    // Farm can fire several incremental updates in quick succession (e.g. a
+    // template edit that recompiles multiple modules), each emitting its own
+    // chunk set. Publish sw.js only after the burst settles so the browser sees
+    // a single activation pointing at the final chunks instead of racing
+    // several overlapping swaps. The self-evict injection stays immediate.
+    let publishTimer: ReturnType<typeof setTimeout> | null = null;
+    const publishSW = () => {
+      if (publishTimer) clearTimeout(publishTimer);
+      publishTimer = setTimeout(() => {
+        publishTimer = null;
+        onUpdate();
+      }, 300);
+    };
+    resolvedConfig.jsPlugins = [
+      ...(resolvedConfig.jsPlugins ?? []),
+      {
+        name: "sw-refresh",
+        writeResources: {
+          executor: () => {
+            try {
+              injectSelfEvicting(assetsDir);
+              publishSW();
+            } catch (err) {
+              console.error("[bundle] watch refresh failed:", err);
+            }
+          },
+        },
+      },
+    ];
+    await createBundleHandler(resolvedConfig, logger, true);
+  } catch (err) {
+    console.error("[bundle] Farm watch compile failed:", err);
+  }
+}

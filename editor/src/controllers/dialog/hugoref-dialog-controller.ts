@@ -1,7 +1,18 @@
 import { BaseDialogController } from "./base-dialog-controller"
+import renderHugoRefDialog from "@/eta/views/dialog/hugoref-dialog"
 
 export class HugoRefDialogController extends BaseDialogController {
+  static values = { payload: Object }
+
+  declare payloadValue: {
+    pathId: string
+    titleId: string
+    currentPath?: string
+    currentTitle?: string
+  }
+
   connect() {
+    this.element.innerHTML = renderHugoRefDialog(this.payloadValue)
     this.focusInput("input", { raf: true })
   }
 

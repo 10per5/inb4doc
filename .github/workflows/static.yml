@@ -37,9 +37,15 @@ jobs:
           editor-url: /inb4doc/editor-live
           site-url: https://10per5.github.io/inb4doc
 
+      - name: Load PREDEP SHA
+        id: predep-copy-images-sha
+        shell: bash
+        run: |
+          echo "sha=$(sed -n 's/^package: //p' .github/predep-shas.yml)" >> $GITHUB_OUTPUT
+
       - name: Copy content images into Hugo output
         shell: bash
-        run: predep copy-images
+        run: predep --privileged ${{ steps.predep-copy-images-sha.outputs.sha }} copy-images
 
       - name: Copy editor into site output
         shell: bash

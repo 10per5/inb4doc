@@ -7,7 +7,7 @@
  * The Eta compiler never ships to the browser.
  */
 import { Eta } from "eta";
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync } from "fs";
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, statSync, existsSync } from "fs";
 import { join, relative, basename, dirname, sep } from "path";
 
 /**
@@ -45,7 +45,7 @@ export function compileAll(srcDir: string, outDir: string): number {
         continue;
       }
       if (!entry.name.endsWith(".eta")) continue;
-      if (entry.name === "shell.eta") continue; // compile-time only, rendered by build.ts
+      if (entry.name === "shell.eta" || entry.name === "sw-assets.eta" || entry.name === "sw.eta") continue; // compile-time only, rendered by build.ts
 
       const etaPath = join(dir, entry.name);
       const relPath = toPosixRelativePath(srcDir, etaPath);
@@ -82,6 +82,8 @@ export default function render(data: ${paramType}): string {
 export { render as render${pascalName} };
 `;
 
+      const existing = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : null;
+      if (existing === code) continue;
       writeFileSync(tsPath, code);
       count++;
     }

@@ -1,0 +1,171 @@
+/* ── Critical-path layout structure ─────────────────────────────────
+ * Build-time asset: inlined into <head> by lib/build.ts (concatenated
+ * with loading.css) so the skeleton hosts occupy their layout slots
+ * before app.css / the JS bundle arrive. These rules remain the single
+ * source for the page structure at runtime — do not re-declare them in
+ * the bundle. Runtime-only behaviors (mobile drawers, print, Milkdown
+ * content, buttons) stay in src/styles/.
+ */
+
+/* ── Base structure ──────────────────────────────────────────────── */
+
+html,
+body {
+  height: 100%;
+}
+
+#app {
+  height: 100vh;
+}
+
+/* ── Layout variables (extracted from foundation/base.css) ───────── */
+
+:root {
+  --editor-padding-x: 1rem;
+  --editor-padding-y: 0.8rem;
+  --sidebar-width: 0;
+  --sidebar-visibility: none;
+  --aside-width: 0;
+  --aside-visibility: none;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --editor-padding-x: 1.5rem;
+    --sidebar-width: 260px;
+    --sidebar-visibility: flex;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --editor-padding-x: 2rem;
+    --aside-width: 240px;
+    --aside-visibility: flex;
+  }
+}
+
+/* ── Main layout grid ────────────────────────────────────────────── */
+
+.book-layout {
+  display: flex;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--color-bg-primary);
+}
+
+/* ── Content column (toolbar + page) ─────────────────────────────── */
+
+.book-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+
+.book-menu {
+  width: var(--sidebar-width);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
+  display: var(--sidebar-visibility);
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+/* Skeleton host must fill the menu column before the sidebar view renders */
+#sidebar-nav {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.book-menu .sidebar-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100vh;
+}
+
+.sidebar-inner {
+  padding: 0.25rem 0;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ── Main content area ───────────────────────────────────────────── */
+
+.book-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  padding: var(--editor-padding-x);
+}
+
+.book-page-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  align-self: center;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 0.5rem;
+}
+
+@media (min-width: 768px) {
+  #editor-area {
+    max-width: 800px;
+    padding: 0;
+  }
+}
+
+/* ── Toolbar host ────────────────────────────────────────────────── */
+
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 1rem;
+  gap: 2px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  align-self: flex-start;
+}
+
+/* ── Meta panel (right sidebar) ──────────────────────────────────── */
+
+.book-aside {
+  width: var(--aside-width);
+  border-left: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: var(--aside-visibility);
+  flex-direction: column;
+}

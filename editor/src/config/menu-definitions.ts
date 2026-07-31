@@ -2,7 +2,7 @@ import { createRegistry } from "@/components/ui/menu"
 import type { MenuItem } from "@/components/ui/menu"
 import { MenuType } from "@/components/ui/menu"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import type { ViewType } from "@/controllers/view-controller"
+import type { ViewType } from "@/services/view-controller"
 import { mediaImage, floppyDisk, folder } from "@/eta/icons"
 
 export const menuRegistry = createRegistry()

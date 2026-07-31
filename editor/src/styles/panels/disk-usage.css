@@ -1,5 +1,9 @@
 /* ── Disk Usage View ───────────────────────────────────────────────── */
 
+[data-controller="disk-usage"] {
+  height: 100%;
+}
+
 .disk-usage-wrapper {
   display: flex;
   flex-direction: column;

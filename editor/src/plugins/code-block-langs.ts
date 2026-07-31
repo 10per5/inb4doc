@@ -14,12 +14,16 @@ export const LANG_IMPORTS: Record<string, () => Promise<any>> = {
     await import("prism-code-editor/languages/jsx");
   },
   python: () => import("prism-code-editor/prism/languages/python"),
+  // Farm tree-shakes the side-effect-only `import "./xml.js"` inside
+  // `prism/languages/markup.js`, so the xml grammar must be loaded explicitly
+  // first or `languages.xml` is undefined and markup.js throws at `markup.tag`.
   markup: async () => {
+    await import("prism-code-editor/prism/languages/xml");
     await import("prism-code-editor/prism/languages/markup");
     await import("prism-code-editor/languages/html");
   },
   xml: async () => {
-    await import("prism-code-editor/prism/languages/markup");
+    await import("prism-code-editor/prism/languages/xml");
     await import("prism-code-editor/languages/xml");
   },
   css: () => import("prism-code-editor/prism/languages/css"),
@@ -27,7 +31,11 @@ export const LANG_IMPORTS: Record<string, () => Promise<any>> = {
   json: () => import("prism-code-editor/prism/languages/json"),
   yaml: () => import("prism-code-editor/prism/languages/yaml"),
   toml: () => import("prism-code-editor/prism/languages/toml"),
-  markdown: () => import("prism-code-editor/prism/languages/markdown"),
+  markdown: async () => {
+    await import("prism-code-editor/prism/languages/xml");
+    await import("prism-code-editor/prism/languages/markup");
+    await import("prism-code-editor/prism/languages/markdown");
+  },
   latex: () => import("prism-code-editor/prism/languages/latex"),
   rust: () => import("prism-code-editor/prism/languages/rust"),
   go: () => import("prism-code-editor/prism/languages/go"),

@@ -1,0 +1,22 @@
+{
+  "name": "inb4doc",
+  "short_name": "inb4doc",
+  "description": "Markdown editor for Hugo sites",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2e3440",
+  "icons": [
+    {
+      "src": "inb4doc-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "inb4doc-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

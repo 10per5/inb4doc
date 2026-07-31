@@ -1,0 +1,57 @@
+/* ── Source Editor ───────────────────────────────────────────────────
+ * Markup rendered at runtime by EditorController.connect() from
+ * templates/views/controller/source-editor.eta (kept out of the
+ * initial HTML so Apply/Cancel never flash before app.css arrives).
+ */
+
+#source-editor {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+#source-editor textarea {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  padding: 1rem;
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.source-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.source-actions button {
+  padding: 0.3rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.source-actions button:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.source-actions button.primary {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}

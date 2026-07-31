@@ -1,53 +1,10 @@
-/* ── Layout Structure ──────────────────────────────────────────────────
- * 
- * Main layout grid: sidebar, editor area, meta panel
- * Responsive behavior controlled via CSS variables and media queries
+/* ── Layout Runtime Behaviors ─────────────────────────────────────────
+ * The structural layout (grid, sidebar/toolbar/aside sizing, #editor-area)
+ * lives in lib/style/layout.css — a build-time asset inlined into <head>
+ * by lib/build.ts so skeletons fill their slots before app.css arrives.
+ * This file keeps only runtime-only behaviors: mobile drawers, tablet
+ * panel overlay, Milkdown content sizing, and print styles.
  */
-
-.book-layout {
-  display: flex;
-  height: 100vh;
-  overflow-y: auto;
-  background: var(--color-bg-primary);
-}
-
-/* ── Content Column (toolbar + page) ──────────────────────────────── */
-
-.book-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-/* ── Sidebar Menu ──────────────────────────────────────────────────── */
-
-.book-menu {
-  width: var(--sidebar-width);
-  border-right: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  flex-shrink: 0;
-  display: var(--sidebar-visibility);
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-
-.book-menu .sidebar-wrapper {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  height: 100vh;
-}
-
-.sidebar-inner {
-  padding: 0.25rem 0;
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
 
 /* Mobile: sidebar as slide-in drawer */
 @media (max-width: 767px) {
@@ -85,41 +42,6 @@
 
 /* ── Main Content Area ─────────────────────────────────────────────── */
 
-.book-page {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  position: relative;
-  padding: var(--editor-padding-x);
-}
-
-.book-page-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-#editor-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  align-self: center;
-  width: 100%;
-  max-width: 800px;
-  max-width: 100%;
-  padding: 0 0.5rem;
-}
-
-@media (min-width: 768px) {
-  #editor-area {
-    max-width: 800px;
-    padding: 0;
-  }
-}
-
 #milkdown-editor {
   flex: 1;
 }
@@ -143,72 +65,7 @@
   line-height: 1.6;
 }
 
-#source-editor {
-  display: none;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  overflow: auto;
-}
-
-#source-editor textarea {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  border: none;
-  border-radius: 0;
-  padding: 1rem;
-  font-family: "SF Mono", Monaco, monospace;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  resize: none;
-  outline: none;
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-}
-
-.source-actions {
-  flex-shrink: 0;
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-}
-
-.source-actions button {
-  padding: 0.3rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 3px;
-  background: var(--color-bg-primary);
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.source-actions button:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.source-actions button.primary {
-  background: var(--color-accent);
-  color: #fff;
-  border-color: var(--color-accent);
-}
-
 /* ── Meta Panel (Right Sidebar) ────────────────────────────────────── */
-
-.book-aside {
-  width: var(--aside-width);
-  border-left: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  display: var(--aside-visibility);
-  flex-direction: column;
-}
 
 /* Hide meta panel on tablet and below by default */
 @media (max-width: 1199px) {

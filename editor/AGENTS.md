@@ -16,7 +16,7 @@ ShellController (#app, data-controller="shell", data-shell-editor-outlet="#edito
 │   └── ViewMenuController (data-controller="view-menu")
 ├── SidebarController (#sidebar-nav, data-controller="sidebar")
 ├── EditorController (#editor-area, data-controller="editor") ← outlet of ShellController
-├── NavigationController (plain class, receives editor + cache + sidebarEl via constructor)
+├── NavigationService (plain class, receives editor + cache via constructor)
 ├── FileSyncController (plain class, no DOM)
 └── ViewController (plain class, accesses editor targets for element visibility)
 ```
@@ -79,9 +79,9 @@ This applies to all `static targets`, `static values`, and `static outlets` bles
 - **Never use `document.getElementById`** in controllers or view components. All element access goes through Stimulus targets or constructor-injected references.
 - **Exception**: Global UI cleanup (e.g., `document.querySelectorAll(".toolbar-menu.open")` to close menus) is acceptable.
 
-### Loading Overlay
+### Loading Skeleton
 
-The loading overlay markup is rendered server-side in `shell.eta`. It must be explicitly hidden after app initialization by calling `hideLoadingOverlay()` from `@/components/overlay/loading-overlay`. If the app stalls with the overlay visible, check that `hideLoadingOverlay()` is called at the end of the initialization lifecycle.
+There is no full-screen loading overlay. `shell.eta` renders skeleton placeholders directly in the layout slots (`skeleton-topbar`, `skeleton-sidebar`, `skeleton-editor`, `skeleton-meta` partials). Their styles live in `lib/style/loading.css` (a build-time asset inlined into `<head>` by `lib/build.ts`) so they paint before `app.css` / JS arrive. Each controller replaces its skeleton with the real view on `connect()` — no explicit hide step is needed. Do not reintroduce a blocking overlay or logo animation.
 
 ### Eta Templates
 
@@ -103,7 +103,8 @@ The loading overlay markup is rendered server-side in `shell.eta`. It must be ex
 ### Build Commands
 
 ```bash
-bun build.ts          # Full build: Eta render → CSS → Bun bundle → KaTeX assets
+bun lib/build.ts     # Full build: Eta render → CSS → Farm bundle → SW + KaTeX assets
+bun lib/dev.ts       # Dev server: Farm watch build + static serve + eta recompile
 bun --bun tsc --noEmit # TypeScript check
 ```
 
@@ -235,6 +236,14 @@ This generates an LLM-friendly markdown report with largest modules, dependency 
 | --------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `app.js`  | 1.3 MB initial | Milkdown + ProseMirror + CM core                                                                                                       |
 | `app.css` | 1.5 MB         | `katex/dist/katex.min.css` has `@font-face` blocks → Bun inlines all woff2/woff/ttf fonts as base64 data URIs (~60 font files, 1.2 MB) |
+
+## Template HMR (Hot Module Replacement)
+
+When a controller's template file (Eta) or the controller itself is edited, the build produces a new chunk. The SW detects the change, activates, and calls `registry.swap()` to re-import the controller module. `ModuleRegistry.swap()` unloads the controller identifier, re-imports the module, and re-registers the class.
+
+Controllers do **not** implement `refresh()` — view components are re-mounted and call `load()` again on the next activation with fresh data.
+
+**Sidebar decoupling**: `NavigationService` and `SidebarController` are fully decoupled via the event bus. The sidebar self-sources its data on each load (from `treeStore`, `pendingOpsStore`, provider-store, and `getCurrentPath()`), and its actions emit `AppEvent.Navigate` / `AppEvent.Sidebar*Requested` events that `NavigationService` handles. `NavigationService.loadSidebar()` is purely a re-render trigger (`AppEvent.SidebarReload`). Do NOT reintroduce direct sidebar references into services.
 
 ### Pending Image Lifecycle
 

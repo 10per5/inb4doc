@@ -1,6 +1,7 @@
 import type { ImageStorageMode } from "@/services/storage"
 import { prefsStore } from "@/stores/preferences-store"
 import { BaseDialogController } from "./base-dialog-controller"
+import renderPrefsDialog from "@/eta/views/dialog/prefs-dialog"
 
 export const PrefsDialogEvent = {
   StickyChange:    "prefs-dialog:sticky-change",
@@ -8,15 +9,17 @@ export const PrefsDialogEvent = {
 } as const
 
 export class PrefsDialogController extends BaseDialogController {
-  static values = {
-    sticky: Boolean,
-    dark: Boolean,
-    imageMode: String,
+  static values = { payload: Object }
+
+  declare payloadValue: {
+    stickyToolbar: boolean
+    darkMode: boolean
+    imageStorageMode: ImageStorageMode
   }
 
-  declare stickyValue: boolean
-  declare darkValue: boolean
-  declare imageModeValue: string
+  connect() {
+    this.element.innerHTML = renderPrefsDialog(this.payloadValue)
+  }
 
   stickyChanged(e: Event) {
     const v = (e.target as HTMLInputElement).checked

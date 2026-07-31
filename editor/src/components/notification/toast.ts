@@ -1,5 +1,3 @@
-import { colors } from "@/config/theme";
-
 const DEFAULT_DURATION = 4000;
 
 export type ToastType = "danger" | "warning" | "info";
@@ -19,7 +17,6 @@ export function showToast(msg: string, opts?: ToastOptions) {
   const duration = opts?.duration ?? DEFAULT_DURATION;
   const type = opts?.type ?? "danger";
 
-  // Remove existing toast if present
   const old = document.getElementById("prdc-toast");
   if (old) old.remove();
 
@@ -34,27 +31,46 @@ export function showToast(msg: string, opts?: ToastOptions) {
   }
 }
 
-export function initToast() {
-  // Inject styles if not already present
-  if (!document.getElementById("prdc-toast-styles")) {
-    const style = document.createElement("style");
-    style.id = "prdc-toast-styles";
-    style.textContent = `
-#prdc-toast {
-  position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100000;
-  background: ${colors.dark}; color: ${colors.lighterBg}; padding: 0.75rem 1.25rem;
-  border-radius: 8px; font: 13px/1.4 system-ui, sans-serif;
-  box-shadow: 0 4px 16px rgba(0,0,0,.45);
-  white-space: pre-wrap; text-align: center;
-  max-width: min(90vw, 500px);
-  animation: prdc-toast-in .2s ease-out;
-}
-@keyframes prdc-toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-0.5rem); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-        `;
-    document.head.appendChild(style);
-  }
+export interface ProgressToastHandle {
+  updateProgress(loaded: number, total: number): void
+  setMessage(msg: string): void
+  remove(): void
 }
 
+const PROGRESS_COLOR = "#388bf2";
+
+export function showProgressToast(initialMsg: string): ProgressToastHandle {
+  const old = document.getElementById("prdc-toast");
+  if (old) old.remove();
+
+  const el = document.createElement("div");
+  el.id = "prdc-toast";
+  el.className = "prdc-toast prdc-toast-progress";
+
+  const msgEl = document.createElement("div");
+  msgEl.textContent = initialMsg;
+  msgEl.style.padding = "0.75rem 1.25rem 0.5rem";
+  el.appendChild(msgEl);
+
+  const barWrap = document.createElement("div");
+  barWrap.style.cssText = "height:4px;background:#333;margin:0 1.25rem 0.75rem;border-radius:2px;overflow:hidden;";
+  const bar = document.createElement("div");
+  bar.style.cssText = "height:100%;width:0%;background:" + PROGRESS_COLOR + ";transition:width .3s ease;border-radius:2px;";
+  barWrap.appendChild(bar);
+  el.appendChild(barWrap);
+
+  document.body.appendChild(el);
+
+  return {
+    updateProgress(loaded: number, total: number): void {
+      const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+      bar.style.width = pct + "%";
+    },
+    setMessage(msg: string): void {
+      msgEl.textContent = msg;
+    },
+    remove(): void {
+      el.remove();
+    },
+  };
+}

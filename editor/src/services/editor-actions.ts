@@ -1,6 +1,6 @@
-import { confirmDialog, promptDialog, promptCreateDialog } from "@/components/dialogs/dialog"
+import { confirmDialog, promptDialog, promptCreateDialog } from "@/controllers/dialog/dialog"
 import { serializeFrontmatter } from "@/utils/frontmatter"
-import type { MetaPanelData } from "@/components/panels/meta-panel"
+import type { MetaPanelData } from "@/entities/Frontmatter"
 import { pagesStore } from "@/stores/page-store"
 import type { FileSyncService } from "@/services/file-sync-service"
 import { showNotification } from "@/components/notification/notification"

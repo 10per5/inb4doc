@@ -6,8 +6,8 @@
  * State changes flow back via events that components subscribe to.
  */
 
-import type { ViewType } from "@/controllers/view-controller"
-import type { MetaPanelData } from "@/components/panels/meta-panel"
+import type { ViewType } from "@/services/view-controller"
+import type { MetaPanelData } from "@/entities/Frontmatter"
 import type { ProviderType } from "@/providers/index"
 import type { ToolbarCommand } from "@/config/enums"
 import type { FileEntry } from "@/config/storage-keys"
@@ -19,6 +19,11 @@ export enum AppEvent {
   // Navigation
   Navigate = "navigate",
   SidebarReload = "sidebar-reload",
+  SidebarActive = "sidebar-active",
+  SidebarNewItemRequested = "sidebar-new-item-requested",
+  SidebarDeleteRequested = "sidebar-delete-requested",
+  SidebarRenameRequested = "sidebar-rename-requested",
+  SidebarMoveRequested = "sidebar-move-requested",
 
   // Dirty / sync
   EditorChanged = "editor-changed",
@@ -50,6 +55,7 @@ export enum AppEvent {
 
   // Meta panel
   MetaDataChanged = "meta-data-changed",
+  MetaPanelReload = "meta-panel-reload",
 
   // Editor
   SourceModeToggled = "source-mode-toggled",
@@ -59,13 +65,24 @@ export enum AppEvent {
 
   // Storage
   ProviderFilesLoaded = "provider-files-loaded",
+
+  // Module lifecycle
+  UpdateAvailable = "update-available",
+  SWInstallProgress = "sw-install-progress",
+  SWUpdateReady = "sw-update-ready",
+  ModulesSwapped = "modules-swapped",
 }
 
 // ── Strict payload map ──
 
 export interface AppEventPayloads {
-  [AppEvent.Navigate]:              { path: string }
+  [AppEvent.Navigate]:              { path: string; query?: string; matchIndex?: number; snippetText?: string }
   [AppEvent.SidebarReload]:         void
+  [AppEvent.SidebarActive]:         { path: string }
+  [AppEvent.SidebarNewItemRequested]: { parentPath: string; isFolder: boolean }
+  [AppEvent.SidebarDeleteRequested]:  { path: string }
+  [AppEvent.SidebarRenameRequested]:  { path: string }
+  [AppEvent.SidebarMoveRequested]:    { from: string; to: string }
 
   [AppEvent.EditorChanged]:         { path: string; md: string }
   [AppEvent.DirtyChanged]:          { count: number; bytes: number; pendingCount: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
@@ -93,6 +110,7 @@ export interface AppEventPayloads {
   [AppEvent.DirIndexActivated]:   { path: string }
 
   [AppEvent.MetaDataChanged]:       { data: MetaPanelData }
+  [AppEvent.MetaPanelReload]:       void
 
   [AppEvent.SourceModeToggled]:     void
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
@@ -100,6 +118,11 @@ export interface AppEventPayloads {
   [AppEvent.LinkDialogRequested]:   void
 
   [AppEvent.ProviderFilesLoaded]:  Record<string, FileEntry>
+
+  [AppEvent.UpdateAvailable]: void
+  [AppEvent.SWInstallProgress]: { loaded: number; total: number; done: boolean }
+  [AppEvent.SWUpdateReady]: void
+  [AppEvent.ModulesSwapped]: { names: string[] }
 }
 
 // ── EventBus ──
@@ -132,3 +155,5 @@ export class EventBus<Events extends Record<string, any>> {
 // ── Singleton ──
 
 export const appEvents = new EventBus<AppEventPayloads>()
+
+

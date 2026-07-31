@@ -1,5 +1,5 @@
 import type { Frontmatter } from "@/entities/Frontmatter";
-import type { MetaPanelData } from "@/components/panels/meta-panel";
+import type { MetaPanelData } from "@/entities/Frontmatter";
 
 export type MetaDiffStatus = "added" | "removed" | "changed";
 

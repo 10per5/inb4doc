@@ -4,8 +4,6 @@ import type { ConnectionConfig } from "@/services/storage"
 import { ProviderType } from "@/providers"
 import { STORE_CONNECTIONS } from "@/config/storage-keys"
 
-const REMOTE_ID = String(ProviderType.Remote)
-
 const DEFAULTS: ConnectionConfig = {
   host: "localhost",
   port: 3000,
@@ -14,9 +12,13 @@ const DEFAULTS: ConnectionConfig = {
 class ConnectionStore {
   private config: ConnectionConfig | null = null
 
+  private get remoteId(): string {
+    return String(ProviderType.Remote)
+  }
+
   private tryLoadConfig(): void {
     if (this.config) return
-    const stored = storageService.getJSON<{ host: string; port: number }>(STORE_CONNECTIONS, REMOTE_ID)
+    const stored = storageService.getJSON<{ host: string; port: number }>(STORE_CONNECTIONS, this.remoteId)
     if (stored && typeof stored.host === "string" && typeof stored.port === "number") {
       this.config = { host: stored.host, port: stored.port }
     }
@@ -31,7 +33,7 @@ class ConnectionStore {
 
   setConfig(host: string, port: number): void {
     this.config = { host, port }
-    storageService.setJSON(STORE_CONNECTIONS, REMOTE_ID, { host, port })
+    storageService.setJSON(STORE_CONNECTIONS, this.remoteId, { host, port })
     this._remoteAvailable = false
   }
 

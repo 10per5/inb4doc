@@ -1,0 +1,22 @@
+<div class="meta-panel-wrapper">
+  <div class="meta-panel">
+    <div class="meta-panel-header">Page Metadata</div>
+    <div class="meta-field">
+      <label>Title</label>
+      <input type="text" class="meta-title" data-action="input->meta-panel#inputChanged" />
+    </div>
+    <div class="meta-field">
+      <label>Weight</label>
+      <input type="number" class="meta-weight" data-action="input->meta-panel#inputChanged" />
+    </div>
+    <div class="meta-extra-header">Extra Fields</div>
+    <div class="meta-extra"></div>
+    <button class="meta-extra-add" data-action="click->meta-panel#addField">+ Add Field</button>
+  </div>
+  <div class="meta-panel-footer">
+    <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
+      <%~ it.github %>
+      <span>View on GitHub</span>
+    </a>
+  </div>
+</div>

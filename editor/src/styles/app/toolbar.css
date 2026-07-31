@@ -2,25 +2,10 @@
  * 
  * Application toolbar with buttons, provider badge, and view switcher
  * Responsive layout adjustments for mobile and tablet
+ *
+ * NOTE: the structural .app-toolbar rules (flex, height, sticky, bg)
+ * live in lib/style/layout.css (critical, inlined in <head>).
  */
-
-.app-toolbar {
-  display: flex;
-  align-items: center;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 1rem;
-  gap: 2px;
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-  width: 100%;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  align-self: flex-start;
-  transition: opacity 0.3s;
-}
 
 .app-toolbar.hidden {
   opacity: 0;

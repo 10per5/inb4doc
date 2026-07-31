@@ -1,0 +1,8 @@
+<div class="sidebar-skeleton" id="sidebar-skeleton">
+  <div class="skel-bar skel-sidebar-line"></div>
+  <div class="skel-bar skel-sidebar-line skel-w80"></div>
+  <div class="skel-bar skel-sidebar-line skel-w60"></div>
+  <div class="skel-bar skel-sidebar-line skel-w90"></div>
+  <div class="skel-bar skel-sidebar-line skel-w70"></div>
+  <div class="skel-bar skel-sidebar-line skel-w85"></div>
+</div>

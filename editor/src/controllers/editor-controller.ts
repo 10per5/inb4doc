@@ -6,9 +6,9 @@
  * This class owns: path context, editor state, content loading, source mode.
  */
 
-import { Controller } from "@hotwired/stimulus"
+import { Controller } from "@hotwired/stimulus";
 import type { Editor } from "@milkdown/kit/core";
-import type { EditorHost } from "@/config/editor-config";
+import { createEditor, type EditorHost } from "@/config/editor-config";
 import { editorContext, getMarkdown, getView } from "@/services/editor-context";
 import { initToolbarHandler } from "@/features/toolbar-handler";
 import { initLinkHandler } from "@/features/link-handler";
@@ -17,6 +17,7 @@ import { pagesStore } from "@/stores/page-store";
 import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps, PendingOpType } from "@/entities/PendingOps";
 import { toggleSourceMode, applySourceContent } from "@/features/editor-source";
+import renderSourceEditor from "@/eta/views/controller/source-editor";
 import { getProvider } from "@/stores/provider-store";
 import { stripFrontmatter } from "@/utils/frontmatter";
 import { imageService } from "@/services/image-service";
@@ -26,14 +27,19 @@ import {
   executeConflictDecision,
   applyNoConflict,
 } from "@/services/conflict-resolver";
-import { findTextMatch, flashHighlight, centerOnRect } from "@/features/search/scroll-to-text";
+import {
+  findTextMatch,
+  flashHighlight,
+  centerOnRect,
+} from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
 
 export class EditorController extends Controller {
-  static targets = ["milkdown", "source"]
+  static targets = ["milkdown", "source", "loadLogo"];
 
-  declare readonly milkdownTarget: HTMLElement
-  declare readonly sourceTarget: HTMLElement
+  declare readonly milkdownTarget: HTMLElement;
+  declare readonly sourceTarget: HTMLElement;
+  declare readonly loadLogoTarget: HTMLElement;
 
   private editor: Editor | null = null;
   private host: EditorHost | null = null;
@@ -94,6 +100,7 @@ export class EditorController extends Controller {
   hideSkeleton(): void {
     const el = document.getElementById("editor-skeleton");
     el?.classList.add("is-hidden");
+    this.loadLogoTarget.classList.add("is-hidden");
     this.milkdownTarget.style.visibility = "";
   }
 
@@ -124,7 +131,6 @@ export class EditorController extends Controller {
     this.host = host;
     this.lastSetContent.set(this.currentPath, "");
     await editorContext.load();
-    const { createEditor } = await import("@/config/editor-config");
     this.editor = await createEditor(editorEl, content, host);
   }
 
@@ -132,7 +138,7 @@ export class EditorController extends Controller {
 
   async fetchContent(
     path: string,
-    onMetaUpdate?: (data: any) => void,
+    onMetaUpdate?: (data: any) => void
   ): Promise<string | null> {
     try {
       const provider = getProvider();
@@ -147,7 +153,7 @@ export class EditorController extends Controller {
         }
         const ops = pendingOpsStore.load();
         const createOp = ops.find(
-          (o) => o.type === PendingOpType.Create && o.path === path,
+          (o) => o.type === PendingOpType.Create && o.path === path
         ) as { content?: string } | undefined;
         if (createOp?.content) {
           const { frontmatter, body } = stripFrontmatter(createOp.content);
@@ -169,7 +175,13 @@ export class EditorController extends Controller {
       const page = pagesStore.get(path);
       const savedOps = pendingOpsStore.load();
       const localPendingOps = new PendingOps(savedOps);
-      const decision = resolveConflict(page, body, frontmatter, serverTime, localPendingOps);
+      const decision = resolveConflict(
+        page,
+        body,
+        frontmatter,
+        serverTime,
+        localPendingOps
+      );
 
       if (!decision) {
         return applyNoConflict(
@@ -178,15 +190,22 @@ export class EditorController extends Controller {
           frontmatter,
           serverTime,
           onMetaUpdate,
-          localPendingOps,
+          localPendingOps
         );
       }
 
-      executeConflictDecision(decision, path, raw, serverTime, {
-        currentPath: this.currentPath,
-        ensureEditor: (c) => this.ensureEditor(c),
-        onMetaUpdate,
-      }, localPendingOps);
+      executeConflictDecision(
+        decision,
+        path,
+        raw,
+        serverTime,
+        {
+          currentPath: this.currentPath,
+          ensureEditor: (c) => this.ensureEditor(c),
+          onMetaUpdate,
+        },
+        localPendingOps
+      );
 
       this.editorStates.delete(path);
       if (frontmatter) onMetaUpdate?.(frontmatter);
@@ -203,7 +222,7 @@ export class EditorController extends Controller {
 
   async loadContent(
     path: string,
-    onMetaUpdate?: (data: any) => void,
+    onMetaUpdate?: (data: any) => void
   ): Promise<void> {
     const content = await this.fetchContent(path, onMetaUpdate);
     return this.ensureEditor(content ?? "");
@@ -219,7 +238,7 @@ export class EditorController extends Controller {
       this.milkdownTarget,
       this.sourceMode,
       () => getMarkdown(this.editor!),
-      (content) => this.setEditorContent(content),
+      (content) => this.setEditorContent(content)
     );
     return this.sourceMode;
   }
@@ -227,7 +246,9 @@ export class EditorController extends Controller {
   async applySourceContent(): Promise<void> {
     if (!this.editor) return;
 
-    const textarea = this.sourceTarget.querySelector("textarea") as HTMLTextAreaElement;
+    const textarea = this.sourceTarget.querySelector(
+      "textarea"
+    ) as HTMLTextAreaElement;
     if (!textarea) return;
 
     this.lastSetContent.set(this.currentPath, "");
@@ -269,7 +290,11 @@ export class EditorController extends Controller {
         const pos = view.posAtDOM(match.node, match.offset);
         if (pos == null) return;
         const tr = view.state.tr.setSelection(
-          editorContext.TextSelection.create(view.state.doc, pos, pos + match.length),
+          editorContext.TextSelection.create(
+            view.state.doc,
+            pos,
+            pos + match.length
+          )
         );
         view.dispatch(tr);
       });
@@ -283,27 +308,38 @@ export class EditorController extends Controller {
   // ── Lifecycle ──
 
   connect() {
+    if (!this.element.querySelector("#source-editor")) {
+      this.element.insertAdjacentHTML("beforeend", renderSourceEditor({}));
+    }
     this.unsubs.push(
       initToolbarHandler(() => this.editor),
       initLinkHandler(() => this.editor),
-      appEvents.on(AppEvent.ScrollToText, ({ query, matchIndex, snippetText }) => {
-        this.scrollToText(query, matchIndex, snippetText);
-      }),
+      appEvents.on(
+        AppEvent.ScrollToText,
+        ({ query, matchIndex, snippetText }) => {
+          this.scrollToText(query, matchIndex, snippetText);
+        }
+      )
     );
   }
 
   disconnect() {
     this.unsubs.forEach((u) => u());
     this.unsubs = [];
-    this.destroy()
+    this.destroy();
   }
 
   destroy(): void {
+    const editor = this.editor;
     this.editor = null;
     this.host = null;
     this.mentionView = null;
     this.editorStates.clear();
     this.lastSetContent.clear();
+    if (editor) {
+      void editor.destroy().catch(() => {});
+      this.milkdownTarget.replaceChildren();
+    }
   }
 
   // ── Private ──
@@ -314,7 +350,8 @@ export class EditorController extends Controller {
     const cached = this.editorStates.get(this.currentPath);
     if (cached) {
       const page = pagesStore.get(this.currentPath);
-      const persistedBody = page?.bodyState.body ?? page?.bodyState.baseline ?? "";
+      const persistedBody =
+        page?.bodyState.body ?? page?.bodyState.baseline ?? "";
       this.lastSetContent.set(this.currentPath, persistedBody);
       this.editor.action((ctx) => {
         const view = ctx.get(editorContext.editorViewCtx);
@@ -353,5 +390,4 @@ export class EditorController extends Controller {
   }
 }
 
-export default EditorController
-
+export default EditorController;

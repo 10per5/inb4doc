@@ -1,7 +1,4 @@
-import "@milkdown/theme-nord/style.css"
-
 /* ── Foundation ────────────────────────────────────────────────── */
-import "./loading-overlay.css"
 import "./foundation/base.css"
 import "./app/buttons.css"
 
@@ -13,15 +10,18 @@ import "./layout/responsive.css"
 import "./editor/editor.css"
 import "./editor/math.css"
 import "./editor/milkdown.css"
-import "./editor/skeleton.css"
+import "./editor/source-editor.css"
 
 /* ── Panels ─────────────────────────────────────────────────────── */
 import "./panels/panels.css"
 import "./panels/search.css"
+import "./panels/meta.css"
 
 /* ── App UI ─────────────────────────────────────────────────────── */
 import "./app/toolbar.css"
 import "./app/dialogs.css"
+import "./app/toast.css"
+import "./app/notification.css"
 
 /* ── Build-conditional styles (mobile / desktop) ──────────────── */
 import "../eta/styles/conditions.css"

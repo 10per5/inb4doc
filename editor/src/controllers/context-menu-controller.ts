@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import type { SidebarActions } from "@/components/panels/sidebar"
+import type { SidebarActions } from "@/controllers/sidebar/sidebar"
 import { sidebarActions, SidebarAction } from "@/config/enums"
 
 const pendingActions = new Map<HTMLElement, SidebarActions>()

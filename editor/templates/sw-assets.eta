@@ -1,0 +1,2 @@
+self.IMPORTANT = <%~ JSON.stringify(it.important) %>;
+self.CHUNKS = <%~ JSON.stringify(it.chunks) %>;

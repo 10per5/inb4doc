@@ -1,0 +1,223 @@
+/* ── Critical-path skeleton styles ─────────────────────────────────
+ * Build-time asset: inlined into <head> by lib/build.ts so the
+ * skeleton bars paint before app.css / the JS bundle arrive.
+ * Shared by every skeleton view: editor, sidebar, topbar, meta panel.
+ */
+
+/* ── Skeleton containers ─────────────────────────────────────────── */
+
+/* Guide logo above the editor skeleton, first app load only */
+.il-load-logo {
+  align-self: flex-start;
+  width: 128px;
+  height: 128px;
+  margin-bottom: 16px;
+  border-radius: 28px;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0;
+  animation: il-logo-fade-in 0.3s ease forwards;
+  animation-delay: 0.1s;
+  filter: saturate(0.6);
+}
+@keyframes il-logo-fade-in {
+  to {
+    opacity: 0.75;
+  }
+}
+
+.il-load-logo.is-hidden {
+  display: none;
+}
+
+.editor-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  width: 100%;
+  transition: opacity 0.15s ease;
+}
+
+.editor-skeleton.is-hidden {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.sidebar-skeleton.is-hidden {
+  display: none;
+}
+
+.toolbar-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-skeleton .skel-bar {
+  flex-shrink: 0;
+}
+.toolbar-skeleton .skel-bar:nth-child(1) {
+  width: 34%;
+}
+.toolbar-skeleton .skel-bar:nth-child(2) {
+  width: 22%;
+}
+.toolbar-skeleton .skel-bar:nth-child(3) {
+  width: 26%;
+}
+
+.meta-panel-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.meta-panel-skeleton .skel-bar {
+  flex-shrink: 0;
+}
+.meta-panel-skeleton .skel-bar:nth-child(1) {
+  width: 70%;
+}
+.meta-panel-skeleton .skel-bar:nth-child(2) {
+  width: 40%;
+}
+.meta-panel-skeleton .skel-bar:nth-child(3) {
+  width: 60%;
+}
+
+/* ── Shared skeleton bars ────────────────────────────────────────── */
+
+.skel-bar {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(
+    100deg,
+    var(--color-bg-tertiary, #e5e9f0) 30%,
+    var(--color-bg-secondary, #eef1f6) 50%,
+    var(--color-bg-tertiary, #e5e9f0) 70%
+  );
+  background-size: 200% 100%;
+  animation: il-shimmer 1.6s ease infinite;
+  will-change: background-position;
+}
+.skel-bar:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.skel-bar:nth-child(3) {
+  animation-delay: 0.16s;
+}
+.skel-bar:nth-child(4) {
+  animation-delay: 0.24s;
+}
+
+.skel-title {
+  height: 26px;
+  width: 60%;
+  margin-bottom: 4px;
+}
+
+.skel-heading {
+  height: 20px;
+  width: 40%;
+  margin-top: 4px;
+}
+
+.skel-gap {
+  height: 8px;
+}
+
+/* Width variants */
+.skel-w100 {
+  width: 100%;
+}
+.skel-w95 {
+  width: 95%;
+}
+.skel-w92 {
+  width: 92%;
+}
+.skel-w90 {
+  width: 90%;
+}
+.skel-w88 {
+  width: 88%;
+}
+.skel-w85 {
+  width: 85%;
+}
+.skel-w80 {
+  width: 80%;
+}
+.skel-w75 {
+  width: 75%;
+}
+.skel-w70 {
+  width: 70%;
+}
+.skel-w60 {
+  width: 60%;
+}
+.skel-w50 {
+  width: 50%;
+}
+
+/* Sidebar bars are shorter */
+.skel-sidebar-line {
+  height: 12px;
+  width: 100%;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+/* Breakpoints mirror layout.css/conditions.css: ≤767px mobile (compact
+ * 28px toolbar, drawer sidebar), 768–1199px tablet (aside hidden). */
+
+@media (max-width: 767px) {
+  .editor-skeleton {
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .toolbar-skeleton {
+    gap: 4px;
+  }
+
+  .toolbar-skeleton .skel-bar {
+    height: 12px;
+  }
+
+  .il-load-logo {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 12px;
+  }
+
+  .sidebar-skeleton {
+    padding: 10px 14px;
+  }
+}
+
+@keyframes il-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel-bar {
+    animation: none;
+  }
+}

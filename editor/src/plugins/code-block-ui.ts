@@ -117,13 +117,19 @@ function toPrismId(canonical: string): string {
   return nameToPrismId.get(canonical) ?? canonical.toLowerCase();
 }
 
-const loadedGrammars = new Set<string>();
+const loadedGrammars = new Map<string, Promise<void>>();
 
-async function loadLanguage(language: string): Promise<void> {
-  if (!language || loadedGrammars.has(language)) return;
-  loadedGrammars.add(language);
+function loadLanguage(language: string): Promise<void> {
+  if (!language) return Promise.resolve();
+  const existing = loadedGrammars.get(language);
+  if (existing) return existing;
   const imp = LANG_IMPORTS[language];
-  if (imp) await imp();
+  const promise = (imp ? imp() : Promise.resolve()).catch((error) => {
+    loadedGrammars.delete(language);
+    throw error;
+  });
+  loadedGrammars.set(language, promise);
+  return promise;
 }
 
 // ---- Language picker ----

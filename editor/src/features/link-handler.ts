@@ -29,7 +29,7 @@ export function initLinkHandler(getEditor: () => Editor | null) {
       }
     })
 
-    const { openLinkDialog } = await import("@/components/dialogs/link-dialog")
+    const { openLinkDialog } = await import("@/controllers/dialog/link-dialog")
     const url = await openLinkDialog(initialUrl)
 
     const { toggleMark } = await import("prosemirror-commands")

@@ -3,7 +3,7 @@ import { pagesStore } from "@/stores/page-store";
 import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps, PendingOpType, type PendingOp } from "@/entities/PendingOps";
 import { Frontmatter } from "@/entities/Frontmatter";
-import type { MetaPanelData } from "@/components/panels/meta-panel";
+import type { MetaPanelData } from "@/entities/Frontmatter";
 
 export class DirtyTrackingService {
   private unsubs: (() => void)[] = [];

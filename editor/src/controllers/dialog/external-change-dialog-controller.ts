@@ -1,20 +1,24 @@
 import { computeDiff, renderDiffHtml } from "@/components/ui/diff-viewer"
 import { BaseDialogController } from "./base-dialog-controller"
 import { navArrowRight, navArrowDown } from "@/eta/icons"
+import renderExternalChangeDialog from "@/eta/views/dialog/external-change-dialog"
 
 export class ExternalChangeDialogController extends BaseDialogController {
   static targets = ["diffContainer"]
-  static values = {
-    local: String,
-    disk: String,
-  }
+  static values = { payload: Object }
 
   declare diffContainerTarget: HTMLElement
-  declare localValue: string
-  declare diskValue: string
   declare diffLoaded: boolean
 
+  declare payloadValue: {
+    path: string
+    local: string
+    disk: string
+    icons?: { navArrowRight?: string }
+  }
+
   connect() {
+    this.element.innerHTML = renderExternalChangeDialog(this.payloadValue)
     this.diffLoaded = false
   }
 
@@ -25,7 +29,7 @@ export class ExternalChangeDialogController extends BaseDialogController {
     btn.innerHTML = visible ? `${navArrowRight} View diff` : `${navArrowDown} Hide diff`
 
     if (!visible && !this.diffLoaded) {
-      const diff = computeDiff(this.localValue, this.diskValue)
+      const diff = computeDiff(this.payloadValue.local, this.payloadValue.disk)
       this.diffContainerTarget.innerHTML = renderDiffHtml(diff)
       this.diffLoaded = true
     }

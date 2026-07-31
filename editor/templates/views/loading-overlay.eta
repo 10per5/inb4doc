@@ -1,5 +1,0 @@
-<div id="initial-loader" class="initial-loader">
-  <div class="il-logo-wrapper">
-    <img class="il-logo" src="<%= it.EDITOR_SELF_BASE %>/inb4doc-256.png" alt="inb4doc" width="256" height="256" />
-  </div>
-</div>

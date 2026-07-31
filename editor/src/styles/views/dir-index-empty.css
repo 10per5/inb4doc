@@ -11,6 +11,10 @@
   cursor: pointer;
 }
 
+[data-controller="dir-index-empty"] {
+  height: 100%;
+}
+
 .dir-index-empty-view:hover {
   color: var(--color-text-primary);
 }

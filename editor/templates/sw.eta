@@ -1,0 +1,139 @@
+// build: <%= it.buildVersion %>
+self.BUILD_VERSION = <%~ JSON.stringify(it.buildVersion) %>;
+self.CHUNK_MAP = <%~ JSON.stringify(it.chunkMap) %>;
+importScripts(<%~ JSON.stringify(it.swAssetsUrl) %>);
+
+const CACHE = "inb4doc-assets-v1";
+const NETWORK_FIRST = <%= it.isDev %>;
+
+console.info("[SW] v<%= it.appVersion %> build:<%= it.buildVersion %> networkFirst:", NETWORK_FIRST);
+
+function reportProgress(loaded, total, done) {
+  self.clients.matchAll({ includeUncontrolled: true }).then((clients) => {
+    for (const c of clients) {
+      c.postMessage({ type: "SW_INSTALL_PROGRESS", loaded, total, done });
+    }
+  });
+}
+
+async function fetchAndPut(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Failed to fetch " + url);
+  const cache = await caches.open(CACHE);
+  await cache.put(url, response.clone());
+  return response;
+}
+
+// Byte size of a response, 0 when unknown.
+async function responseBytes(response) {
+  const len = Number(response.headers.get("content-length"));
+  if (Number.isFinite(len) && len > 0) return len;
+  try {
+    return (await response.clone().blob()).size;
+  } catch (_) {
+    return 0;
+  }
+}
+
+// HEAD-probe the blocking IMPORTANT set for a stable byte denominator.
+async function probeSize(url) {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    if (!response.ok) return 0;
+    return await responseBytes(response);
+  } catch (_) {
+    return 0;
+  }
+}
+
+self.addEventListener("install", (event) => {
+  // Take control immediately on every mode. Without this the new SW sits in
+  // "waiting" forever in production, SW_ACTIVATED never fires, and the old SW
+  // keeps serving stale app.js/chunks from its cache on every reload.
+  self.skipWaiting()
+  event.waitUntil(
+    (async () => {
+      const total = (await Promise.all(self.IMPORTANT.map(probeSize))).reduce(
+        (a, b) => a + b,
+        0
+      );
+      let loaded = 0;
+      // Block activation only on the IMPORTANT assets (shell + entry + app.js);
+      // first paint never waits on the lazy controller chunks.
+      for (const url of self.IMPORTANT) {
+        loaded += await fetchAndPut(url).then(responseBytes).catch(() => 0);
+        reportProgress(loaded, total, false);
+      }
+      reportProgress(loaded, total, loaded >= total);
+      // Fill the remaining chunks in the background without delaying activation.
+      self.backgroundFill = (async () => {
+        for (const url of self.CHUNKS) {
+          const size = await fetchAndPut(url).then(responseBytes).catch(() => 0);
+          loaded += size;
+          reportProgress(loaded, total, loaded >= total);
+        }
+      })();
+    })()
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      await self.clients.claim();
+      for (const client of await self.clients.matchAll()) {
+        client.postMessage({ type: "SW_ACTIVATED", version: self.BUILD_VERSION, chunkMap: self.CHUNK_MAP });
+      }
+      for (const key of await caches.keys()) {
+        if (key !== CACHE) await caches.delete(key);
+      }
+    })()
+  );
+});
+
+// Entry shell + app.js are versioned only by build, not by content hash, so a
+// cache-first policy would serve the stale bundle forever. Always go to the
+// network for IMPORTANT paths (falling back to cache offline). Lazy chunks are
+// content-hashed URLs, so cache-first is safe and keeps them available offline.
+const IMPORTANT_PATHS = new Set(
+  self.IMPORTANT.map((url) => new URL(url, self.registration.scope).pathname)
+);
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  const networkFirst = NETWORK_FIRST || IMPORTANT_PATHS.has(url.pathname);
+
+  event.respondWith(
+    (async () => {
+      if (networkFirst) {
+        try {
+          const response = await fetch(event.request);
+          const contentType = response.headers.get("content-type") || "";
+          if (
+            response.ok &&
+            /\.(js|css)(?:\?|$)/.test(event.request.url) &&
+            (contentType.includes("javascript") || contentType.includes("text/css"))
+          ) {
+            const cache = await caches.open(CACHE);
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        } catch {
+          const cached = await caches.match(event.request);
+          return cached || fetch(event.request);
+        }
+      }
+
+      const cached = await caches.match(event.request);
+      return cached || fetch(event.request);
+    })()
+  );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});

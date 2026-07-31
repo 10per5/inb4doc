@@ -2,11 +2,15 @@ import { Application, type Controller } from "@hotwired/stimulus"
 
 import ShellController from "./shell_controller"
 import TopbarController from "./topbar-controller"
-import SidebarController from "./sidebar-controller"
+import SidebarController from "./sidebar/sidebar-controller"
 import EditorController from "./editor-controller"
 import ContextMenuController from "./context-menu-controller"
 import { PressTwiceController } from "./press-twice-controller"
 import NoFileController from "./no-file-controller"
+import DirIndexEmptyController from "./dir-index-empty-controller"
+import DiskUsageController from "./disk-usage-controller"
+import UpdateController from "./update-controller"
+import MetaPanelController from "./meta-panel/meta-panel-controller"
 
 import { ConfirmDialogController } from "./dialog/confirm-dialog-controller"
 import { PromptDialogController } from "./dialog/prompt-dialog-controller"
@@ -46,6 +50,10 @@ const registrations: ControllerRegistration[] = [
   { name: "press-twice", controller: PressTwiceController },
   { name: "context-menu", controller: ContextMenuController },
   { name: "no-file", controller: NoFileController },
+  { name: "dir-index-empty", controller: DirIndexEmptyController },
+  { name: "disk-usage", controller: DiskUsageController },
+  { name: "meta-panel", controller: MetaPanelController },
+  { name: "update", controller: UpdateController },
 ]
 
 export function registerControllers(app: Application): void {

@@ -1,5 +1,14 @@
 import { parseFrontmatter, serializeFrontmatter } from "@/utils/frontmatter";
-import type { MetaPanelData } from "@/components/panels/meta-panel";
+
+/**
+ * Canonical page-frontmatter shape, shared by pages, the meta panel, and the
+ * dirty-tracking service.
+ */
+export interface MetaPanelData {
+  title: string;
+  weight?: number;
+  [key: string]: string | number | undefined;
+}
 
 /**
  * Page frontmatter as a value object.

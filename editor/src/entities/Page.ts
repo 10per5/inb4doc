@@ -5,7 +5,7 @@ import { replacePendingUrls } from "@/utils/text";
 import { Body } from "./Body";
 import { Frontmatter } from "./Frontmatter";
 import type { PageMeta } from "./PageMeta";
-import type { MetaPanelData } from "@/components/panels/meta-panel";
+import type { MetaPanelData } from "@/entities/Frontmatter";
 
 export interface PageData {
   body?: string;

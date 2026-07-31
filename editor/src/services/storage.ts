@@ -1,11 +1,8 @@
 import {
-  VERSION_KEY,
-  MIN_STORAGE_VERSION,
   STORE_FILES,
   STORE_IMAGES,
   type FileEntry,
 } from "@/config/storage-keys"
-import { appVersion } from "@/config"
 
 export type ImageStorageMode = "file" | "base64"
 
@@ -34,11 +31,11 @@ export class StorageService {
     initHandlers.set(type, handler)
   }
 
-  initialize(): void {
+  async initialize(): Promise<void> {
     if (this.inited) return
     this.inited = true
 
-    this.ensureVersion()
+    await this.ensureVersion()
 
     for (const [type, handler] of initHandlers) {
       const entries = this.getAllJSON<unknown>(type)
@@ -232,29 +229,9 @@ export class StorageService {
 
   // ── Versioning ──
 
-  private parseVersion(v: string): [number, number, number] {
-    const parts = v.split(/[^\d]/).filter(Boolean)
-    if (parts.length < 3) return [0, 0, 0]
-    return [parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10)]
-  }
-
-  private versionLt(a: readonly [number, number, number], b: readonly [number, number, number]): boolean {
-    if (a[0] !== b[0]) return a[0] < b[0]
-    if (a[1] !== b[1]) return a[1] < b[1]
-    return a[2] < b[2]
-  }
-
-  private getStoredVersion(): [number, number, number] {
-    const v = this.get(VERSION_KEY)
-    return v ? this.parseVersion(v) : [0, 0, 0]
-  }
-
-  private ensureVersion(): void {
-    const stored = this.getStoredVersion()
-    if (this.versionLt(stored, MIN_STORAGE_VERSION as unknown as [number, number, number])) {
-      localStorage.clear()
-    }
-    this.set(VERSION_KEY, appVersion)
+  private async ensureVersion(): Promise<void> {
+    const { runMigrations } = await import("@/migrations")
+    await runMigrations(this)
   }
 }
 

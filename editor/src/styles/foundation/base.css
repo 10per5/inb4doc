@@ -22,23 +22,17 @@ body {
   color: var(--color-text-primary);
 }
 
-#app {
-  height: 100vh;
+/* ── Utility ────────────────────────────────────────────────────────── */
+
+.hidden {
+  display: none !important;
 }
 
 /* ── CSS Custom Properties ──────────────────────────────────────────── */
+/* Layout/spacing vars (--sidebar-width, --aside-width, --editor-padding-*,
+ * visibility) live in lib/style/layout.css (critical, inlined in <head>). */
 
 :root {
-  /* Spacing */
-  --editor-padding-x: 1rem;
-  --editor-padding-y: 0.8rem;
-
-  /* Panel widths */
-  --sidebar-width: 0;
-  --sidebar-visibility: none;
-  --aside-width: 0;
-  --aside-visibility: none;
-
   /* Font sizes */
   --font-size-base: 0.9rem;
   --font-size-small: 0.8rem;
@@ -88,24 +82,6 @@ body {
   --color-btn-active-bg: #81a1c1;
   --color-btn-active-text: #2e3440;
   --color-btn-active-hover-text: #2e3440;
-}
-
-/* Tablet (768px and up) */
-@media (min-width: 768px) {
-  :root {
-    --editor-padding-x: 1.5rem;
-    --sidebar-width: 260px;
-    --sidebar-visibility: flex;
-  }
-}
-
-/* Desktop (1200px and up) */
-@media (min-width: 1200px) {
-  :root {
-    --editor-padding-x: 2rem;
-    --aside-width: 240px;
-    --aside-visibility: flex;
-  }
 }
 
 /* Mobile typography adjustments */

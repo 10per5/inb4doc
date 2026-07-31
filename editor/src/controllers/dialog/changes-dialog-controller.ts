@@ -3,6 +3,7 @@ import { diffFrontmatter } from "@/entities/MetaDiff"
 import { Frontmatter } from "@/entities/Frontmatter"
 import { stripFrontmatter } from "@/utils/frontmatter"
 import { BaseDialogController } from "./base-dialog-controller"
+import renderChangesDialog from "@/eta/views/dialog/changes-dialog"
 
 export const ChangesDialogEvent = {
   Discard:    "changes-dialog:discard",
@@ -22,18 +23,34 @@ interface ChangeItem {
   sizeColor?: string
 }
 
+interface PendingOpData {
+  opLabel: string
+}
+
 export class ChangesDialogController extends BaseDialogController {
   static targets = ["header", "changeItem", "pending", "preview"]
-  static values = {
-    changes: { type: Array, default: [] },
-  }
+  static values = { payload: Object }
 
   declare headerTarget: HTMLElement
   declare readonly changeItemTargets: HTMLElement[]
   declare readonly pendingTargets: HTMLElement[]
   declare readonly previewTargets: HTMLElement[]
 
-  declare changesValue: ChangeItem[]
+  declare payloadValue: {
+    title: string
+    dirty: ChangeItem[]
+    pending: PendingOpData[]
+    currentPath?: string
+  }
+
+  connect() {
+    this.element.innerHTML = renderChangesDialog(this.payloadValue)
+    // The opener (facade) dispatches reload-ready on this element after it
+    // has fetched the original content for a preview.
+    this.element.addEventListener(ChangesDialogEvent.ReloadReady, ((e: CustomEvent<{ idx: number; text: string }>) => {
+      this.reloadReady(e)
+    }) as EventListener)
+  }
 
   togglePreview(e: Event) {
     const idx = (e.currentTarget as HTMLElement).dataset.idx
@@ -49,7 +66,7 @@ export class ChangesDialogController extends BaseDialogController {
   }
 
   loadPreview(idx: number) {
-    const data = this.changesValue[idx]
+    const data = this.payloadValue.dirty[idx]
     if (!data?.path) return
 
     // Ask the opener (via event) to fetch the original content for this path.
@@ -59,7 +76,7 @@ export class ChangesDialogController extends BaseDialogController {
   reloadReady(e: Event) {
     const { idx, text } = (e as CustomEvent<{ idx: number; text: string }>).detail
     const preview = this.previewTargets[idx]
-    const data = this.changesValue[idx]
+    const data = this.payloadValue.dirty[idx]
     if (!preview || !data?.path) return
 
     const original = text

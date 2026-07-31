@@ -1,8 +1,21 @@
 import { isHugoIndex, HUGO_INDEX_HINT } from "@/utils/hugo-compat"
 import { BaseDialogController } from "./base-dialog-controller"
+import renderCreateDialog from "@/eta/views/dialog/create-dialog"
 
 export class CreateDialogController extends BaseDialogController {
+  static values = { payload: Object }
+
+  declare payloadValue: {
+    title: string
+    inputId: string
+    checkId: string
+    hintId: string
+    defaultValue?: string
+    hint?: string
+  }
+
   connect() {
+    this.element.innerHTML = renderCreateDialog(this.payloadValue)
     this.focusInput("input[type='text']")
   }
 

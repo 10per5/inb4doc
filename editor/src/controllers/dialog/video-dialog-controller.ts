@@ -1,12 +1,33 @@
 import { BaseDialogController } from "./base-dialog-controller"
+import renderVideoDialog from "@/eta/views/dialog/video-dialog"
 
 export class VideoDialogController extends BaseDialogController {
   static targets = ["controls", "loop", "muted", "autoplay"]
+  static values = { payload: Object }
 
   declare controlsTarget: HTMLInputElement
   declare loopTarget: HTMLInputElement
   declare mutedTarget: HTMLInputElement
   declare autoplayTarget: HTMLInputElement
+
+  declare payloadValue: {
+    inputId: string
+    widthId: string
+    heightId: string
+    current: {
+      src?: string
+      width?: string
+      height?: string
+      controls?: boolean
+      loop?: boolean
+      muted?: boolean
+      autoplay?: boolean
+    }
+  }
+
+  connect() {
+    this.element.innerHTML = renderVideoDialog(this.payloadValue)
+  }
 
   keydown(e: KeyboardEvent) {
     if (e.key === "Enter") this.save()

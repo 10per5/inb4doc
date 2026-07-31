@@ -7,7 +7,9 @@
 
   <meta name="app-version" content="<%= it.APP_VERSION %>" />
 
-  <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.ico" />
+  <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.png" />
+  <link rel="apple-touch-icon" href="<%= it.EDITOR_SELF_BASE || '' %>/inb4doc-256.png" />
+  <link rel="manifest" href="<%= it.EDITOR_SELF_BASE || '' %>/manifest.json" />
 
   <title>inb4doc - Your notes, where you need them</title>
   <meta name="description" content="Live markdown editor for browser, desktop, and mobile. Connect providers to export wikis, static sites, and more.">

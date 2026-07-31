@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { DialogEvent } from "./dialog-events"
+import { DialogEvent } from "@/config/dialog-events"
 
 export class BaseDialogController extends Controller {
   cancel() {

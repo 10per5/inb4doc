@@ -1,6 +1,6 @@
 import { $node } from "@milkdown/utils"
 import type { EditorView } from "@milkdown/kit/prose/view"
-import { openHugoRefDialog } from "@/components/dialogs/hugo-ref-dialog"
+import { openHugoRefDialog } from "@/controllers/dialog/hugoref-dialog"
 
 export const hugoRefSchema = $node("hugoRef", () => ({
   group: "inline",

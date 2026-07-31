@@ -1,0 +1,16 @@
+<div class="editor-skeleton" id="editor-skeleton">
+  <div class="skel-bar skel-title"></div>
+  <div class="skel-bar skel-w100"></div>
+  <div class="skel-bar skel-w85"></div>
+  <div class="skel-bar skel-w92"></div>
+  <div class="skel-bar skel-w70"></div>
+  <div class="skel-gap"></div>
+  <div class="skel-bar skel-w95"></div>
+  <div class="skel-bar skel-w60"></div>
+  <div class="skel-bar skel-w80"></div>
+  <div class="skel-bar skel-w50"></div>
+  <div class="skel-gap"></div>
+  <div class="skel-bar skel-heading"></div>
+  <div class="skel-bar skel-w88"></div>
+  <div class="skel-bar skel-w75"></div>
+</div>

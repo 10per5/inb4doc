@@ -8,15 +8,13 @@
 
 import { Controller } from "@hotwired/stimulus"
 import type { Editor } from "@milkdown/kit/core"
-import { openPrefsDialog, applyThemeFromPrefs } from "@/components/dialogs/prefs-dialog";
-import { mountMetaPanel } from "@/components/panels/meta-panel";
+import { openPrefsDialog, applyThemeFromPrefs } from "@/controllers/dialog/prefs-dialog";
 import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";
 import { EditorController } from "@/controllers/editor-controller";
 import { FileSyncService } from "@/services/file-sync-service";
-import { ViewController } from "@/controllers/view-controller";
+import { ViewController } from "@/services/view-controller";
 import { NavigationService } from "@/services/navigation-service";
-import type SidebarController from "@/controllers/sidebar-controller";
 import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { NEW_PAGE_BODY } from "@/utils/constants"
@@ -24,8 +22,8 @@ import { pagesStore } from "@/stores/page-store";
 import { HOME_PATH, isRootPath, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import { exportToZip, pickAndParseZip } from "@/utils/zip";
 import type { ZipEntry, ZipFileEntry } from "@/utils/zip";
-import { openImportZipDialog } from "@/components/dialogs/import-zip-dialog";
-import { openImageManagerDialog } from "@/components/dialogs/image-manager-dialog";
+import { openImportZipDialog } from "@/controllers/dialog/import-zip-dialog";
+import { openImageManagerDialog } from "@/controllers/dialog/image-manager-dialog";
 import { showNotification } from "@/components/notification/notification";
 import { prefsStore } from "@/stores/preferences-store";
 import { getCurrentPath, replacePath } from "@/utils/url";
@@ -34,7 +32,6 @@ import * as hotkeys from "@/utils/hotkeys";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
-import { hideLoadingOverlay } from "@/components/overlay/loading-overlay";
 import { updateEditorTint } from "@/services/file-status-tint";
 import { storageService } from "@/services/storage";
 
@@ -49,12 +46,10 @@ function treePaths(tree: ReturnType<typeof treeStore.getTree>): string[] {
 }
 
 export default class extends Controller {
-  static targets = ["sidebar", "editorArea", "metaPanel"]
+  static targets = ["editorArea"]
   static outlets = ["editor"]
 
-  declare readonly sidebarTarget: HTMLElement
   declare readonly editorAreaTarget: HTMLElement
-  declare readonly metaPanelTarget: HTMLElement
 
   private editor!: EditorController
   private cache!: FileSyncService
@@ -81,15 +76,12 @@ export default class extends Controller {
   }
 
   private async initializeApp() {
-    storageService.initialize()
+    await storageService.initialize()
     applyThemeFromPrefs()
 
     this.cache = new FileSyncService(this.editor as any)
     this.view = new ViewController(this.editor as any, sessionStarted)
-    const sidebarController = this.application.getControllerForElementAndIdentifier(
-      this.sidebarTarget, "sidebar"
-    ) as unknown as SidebarController
-    this.nav = new NavigationService(this.editor as any, this.cache, this.sidebarTarget, sidebarController)
+    this.nav = new NavigationService(this.editor as any, this.cache)
 
     this.editor.setCurrentPath(this.initialPath)
     this.cache.setCurrentPath(this.initialPath)
@@ -100,7 +92,7 @@ export default class extends Controller {
 
     this.unsubs.push(
       appEvents.on(AppEvent.FlushComplete, () => this.nav.loadSidebar()),
-      appEvents.on(AppEvent.SidebarReload, () => this.nav.loadSidebar()),
+      appEvents.on(AppEvent.ModulesSwapped, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.PrefsOpened, () => {
         openPrefsDialog({
           onStickyToolbarChange: (sticky) => this.toolbarStore!.setStickyPreference(sticky),
@@ -161,16 +153,11 @@ export default class extends Controller {
 
     this.view.initialize()
 
-    const metaPanel = mountMetaPanel(this.metaPanelTarget)
-    this.nav.setMetaPanel(metaPanel)
-
     this.onBeforeUnload = () => { dirtyTrackingService.flush() }
     window.addEventListener("beforeunload", this.onBeforeUnload)
 
     hotkeys.register("ctrl+s", () => appEvents.emit(AppEvent.SaveCurrentFile))
     hotkeys.attach()
-
-    hideLoadingOverlay()
 
     this.loadBackground()
   }
@@ -199,7 +186,7 @@ export default class extends Controller {
     })
 
     await this.cache.afterRestore()
-    await this.editor.loadContent(startPath, (data) => this.nav.getMetaPanel()?.update(data))
+    await this.editor.loadContent(startPath, () => appEvents.emit(AppEvent.MetaPanelReload))
     updateEditorTint(this.editor.element as HTMLElement, startPath, this.cache.getPendingOps())
     await this.nav.loadSidebar()
     this.editor.hideSkeleton()
@@ -274,7 +261,7 @@ export default class extends Controller {
         pagesStore.clearAll()
         treeStore.setTree(await provider.getTree())
         await this.nav.loadSidebar()
-        await this.editor.loadContent(this.initialPath, (data) => this.nav.getMetaPanel()?.update(data))
+        await this.editor.loadContent(this.initialPath, () => appEvents.emit(AppEvent.MetaPanelReload))
         showNotification(`Imported ${result.selected.length} file${result.selected.length > 1 ? "s" : ""}`, { type: "info" })
       },
     )
