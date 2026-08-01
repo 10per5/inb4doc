@@ -2,7 +2,7 @@ import { stripFrontmatter, serializeFrontmatter } from "@/utils/frontmatter";
 import { Frontmatter } from "@/entities/Frontmatter";
 import {
   openChangesDialog,
-  type ChangesDialogData,
+  type ChangesDialogItem,
 } from "@/controllers/dialog/changes-dialog";
 import { pagesStore } from "@/stores/page-store";
 import {
@@ -286,12 +286,86 @@ export class FileSyncService {
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
   }
 
+  private async executeOp(
+    op: PendingOp,
+    flushedPaths?: Set<string>
+  ): Promise<void> {
+    const provider = getProvider();
+    const providerId = activeProviderId();
+
+    switch (op.type) {
+      case PendingOpType.Create: {
+        const latest =
+          repo.get(op.path)?.reconstructContent() ?? op.content;
+        await provider?.writeFile(op.path, latest);
+        treeStore.afterWrite(op.path, latest);
+        const page = repo.get(op.path);
+        if (page && page.bodyState.body !== undefined) {
+          page.setBaseline(page.bodyState.body);
+        }
+        break;
+      }
+      case PendingOpType.Delete: {
+        await provider?.deleteFile?.(op.path);
+        storageService.removeEntity(
+          STORE_FILES,
+          `${providerId}/${op.path}`
+        );
+        if (!op.path.endsWith("/_index")) {
+          const indexPath = op.path + "/_index";
+          await provider?.deleteFile?.(indexPath).catch(() => {});
+          storageService.removeEntity(
+            STORE_FILES,
+            `${providerId}/${indexPath}`
+          );
+        }
+        treeStore.afterDelete(op.path);
+        break;
+      }
+      case PendingOpType.Rename:
+        if (op.content) {
+          await provider?.deleteFile?.(op.from);
+          if (!flushedPaths?.has(op.to)) {
+            const latest =
+              repo.get(op.to)?.reconstructContent() ?? op.content;
+            await provider?.writeFile?.(op.to, latest);
+          }
+        } else {
+          await provider?.moveFile?.(op.from, op.to);
+        }
+        treeStore.afterMove(op.from, op.to, op.content);
+        storageService.removeEntity(
+          STORE_FILES,
+          `${providerId}/${op.from}`
+        );
+        break;
+      case PendingOpType.Move:
+        if (op.content) {
+          await provider?.deleteFile?.(op.from);
+          if (!flushedPaths?.has(op.to)) {
+            const latest =
+              repo.get(op.to)?.reconstructContent() ?? op.content;
+            await provider?.writeFile?.(op.to, latest);
+          }
+        } else {
+          await provider?.moveFile?.(op.from, op.to);
+        }
+        treeStore.afterMove(op.from, op.to, op.content);
+        storageService.removeEntity(
+          STORE_FILES,
+          `${providerId}/${op.from}`
+        );
+        break;
+      case PendingOpType.Edit:
+        break;
+    }
+  }
+
   private async executePendingOps(
     flushedPaths?: Set<string>
   ): Promise<{ deletedPaths: string[]; renamedPaths: Map<string, string> }> {
     if (this.pendingOps.count === 0)
       return { deletedPaths: [], renamedPaths: new Map() };
-    const provider = getProvider();
     const deletedPaths: string[] = [];
     const renamedPaths = new Map<string, string>();
 
@@ -306,77 +380,12 @@ export class FileSyncService {
       return (order[a.type] ?? 1) - (order[b.type] ?? 1);
     });
 
-    const providerId = activeProviderId();
     for (const op of sorted) {
       try {
-        switch (op.type) {
-          case PendingOpType.Create: {
-            const latest =
-              repo.get(op.path)?.reconstructContent() ?? op.content;
-            await provider?.writeFile(op.path, latest);
-            treeStore.afterWrite(op.path, latest);
-            const page = repo.get(op.path);
-            if (page && page.bodyState.body !== undefined) {
-              page.setBaseline(page.bodyState.body);
-            }
-            break;
-          }
-          case PendingOpType.Delete: {
-            await provider?.deleteFile?.(op.path);
-            storageService.removeEntity(
-              STORE_FILES,
-              `${providerId}/${op.path}`
-            );
-            if (!op.path.endsWith("/_index")) {
-              const indexPath = op.path + "/_index";
-              await provider?.deleteFile?.(indexPath).catch(() => {});
-              storageService.removeEntity(
-                STORE_FILES,
-                `${providerId}/${indexPath}`
-              );
-            }
-            treeStore.afterDelete(op.path);
-            deletedPaths.push(op.path);
-            break;
-          }
-          case PendingOpType.Rename:
-            renamedPaths.set(op.from, op.to);
-            if (op.content) {
-              await provider?.deleteFile?.(op.from);
-              if (!flushedPaths?.has(op.to)) {
-                const latest =
-                  repo.get(op.to)?.reconstructContent() ?? op.content;
-                await provider?.writeFile?.(op.to, latest);
-              }
-            } else {
-              await provider?.moveFile?.(op.from, op.to);
-            }
-            treeStore.afterMove(op.from, op.to, op.content);
-            storageService.removeEntity(
-              STORE_FILES,
-              `${providerId}/${op.from}`
-            );
-            break;
-          case PendingOpType.Move:
-            if (op.content) {
-              await provider?.deleteFile?.(op.from);
-              if (!flushedPaths?.has(op.to)) {
-                const latest =
-                  repo.get(op.to)?.reconstructContent() ?? op.content;
-                await provider?.writeFile?.(op.to, latest);
-              }
-            } else {
-              await provider?.moveFile?.(op.from, op.to);
-            }
-            treeStore.afterMove(op.from, op.to, op.content);
-            storageService.removeEntity(
-              STORE_FILES,
-              `${providerId}/${op.from}`
-            );
-            break;
-          case PendingOpType.Edit:
-            break;
-        }
+        await this.executeOp(op, flushedPaths);
+        if (op.type === PendingOpType.Delete) deletedPaths.push(op.path);
+        if (op.type === PendingOpType.Rename)
+          renamedPaths.set(op.from, op.to);
       } catch (error) {
         console.error(
           `Failed to execute pending op ${op.type} ${
@@ -417,140 +426,282 @@ export class FileSyncService {
   // ── Discard ──
 
   async discardFileChanges(pagePath: string): Promise<void> {
-    this.cancelCreate(pagePath);
-    this.pendingOps.cancelEdit(pagePath);
+    this.pendingOps.cancelOp(pagePath);
     pendingOpsStore.save(this.pendingOps.all);
     repo.clearPath(pagePath);
     this.recomputeDirty();
     this.editor.invalidateState(pagePath);
 
     if (pagePath === this.currentPath) {
-      clearEditorTint(this.editor.element as HTMLElement);
-      const provider = getProvider();
-      const raw = (await provider?.readFile(pagePath)) || "";
-
-      if (!raw) {
-        appEvents.emit(AppEvent.NoFileView, { lastPath: pagePath });
-      } else {
-        const { frontmatter, body } = stripFrontmatter(raw);
-        const page = repo.getOrCreate(pagePath);
-        if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
-        page.originalFrontmatter = frontmatter
-          ? Frontmatter.fromMeta(frontmatter)
-          : undefined;
-        page.setBaseline(body);
-
-        await this.editor.ensureEditor(body);
-      }
+      await this.reloadCurrentFromDisk(pagePath);
     }
 
     showNotification("Changes discarded", { type: "info" });
   }
 
+  private async reloadCurrentFromDisk(pagePath: string): Promise<void> {
+    clearEditorTint(this.editor.element as HTMLElement);
+    const provider = getProvider();
+    const raw = (await provider?.readFile(pagePath)) || "";
+
+    if (!raw) {
+      appEvents.emit(AppEvent.NoFileView, { lastPath: pagePath });
+    } else {
+      const { frontmatter, body } = stripFrontmatter(raw);
+      const page = repo.getOrCreate(pagePath);
+      if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter);
+      page.originalFrontmatter = frontmatter
+        ? Frontmatter.fromMeta(frontmatter)
+        : undefined;
+      page.setBaseline(body);
+
+      await this.editor.ensureEditor(body);
+    }
+  }
+
+  // ── Single-op approve / reject ──
+
+  private async flushPendingEdit(path: string): Promise<boolean> {
+    const provider = getProvider();
+    const imageUrlMap = await imageService.commitAllPendingImages();
+    const page = repo.getOrCreate(path);
+    const editOp = this.pendingOps.findEdit(path);
+
+    let bodyToWrite: string;
+    if (editOp) {
+      bodyToWrite = editOp.patch || page.bodyState.body || "";
+    } else {
+      bodyToWrite = page.bodyState.body || "";
+    }
+
+    if (path === this.currentPath) {
+      bodyToWrite = this.editor.getCurrentContent();
+    } else if (!bodyToWrite) {
+      const cachedRaw = await provider?.readFile(path);
+      if (!cachedRaw) return false;
+      bodyToWrite = stripFrontmatter(cachedRaw).body;
+    }
+
+    if (path === this.currentPath) {
+      const serverTime = page.getServerTime();
+      if (serverTime) {
+        const fileTime = await provider?.getServerTime(path);
+        if (fileTime && fileTime > serverTime) {
+          if (!confirm(`"${path}" was modified on disk. Overwrite?`))
+            return false;
+        }
+      }
+    }
+
+    page.setBody(bodyToWrite);
+    const ok = await page.flushOut(imageUrlMap);
+    if (ok) {
+      treeStore.afterWrite(path, page.reconstructContent());
+      this.pendingOps.cancelEdit(path);
+    }
+    return ok;
+  }
+
+  async approveOp(path: string): Promise<void> {
+    const op = this.pendingOps.get(path);
+    if (!op) return;
+    const provider = getProvider();
+    const affected = "path" in op ? op.path : op.from;
+
+    try {
+      if (op.type === PendingOpType.Edit) {
+        const ok = await this.flushPendingEdit(op.path);
+        if (!ok) {
+          showNotification("Failed to save", { type: "danger" });
+          return;
+        }
+      } else {
+        await this.executeOp(op);
+        this.pendingOps.cancelOp(affected);
+      }
+    } catch (error) {
+      console.error(`Failed to apply change for ${path}:`, error);
+      showNotification("Failed to apply change", { type: "danger" });
+      return;
+    }
+
+    pendingOpsStore.save(this.pendingOps.all);
+    this.recomputeDirty();
+    appEvents.emit(AppEvent.SidebarReload);
+
+    if (op.type === PendingOpType.Rename || op.type === PendingOpType.Move) {
+      if (op.to === this.currentPath) {
+        appEvents.emit(AppEvent.Navigate, { path: op.to });
+      } else if (affected === this.currentPath) {
+        await this.reloadCurrentFromDisk(this.currentPath);
+      } else {
+        updateEditorTint(
+          this.editor.element as HTMLElement,
+          this.currentPath,
+          this.pendingOps
+        );
+      }
+    } else if (affected === this.currentPath) {
+      const raw = await provider?.readFile(this.currentPath);
+      if (!raw) {
+        clearEditorTint(this.editor.element as HTMLElement);
+        appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+      } else {
+        await this.reloadCurrentFromDisk(this.currentPath);
+      }
+    } else {
+      updateEditorTint(
+        this.editor.element as HTMLElement,
+        this.currentPath,
+        this.pendingOps
+      );
+    }
+
+    showNotification("Change applied", { type: "success" });
+  }
+
+  async rejectOp(path: string): Promise<void> {
+    const op = this.pendingOps.get(path);
+    if (!op) return;
+    const affected = "path" in op ? op.path : op.from;
+
+    this.pendingOps.cancelOp(affected);
+    pendingOpsStore.save(this.pendingOps.all);
+    repo.clearPath(affected);
+    this.editor.invalidateState(affected);
+    this.recomputeDirty();
+    appEvents.emit(AppEvent.SidebarReload);
+
+    if (affected === this.currentPath) {
+      await this.reloadCurrentFromDisk(this.currentPath);
+    } else {
+      updateEditorTint(
+        this.editor.element as HTMLElement,
+        this.currentPath,
+        this.pendingOps
+      );
+    }
+
+    showNotification("Change rejected", { type: "info" });
+  }
+
   // ── Changes dialog ──
 
   async handleDirtyClick(): Promise<void> {
-    const dirtyPaths = this.pendingOps.getDirtyPaths();
-    if (dirtyPaths.length === 0 && this.pendingOps.count === 0) return;
+    if (this.pendingOps.count === 0) return;
 
     const provider = getProvider();
-    const pendingChanges: { opLabel: string }[] = [];
+    const items: ChangesDialogItem[] = [];
 
-    for (const op of this.pendingOps.all) {
-      let label = "";
+    const sorted = [...this.pendingOps.all].sort((a, b) => {
+      const order: Record<PendingOpType, number> = {
+        [PendingOpType.Create]: 0,
+        [PendingOpType.Edit]: 0,
+        [PendingOpType.Move]: 1,
+        [PendingOpType.Rename]: 1,
+        [PendingOpType.Delete]: 2,
+      };
+      return (order[a.type] ?? 1) - (order[b.type] ?? 1);
+    });
+
+    for (const op of sorted) {
       switch (op.type) {
-        case PendingOpType.Create:
-          label = `Create: ${op.path}`;
+        case PendingOpType.Edit: {
+          const page = repo.getOrCreate(op.path);
+          if (op.patch) page.bodyState.body = op.patch;
+
+          let md = page.reconstructContent();
+
+          if (!md && op.path === this.currentPath) {
+            md = this.editor.getCurrentContent();
+          }
+
+          if (!md) {
+            const cachedRaw = await provider?.readFile(op.path);
+            if (!cachedRaw) continue;
+            const { frontmatter: rawFm, body } = stripFrontmatter(cachedRaw);
+            const fallbackPage = repo.getOrCreate(op.path);
+            fallbackPage.setBaseline(body);
+            fallbackPage.originalFrontmatter = rawFm
+              ? Frontmatter.fromMeta(rawFm)
+              : undefined;
+            md = fallbackPage.reconstructContent();
+          }
+
+          if (!md) continue;
+
+          const changeSize =
+            op.patch.length - (page.bodyState.baseline?.length ?? 0);
+
+          items.push({
+            path: op.path,
+            label: op.path,
+            kind: PendingOpType.Edit,
+            currentPath: op.path === this.currentPath,
+            md,
+            size: changeSize,
+          });
           break;
+        }
+        case PendingOpType.Create: {
+          const page = repo.get(op.path);
+          const md = page?.reconstructContent() ?? op.content;
+          items.push({
+            path: op.path,
+            label: `Create: ${op.path}`,
+            kind: PendingOpType.Create,
+            currentPath: op.path === this.currentPath,
+            md,
+            size: md.length,
+          });
+          break;
+        }
         case PendingOpType.Delete:
-          label = `Delete: ${op.path}`;
+          items.push({
+            path: op.path,
+            label: `Delete: ${op.path}`,
+            kind: PendingOpType.Delete,
+            currentPath: op.path === this.currentPath,
+            md: "",
+            size: 0,
+          });
           break;
         case PendingOpType.Rename:
-          label = `Rename: ${op.from} → ${op.to}`;
+          items.push({
+            path: op.from,
+            label: `Rename: ${op.from} → ${op.to}`,
+            kind: PendingOpType.Rename,
+            currentPath: op.from === this.currentPath,
+            ...(op.content
+              ? { md: op.content, size: op.content.length }
+              : { notice: `Rename: ${op.from} → ${op.to}`, size: 0 }),
+          });
           break;
         case PendingOpType.Move:
-          label = `Move: ${op.from} → ${op.to}`;
-          break;
-        case PendingOpType.Edit:
-          label = `Edit: ${op.path}`;
+          items.push({
+            path: op.from,
+            label: `Move: ${op.from} → ${op.to}`,
+            kind: PendingOpType.Move,
+            currentPath: op.from === this.currentPath,
+            ...(op.content
+              ? { md: op.content, size: op.content.length }
+              : { notice: `Move: ${op.from} → ${op.to}`, size: 0 }),
+          });
           break;
       }
-      pendingChanges.push({ opLabel: label });
     }
 
-    const dirtyChanges: ChangesDialogData[] = [];
-
-    for (const path of dirtyPaths) {
-      const editOp = this.pendingOps.findEdit(path);
-      const page = repo.getOrCreate(path);
-
-      if (editOp && editOp.patch) {
-        page.bodyState.body = editOp.patch;
-      }
-
-      let md = page.reconstructContent();
-
-      if (!md && path === this.currentPath) {
-        md = this.editor.getCurrentContent();
-      }
-
-      if (!md) {
-        const cachedRaw = await provider?.readFile(path);
-        if (!cachedRaw) continue;
-        const { frontmatter: rawFm, body } = stripFrontmatter(cachedRaw);
-        const fallbackPage = repo.getOrCreate(path);
-        fallbackPage.setBaseline(body);
-        fallbackPage.originalFrontmatter = rawFm
-          ? Frontmatter.fromMeta(rawFm)
-          : undefined;
-        md = fallbackPage.reconstructContent();
-      }
-
-      if (!md) continue;
-
-      const changeSize = editOp
-        ? editOp.patch.length - (page.bodyState.baseline?.length ?? 0)
-        : page.bodyState.getDelta();
-
-      dirtyChanges.push({
-        path,
-        currentPath: path === this.currentPath,
-        md,
-        changeSize,
-      });
-    }
+    if (items.length === 0) return;
 
     openChangesDialog(
-      dirtyChanges,
-      pendingChanges,
+      items,
       this.currentPath,
       {
-        onDiscard: (path) => {
-          this.cancelCreate(path);
-          this.pendingOps.cancelEdit(path);
-          pendingOpsStore.save(this.pendingOps.all);
-          repo.clearPath(path);
-          this.recomputeDirty();
-          this.editor.invalidateState(path);
-
-          if (path === this.currentPath) {
-            clearEditorTint(this.editor.element as HTMLElement);
-            provider?.readFile(path).then((raw) => {
-              if (!raw) {
-                appEvents.emit(AppEvent.NoFileView, { lastPath: path });
-              } else {
-                const { frontmatter, body } = stripFrontmatter(raw);
-                const page = repo.getOrCreate(path);
-                if (frontmatter)
-                  page.frontmatter = Frontmatter.fromMeta(frontmatter);
-                page.originalFrontmatter = frontmatter
-                  ? Frontmatter.fromMeta(frontmatter)
-                  : undefined;
-                page.setBaseline(body);
-                this.editor.ensureEditor(body);
-              }
-            });
-          }
+        onApprove: (path) => {
+          this.approveOp(path).catch(() => {});
+        },
+        onReject: (path) => {
+          this.rejectOp(path).catch(() => {});
         },
         onLoadOriginal: async (path) => {
           const page = repo.getOrCreate(path);
@@ -569,51 +720,12 @@ export class FileSyncService {
         },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
-          const dirtyPaths = this.pendingOps.getDirtyPaths();
-          const allPaths = this.pendingOps.all
-            .filter(
-              (o) =>
-                o.type === PendingOpType.Create || o.type === PendingOpType.Edit
-            )
-            .map((o) => o.path);
-
-          for (const p of allPaths) {
-            repo.clearPath(p);
-            this.editor.invalidateState(p);
-          }
           this.clearPendingOps();
           await imageService.removeAllForDir(imageService.getCurrentDocDir());
           this.recomputeDirty();
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
-
-          if (allPaths.includes(this.currentPath)) {
-            const raw = (await provider?.readFile(this.currentPath)) || "";
-
-            if (!raw) {
-              clearEditorTint(this.editor.element as HTMLElement);
-              appEvents.emit(AppEvent.NoFileView, {
-                lastPath: this.currentPath,
-              });
-            } else {
-              clearEditorTint(this.editor.element as HTMLElement);
-              const { frontmatter, body } = stripFrontmatter(raw);
-              const page = repo.getOrCreate(this.currentPath);
-              if (frontmatter)
-                page.frontmatter = Frontmatter.fromMeta(frontmatter);
-              page.originalFrontmatter = frontmatter
-                ? Frontmatter.fromMeta(frontmatter)
-                : undefined;
-              page.setBaseline(body);
-              await this.editor.ensureEditor(body);
-            }
-          } else {
-            updateEditorTint(
-              this.editor.element as HTMLElement,
-              this.currentPath,
-              this.pendingOps
-            );
-          }
+          await this.reloadCurrentFromDisk(this.currentPath);
         },
       },
       () => {}

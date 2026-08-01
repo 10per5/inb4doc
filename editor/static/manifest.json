@@ -1,7 +1,7 @@
 {
   "name": "inb4doc",
   "short_name": "inb4doc",
-  "description": "Markdown editor for Hugo sites",
+  "description": "Markdown editor for web, desktop & mobile",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

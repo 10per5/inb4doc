@@ -1,35 +1,35 @@
 import { colors } from "@/config/theme"
 import { formatBytes } from "@/utils/format"
 import { openDialog } from "@/services/dialog-service"
+import { PendingOpType } from "@/entities/PendingOps"
 import { ChangesDialogEvent } from "./changes-dialog-controller"
 
-export interface ChangesDialogData {
-  path?: string
+export interface ChangesDialogItem {
+  path: string
+  label: string
   currentPath?: boolean
+  size?: number
   md?: string
-  changeSize?: number
-}
-
-export interface PendingOpData {
-  opLabel: string
+  notice?: string
+  kind: PendingOpType
 }
 
 export interface ChangesDialogActions {
-  onDiscard: (path: string) => void
+  onApprove: (path: string) => void
+  onReject: (path: string) => void
   onLoadOriginal: (path: string) => Promise<string>
   onFlushAll: () => void
   onDiscardAll: () => void
 }
 
 export function openChangesDialog(
-  dirtyChanges: ChangesDialogData[],
-  pendingChanges: PendingOpData[],
+  items: ChangesDialogItem[],
   currentPath: string,
   actions: ChangesDialogActions,
   onClose: () => void
 ) {
-  const enrichedDirty = dirtyChanges.map(c => {
-    const size = c.changeSize ?? 0
+  const enriched = items.map((c) => {
+    const size = c.size ?? 0
     return {
       ...c,
       sizeStr: formatBytes(size),
@@ -37,21 +37,18 @@ export function openChangesDialog(
     }
   })
 
-  const titleParts = [`Unsaved Changes (${dirtyChanges.length})`]
-  if (pendingChanges.length > 0) titleParts.push(`Pending Ops (${pendingChanges.length})`)
-
   const handle = openDialog("changes-dialog", {
-    title: titleParts.join(" — "),
-    dirty: enrichedDirty,
-    pending: pendingChanges,
+    title: `Pending changes (${items.length})`,
+    items: enriched,
     currentPath,
   }, {
     onClose,
     listeners: {
-      // The controller emits namespaced events (e.g. changes-dialog:discard)
-      // instead of a callback registry.
-      [ChangesDialogEvent.Discard]: ((e: CustomEvent<string>) => {
-        actions.onDiscard(e.detail)
+      [ChangesDialogEvent.Approve]: ((e: CustomEvent<string>) => {
+        actions.onApprove(e.detail)
+      }) as EventListener,
+      [ChangesDialogEvent.Reject]: ((e: CustomEvent<string>) => {
+        actions.onReject(e.detail)
       }) as EventListener,
       [ChangesDialogEvent.DiscardAll]: () => actions.onDiscardAll(),
       [ChangesDialogEvent.SaveAll]: () => actions.onFlushAll(),

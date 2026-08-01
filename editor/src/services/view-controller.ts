@@ -42,6 +42,9 @@ export class ViewController {
         this.dirIndexEmptyPath = path;
         this.switchTo("dir-index-empty");
       }),
+      appEvents.on(AppEvent.TreeChanged, () => {
+        if (this.current === "disk-usage") this.showDiskUsage();
+      }),
     );
   }
 
@@ -205,12 +208,13 @@ export class ViewController {
 
       if (self.current !== "disk-usage") return;
 
+      const freshTree = treeStore.getTree();
       const el = self.editor.element as HTMLElement;
       const diskUsageEl = el.querySelector<HTMLElement>('[data-controller="disk-usage"]');
       if (!diskUsageEl) return;
 
       const data: DiskUsageData = {
-        tree,
+        tree: freshTree,
         fileSizes,
         lastModified,
         providerName: getProviderDisplayInfo(provider.name).label,

@@ -1,4 +1,4 @@
-import { computeDiff, renderDiffHtml } from "@/components/ui/diff-viewer"
+import { renderPendingDiff } from "@/components/ui/pending-diff"
 import { BaseDialogController } from "./base-dialog-controller"
 import { navArrowRight, navArrowDown } from "@/eta/icons"
 import renderExternalChangeDialog from "@/eta/views/dialog/external-change-dialog"
@@ -29,8 +29,10 @@ export class ExternalChangeDialogController extends BaseDialogController {
     btn.innerHTML = visible ? `${navArrowRight} View diff` : `${navArrowDown} Hide diff`
 
     if (!visible && !this.diffLoaded) {
-      const diff = computeDiff(this.payloadValue.local, this.payloadValue.disk)
-      this.diffContainerTarget.innerHTML = renderDiffHtml(diff)
+      this.diffContainerTarget.innerHTML = renderPendingDiff(
+        this.payloadValue.disk,
+        this.payloadValue.local,
+      )
       this.diffLoaded = true
     }
   }

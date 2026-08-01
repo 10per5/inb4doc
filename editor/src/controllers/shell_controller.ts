@@ -211,6 +211,8 @@ export default class extends Controller {
   flush = () => this.cache?.flushDirtyFiles()
 
   private async saveCurrentFile(): Promise<void> {
+    dirtyTrackingService.flush()
+
     const path = this.nav.getCurrentPath()
     if (!path) return
 

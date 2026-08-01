@@ -26,6 +26,9 @@ files = [
       "root://editor/static/favicon.png",
       "root://gui/bin/icon.png",
   ] },
+  { source = "root://images/inb4doc-512.png", dests = [
+      "root://editor/static/inb4doc-512.png",
+  ] },
   { source = "root://images/inb4doc-256.png", dests = [
       "root://editor/static/inb4doc-256.png",
   ] },

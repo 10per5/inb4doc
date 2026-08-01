@@ -138,7 +138,7 @@ export default class extends Controller {
       basePath: editorSelfBase,
       collapsedSections: this.collapsedSections,
       rawTree,
-      pendingSets: buildPendingSets(pendingOps.all, pendingOps.getDirtyPaths()),
+      pendingSets: buildPendingSets(pendingOps.all),
       pendingOps: pendingOps.all,
       hideEmptyFolders: this.hideEmptyFolders,
     };

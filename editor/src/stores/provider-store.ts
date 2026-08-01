@@ -1,6 +1,5 @@
 import type { ContentProvider } from "@/providers/provider";
 import { ProviderType, createProviderByType } from "@/providers/index";
-import { connectionStore } from "@/stores/connection-store";
 import { treeStore } from "@/stores/tree-store";
 import { createEmptyTreeIndex } from "@/utils/tree";
 import { cloud, packageIcon, laptop, database, helpCircle } from "@/eta/icons";
@@ -31,11 +30,17 @@ export function getProvider(): ContentProvider {
 
 /** Active provider's numeric ID as a string — used in storage keys (meta, recents, entity IDs). */
 export function activeProviderId(): string {
-  try { return String(getProvider().name) } catch { return String(ProviderType.LocalStorage) }
+  try {
+    return String(getProvider().name);
+  } catch {
+    return String(ProviderType.LocalStorage);
+  }
 }
 
 function saveLastProvider(type: ProviderType) {
-  try { localStorage.setItem(LAST_PROVIDER_KEY, String(type)) } catch {}
+  try {
+    localStorage.setItem(LAST_PROVIDER_KEY, String(type));
+  } catch {}
 }
 
 function loadLastProvider(): ProviderType | null {
@@ -69,11 +74,11 @@ export async function initializeProvider(): Promise<void> {
   const base: ProviderType[] = useMount
     ? [ProviderType.Mount, ProviderType.LocalStorage]
     : defaultToRemote
-      ? [ProviderType.Remote, ProviderType.LocalStorage]
-      : [ProviderType.LocalStorage];
+    ? [ProviderType.Remote, ProviderType.LocalStorage]
+    : [ProviderType.LocalStorage];
 
   const candidates: ProviderType[] =
-    (last != null && last !== ProviderType.Filesystem)
+    last != null && last !== ProviderType.Filesystem
       ? [last, ...base.filter((t) => t !== last)]
       : base;
 
@@ -117,7 +122,11 @@ export async function switchProvider(type: ProviderType): Promise<void> {
   }
 
   const pdi = getProviderDisplayInfo(type);
-  appEvents.emit(AppEvent.ProviderChanged, { type, icon: pdi.icon, label: pdi.label });
+  appEvents.emit(AppEvent.ProviderChanged, {
+    type,
+    icon: pdi.icon,
+    label: pdi.label,
+  });
 }
 
 export async function getAvailableProviders(): Promise<
@@ -164,14 +173,18 @@ export async function getAvailableProviders(): Promise<
 
   entries.push({
     type: ProviderType.Filesystem,
-    description: "Access local markdown files via the File System Access API (Chrome/Edge)",
+    description:
+      "Access local markdown files via the File System Access API (Chrome/Edge)",
     available: fsOk,
-    reason: fsOk ? undefined : "Not supported in this browser (use Chrome or Edge)",
+    reason: fsOk
+      ? undefined
+      : "Not supported in this browser (use Chrome or Edge)",
   });
 
   entries.push({
     type: ProviderType.LocalStorage,
-    description: "Store files in browser local storage — persists across sessions",
+    description:
+      "Store files in browser local storage — persists across sessions",
     available: lsOk,
   });
 
@@ -187,11 +200,30 @@ export function getProviderDisplayInfo(type: ProviderType): {
   label: string;
   type: ProviderType;
 } {
-  const map: Record<ProviderType, { icon: string; label: string; type: ProviderType }> = {
-    [ProviderType.Remote]: { icon: cloud, label: "Server (Remote)", type: ProviderType.Remote },
-    [ProviderType.Mount]: { icon: packageIcon, label: "Mounted (GUI)", type: ProviderType.Mount },
-    [ProviderType.Filesystem]: { icon: laptop, label: "Local Files", type: ProviderType.Filesystem },
-    [ProviderType.LocalStorage]: { icon: database, label: "Browser Storage", type: ProviderType.LocalStorage },
+  const map: Record<
+    ProviderType,
+    { icon: string; label: string; type: ProviderType }
+  > = {
+    [ProviderType.Remote]: {
+      icon: cloud,
+      label: "Server (Remote)",
+      type: ProviderType.Remote,
+    },
+    [ProviderType.Mount]: {
+      icon: packageIcon,
+      label: "Mounted (GUI)",
+      type: ProviderType.Mount,
+    },
+    [ProviderType.Filesystem]: {
+      icon: laptop,
+      label: "Local Files",
+      type: ProviderType.Filesystem,
+    },
+    [ProviderType.LocalStorage]: {
+      icon: database,
+      label: "Browser Storage",
+      type: ProviderType.LocalStorage,
+    },
   };
   return map[type] ?? { icon: helpCircle, label: String(type), type };
 }

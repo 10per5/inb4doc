@@ -43,14 +43,8 @@ export default class extends Controller {
     this.unsubs.push(
       appEvents.on(
         AppEvent.DirtyChanged,
-        ({ count, bytes, pendingCount, singleDirtyPath, currentPath }) => {
-          this.updateDirtyCounter(
-            count,
-            bytes,
-            pendingCount,
-            singleDirtyPath,
-            currentPath,
-          );
+        ({ count, bytes, singleDirtyPath, currentPath }) => {
+          this.updateDirtyCounter(count, bytes, singleDirtyPath, currentPath);
         },
       ),
     );
@@ -133,10 +127,11 @@ export default class extends Controller {
       const dir = e.key === "ArrowRight" ? 1 : -1;
       const next = (idx + dir + all.length) % all.length;
       const nextEl = all[next];
-      if (this.hasOpenMenu()) this.closeAllMenus();
+      const hadOpenMenu = this.hasOpenMenu();
+      if (hadOpenMenu) this.closeAllMenus();
       const mount = nextEl.closest("[data-menu-name]");
       const mnemonic = mount?.getAttribute("data-menu-mnemonic")?.toLowerCase();
-      if (mnemonic) {
+      if (hadOpenMenu && mnemonic) {
         this.openMenuAndFocusFirst(mnemonic);
       } else {
         nextEl.focus();
@@ -328,7 +323,6 @@ export default class extends Controller {
   private updateDirtyCounter(
     count: number,
     bytes: number,
-    pendingCount: number,
     singleDirtyPath?: string,
     currentPath?: string,
   ) {
@@ -339,14 +333,22 @@ export default class extends Controller {
     el.textContent = "";
     el.classList.toggle("clickable", false);
 
-    const hasDirty = count > 0 || pendingCount > 0;
+    const hasDirty = count > 0;
+    if (!hasDirty) {
+      el.style.display = "none";
+      el.tabIndex = -1;
+      this.flushBtnTarget.disabled = true;
+      return;
+    }
 
-    if (
-      count === 1 &&
-      pendingCount === 0 &&
-      singleDirtyPath &&
-      singleDirtyPath === currentPath
-    ) {
+    el.style.display = "";
+    el.tabIndex = 0;
+
+    const isSingleCurrent =
+      count === 1 && singleDirtyPath && singleDirtyPath === currentPath;
+
+    if (isSingleCurrent) {
+      // Current file only → compact eye + discard, no pending text.
       el.prepend(createChangesBtn());
       const btn = pressTwiceButton({
         idleText: "⟲",
@@ -360,25 +362,17 @@ export default class extends Controller {
           }),
       });
       el.appendChild(btn);
-    } else if (hasDirty) {
-      const parts: string[] = [];
-      if (count > 0) {
-        const color =
-          bytes > 0 ? colors.green : bytes < 0 ? colors.danger : "inherit";
-        parts.push(
-          `<span>${count} unsaved</span><span style="color:${color};font-size:0.7rem;margin-left:4px">${formatBytes(bytes)}</span>`,
-        );
-      }
-      if (pendingCount > 0) {
-        parts.push(
-          `<span style="color:#856404;font-size:0.7rem">${pendingCount} pending</span>`,
-        );
-      }
-      el.innerHTML = `<div style="display:flex;gap:6px;align-items:center">${parts.join('<span style="color:#ccc">|</span>')}</div>`;
+    } else {
+      // Multiple pending ops, or a single op on a non-current file → text.
+      const badge =
+        bytes !== 0
+          ? `<span style="color:${bytes > 0 ? colors.green : colors.danger};font-size:0.7rem;margin-left:4px">${formatBytes(bytes)}</span>`
+          : "";
+      el.innerHTML = `<div style="display:flex;gap:6px;align-items:center"><span>${count} pending</span>${badge}</div>`;
       el.classList.toggle("clickable", true);
     }
 
-    this.flushBtnTarget.disabled = !hasDirty;
+    this.flushBtnTarget.disabled = false;
   }
 }
 

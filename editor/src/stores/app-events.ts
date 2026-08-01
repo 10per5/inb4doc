@@ -40,6 +40,7 @@ export enum AppEvent {
   ViewChanged = "view-changed",
   ProviderChanged = "provider-changed",
   ProviderChangeRequested = "provider-change-requested",
+  TreeChanged = "tree-changed",
 
   // UI toggles
   SidebarToggle = "sidebar-toggle",
@@ -85,7 +86,7 @@ export interface AppEventPayloads {
   [AppEvent.SidebarMoveRequested]:    { from: string; to: string }
 
   [AppEvent.EditorChanged]:         { path: string; md: string }
-  [AppEvent.DirtyChanged]:          { count: number; bytes: number; pendingCount: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
+  [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
   [AppEvent.DirtyClicked]:          void
   [AppEvent.SingleDiscardRequested]:{ path: string }
   [AppEvent.FlushComplete]:         void
@@ -97,6 +98,7 @@ export interface AppEventPayloads {
   [AppEvent.ViewChanged]:           { view: ViewType }
   [AppEvent.ProviderChanged]:       { type: ProviderType; icon: string; label: string }
   [AppEvent.ProviderChangeRequested]: void
+  [AppEvent.TreeChanged]:           void
 
   [AppEvent.SidebarToggle]:         void
   [AppEvent.MetaPanelToggle]:       void

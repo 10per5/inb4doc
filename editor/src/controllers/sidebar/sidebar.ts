@@ -65,7 +65,6 @@ const LINE_COLORS = [
 
 export function buildPendingSets(
   pendingOps?: readonly PendingOp[],
-  dirtyPaths?: string[],
 ): PendingSets {
   return {
     pendingDeleteSet: new Set(
@@ -90,7 +89,9 @@ export function buildPendingSets(
         ?.filter((o) => o.type === PendingOpType.Move)
         .map((o) => o.from) ?? [],
     ),
-    dirtySet: new Set(dirtyPaths ?? []),
+    dirtySet: new Set(
+      pendingOps?.filter((o) => o.type === PendingOpType.Edit).map((o) => o.path) ?? [],
+    ),
   };
 }
 
@@ -213,14 +214,17 @@ export function renderItems(
   const children = tree.children.get(prefix) ?? []
   const lineColor = LINE_COLORS[depth % LINE_COLORS.length]
 
-  // Build display list: merge tree children with rawTree pending deletes and pending moves
+  // Build display list: merge tree children with rawTree pending deletes.
+  // Pending moves are NOT re-added here — applyPendingOps already removed the
+  // source and added the destination, so re-adding the source would render the
+  // same file at both locations.
   const displayChildren = [...children]
   if (ctx.rawTree && prefix !== undefined) {
     const rawChildren = ctx.rawTree.children.get(prefix) ?? []
     for (const rawChild of rawChildren) {
       if (isHomePageFilename(rawChild.name)) continue
       const pagePath = rawChild.path
-      if (ctx.pendingSets.pendingDeleteSet.has(pagePath) || ctx.pendingSets.pendingMoveFromSet.has(pagePath)) {
+      if (ctx.pendingSets.pendingDeleteSet.has(pagePath)) {
         if (!displayChildren.some(c => c.path === pagePath)) {
           displayChildren.push(rawChild)
         }

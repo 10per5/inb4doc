@@ -67,9 +67,14 @@ export class DirtyTrackingService {
         }
 
         const editOp = this.pendingOps!.findEdit(path);
+        const baseline = pagesStore.get(path)?.bodyState.baseline;
         if (editOp) {
-          editOp.patch = body;
-        } else {
+          if (body === baseline && !editOp.frontmatterPatch) {
+            this.pendingOps!.remove(path);
+          } else {
+            editOp.patch = body;
+          }
+        } else if (body !== baseline) {
           this.pendingOps!.queueEdit(path, body);
         }
         pendingOpsStore.save(this.pendingOps!.all);
@@ -143,9 +148,14 @@ export class DirtyTrackingService {
       }
 
       const editOp = this.pendingOps.findEdit(path);
+      const baseline = pagesStore.get(path)?.bodyState.baseline;
       if (editOp) {
-        editOp.patch = body;
-      } else {
+        if (body === baseline && !editOp.frontmatterPatch) {
+          this.pendingOps.remove(path);
+        } else {
+          editOp.patch = body;
+        }
+      } else if (body !== baseline) {
         this.pendingOps.queueEdit(path, body);
       }
       pendingOpsStore.save(this.pendingOps.all);
@@ -157,27 +167,34 @@ export class DirtyTrackingService {
   private recomputeAndEmit(): void {
     if (!this.pendingOps) return;
     let totalBytes = 0;
-    const dirtyPaths = this.pendingOps.getDirtyPaths();
-    for (const p of dirtyPaths) {
-      const editOp = this.pendingOps.findEdit(p);
-      if (editOp) {
-        totalBytes += editOp.patch.length;
-      } else {
-        const page = pagesStore.get(p);
-        const baseline = page?.bodyState.baseline;
-        if (baseline) totalBytes += baseline.length;
+    let singlePath: string | undefined;
+
+    for (const op of this.pendingOps.all) {
+      if (singlePath === undefined) {
+        singlePath = "path" in op ? op.path : op.from;
+      }
+      switch (op.type) {
+        case PendingOpType.Edit: {
+          const page = pagesStore.get(op.path);
+          totalBytes +=
+            (op.patch?.length ?? 0) - (page?.bodyState.baseline?.length ?? 0);
+          break;
+        }
+        case PendingOpType.Create:
+          totalBytes += op.content.length;
+          break;
+        default:
+          break;
       }
     }
 
-    const count = dirtyPaths.length;
-    const pendingCount = this.pendingOps.all.filter(o => o.type !== PendingOpType.Edit).length;
-    const isSingleDirty = count === 1 && pendingCount <= 1;
+    const count = this.pendingOps.count;
+    const dirtyPaths = this.pendingOps.getDirtyPaths();
 
     appEvents.emit(AppEvent.DirtyChanged, {
       count,
       bytes: totalBytes,
-      pendingCount,
-      singleDirtyPath: isSingleDirty ? dirtyPaths[0] : undefined,
+      singleDirtyPath: count === 1 ? singlePath : undefined,
       currentPath: this.pathResolver(),
       dirtyPaths,
     });

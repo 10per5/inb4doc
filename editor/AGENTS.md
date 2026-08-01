@@ -237,6 +237,72 @@ This generates an LLM-friendly markdown report with largest modules, dependency 
 | `app.js`  | 1.3 MB initial | Milkdown + ProseMirror + CM core                                                                                                       |
 | `app.css` | 1.5 MB         | `katex/dist/katex.min.css` has `@font-face` blocks → Bun inlines all woff2/woff/ttf fonts as base64 data URIs (~60 font files, 1.2 MB) |
 
+## Playwright Testing
+
+For any behavior that depends on the real app runtime (Stimulus connect timing, view switching, providers, SVG/browser rendering), use **Playwright + Chromium** against the built app. Do not rely on happy-dom-style mocks for these — DOM-lite environments hide runtime errors that a real browser surfaces as `pageerror`/console errors.
+
+### Tooling
+
+- devDeps: `@playwright/test` + `@playwright/browser-chromium`.
+- Chromium binary: `bun x playwright install chromium` (the browser-chromium package does not auto-install; the postinstall is blocked by bun by default).
+- Test server: `bun lib/serve.ts` serves the built `public/` and reads content from `../../content`.
+
+### Port convention
+
+Use a **distinctive, far-from-common port** so the test server never collides with a dev server or anything already bound. The canonical test port is **`32600`** — memorable as "big far clear". Common ports (3000, 5173, 8080) are frequently already taken; check with `curl -s -o /dev/null -w "%{http_code}" http://localhost:32600/` before assuming the server is up.
+
+### Workflow
+
+```bash
+bun lib/build.ts                              # build the app into public/
+PORT=32600 bun lib/serve.ts &                 # serve it (background)
+bun e2e/<test>.ts                             # run a Playwright script (top-level await OK)
+```
+
+### Script template
+
+```ts
+import { chromium } from "@playwright/test";
+
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+
+const errors: string[] = [];
+page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
+page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
+
+await page.goto("http://localhost:32600/", { waitUntil: "load" });
+await page.waitForTimeout(3000); // let the app boot + controllers connect
+
+// ... interact with the real DOM ...
+await page.screenshot({ path: "/tmp/opencode/out.png" });
+console.log(JSON.stringify(await page.evaluate(() => { /* inspect state */ }), null, 2));
+console.log("ERRORS:", errors);
+await browser.close();
+```
+
+### Gotchas
+
+- **Always capture `console` errors + `pageerror`** — the root cause usually shows up there (e.g., a thrown TypeError in an async handler that a happy-dom test never executes).
+- Locate interactive elements by their rendered label/`data-action` (`#menu-panel-2 [data-action="menu-item"]`), not by guessing selectors.
+- Wait generous boot time after `goto` — the app is a large bundle and controllers connect asynchronously.
+- Use `page.evaluate` with `getComputedStyle`/`getBoundingClientRect` to verify *visible* state, not just DOM presence (an element can exist with `display: none`).
+- Keep throwaway repro scripts in `/tmp/opencode/`; keep reusable checks in `e2e/`.
+
+### Cache / connection injection
+
+The app's **remote connection store defaults to `localhost:3000`**. To point a Playwright session at the e2e server, the connection must be seeded in `localStorage` **before the app bundle runs** — use `page.addInitScript`, not `page.evaluate` after `goto` (the app reads it during boot):
+
+```ts
+await page.addInitScript(() => {
+  localStorage.setItem("inb4doc:connections:0", JSON.stringify({ host: "localhost", port: 32600 }));
+});
+```
+
+- Storage keys are namespaced `inb4doc:<type>:<id>` (see `src/services/storage.ts` `entityKey()`). The connection key is `inb4doc:connections:0` — `STORE_CONNECTIONS = "connections"` (`src/config/storage-keys.ts`) and provider id `0` (the single remote provider).
+- Pending ops persist under `inb4doc:pending-ops:<providerId>/<path>` (`STORE_PENDING_OPS`, per-path entries). Useful to inspect `localStorage` in `page.evaluate` to confirm an op was queued without waiting for UI.
+- The served content repo is `../../content` relative to the editor. After an edit, re-read the file with `page.request.get("http://localhost:32600/content/<path>.md")` to assert what actually hit disk (e.g., title persisted in frontmatter).
+
 ## Template HMR (Hot Module Replacement)
 
 When a controller's template file (Eta) or the controller itself is edited, the build produces a new chunk. The SW detects the change, activates, and calls `registry.swap()` to re-import the controller module. `ModuleRegistry.swap()` unloads the controller identifier, re-imports the module, and re-registers the class.

@@ -9,6 +9,7 @@
 
 import type { TreeIndex } from "@/utils/tree"
 import { createEmptyTreeIndex, addPathToTree, removePathFromTree } from "@/utils/tree"
+import { appEvents, AppEvent } from "@/stores/app-events"
 
 function extractWeight(content: string): number | undefined {
   const fm = content.match(/^---\n([\s\S]*?)\n---/)
@@ -22,6 +23,7 @@ class TreeStore {
 
   setTree(tree: TreeIndex): void {
     this.tree = tree
+    appEvents.emit(AppEvent.TreeChanged)
   }
 
   getTree(): TreeIndex {

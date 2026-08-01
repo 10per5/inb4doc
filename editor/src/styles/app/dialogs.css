@@ -637,6 +637,12 @@
   border-radius: 4px;
   overflow: hidden;
 }
+.inb4doc-changes-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
 .inb4doc-changes-header {
   display: flex;
   align-items: center;

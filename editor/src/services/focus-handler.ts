@@ -11,10 +11,23 @@
 let previousFocus: HTMLElement | null = null;
 let defaultFocus: (() => void) | null = null;
 
+const TOOLBAR_SELECTOR = ".app-toolbar";
+
+function isToolbarElement(el: Element | null): boolean {
+  return !!el?.closest?.(TOOLBAR_SELECTOR);
+}
+
 export function save(): void {
-  if (!previousFocus) {
-    previousFocus = document.activeElement as HTMLElement | null;
+  const active = document.activeElement as HTMLElement | null;
+  // Ignore non-focusable roots (BODY/HTML) and keep the original target
+  // while focus already lives inside the toolbar.
+  if (!active || active === document.body || active === document.documentElement) {
+    return;
   }
+  if (isToolbarElement(active)) {
+    return;
+  }
+  previousFocus = active;
 }
 
 export function restore(): void {
@@ -22,7 +35,9 @@ export function restore(): void {
   previousFocus = null;
   if (el && el.isConnected) {
     el.focus();
-  } else if (defaultFocus) {
+    if (document.activeElement === el) return;
+  }
+  if (defaultFocus) {
     defaultFocus();
   }
 }

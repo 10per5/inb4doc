@@ -58,7 +58,7 @@ export class LocalStorageProvider implements ContentProvider {
 
   async writeFile(path: string, content: string): Promise<void> {
     const existing = storageService.getJSON<FileEntry>(STORE_FILES, this.fileId(path)) ?? { dirty: false }
-    storageService.setJSON(STORE_FILES, this.fileId(path), { ...existing, content })
+    storageService.setJSON(STORE_FILES, this.fileId(path), { ...existing, content, serverTime: Date.now() })
   }
 
   async deleteFile(path: string, keepImages?: boolean): Promise<void> {
@@ -74,8 +74,9 @@ export class LocalStorageProvider implements ContentProvider {
     this.removeOrphanedImages()
   }
 
-  async getServerTime(_path: string): Promise<number | null> {
-    return Date.now()
+  async getServerTime(path: string): Promise<number | null> {
+    const entry = storageService.getJSON<FileEntry>(STORE_FILES, this.fileId(path))
+    return entry?.serverTime ?? null
   }
 
   async search(query: string): Promise<SearchResult[]> {

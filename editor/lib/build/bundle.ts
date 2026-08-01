@@ -1,4 +1,4 @@
-import { resolve } from "path";
+import { relative, resolve, sep } from "path";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "fs";
 import {
   resolveConfig,
@@ -57,7 +57,10 @@ function discoverControllers(
       const name = entry.name.slice(0, -EXT_TS.length);
       const id = name.replace(CTRL_SUFFIX_RE, "");
       if (id === name) continue;
-      const rel = full.replace(srcDir + "/", "").replace(EXT_TS, "");
+      const rel = relative(srcDir, full)
+        .split(sep)
+        .join("/")
+        .replace(EXT_TS, "");
       const isDialog = rel.startsWith(`controllers/${DIALOG_SUBDIR}/`);
       const templateRel = pairedTemplate(id, srcDir, isDialog);
       result.push({ id, rel, isDialog, templateRel });
