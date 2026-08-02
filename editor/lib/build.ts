@@ -111,8 +111,11 @@ if (!renderTemplates) {
     const allFiles = readdirSync(assetsDir)
       .filter((f) => f.endsWith(".js") || f.endsWith(".css"))
       .map((f) => `${SW_PREFIX}/${f}`)
-    const important = [BASE, `${SW_PREFIX}/app.js`, `${BASE}favicon.png`, `${BASE}inb4doc-256.png`, `${BASE}inb4doc-512.png`, `${BASE}manifest.json`]
-    const chunks = watch ? [] : allFiles.filter((f) => !important.includes(f))
+    const important = [BASE, `${SW_PREFIX}/app.js`, `${SW_PREFIX}/theme-nord.css`, `${SW_PREFIX}/katex.css`, `${BASE}favicon.png`, `${BASE}inb4doc-256.png`, `${BASE}inb4doc-512.png`, `${BASE}manifest.json`]
+    // Watch mode precaches the same chunk set so an edited controller's new
+    // chunk is part of the SW-install transfer (and shows up in the loader).
+    // Cache-skip in the SW makes re-installs transfer only the changed files.
+    const chunks = allFiles.filter((f) => !important.includes(f))
 
     const chunkMap = getChunkMap(root, SW_PREFIX)
 
@@ -122,6 +125,10 @@ if (!renderTemplates) {
     const swJs = eta.renderString(readFileSync(join(templatesSrc, "sw.eta"), "utf-8"), {
       buildVersion, chunkMap, isDev: watch, appVersion: process.env.APP_VERSION || "",
       swAssetsUrl: `${SW_PREFIX}/sw-assets.js`,
+      // Only cache source maps in dev/watch (where they're emitted) and on
+      // WebLocal builds; remote/deployed builds never ship maps, so the SW
+      // shouldn't hold onto them either.
+      cacheMaps: Boolean(watch) || modeStr === "web-local",
     })
     writeFileSync(join(publicDir, "sw.js"), swJs)
   }

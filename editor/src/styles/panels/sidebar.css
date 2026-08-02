@@ -297,6 +297,19 @@
   opacity: 1;
 }
 
+.sidebar-count {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  vertical-align: middle;
+  line-height: 1.3;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+}
+
 .pending-badge-delete {
   background: var(--color-error);
   color: #fff;
@@ -392,6 +405,7 @@
     display: inline;
     font-size: 0.7rem;
     width: 3em;
+    white-space: wrap;
   }
 }
 

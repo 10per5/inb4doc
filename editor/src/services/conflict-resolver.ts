@@ -74,6 +74,7 @@ export function executeConflictDecision(
     pendingOps?.cancelEdit(path)
     const fresh = pagesStore.getOrCreate(path)
     fresh.setBaseline(decision.body)
+    fresh.bodyState.body = decision.body
     fresh.setServerTime(decision.time)
     fresh.originalFrontmatter = decision.fm ? Frontmatter.fromMeta(decision.fm) : undefined
     if (decision.fm) { fresh.setFrontmatter(decision.fm); host.onMetaUpdate?.(decision.fm) }
@@ -94,6 +95,7 @@ export function executeConflictDecision(
     p.originalFrontmatter = decision.diskFm ? Frontmatter.fromMeta(decision.diskFm) : undefined
 
     if (action === "discard") {
+      p.bodyState.body = decision.diskBody
       if (decision.diskFm) {
         p.setFrontmatter(decision.diskFm)
         host.onMetaUpdate?.(decision.diskFm)
@@ -132,7 +134,7 @@ export function applyNoConflict(
   }
 
   const editOp = pendingOps?.findEdit(path)
-  if (editOp && editOp.patch) {
+  if (editOp && editOp.patch !== undefined) {
     const page = pagesStore.getOrCreate(path)
     page.bodyState.body = editOp.patch
   }
@@ -148,11 +150,18 @@ export function applyNoConflict(
       onMetaUpdate?.(frontmatter)
     }
   } else {
-    pagesStore.getOrCreate(path).removeFrontmatter()
-    onMetaUpdate?.({ title: "" })
+    const isDirty = pendingOps?.hasPendingEdit(path) ?? false
+    if (isDirty && page?.getFrontmatter()) {
+      onMetaUpdate?.(page.getFrontmatter()!)
+    } else {
+      pagesStore.getOrCreate(path).removeFrontmatter()
+      onMetaUpdate?.({ title: "" })
+    }
   }
 
   pagesStore.getOrCreate(path).originalFrontmatter = diskFm
 
-  return pagesStore.get(path)?.bodyState.body ?? body
+  const resolved = pagesStore.get(path)?.bodyState.body ?? body
+  pagesStore.getOrCreate(path).bodyState.body = resolved
+  return resolved
 }

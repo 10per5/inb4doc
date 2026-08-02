@@ -128,15 +128,37 @@ const SRC_DOMAIN_RULES: Array<{ name: string; test: string[] }> = [
   { name: "styles", test: [".*src/styles/.*"] },
 ];
 
+// Chunk filenames that app.js references. Farm can emit an orphan duplicate
+// controller pot in a single compile (a partialBundling quirk) — the entry
+// imports one copy while an identical-named, newer pot nobody imports lands on
+// disk too. app.js is ground truth for what the page needs, so pruning and the
+// chunk map must prefer the referenced copy and drop the orphan, otherwise the
+// page 404s on the chunk it actually imports.
+function referencedChunkSet(assetsDir: string): Set<string> {
+  const appPath = resolve(assetsDir, "app.js");
+  if (!existsSync(appPath)) return new Set();
+  const text = readFileSync(appPath, "utf8");
+  return new Set(
+    readdirSync(assetsDir)
+      .filter((f) => f.endsWith(".js") && text.includes(f))
+  );
+}
+
 function findChunkFile(assetsDir: string, id: string): string | null {
   const candidates = readdirSync(assetsDir).filter(
     (f) => f.endsWith(".js") && (f === `${id}.js` || f.startsWith(`${id}-`))
   );
   if (candidates.length === 0) return null;
-  candidates.sort(
-    (a, b) =>
-      statSync(resolve(assetsDir, b)).mtimeMs - statSync(resolve(assetsDir, a)).mtimeMs
-  );
+  const referenced = referencedChunkSet(assetsDir);
+  candidates.sort((a, b) => {
+    const ra = referenced.has(a) ? 1 : 0;
+    const rb = referenced.has(b) ? 1 : 0;
+    if (ra !== rb) return rb - ra;
+    return (
+      statSync(resolve(assetsDir, b)).mtimeMs -
+      statSync(resolve(assetsDir, a)).mtimeMs
+    );
+  });
   return candidates[0];
 }
 

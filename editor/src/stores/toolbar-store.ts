@@ -10,9 +10,21 @@ export interface ToolbarConfig {
 }
 
 export class ToolbarStore {
+  /** Don't auto-hide while scrolled this close to the top. */
+  private static readonly HIDE_BELOW = 100
+  /**
+   * Dead-zone margin for visibility flips. Scroll position can jitter by
+   * several px around the scroll anchor while content height settles (e.g.
+   * after a source-mode apply/cancel re-render); without this margin the
+   * `hidden` class flips on every reversal and the 0.46s opacity transition
+   * reads as visible flicker. Keep it larger than the observed jitter.
+   */
+  private static readonly MARGIN = 64
+
   private toolbar: HTMLElement | null
   private editorEl: HTMLElement | null
-  private lastScrollY: number = 0
+  private hidden = false
+  private flipScrollY = 0
   private autoHidePref: boolean
   private onScroll: (() => void) | null = null
   private showOnFocus: (() => void) | null = null
@@ -40,7 +52,7 @@ export class ToolbarStore {
     this.autoHidePref = !sticky
 
     if (sticky) {
-      this.toolbar?.classList.remove("hidden")
+      this.setHidden(false)
     }
   }
 
@@ -61,23 +73,30 @@ export class ToolbarStore {
       const layoutEl = document.querySelector(".book-layout")
       const sy = layoutEl?.scrollTop ?? 0
 
-      if (sy > 100 && sy > this.lastScrollY) {
-        this.toolbar.classList.add("hidden")
-      } else if (sy < this.lastScrollY) {
-        this.toolbar.classList.remove("hidden")
+      if (this.hidden) {
+        if (sy <= this.flipScrollY - ToolbarStore.MARGIN) {
+          this.setHidden(false)
+        }
+      } else if (sy > ToolbarStore.HIDE_BELOW && sy >= this.flipScrollY + ToolbarStore.MARGIN) {
+        this.setHidden(true)
       }
-
-      this.lastScrollY = sy
     }
   }
 
   private createFocusHandler(): () => void {
     return () => {
-      if (!this.toolbar) return
-
       if (this.autoHidePref) {
-        this.toolbar.classList.remove("hidden")
+        this.setHidden(false)
       }
     }
+  }
+
+  private setHidden(hidden: boolean): void {
+    if (this.hidden === hidden) return
+
+    this.hidden = hidden
+    const layoutEl = document.querySelector(".book-layout")
+    this.flipScrollY = layoutEl?.scrollTop ?? 0
+    this.toolbar?.classList.toggle("hidden", hidden)
   }
 }

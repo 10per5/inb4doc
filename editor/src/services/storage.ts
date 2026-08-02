@@ -152,7 +152,7 @@ export class StorageService {
       return global
         .map((id) => {
           const value = this.getJSON<T>(type, id)
-          return value ? { id, value } : null
+          return value !== null ? { id, value } : null
         })
         .filter(Boolean) as Array<{ id: string; value: T }>
     }
@@ -161,7 +161,7 @@ export class StorageService {
     for (const key of this.keys(prefix)) {
       const id = key.slice(prefix.length)
       const value = this.getJSON<T>(type, id)
-      if (value) results.push({ id, value })
+      if (value !== null) results.push({ id, value })
     }
     return results
   }

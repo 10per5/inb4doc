@@ -41,7 +41,7 @@ import {
   imageBlockComponent,
   imageBlockConfig,
 } from "@milkdown/kit/component/image-block";
-import { createKeymap } from "@/plugins/keyboard";
+import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
 import {
   copy,
   editPencil,
@@ -80,6 +80,7 @@ import { createDirtyPlugin } from "@/plugins/dirty";
 import { createMentionPlugin } from "@/plugins/mention";
 import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
+import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
 import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
@@ -91,7 +92,7 @@ export interface EditorHost {
   currentPathDir(): string
   currentPath: string
   stateCache: {
-    getLastSet(path: string): string
+    getLastSet(path: string): string | undefined
     setLastSet(path: string, content: string): void
   }
   onMentionView(mv: MentionView | null): void
@@ -196,6 +197,7 @@ export async function createEditor(
 
       ctx.update(prosePluginsCtx, (plugins) => {
         return plugins.concat(
+          createUrlPastePlugin(),
           createDirtyPlugin(ctx, {
             getLastSetContent: (path) => host.stateCache.getLastSet(path),
             setLastSetContent: (path, content) => host.stateCache.setLastSet(path, content),
@@ -206,6 +208,7 @@ export async function createEditor(
           createLinkBoundaryPlugin(),
           createImageEditPlugin(),
           createKeymap(),
+          createCodeBlockMovePlugin(),
         );
       });
     })

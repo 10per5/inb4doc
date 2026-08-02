@@ -4,7 +4,12 @@ self.CHUNK_MAP = <%~ JSON.stringify(it.chunkMap) %>;
 importScripts(<%~ JSON.stringify(it.swAssetsUrl) %>);
 
 const CACHE = "inb4doc-assets-v1";
+// Cache entry listing the chunk URLs precached by the last completed install.
+// Content-hashed chunk URLs are immutable, so the next install can skip any
+// chunk already on this list (see the install handler).
+const PRECACHED_KEY = "/__inb4doc_precached__";
 const NETWORK_FIRST = <%= it.isDev %>;
+const CACHE_MAPS = <%= it.cacheMaps %>;
 
 console.info("[SW] v<%= it.appVersion %> build:<%= it.buildVersion %> networkFirst:", NETWORK_FIRST);
 
@@ -16,34 +21,51 @@ function reportProgress(loaded, total, done) {
   });
 }
 
-async function fetchAndPut(url) {
+// Size of a previously cached copy, 0 when absent. Fallback for servers that
+// don't send content-length on GET: lets the denominator reuse sizes we already
+// know from an earlier install.
+async function cachedCopySize(url) {
+  try {
+    const cached = await caches.match(url);
+    return Number(cached?.headers.get("content-length")) || 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+// GET a precache file, counting real bytes as they stream. `onTotal(size)` fires
+// once the file's expected size is known (before streaming starts);
+// `onProgress(received)` fires per chunk with the bytes actually transferred so
+// far. Returns the total bytes received.
+async function fetchAndPutCounted(url, onTotal, onProgress) {
   const response = await fetch(url);
   if (!response.ok) throw new Error("Failed to fetch " + url);
+  const known =
+    Number(response.headers.get("content-length")) || (await cachedCopySize(url));
+  if (known > 0) onTotal(known);
   const cache = await caches.open(CACHE);
-  await cache.put(url, response.clone());
-  return response;
-}
-
-// Byte size of a response, 0 when unknown.
-async function responseBytes(response) {
-  const len = Number(response.headers.get("content-length"));
-  if (Number.isFinite(len) && len > 0) return len;
-  try {
-    return (await response.clone().blob()).size;
-  } catch (_) {
-    return 0;
+  if (!response.body) {
+    await cache.put(url, response.clone());
+    return known;
   }
-}
-
-// HEAD-probe the blocking IMPORTANT set for a stable byte denominator.
-async function probeSize(url) {
-  try {
-    const response = await fetch(url, { method: "HEAD" });
-    if (!response.ok) return 0;
-    return await responseBytes(response);
-  } catch (_) {
-    return 0;
+  const reader = response.body.getReader();
+  const parts = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    received += value.byteLength;
+    onProgress(received);
   }
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const part of parts) {
+    body.set(part, offset);
+    offset += part.byteLength;
+  }
+  await cache.put(url, new Response(body, response));
+  return received;
 }
 
 self.addEventListener("install", (event) => {
@@ -53,25 +75,77 @@ self.addEventListener("install", (event) => {
   self.skipWaiting()
   event.waitUntil(
     (async () => {
-      const total = (await Promise.all(self.IMPORTANT.map(probeSize))).reduce(
-        (a, b) => a + b,
-        0
-      );
+      // Progress shows real transferred bytes: `loaded` is the cumulative
+      // streamed total, `total` the sum of every size we know so far (each
+      // file's content-length, or its previously cached copy's size). Files of
+      // unknown size don't count toward the denominator until their GET reveals
+      // one; if nothing is known yet the UI falls back to an indeterminate
+      // loader.
+      let total = 0;
       let loaded = 0;
+      // Chunk URLs precached by the last completed install. Content-hashed
+      // chunk URLs are immutable, so a chunk already on this list is
+      // byte-identical to the cached copy and can be skipped — only
+      // new/changed chunks (whose URL isn't listed) are fetched and counted.
+      // Reading the persisted list instead of the live cache avoids the race
+      // where the page re-caches a chunk through the fetch path while the
+      // install is still running: that chunk is absent from the list, so it
+      // still gets fetched and counted.
+      const cache = await caches.open(CACHE);
+      let precached = new Set();
+      try {
+        const meta = await cache.match(PRECACHED_KEY);
+        if (meta) precached = new Set(JSON.parse(await meta.text()));
+      } catch (_) {
+        // Corrupt/missing list — treat every chunk as not precached.
+      }
+      // `skipCached` is for content-hashed chunks: once a chunk URL is on the
+      // precached list it is byte-identical forever, so re-installs skip it
+      // entirely — only genuinely new/changed chunks are fetched and counted.
+      // IMPORTANT assets are build-versioned with stable URLs and change on
+      // every build, so they always transfer.
+      const transfer = async (url, skipCached) => {
+        if (skipCached && precached.has(url)) return;
+        try {
+          loaded += await fetchAndPutCounted(
+            url,
+            (size) => {
+              total += size;
+            },
+            (received) => reportProgress(loaded + received, total, false)
+          );
+        } catch (_) {
+          // A missing asset must not abort activation; the denominator just
+          // keeps whatever sizes it already knows.
+        }
+        reportProgress(loaded, total, true);
+      };
       // Block activation only on the IMPORTANT assets (shell + entry + app.js);
       // first paint never waits on the lazy controller chunks.
       for (const url of self.IMPORTANT) {
-        loaded += await fetchAndPut(url).then(responseBytes).catch(() => 0);
-        reportProgress(loaded, total, false);
+        await transfer(url, false);
       }
-      reportProgress(loaded, total, loaded >= total);
       // Fill the remaining chunks in the background without delaying activation.
+      // Already-precached chunks are skipped, so only changed files are fetched.
       self.backgroundFill = (async () => {
         for (const url of self.CHUNKS) {
-          const size = await fetchAndPut(url).then(responseBytes).catch(() => 0);
-          loaded += size;
-          reportProgress(loaded, total, loaded >= total);
+          await transfer(url, true);
         }
+        // Persist the chunk set now in the cache so the next install skips
+        // them. Only URLs actually present are recorded, so a failed transfer
+        // is retried on the next install instead of skipped.
+        try {
+          const list = [];
+          for (const url of self.CHUNKS) {
+            if (await caches.match(url)) list.push(url);
+          }
+          await cache.put(
+            PRECACHED_KEY,
+            new Response(JSON.stringify(list), {
+              headers: { "Content-Type": "application/json" },
+            })
+          );
+        } catch (_) {}
       })();
     })()
   );
@@ -93,41 +167,106 @@ self.addEventListener("activate", (event) => {
 
 // Entry shell + app.js are versioned only by build, not by content hash, so a
 // cache-first policy would serve the stale bundle forever. Always go to the
-// network for IMPORTANT paths (falling back to cache offline). Lazy chunks are
+// network for IMPORTANT paths (falling back to cache offline). theme-nord.css
+// and katex.css are likewise build-versioned (the shell links them with
+// ?ver=<APP_VERSION>), so they are network-first too. Lazy chunks are
 // content-hashed URLs, so cache-first is safe and keeps them available offline.
 const IMPORTANT_PATHS = new Set(
   self.IMPORTANT.map((url) => new URL(url, self.registration.scope).pathname)
 );
 
+// The shell cache-busts build-versioned assets with ?ver=<APP_VERSION>, but the
+// precache stores the bare URL. Match and store by a query-stripped key so the
+// two meet, and so offline fallback still finds the precached copy.
+function cacheKeyOf(requestOrUrl) {
+  const href =
+    typeof requestOrUrl === "string"
+      ? requestOrUrl
+      : requestOrUrl.href ?? requestOrUrl.url;
+  const url = new URL(href);
+  url.search = "";
+  return url.toString();
+}
+
+async function putCacheable(key, response) {
+  const contentType = response.headers.get("content-type") || "";
+  // .map files (dev-only, served as application/json and fetched by DevTools)
+  // don't pass the js/css content-type check; cache them too (only in
+  // dev/watch and WebLocal builds) so offline debugging still resolves maps.
+  const isMap = CACHE_MAPS && /\.map$/.test(key);
+  const isCode =
+    /\.(js|css)(?:\?|$)/.test(key) &&
+    (contentType.includes("javascript") || contentType.includes("text/css"));
+  if (response.ok && (isMap || isCode)) {
+    const cache = await caches.open(CACHE);
+    await cache.put(key, response.clone());
+  }
+}
+
+// A 404 on a non-IMPORTANT js/css URL means the page is running a stale
+// build and references a chunk that was pruned on the server (e.g. after a
+// rebuild during an interrupted update). Ask the page to reload so it picks
+// up the current app.js/chunk map instead of choking on every refresh.
+function isStaleChunk(response, url) {
+  return (
+    response.status === 404 &&
+    !IMPORTANT_PATHS.has(url.pathname) &&
+    /\.(js|css)(?:\?|$)/.test(url.pathname)
+  );
+}
+
+function notifyStaleAsset(url) {
+  self.clients.matchAll({ includeUncontrolled: true }).then((clients) => {
+    for (const c of clients) {
+      c.postMessage({ type: "SW_STALE_ASSET", url });
+    }
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+  const key = cacheKeyOf(url);
   const networkFirst = NETWORK_FIRST || IMPORTANT_PATHS.has(url.pathname);
 
   event.respondWith(
     (async () => {
-      if (networkFirst) {
-        try {
-          const response = await fetch(event.request);
-          const contentType = response.headers.get("content-type") || "";
-          if (
-            response.ok &&
-            /\.(js|css)(?:\?|$)/.test(event.request.url) &&
-            (contentType.includes("javascript") || contentType.includes("text/css"))
-          ) {
-            const cache = await caches.open(CACHE);
-            cache.put(event.request, response.clone());
+      try {
+        if (networkFirst) {
+          try {
+            const response = await fetch(event.request);
+            await putCacheable(key, response);
+            if (isStaleChunk(response, url)) notifyStaleAsset(event.request.url);
+            return response;
+          } catch {
+            const cached = await caches.match(key);
+            if (cached) return cached;
+            return await fetch(event.request);
           }
-          return response;
-        } catch {
-          const cached = await caches.match(event.request);
-          return cached || fetch(event.request);
         }
-      }
 
-      const cached = await caches.match(event.request);
-      return cached || fetch(event.request);
+        const cached = await caches.match(key);
+        if (cached) return cached;
+        const response = await fetch(event.request);
+        await putCacheable(key, response);
+        if (isStaleChunk(response, url)) notifyStaleAsset(event.request.url);
+        return response;
+      } catch (_) {
+        // Never let the respondWith promise reject: when neither the network
+        // nor the cache can satisfy a navigation, serve the cached app shell so
+        // deep links still load the SPA offline (the app restores the path via
+        // history). Non-navigation assets get a graceful 504 instead.
+        if (event.request.mode === "navigate") {
+          const shell = await caches.match(self.registration.scope);
+          if (shell) return shell;
+        }
+        return new Response("", {
+          status: 504,
+          statusText: "Offline",
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
     })()
   );
 });

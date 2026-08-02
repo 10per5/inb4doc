@@ -9,6 +9,7 @@
 #include <sstream>
 #include <print>
 #include <filesystem>
+#include <deque>
 #include <vector>
 #include <algorithm>
 #include <string>
@@ -118,98 +119,126 @@ static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
 {
     struct dir_entry { std::string name; std::string rel_path; int weight; };
     struct file_entry { std::string name; std::string rel_path; int weight; };
-    std::vector<dir_entry> dirs;
-    std::vector<file_entry> files;
-    bool recurse = depth == 0 || current_depth < depth;
 
-    std::error_code ec;
-    for (auto &e : fs::directory_iterator(dir, ec))
+    // Hard cap on directory entries scanned, so tree building exits early
+    // instead of oversearching huge content trees.
+    const std::size_t kMaxScanned = 10000;
+    std::size_t scanned = 0;
+
+    // Breadth-first walk: directories at lower depth are visited before
+    // nested ones, so shallow files are prioritized over deeply nested ones.
+    struct pending_dir
     {
-        auto name = e.path().filename().string();
-        auto rel_path = rel_prefix.empty() ? name : rel_prefix + "/" + name;
+        fs::path dir;
+        std::string rel_prefix;
+        std::vector<GitIgnorePattern> gi;
+        int cur_depth;
+    };
+    std::deque<pending_dir> queue;
+    queue.push_back({dir, rel_prefix, gi_patterns, current_depth});
 
-        if (name[0] == '.')
-            continue;
+    while (!queue.empty() && scanned < kMaxScanned)
+    {
+        auto pd = queue.front();
+        queue.pop_front();
 
-        auto estatus = e.status(ec);
-        if (ec) continue;
-        auto is_dir = fs::is_directory(estatus);
+        bool recurse = depth == 0 || pd.cur_depth < depth;
 
-        if (!no_ignore && is_ignored(rel_path, is_dir, gi_patterns))
-            continue;
+        std::vector<dir_entry> dirs;
+        std::vector<file_entry> files;
 
-        if (is_dir)
+        std::error_code ec;
+        for (auto &e : fs::directory_iterator(pd.dir, ec))
         {
-            if (!recurse)
+            if (scanned >= kMaxScanned) break;
+            scanned++;
+
+            auto name = e.path().filename().string();
+            auto rel_path = pd.rel_prefix.empty() ? name : pd.rel_prefix + "/" + name;
+
+            if (name[0] == '.')
                 continue;
-            auto child_gi = load_gitignore(e.path());
-            std::vector<GitIgnorePattern> merged = gi_patterns;
-            merged.insert(merged.end(), child_gi.begin(), child_gi.end());
-            build_tree(e.path(), out_paths, out_children, out_folder_weights,
-                       merged, depth, current_depth + 1, no_ignore, rel_path);
 
-            // Collect folder weight from _index.md if present
-            int folder_weight = -1;
-            auto index_file = e.path() / "_index.md";
-            if (fs::exists(index_file))
-                folder_weight = extract_weight(index_file);
+            auto estatus = e.status(ec);
+            if (ec) continue;
+            auto is_dir = fs::is_directory(estatus);
 
-            dirs.push_back({name, rel_path, folder_weight});
+            if (!no_ignore && is_ignored(rel_path, is_dir, pd.gi))
+                continue;
+
+            if (is_dir)
+            {
+                if (!recurse)
+                    continue;
+                auto child_gi = load_gitignore(e.path());
+                std::vector<GitIgnorePattern> merged = pd.gi;
+                merged.insert(merged.end(), child_gi.begin(), child_gi.end());
+                queue.push_back({e.path(), rel_path, merged, pd.cur_depth + 1});
+
+                // Collect folder weight from _index.md if present
+                int folder_weight = -1;
+                auto index_file = e.path() / "_index.md";
+                if (fs::exists(index_file))
+                    folder_weight = extract_weight(index_file);
+
+                dirs.push_back({name, rel_path, folder_weight});
+            }
+            else if (name.ends_with(".md"))
+            {
+                auto w = extract_weight(e.path());
+                files.push_back({name, rel_path, w});
+            }
         }
-        else if (name.ends_with(".md"))
-        {
-            auto w = extract_weight(e.path());
-            files.push_back({name, rel_path, w});
-        }
-    }
 
-    // Emit paths for files in this directory
-    for (auto &f : files)
-    {
-        auto page_path = f.rel_path;
-        // Strip .md extension
-        if (page_path.size() > 3)
-            page_path = page_path.substr(0, page_path.size() - 3);
-        out_paths << "    \"" << page_path << "\",\n";
-    }
-
-    // Emit folder weights for directories with _index.md
-    for (auto &d : dirs)
-    {
-        if (d.weight >= 0)
-            out_folder_weights << "    \"" << d.rel_path << "\": " << d.weight << ",\n";
-    }
-
-    // Sort and emit children for this prefix
-    std::sort(dirs.begin(), dirs.end(), [](auto &a, auto &b) { return a.name < b.name; });
-    std::sort(files.begin(), files.end(), [](auto &a, auto &b) { return a.name < b.name; });
-
-    if (!dirs.empty() || !files.empty())
-    {
-        out_children << "    \"" << rel_prefix << "\": [\n";
-        bool first = true;
-        for (auto &d : dirs)
-        {
-            if (!first) out_children << ",\n";
-            first = false;
-            int w = d.weight >= 0 ? d.weight : 1000000;
-            out_children << "      {\"name\": \"" << d.name
-                         << "\", \"path\": \"" << d.rel_path
-                         << "\", \"isDir\": true, \"weight\": " << w << "}";
-        }
+        // Emit paths for files in this directory
         for (auto &f : files)
         {
-            if (!first) out_children << ",\n";
-            first = false;
             auto page_path = f.rel_path;
+            // Strip .md extension
             if (page_path.size() > 3)
                 page_path = page_path.substr(0, page_path.size() - 3);
-            int w = f.weight >= 0 ? f.weight : 1000000;
-            out_children << "      {\"name\": \"" << f.name
-                         << "\", \"path\": \"" << page_path
-                         << "\", \"isDir\": false, \"weight\": " << w << "}";
+            out_paths << "    \"" << json_escape(page_path) << "\",\n";
         }
-        out_children << "\n    ],\n";
+
+        // Emit folder weights for directories with _index.md
+        for (auto &d : dirs)
+        {
+            if (d.weight >= 0)
+                out_folder_weights << "    \"" << json_escape(d.rel_path)
+                                   << "\": " << d.weight << ",\n";
+        }
+
+        // Sort and emit children for this prefix
+        std::sort(dirs.begin(), dirs.end(), [](auto &a, auto &b) { return a.name < b.name; });
+        std::sort(files.begin(), files.end(), [](auto &a, auto &b) { return a.name < b.name; });
+
+        if (!dirs.empty() || !files.empty())
+        {
+            out_children << "    \"" << json_escape(pd.rel_prefix) << "\": [\n";
+            bool first = true;
+            for (auto &d : dirs)
+            {
+                if (!first) out_children << ",\n";
+                first = false;
+                int w = d.weight >= 0 ? d.weight : 1000000;
+                out_children << "      {\"name\": \"" << json_escape(d.name)
+                             << "\", \"path\": \"" << json_escape(d.rel_path)
+                             << "\", \"isDir\": true, \"weight\": " << w << "}";
+            }
+            for (auto &f : files)
+            {
+                if (!first) out_children << ",\n";
+                first = false;
+                auto page_path = f.rel_path;
+                if (page_path.size() > 3)
+                    page_path = page_path.substr(0, page_path.size() - 3);
+                int w = f.weight >= 0 ? f.weight : 1000000;
+                out_children << "      {\"name\": \"" << json_escape(f.name)
+                             << "\", \"path\": \"" << json_escape(page_path)
+                             << "\", \"isDir\": false, \"weight\": " << w << "}";
+            }
+            out_children << "\n    ],\n";
+        }
     }
 }
 

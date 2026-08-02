@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <deque>
 #include <cctype>
 
 namespace fs = std::filesystem;
@@ -170,26 +171,6 @@ static std::vector<std::string> extract_snippets(
     return snippets;
 }
 
-// JSON-escape a string
-static std::string json_escape(const std::string &s)
-{
-    std::string out;
-    out.reserve(s.size() + 4);
-    for (char c : s)
-    {
-        switch (c)
-        {
-        case '"':  out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n";  break;
-        case '\r': out += "\\r";  break;
-        case '\t': out += "\\t";  break;
-        default:   out += c;      break;
-        }
-    }
-    return out;
-}
-
 saucer::scheme::response handle_search(
     const config &cfg,
     std::string_view body)
@@ -205,13 +186,29 @@ saucer::scheme::response handle_search(
     struct Result { std::string path; std::vector<std::string> snippets; };
     std::vector<Result> results;
 
-    // Walk the content directory
-    auto walk = [&](const fs::path &dir, const std::string &prefix, auto &self) -> void
+    // Hard cap on directory entries scanned, so path finding exits early
+    // instead of oversearching huge trees.
+    const std::size_t kMaxScanned = 10000;
+    std::size_t scanned = 0;
+
+    // Breadth-first walk: entries at lower depth are visited before nested
+    // ones, so shallow results are prioritized over deeply nested files.
+    struct Entry { fs::path dir; std::string prefix; };
+    std::deque<Entry> queue;
+    if (fs::exists(cfg.content_root))
+        queue.push_back({cfg.content_root, ""});
+
+    while (!queue.empty() && scanned < kMaxScanned)
     {
-        if (!fs::exists(dir)) return;
+        auto [dir, prefix] = queue.front();
+        queue.pop_front();
+
         std::error_code ec;
         for (const auto &e : fs::directory_iterator(dir, ec))
         {
+            if (scanned >= kMaxScanned) break;
+            scanned++;
+
             auto name = e.path().filename().string();
             auto rel = prefix.empty() ? name : prefix + "/" + name;
             if (name[0] == '.') continue;
@@ -221,7 +218,7 @@ saucer::scheme::response handle_search(
             if (fs::is_directory(estatus))
             {
                 if (name == "image") continue;
-                self(e.path(), rel, self);
+                queue.push_back({e.path(), rel});
             }
             else if (name.ends_with(".md"))
             {
@@ -242,10 +239,7 @@ saucer::scheme::response handle_search(
                     results.push_back({result_path, snippets});
             }
         }
-    };
-
-    if (fs::exists(cfg.content_root))
-        walk(cfg.content_root, "", walk);
+    }
 
     // Build JSON response
     std::ostringstream out;

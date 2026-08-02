@@ -5,6 +5,22 @@
 - **Never modify `node_modules/`** — use custom Milkdown plugins or project source files instead.
 - **Never create postinstall/patch scripts** that modify node_modules at install time.
 
+## Content State Invariants (metadata / content-loss regressions)
+
+File content is stored **body-only**; frontmatter lives separately (`Page.frontmatter`, pending edits carry a `frontmatterPatch`). Several subtle invariants prevent metadata/content loss when a page is re-opened, flushed, or shown in the pending-changes dialog. Breaking any of them resurfaces the "metadata shows as discarded" / "body cleared on re-open" regression.
+
+1. **`Page.bodyState.body` must always be set to the loaded content.** It is the authoritative "current body" used by `onMetaDataChanged` (dirty-tracking-service), `applyNoConflict`, `executeConflictDecision`, `reloadCurrentFromDisk`, and `Page.flushIn`. If a page loads but `bodyState.body` stays `undefined`, a metadata-only edit produces an Edit op with `patch = ""` → re-open shows an empty doc and flush can wipe the real body. Set `bodyState.body` anywhere you set `setBaseline()` on a freshly read page.
+
+2. **Empty string is a valid body state** (a cleared file). Use `!== undefined` / `?? ""` checks on `op.patch` / `page.bodyState.body`, NEVER `||` truthiness. `if (op.patch)` skips the empty patch and falls through to disk re-read or body-only editor content, resurrecting old content and dropping metadata. `getDirtyPaths()` must include Edit ops even when `patch === ""`.
+
+3. **The changes dialog "current" side must include the pending frontmatter.** Build `md` from `body` + `page.getFrontmatter()` (fall back to `originalFrontmatter` merged with `op.frontmatterPatch`). If you fall back to `editor.getCurrentContent()` it is **body-only** — diffing it against the original makes `diffFrontmatter` report every metadata field as `removed`. Only re-read from disk when `md === undefined`, never when `md === ""`.
+
+4. **Metadata-only edits queue an Edit op with `patch =` the current body** (`onMetaDataChanged` uses `page.bodyState.body ?? ""`). Keep `bodyState.body` in sync (invariant 1) so `patch` carries the real body; `flushDirtyFiles`/`flushPendingEdit` must then trust `editOp.patch ?? page.bodyState.body ?? ""`.
+
+5. **The dirty plugin's "uninitialized" sentinel is `undefined` (absent key), never `""`.** `src/plugins/dirty.ts` uses `prevLastSet === undefined` to mean "a programmatic content set happened; re-baseline from the doc". An empty serialized doc is a **valid baseline** (`""`), so using `""` as the sentinel made cut→flush→reopen→paste invisible to dirty-tracking. Programmatic sets must `lastSetContent.delete(path)` (not `.set(path, "")`) before the state update so the plugin absorbs only the programmatic update; `ensureEditor` primes the baseline by serializing the created doc. Do not reintroduce a string sentinel that collides with real content.
+
+6. **Never create or keep a no-op Edit op.** `onMetaDataChanged` (dirty-tracking-service) must not `queueEdit` when neither the frontmatter changed nor the body differs from baseline, and must `remove` an existing Edit op when `frontmatterPatch` becomes `undefined` and `patch === baseline` (e.g., a metadata change reverted to its original value). Otherwise a revert leaves an op that diffs as "No changes" but still shows `Pending changes (1)` / `+0B unflushed`.
+
 ## Architecture — Stimulus + Eta
 
 ### Controller Hierarchy
@@ -245,6 +261,8 @@ For any behavior that depends on the real app runtime (Stimulus connect timing, 
 
 - devDeps: `@playwright/test` + `@playwright/browser-chromium`.
 - Chromium binary: `bun x playwright install chromium` (the browser-chromium package does not auto-install; the postinstall is blocked by bun by default).
+- **Browser location:** always install with `PLAYWRIGHT_BROWSERS_PATH=0 bun x playwright install chromium` so the binary lives in `node_modules/playwright-core/.local-browsers/` instead of `~/.cache/ms-playwright` (which gets wiped). The `PLAYWRIGHT_BROWSERS_PATH` env var is read at module load, so it must be set before `@playwright/test` is imported.
+- **Shared bootstrap:** standalone scripts should `import { chromium } from "../e2e/launch"` (re-exported from `e2e/launch.ts`), which sets `PLAYWRIGHT_BROWSERS_PATH` to the project-local install before dynamically importing `@playwright/test`. Do not `import` `@playwright/test` directly in scripts — `playwright.config.ts` is **not** loaded for standalone `bun e2e/<test>.ts` scripts (it only applies to `bun playwright test`).
 - Test server: `bun lib/serve.ts` serves the built `public/` and reads content from `../../content`.
 
 ### Port convention
@@ -262,7 +280,7 @@ bun e2e/<test>.ts                             # run a Playwright script (top-lev
 ### Script template
 
 ```ts
-import { chromium } from "@playwright/test";
+import { chromium } from "../e2e/launch";
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });

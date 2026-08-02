@@ -39,6 +39,8 @@ export interface ProgressToastHandle {
 
 const PROGRESS_COLOR = "#388bf2";
 
+const INDETERMINATE_KEYFRAMES = `@keyframes prdc-toast-slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`;
+
 export function showProgressToast(initialMsg: string): ProgressToastHandle {
   const old = document.getElementById("prdc-toast");
   if (old) old.remove();
@@ -59,12 +61,35 @@ export function showProgressToast(initialMsg: string): ProgressToastHandle {
   barWrap.appendChild(bar);
   el.appendChild(barWrap);
 
+  // One shared keyframe rule for the indeterminate state.
+  if (!document.getElementById("prdc-toast-style")) {
+    const style = document.createElement("style");
+    style.id = "prdc-toast-style";
+    style.textContent = INDETERMINATE_KEYFRAMES;
+    document.head.appendChild(style);
+  }
+
   document.body.appendChild(el);
+
+  function setIndeterminate(): void {
+    bar.style.transition = "none";
+    bar.style.animation = "prdc-toast-slide 1.2s ease-in-out infinite";
+    bar.style.width = "33%";
+  }
+
+  // No size is known until the SW reports one, so start indeterminate.
+  setIndeterminate();
 
   return {
     updateProgress(loaded: number, total: number): void {
-      const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-      bar.style.width = pct + "%";
+      if (total > 0) {
+        bar.style.animation = "none";
+        bar.style.transition = "width .3s ease";
+        bar.style.width =
+          Math.min(100, Math.round((loaded / total) * 100)) + "%";
+      } else {
+        setIndeterminate();
+      }
     },
     setMessage(msg: string): void {
       msgEl.textContent = msg;

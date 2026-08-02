@@ -61,12 +61,21 @@ export class NavigationService {
     try {
       dirtyTrackingService.flush();
 
+      const samePath = path === this.currentPath;
       this.currentPath = path;
       clearEditorTint(this.editor.element as HTMLElement);
       updateEditorTint(this.editor.element as HTMLElement, path, this.cache.getPendingOps());
       appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
+
+      if (samePath) {
+        appEvents.emit(AppEvent.SidebarActive, { path });
+        dirtyTrackingService.recompute();
+        addRecent(path);
+        return;
+      }
+
       this.editor.showSkeleton();
 
       if (pushHistory) {
@@ -92,7 +101,7 @@ export class NavigationService {
         if (dirIndex) {
           this.editor.hideSkeleton()
           appEvents.emit(AppEvent.DirIndexEmpty, { path });
-          await this.loadSidebar();
+          appEvents.emit(AppEvent.SidebarActive, { path });
           dirtyTrackingService.recompute();
         } else {
           this.editor.hideSkeleton()
@@ -106,7 +115,7 @@ export class NavigationService {
 
       if (dirIndexEmpty) {
         appEvents.emit(AppEvent.DirIndexEmpty, { path });
-        await this.loadSidebar();
+        appEvents.emit(AppEvent.SidebarActive, { path });
         dirtyTrackingService.recompute();
         return;
       }

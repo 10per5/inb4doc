@@ -144,6 +144,9 @@ export default class extends Controller {
       appEvents.on(AppEvent.SourceModeToggled, () => {
         this.editor.toggleSourceMode()
       }),
+      appEvents.on(AppEvent.SourceApplyRequested, ({ path, content }) => {
+        this.cache.flushCurrentFile(path, content)
+      }),
     )
 
     try { imageService.restoreFromStorage() } catch {}

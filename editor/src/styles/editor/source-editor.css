@@ -8,14 +8,10 @@
   display: none;
   flex: 1;
   flex-direction: column;
-  min-height: 0;
-  overflow: auto;
 }
 
 #source-editor textarea {
   width: 100%;
-  flex: 1;
-  min-height: 0;
   border: none;
   border-radius: 0;
   padding: 1rem;
@@ -24,12 +20,16 @@
   line-height: 1.6;
   resize: none;
   outline: none;
+  min-height: 60vh;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
 }
 
 .source-actions {
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
   display: flex;
   gap: 0.5rem;
   padding: 0.5rem 1rem;

@@ -7,34 +7,23 @@
 
 import { autoResize } from "@/utils/text"
 
-export function toggleSourceMode(
+export function showSourceMode(
   sourceEl: HTMLElement,
   wysiwygEl: HTMLElement,
-  sourceMode: boolean,
   getMarkdown: () => string,
-  setEditorContent: (content: string) => void,
-): boolean {
-  const newMode = !sourceMode;
-  if (newMode) {
-    const md = getMarkdown();
-    sourceEl.style.display = "flex";
-    wysiwygEl.style.display = "none";
-    const ta = sourceEl.querySelector("textarea") as HTMLTextAreaElement;
-    ta.value = md;
-    ta.oninput = () => autoResize(ta);
-    autoResize(ta);
-  } else {
-    sourceEl.style.display = "none";
-    wysiwygEl.style.display = "block";
-  }
-  return newMode;
+): void {
+  sourceEl.style.display = "flex";
+  wysiwygEl.style.display = "none";
+  const ta = sourceEl.querySelector("textarea") as HTMLTextAreaElement;
+  ta.value = getMarkdown();
+  ta.oninput = () => autoResize(ta);
+  autoResize(ta);
 }
 
-export function applySourceContent(
-  textarea: HTMLTextAreaElement,
-  setEditorContent: (content: string) => void,
-): boolean {
-  if (!textarea) return false;
-  setEditorContent(textarea.value);
-  return true;
+export function hideSourceMode(
+  sourceEl: HTMLElement,
+  wysiwygEl: HTMLElement,
+): void {
+  sourceEl.style.display = "none";
+  wysiwygEl.style.display = "block";
 }

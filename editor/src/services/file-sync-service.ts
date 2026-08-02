@@ -1,5 +1,8 @@
 import { stripFrontmatter, serializeFrontmatter } from "@/utils/frontmatter";
-import { Frontmatter } from "@/entities/Frontmatter";
+import {
+  Frontmatter,
+  type MetaPanelData,
+} from "@/entities/Frontmatter";
 import {
   openChangesDialog,
   type ChangesDialogItem,
@@ -218,14 +221,14 @@ export class FileSyncService {
 
       let bodyToWrite: string;
       if (editOp) {
-        bodyToWrite = editOp.patch || page.bodyState.body || "";
+        bodyToWrite = editOp.patch ?? page.bodyState.body ?? "";
       } else {
-        bodyToWrite = page.bodyState.body || "";
+        bodyToWrite = page.bodyState.body ?? "";
       }
 
       if (path === this.currentPath) {
         bodyToWrite = currentMd;
-      } else if (!bodyToWrite) {
+      } else if (!editOp && !bodyToWrite) {
         const cachedRaw = await provider?.readFile(path);
         if (!cachedRaw) continue;
         bodyToWrite = stripFrontmatter(cachedRaw).body;
@@ -454,6 +457,7 @@ export class FileSyncService {
         ? Frontmatter.fromMeta(frontmatter)
         : undefined;
       page.setBaseline(body);
+      page.bodyState.body = body;
 
       await this.editor.ensureEditor(body);
     }
@@ -469,14 +473,14 @@ export class FileSyncService {
 
     let bodyToWrite: string;
     if (editOp) {
-      bodyToWrite = editOp.patch || page.bodyState.body || "";
+      bodyToWrite = editOp.patch ?? page.bodyState.body ?? "";
     } else {
-      bodyToWrite = page.bodyState.body || "";
+      bodyToWrite = page.bodyState.body ?? "";
     }
 
     if (path === this.currentPath) {
       bodyToWrite = this.editor.getCurrentContent();
-    } else if (!bodyToWrite) {
+    } else if (!editOp && !bodyToWrite) {
       const cachedRaw = await provider?.readFile(path);
       if (!cachedRaw) return false;
       bodyToWrite = stripFrontmatter(cachedRaw).body;
@@ -608,27 +612,46 @@ export class FileSyncService {
       switch (op.type) {
         case PendingOpType.Edit: {
           const page = repo.getOrCreate(op.path);
-          if (op.patch) page.bodyState.body = op.patch;
+          if (op.patch !== undefined) page.bodyState.body = op.patch;
 
-          let md = page.reconstructContent();
-
-          if (!md && op.path === this.currentPath) {
-            md = this.editor.getCurrentContent();
+          let body = page.bodyState.body;
+          if (op.path === this.currentPath) {
+            body = this.editor.getCurrentContent();
           }
 
-          if (!md) {
+          let fm: MetaPanelData | undefined =
+            page.getFrontmatter() ?? page.originalFrontmatter?.toMeta();
+          if (fm === undefined && op.frontmatterPatch) {
+            fm = {
+              ...(page.originalFrontmatter?.toMeta() ?? {}),
+              ...op.frontmatterPatch,
+            } as MetaPanelData;
+          }
+
+          let md: string | undefined;
+          if (body !== undefined) {
+            md = fm
+              ? `---\n${serializeFrontmatter(fm)}\n---\n\n${body}`
+              : body;
+          }
+
+          if (md === undefined) {
             const cachedRaw = await provider?.readFile(op.path);
             if (!cachedRaw) continue;
-            const { frontmatter: rawFm, body } = stripFrontmatter(cachedRaw);
+            const { frontmatter: rawFm, body: rawBody } =
+              stripFrontmatter(cachedRaw);
             const fallbackPage = repo.getOrCreate(op.path);
-            fallbackPage.setBaseline(body);
+            fallbackPage.setBaseline(rawBody);
             fallbackPage.originalFrontmatter = rawFm
               ? Frontmatter.fromMeta(rawFm)
               : undefined;
-            md = fallbackPage.reconstructContent();
+            const diskFm = fallbackPage.getFrontmatter() ?? rawFm;
+            md = diskFm
+              ? `---\n${serializeFrontmatter(diskFm)}\n---\n\n${rawBody}`
+              : rawBody;
           }
 
-          if (!md) continue;
+          if (md === undefined) continue;
 
           const changeSize =
             op.patch.length - (page.bodyState.baseline?.length ?? 0);

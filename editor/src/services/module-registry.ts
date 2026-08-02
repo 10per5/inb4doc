@@ -1,5 +1,6 @@
 import { Application, Controller } from "@hotwired/stimulus";
 import { getFarmModuleSystem } from "$/farmfe-compat";
+import { appEvents, AppEvent } from "@/stores/app-events";
 
 type ControllerClass = new (...args: any[]) => Controller;
 
@@ -165,6 +166,7 @@ export class ModuleRegistry {
         remounted.push(name);
       } catch (err) {
         console.error(`[sw] swap failed for "${name}":`, err, { chunkName });
+        appEvents.emit(AppEvent.SWSwapFailed, { name });
         // Don't leave the controller unloaded — re-register the previous
         // module so it reconnects.
         try {

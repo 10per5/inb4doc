@@ -1,5 +1,6 @@
 #include "images.h"
 #include "config.h"
+#include "json.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -67,25 +68,6 @@ bool resolve_within(
     auto rel_str = rel.string();
     if (rel_str.find("..") != std::string::npos) return false;
     return true;
-}
-
-static std::string json_escape(const std::string &s)
-{
-    std::string out;
-    out.reserve(s.size() + 4);
-    for (char c : s)
-    {
-        switch (c)
-        {
-        case '"':  out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n";  break;
-        case '\r': out += "\\r";  break;
-        case '\t': out += "\\t";  break;
-        default:   out += c;      break;
-        }
-    }
-    return out;
 }
 
 std::string url_decode(const std::string &s)

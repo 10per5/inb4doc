@@ -59,7 +59,7 @@ export class PendingOps {
   getDirtyPaths(): string[] {
     const paths: string[] = []
     for (const [id, op] of this.ops) {
-      if (op.type === PendingOpType.Edit && (op.patch || op.frontmatterPatch)) paths.push(id)
+      if (op.type === PendingOpType.Edit) paths.push(id)
     }
     return paths
   }

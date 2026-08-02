@@ -107,6 +107,9 @@ export default class extends Controller {
   }
 
   load(): void {
+    const prevScroll = this.targets.has("inner")
+      ? this.innerTarget.scrollTop
+      : 0;
     this.element.innerHTML = renderSidebar({ eyeClosed });
     this.hideEmptyFolders = prefsStore.hideEmptyFolders;
     document.getElementById("sidebar-skeleton")?.classList.add("is-hidden");
@@ -152,7 +155,6 @@ export default class extends Controller {
 
     this.allPaths = treeEmpty ? [] : Array.from(mergedTree.paths);
 
-    const prevScroll = this.innerTarget.scrollTop;
     this.innerTarget.innerHTML = treeEmpty
       ? `<div class="sidebar-empty">No files</div>`
       : renderItems(mergedTree, "", 0, ctx);
@@ -447,9 +449,24 @@ export default class extends Controller {
   }
 
   setActive(path: string): void {
-    const prev =
-      this.innerTarget.querySelector<HTMLElement>(".nav-link.active");
-    if (prev) prev.classList.remove("active");
+    this.innerTarget
+      .querySelectorAll<HTMLElement>(".nav-link")
+      .forEach((el) => el.classList.remove("active", "dir-active"));
+
+    const dirIndex = path.replace(/\/_index(?:\.md)?$/, "");
+    if (dirIndex !== path) {
+      const section = this.innerTarget.querySelector<HTMLElement>(
+        `.nav-section[data-nav-path="${CSS.escape(dirIndex)}"]`
+      );
+      const link = section?.querySelector<HTMLElement>(
+        ".nav-section-title .nav-link"
+      );
+      if (link) {
+        link.classList.add("active", "dir-active");
+        return;
+      }
+    }
+
     const item = this.itemByPath.get(path);
     if (item) {
       const link = item.querySelector<HTMLElement>(".nav-link");

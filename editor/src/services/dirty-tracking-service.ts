@@ -100,25 +100,27 @@ export class DirtyTrackingService {
       return;
     }
 
+    const original = page.originalFrontmatter?.toMeta();
+    const changed: Record<string, string | number | undefined> = {}
+    for (const key of Object.keys({ ...data, ...original })) {
+      if (data[key as keyof MetaPanelData] !== original?.[key as keyof MetaPanelData]) {
+        changed[key] = data[key as keyof MetaPanelData]
+      }
+    }
+    const frontmatterPatch = Object.keys(changed).length > 0 ? changed : undefined
+
+    const baseline = page.bodyState.baseline;
+    const bodyChanged =
+      baseline !== undefined && (page.bodyState.body ?? "") !== baseline;
+
     const editOp = this.pendingOps.findEdit(path);
     if (editOp) {
-      const original = page.originalFrontmatter?.toMeta();
-      const changed: Record<string, string | number | undefined> = {}
-      for (const key of Object.keys({ ...data, ...original })) {
-        if (data[key as keyof MetaPanelData] !== original?.[key as keyof MetaPanelData]) {
-          changed[key] = data[key as keyof MetaPanelData]
-        }
+      editOp.frontmatterPatch = frontmatterPatch;
+      if (!frontmatterPatch && !bodyChanged) {
+        this.pendingOps.remove(path);
       }
-      editOp.frontmatterPatch = Object.keys(changed).length > 0 ? changed : undefined
-    } else {
-      const original = page.originalFrontmatter?.toMeta();
-      const changed: Record<string, string | number | undefined> = {}
-      for (const key of Object.keys({ ...data, ...original })) {
-        if (data[key as keyof MetaPanelData] !== original?.[key as keyof MetaPanelData]) {
-          changed[key] = data[key as keyof MetaPanelData]
-        }
-      }
-      this.pendingOps.queueEdit(path, page.bodyState.body ?? "", Object.keys(changed).length > 0 ? changed : undefined)
+    } else if (frontmatterPatch || bodyChanged) {
+      this.pendingOps.queueEdit(path, page.bodyState.body ?? "", frontmatterPatch);
     }
     pendingOpsStore.save(this.pendingOps.all);
 

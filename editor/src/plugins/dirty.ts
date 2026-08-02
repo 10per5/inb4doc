@@ -4,7 +4,7 @@ import { serializerCtx } from "@milkdown/kit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 
 export interface DirtyPluginConfig {
-  getLastSetContent: (path: string) => string
+  getLastSetContent: (path: string) => string | undefined
   setLastSetContent: (path: string, content: string) => void
   getCurrentPath: () => string
 }
@@ -28,7 +28,7 @@ export function createDirtyPlugin(ctx: Ctx, config: DirtyPluginConfig) {
 
         const path = config.getCurrentPath()
         const prevLastSet = config.getLastSetContent(path)
-        if (prevLastSet === "") {
+        if (prevLastSet === undefined) {
           const serializer = ctx.get(serializerCtx)
           config.setLastSetContent(
             path,

@@ -27,6 +27,7 @@ export enum AppEvent {
 
   // Dirty / sync
   EditorChanged = "editor-changed",
+  OutlineChanged = "outline-changed",
   DirtyChanged = "dirty-changed",
   DirtyClicked = "dirty-clicked",
   SingleDiscardRequested = "single-discard-requested",
@@ -60,6 +61,7 @@ export enum AppEvent {
 
   // Editor
   SourceModeToggled = "source-mode-toggled",
+  SourceApplyRequested = "source-apply-requested",
   ToolbarCommandExec = "toolbar-command-exec",
   ScrollToText = "scroll-to-text",
   LinkDialogRequested = "link-dialog-requested",
@@ -72,6 +74,9 @@ export enum AppEvent {
   SWInstallProgress = "sw-install-progress",
   SWUpdateReady = "sw-update-ready",
   ModulesSwapped = "modules-swapped",
+  SWSwapFailed = "sw-swap-failed",
+  SWUpdatePending = "sw-update-pending",
+  SWUpdateResolved = "sw-update-resolved",
 }
 
 // ── Strict payload map ──
@@ -86,6 +91,7 @@ export interface AppEventPayloads {
   [AppEvent.SidebarMoveRequested]:    { from: string; to: string }
 
   [AppEvent.EditorChanged]:         { path: string; md: string }
+  [AppEvent.OutlineChanged]:        void
   [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
   [AppEvent.DirtyClicked]:          void
   [AppEvent.SingleDiscardRequested]:{ path: string }
@@ -115,6 +121,7 @@ export interface AppEventPayloads {
   [AppEvent.MetaPanelReload]:       void
 
   [AppEvent.SourceModeToggled]:     void
+  [AppEvent.SourceApplyRequested]:  { path: string; content: string }
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
   [AppEvent.ScrollToText]:          { query: string; matchIndex: number; snippetText?: string }
   [AppEvent.LinkDialogRequested]:   void
@@ -125,6 +132,9 @@ export interface AppEventPayloads {
   [AppEvent.SWInstallProgress]: { loaded: number; total: number; done: boolean }
   [AppEvent.SWUpdateReady]: void
   [AppEvent.ModulesSwapped]: { names: string[] }
+  [AppEvent.SWSwapFailed]: { name: string }
+  [AppEvent.SWUpdatePending]: void
+  [AppEvent.SWUpdateResolved]: void
 }
 
 // ── EventBus ──

@@ -1,5 +1,9 @@
 <div class="meta-panel-wrapper">
   <div class="meta-panel">
+    <div class="meta-outline-section" data-meta-panel-target="outlineSection" hidden>
+      <div class="meta-panel-header">Outline</div>
+      <div class="meta-outline" data-meta-panel-target="outline" data-action="click->meta-panel#onOutlineClick"></div>
+    </div>
     <div class="meta-panel-header">Page Metadata</div>
     <div class="meta-field">
       <label>Title</label>

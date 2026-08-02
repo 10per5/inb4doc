@@ -84,6 +84,7 @@ export class Page {
 
       const { frontmatter, body } = stripFrontmatter(content);
       this.setBaseline(body);
+      this.bodyState.body = body;
       this.frontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined;
       this.originalFrontmatter = this.frontmatter;
       const time = await provider.getServerTime(this.path);

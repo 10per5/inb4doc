@@ -22,6 +22,47 @@
   margin-bottom: 1rem;
 }
 
+/* ── Outline ───────────────────────────────────────────────────────── */
+
+.meta-outline-section {
+  margin-bottom: 1.5rem;
+}
+
+.meta-outline-section[hidden] {
+  display: none;
+}
+
+.meta-outline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+
+.meta-outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: calc(0.5rem + (var(--outline-level, 2) - 1) * 0.75rem);
+}
+
+.meta-outline-item:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
 /* ── Meta Fields ───────────────────────────────────────────────────── */
 
 .meta-field {

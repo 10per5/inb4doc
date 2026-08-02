@@ -26,7 +26,7 @@
             </div>
           </div>
         </div>
-        <aside class="book-aside" id="meta-panel-mount" data-controller="meta-panel">
+        <aside class="book-aside" id="meta-panel-mount" data-controller="meta-panel" data-meta-panel-editor-outlet="#editor-area">
           <%~ include('partials/skeleton-meta', it) %>
         </aside>
       </div>

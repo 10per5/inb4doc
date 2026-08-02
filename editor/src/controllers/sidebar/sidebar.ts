@@ -288,6 +288,7 @@ export function renderItems(
     const hasIndex = dirChildren.some(
       (c) => isHomePageFilename(c.name)
     )
+    const fileCount = filteredDirChildren.filter((c) => !c.isDir).length
     const indexPage = hasIndex ? pagesStore.get(`${dirPath}/${HOME_FILENAME}`) : undefined
     const indexTitle = indexPage?.getFrontmatter?.()?.title
     const dirBaseName = child.name.replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase())
@@ -326,7 +327,7 @@ export function renderItems(
       <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${dirPath}">
         <span class="nav-section-title depth-${depth}">
           <a href="${buildEditorUrl(ctx.basePath, indexPagePath)}" class="${dirLinkClasses}" data-nav-path="${indexPagePath}" data-action="click->sidebar#onNavigate">
-            ${dirIcon}${label}${dirBadges.join("")}
+            ${dirIcon}${label}${fileCount > 0 ? `<span class="sidebar-count">${fileCount}</span>` : ""}${dirBadges.join("")}
           </a>
           <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
             ${navArrowDown}

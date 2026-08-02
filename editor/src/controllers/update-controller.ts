@@ -8,6 +8,11 @@ import {
 
 const APPLY_FALLBACK_MS = 2500;
 const UPDATED_MS = 800;
+// Last-resort backstop: if a leftover-update notice never resolves (e.g. the SW
+// is genuinely stuck), stop showing it rather than block forever. Real updates
+// dismiss naturally via progress/apply events, and a moot update is resolved
+// immediately, so this only fires in the stuck case.
+const PENDING_MAX_MS = 30_000;
 
 export default class UpdateController extends Controller {
   private toast: ProgressToastHandle | null = null;
@@ -20,6 +25,8 @@ export default class UpdateController extends Controller {
       appEvents.on(AppEvent.SWInstallProgress, (data) => this.onProgress(data)),
       appEvents.on(AppEvent.SWUpdateReady, () => this.onReady()),
       appEvents.on(AppEvent.ModulesSwapped, () => this.onSwapped()),
+      appEvents.on(AppEvent.SWUpdatePending, () => this.onPending()),
+      appEvents.on(AppEvent.SWUpdateResolved, () => this.dismiss()),
     ];
   }
 
@@ -35,12 +42,31 @@ export default class UpdateController extends Controller {
     this.toast = showProgressToast("Downloading update\u2026");
   }
 
+  // A reload found an unfinished update (the upgrade-in-progress flag was still
+  // set). The install is being retried; hold the notice until it resolves or a
+  // stale-flag timeout clears it.
+  private onPending(): void {
+    if (this.toast) this.toast.remove();
+    this.toast = showProgressToast("Finishing update\u2026");
+    if (this.dismissTimer) clearTimeout(this.dismissTimer);
+    this.dismissTimer = setTimeout(() => this.dismiss(), PENDING_MAX_MS);
+  }
+
   private onProgress(data: { loaded: number; total: number }): void {
     if (!this.toast) return;
     this.toast.updateProgress(data.loaded, data.total);
-    this.toast.setMessage(
-      `Downloading update\u2026 ${formatBytes(data.loaded, false)} / ${formatBytes(data.total, false)}`
-    );
+    // `total` is the sum of every size the SW knows so far (an estimate that
+    // converges to the real transfer); when nothing is known yet, or a file of
+    // unknown size pushed `loaded` past the estimate, show just the actual
+    // bytes transferred instead of a meaningless ratio.
+    const label =
+      data.total > 0 && data.loaded <= data.total
+        ? `Downloading update\u2026 ${formatBytes(
+            data.loaded,
+            false
+          )} / ${formatBytes(data.total, false)}`
+        : `Downloading update\u2026 ${formatBytes(data.loaded, false)}`;
+    this.toast.setMessage(label);
   }
 
   private onReady(): void {
