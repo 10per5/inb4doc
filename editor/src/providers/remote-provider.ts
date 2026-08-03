@@ -45,6 +45,15 @@ export class RemoteProvider implements ContentProvider {
     await fetch(this.url(`/content/${path}.md`), { method: "DELETE" })
   }
 
+  async deleteFiles(paths: string[]): Promise<void> {
+    const res = await fetch(this.url("/api/delete"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paths }),
+    })
+    if (!res.ok) throw new Error(`Bulk delete failed: ${res.status}`)
+  }
+
   async moveFile(from: string, to: string): Promise<void> {
     const res = await fetch(this.url("/api/move"), {
       method: "POST",

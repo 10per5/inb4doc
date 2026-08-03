@@ -9,6 +9,8 @@
   </div>
   <div class="sidebar-toolbar">
     <button class="btn btn-toggle sidebar-toggle-btn" data-sidebar-target="hideEmptyToggle" data-action="click->sidebar#onToggleEmptyFolders" title="Hide empty folders"><%~ it.eyeClosed %><span class="sidebar-toggle-label">Toggle empty</span></button>
+    <button class="btn sidebar-delete-selected" data-sidebar-target="deleteSelectedBtn" data-action="click->sidebar#onDeleteSelected" title="Delete selected" hidden>Delete selected (0)</button>
+    <button class="btn sidebar-cancel-selection" data-sidebar-target="cancelSelectionBtn" data-action="click->sidebar#onCancelSelection" title="Cancel selection" hidden>Cancel</button>
   </div>
   <div class="sidebar-inner" data-sidebar-target="inner" data-action="dragstart->sidebar#onDragStart dragenter->sidebar#onDragEnter dragleave->sidebar#onDragLeave dragover->sidebar#onDragOver dragend->sidebar#onDragEnd drop->sidebar#onDrop">
     <div class="sidebar-skeleton" id="sidebar-skeleton">

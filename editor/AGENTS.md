@@ -4,6 +4,7 @@
 
 - **Never modify `node_modules/`** — use custom Milkdown plugins or project source files instead.
 - **Never create postinstall/patch scripts** that modify node_modules at install time.
+- **No raw global (document/window) event bindings outside `src/plugins/keyboard.ts`.** All global key handling is a static list in `src/plugins/keyboard.ts` (the `globalKeyBindings` array), which owns the single document-level `keydown` listener. Its handlers emit app events (e.g. Escape → `AppEvent.SidebarCancel`); controllers subscribe to those events instead of registering their own document listeners. Editor keybindings live in the Milkdown keymap (`createKeymap`) in the same file. Do NOT call `document.addEventListener` in controllers, services, or other plugins.
 - **Do not run Playwright/E2E browser tests unless the user explicitly asks.** Verify changes with `bun --bun tsc --noEmit` and static reasoning; leave E2E repro scripts out of the repo (keep them in `/tmp/opencode/` only if asked).
 
 ## Content State Invariants (metadata / content-loss regressions)
@@ -42,6 +43,7 @@ ShellController (#app, data-controller="shell", data-shell-editor-outlet="#edito
 - **Plain class controllers** receive Stimulus controllers as constructor args for cross-controller calls. They do NOT use `document.getElementById`.
 - **ShellController** is the composition root: finds child Stimulus controllers via `this.application.getControllerForElementAndIdentifier()`, creates plain class sub-controllers, wires event subscriptions, and runs the async initialization lifecycle.
 - **Event bus** (`appEvents`) is the primary decoupling mechanism. Controllers emit user-intents; other controllers subscribe.
+- **Prefer array payloads over twin events.** Do NOT add a second event (e.g. `FooRequested` + `FooManyRequested`) for the same action just to support a batch. Model the payload as an array and let a single operation be a one-element array. Examples: `SidebarDeleteRequested` carries `{ paths: string[] }` (delete one page = `paths: [path]`), `SidebarWeightsRequested` carries `{ weights: [...] }` (single reorder = one-element array). There is deliberately no `*ManyRequested` event and no separate `setPageWeight`/`deletePage` function — the array form handles both. Similarly prefer one batching backend endpoint (`POST /api/delete` taking `{ paths }`) over N single deletes.
 
 ### Stimulus Outlets
 

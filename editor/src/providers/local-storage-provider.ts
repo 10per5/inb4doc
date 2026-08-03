@@ -66,6 +66,13 @@ export class LocalStorageProvider implements ContentProvider {
     if (!keepImages) this.removeOrphanedImages()
   }
 
+  async deleteFiles(paths: string[]): Promise<void> {
+    for (const path of paths) {
+      storageService.removeEntity(STORE_FILES, this.fileId(path))
+    }
+    this.removeOrphanedImages()
+  }
+
   async moveFile(from: string, to: string): Promise<void> {
     const content = await this.readFile(from)
     if (content === null) throw new Error("Source not found")

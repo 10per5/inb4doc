@@ -161,20 +161,26 @@ export async function createNewItem(
   }
 }
 
-export async function deletePage(
+export async function deletePages(
   cacheService: FileSyncService,
-  pagePath: string,
+  pagePaths: string[],
   afterDelete: () => void
 ): Promise<boolean> {
+  if (pagePaths.length === 0) return false
+
+  const title = pagePaths.length === 1 ? "Delete page" : "Delete pages"
+  const what = pagePaths.length === 1
+    ? `Are you sure you want to delete "${pagePaths[0]}"?`
+    : `Are you sure you want to delete ${pagePaths.length} pages (${pagePaths.slice(0, 5).map(p => `"${p}"`).join(", ")}${pagePaths.length > 5 ? ` and ${pagePaths.length - 5} more` : ""})?`
   const confirmed = await confirmDialog({
-    title: "Delete page",
-    message: `Are you sure you want to delete "${pagePath}"? This operation must be flushed to take effect.`,
+    title,
+    message: `${what} This operation must be flushed to take effect.`,
     confirmLabel: "Delete",
     cancelLabel: "Cancel",
   })
   if (!confirmed) return false
 
-  cacheService.queueDelete(pagePath)
+  cacheService.queueDeleteMany(pagePaths)
   afterDelete()
   return true
 }
@@ -336,24 +342,6 @@ export async function movePage(
  *
  * `path` is the file that carries the weight — for a folder reorder that is the
  * folder's `_index` page.
- */
-export async function setPageWeight(
-  cacheService: FileSyncService,
-  path: string,
-  weight: number,
-  after: () => void
-): Promise<void> {
-  await queuePageWeight(cacheService, path, weight)
-  pendingOpsStore.save(cacheService.getPendingOps().all)
-  dirtyTrackingService.recompute()
-  appEvents.emit(AppEvent.MetaPanelReload)
-  after()
-}
-
-/**
- * Batch reorder (e.g. a weight exchange between two siblings). All weights are
- * queued first, then saved/recomputed/reloaded once so intermediate states
- * never hit disk or the sidebar.
  */
 export async function setPageWeights(
   cacheService: FileSyncService,

@@ -21,6 +21,8 @@ export interface ContentProvider {
   readFile(path: string): Promise<string | null>
   writeFile(path: string, content: string): Promise<void>
   deleteFile(path: string): Promise<void>
+  /** Bulk delete — providers that can batch deletes into one backend request should implement this. */
+  deleteFiles?(paths: string[]): Promise<void>
   moveFile(from: string, to: string): Promise<void>
   getServerTime(path: string): Promise<number | null>
   search?(query: string): Promise<SearchResult[]>

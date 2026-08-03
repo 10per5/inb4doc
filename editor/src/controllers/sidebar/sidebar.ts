@@ -27,10 +27,10 @@ export interface SidebarActions {
     snippetText?: string,
   ) => void;
   onNewItem: (parentPath: string, isFolder?: boolean) => void;
-  onDelete: (path: string) => void;
+  onDelete: (paths: string[]) => void;
+  onSelect: (path: string, isFolder?: boolean) => void;
   onRename: (path: string) => void;
   onMove: (from: string, to: string) => void;
-  onReorderWeight: (path: string, weight: number) => void;
   onReorderWeights: (weights: { path: string; weight: number }[]) => void;
   onChangeProvider: () => void;
 }
@@ -53,6 +53,7 @@ export interface RenderContext {
   pendingSets: PendingSets;
   pendingOps?: readonly PendingOp[];
   hideEmptyFolders?: boolean;
+  selectionMode?: boolean;
 }
 
 const LINE_COLORS = [
@@ -252,7 +253,7 @@ export function renderItems(
       return `
         <div class="nav-item${pendingClass(child.name, prefix, ctx.pendingSets)}" draggable="true" data-nav-path="${path}">
           <a href="${buildEditorUrl(ctx.basePath, path)}" class="nav-link ${active ? "active" : ""}${isHomePageFilename(child.name) && !prefix ? " nav-link-home" : ""}${pendingClass(child.name, prefix, ctx.pendingSets)}" data-action="click->sidebar#onNavigate">
-            ${fileIcon}${label}${pendingLabelSuffix(child.name, prefix, ctx.pendingSets, ctx.pendingOps)}
+            ${ctx.selectionMode ? `<span class="sidebar-checkbox"></span>` : fileIcon}${label}${pendingLabelSuffix(child.name, prefix, ctx.pendingSets, ctx.pendingOps)}
           </a>
            <button class="nav-more" data-action="click->sidebar#onShowMenu" tabindex="-1">${menuScale}</button>
         </div>`
@@ -329,7 +330,7 @@ export function renderItems(
       <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${dirPath}">
         <span class="nav-section-title depth-${depth}">
           <a href="${buildEditorUrl(ctx.basePath, indexPagePath)}" class="${dirLinkClasses}" data-nav-path="${indexPagePath}" data-action="click->sidebar#onNavigate">
-            ${dirIcon}${label}${fileCount > 0 ? `<span class="sidebar-count">${fileCount}</span>` : ""}${dirBadges.join("")}
+            ${ctx.selectionMode ? `<span class="sidebar-checkbox"></span>` : dirIcon}${label}${fileCount > 0 ? `<span class="sidebar-count">${fileCount}</span>` : ""}${dirBadges.join("")}
           </a>
           <span class="nav-section-toggle" data-action="click->sidebar#onToggleSection">
             ${navArrowDown}

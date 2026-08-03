@@ -71,6 +71,13 @@ export class FileSyncService {
     pendingOpsStore.save(this.pendingOps.all);
   }
 
+  queueDeleteMany(paths: string[]): void {
+    for (const path of paths) {
+      this.pendingOps.queueDelete(path);
+    }
+    pendingOpsStore.save(this.pendingOps.all);
+  }
+
   cancelCreate(path: string): void {
     this.pendingOps.cancelCreate(path);
     pendingOpsStore.save(this.pendingOps.all);
@@ -385,12 +392,23 @@ export class FileSyncService {
       return (order[a.type] ?? 1) - (order[b.type] ?? 1);
     });
 
+    const deleteOps: (PendingOp & { type: PendingOpType.Delete })[] = [];
+    const otherOps: PendingOp[] = [];
+
     for (const op of sorted) {
+      if (op.type === PendingOpType.Delete) {
+        deleteOps.push(op);
+      } else {
+        otherOps.push(op);
+      }
+    }
+
+    for (const op of otherOps) {
       try {
         await this.executeOp(op, flushedPaths);
-        if (op.type === PendingOpType.Delete) deletedPaths.push(op.path);
-        if (op.type === PendingOpType.Rename)
+        if (op.type === PendingOpType.Rename) {
           renamedPaths.set(op.from, op.to);
+        }
       } catch (error) {
         console.error(
           `Failed to execute pending op ${op.type} ${
@@ -401,9 +419,75 @@ export class FileSyncService {
       }
     }
 
+    if (deleteOps.length > 0) {
+      const deleted = await this.executeDeleteOps(deleteOps);
+      deletedPaths.push(...deleted);
+    }
+
     this.pendingOps.clear();
     pendingOpsStore.clear();
     return { deletedPaths, renamedPaths };
+  }
+
+  private async executeDeleteOps(
+    deleteOps: (PendingOp & { type: PendingOpType.Delete })[]
+  ): Promise<string[]> {
+    const provider = getProvider();
+    const providerId = activeProviderId();
+    const deletedPaths: string[] = [];
+
+    const targets: string[] = [];
+    for (const op of deleteOps) {
+      targets.push(op.path);
+      if (!op.path.endsWith("/_index")) {
+        targets.push(op.path + "/_index");
+      }
+    }
+
+    if (deleteOps.length > 1 && provider?.deleteFiles) {
+      try {
+        await provider.deleteFiles(targets);
+      } catch (error) {
+        console.error("Failed to execute bulk delete:", error);
+        for (const op of deleteOps) {
+          try {
+            await this.executeOp(op);
+            deletedPaths.push(op.path);
+          } catch (e) {
+            console.error(
+              `Failed to execute pending op delete ${op.path}:`,
+              e
+            );
+          }
+        }
+        return deletedPaths;
+      }
+      for (const op of deleteOps) {
+        storageService.removeEntity(STORE_FILES, `${providerId}/${op.path}`);
+        if (!op.path.endsWith("/_index")) {
+          storageService.removeEntity(
+            STORE_FILES,
+            `${providerId}/${op.path + "/_index"}`
+          );
+        }
+        treeStore.afterDelete(op.path);
+        deletedPaths.push(op.path);
+      }
+      return deletedPaths;
+    }
+
+    for (const op of deleteOps) {
+      try {
+        await this.executeOp(op);
+        deletedPaths.push(op.path);
+      } catch (error) {
+        console.error(
+          `Failed to execute pending op delete ${op.path}:`,
+          error
+        );
+      }
+    }
+    return deletedPaths;
   }
 
   private async cleanupOrphanedImages(

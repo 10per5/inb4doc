@@ -220,7 +220,7 @@ static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
             {
                 if (!first) out_children << ",\n";
                 first = false;
-                int w = d.weight >= 0 ? d.weight : 1000000;
+                int w = d.weight >= 0 ? d.weight : 0;
                 out_children << "      {\"name\": \"" << json_escape(d.name)
                              << "\", \"path\": \"" << json_escape(d.rel_path)
                              << "\", \"isDir\": true, \"weight\": " << w << "}";
@@ -232,7 +232,7 @@ static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
                 auto page_path = f.rel_path;
                 if (page_path.size() > 3)
                     page_path = page_path.substr(0, page_path.size() - 3);
-                int w = f.weight >= 0 ? f.weight : 1000000;
+                int w = f.weight >= 0 ? f.weight : 0;
                 out_children << "      {\"name\": \"" << json_escape(f.name)
                              << "\", \"path\": \"" << json_escape(page_path)
                              << "\", \"isDir\": false, \"weight\": " << w << "}";
@@ -305,6 +305,74 @@ saucer::scheme::response handle_app_request(
 
         return {.data = saucer::stash::from_str(result.str()),
                 .mime = "application/json", .status = 200};
+    }
+
+    // -- API: bulk delete --
+
+    if (path == "api/delete" && method == "POST")
+    {
+        std::string body(req.content().str());
+        auto paths = json_string_array(body, "paths");
+        if (paths.empty())
+            return {.data = saucer::stash::from_str("Missing paths"),
+                    .mime = "text/plain", .status = 400};
+
+        std::vector<std::string> doc_dirs;
+        for (auto &raw : paths)
+        {
+            auto p = raw;
+            if (p.empty())
+                continue;
+            if (p[0] == '/')
+                p = p.substr(1);
+            if (!p.ends_with(".md"))
+                p += ".md";
+
+            fs::path resolved;
+            if (!resolve_within(fs::path(cfg.content_root) / p, cfg.content_root, resolved))
+                continue;
+
+            fs::path parent_to_prune;
+            if (fs::is_directory(resolved))
+            {
+                fs::remove_all(resolved);
+                parent_to_prune = resolved.parent_path();
+            }
+            else if (fs::exists(resolved))
+            {
+                fs::remove(resolved);
+                parent_to_prune = resolved.parent_path();
+            }
+            else
+            {
+                // `/content/docs.md` for an existing folder `docs` → delete the dir.
+                auto dir_target = resolved;
+                dir_target = fs::path(dir_target.string().substr(0, dir_target.string().size() - 3));
+                fs::path dir_resolved;
+                if (!resolve_within(dir_target, cfg.content_root, dir_resolved) ||
+                    !fs::is_directory(dir_resolved))
+                    continue;
+                fs::remove_all(dir_resolved);
+                parent_to_prune = dir_resolved.parent_path();
+            }
+
+            auto doc_dir = fs::path(p).parent_path().string();
+            if (!doc_dir.empty())
+                doc_dirs.push_back(doc_dir);
+
+            while (parent_to_prune != fs::path(cfg.content_root) &&
+                   fs::is_empty(parent_to_prune))
+            {
+                fs::remove(parent_to_prune);
+                parent_to_prune = parent_to_prune.parent_path();
+            }
+        }
+
+        for (auto &dir : doc_dirs)
+            remove_orphaned_images(cfg, dir);
+
+        return {.data = saucer::stash::from_str("ok"),
+                .mime = "text/plain", .status = 200};
     }
 
     // -- API: move --

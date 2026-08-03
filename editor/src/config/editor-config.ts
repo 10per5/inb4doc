@@ -13,7 +13,7 @@ import {
   editorViewCtx,
   prosePluginsCtx,
 } from "@milkdown/kit/core";
-import { commonmark as _commonmark, wrapInHeadingInputRule } from "@milkdown/kit/preset/commonmark";
+import { commonmark as _commonmark, wrapInHeadingInputRule, headingKeymap } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
 import { nord } from "@milkdown/theme-nord";
 import { EditorState, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state";
@@ -108,6 +108,15 @@ export async function createEditor(
       ctx.set(rootCtx, container);
       ctx.set(defaultValueCtx, content);
       configureBlockEdit(ctx);
+
+      // Milkdown's DowngradeHeading binds Backspace/Delete at heading start to
+      // step the level down one `#` at a time (## → # → paragraph). Disable the
+      // shortcut; the replacement (heading → paragraph directly) lives in
+      // @/plugins/keyboard.
+      ctx.update(headingKeymap.key, (prev) => ({
+        ...prev,
+        DowngradeHeading: { ...prev.DowngradeHeading, shortcuts: [] },
+      }));
 
       ctx.update(dropIndicatorConfig.key, () => ({
         class: "inb4doc-drop-cursor",

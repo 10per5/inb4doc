@@ -31,6 +31,7 @@ export default class extends Controller {
       <div class="ctx-menu" style="top:${top};left:${left}">
         <div class="ctx-action" data-action="click->context-menu#${sidebarActions[SidebarAction.New]}">New…</div>
         <div class="ctx-action" data-action="click->context-menu#${sidebarActions[SidebarAction.Rename]}">Rename</div>
+        <div class="ctx-action" data-action="click->context-menu#${sidebarActions[SidebarAction.Select]}">Select</div>
         <div class="ctx-action action-delete" data-action="click->context-menu#${sidebarActions[SidebarAction.Delete]}">Delete</div>
       </div>
     `
@@ -50,8 +51,13 @@ export default class extends Controller {
     this.actions?.onRename(this.pagePath)
   }
 
+  onSelect() {
+    this.el.remove()
+    this.actions?.onSelect(this.pagePath, this.isFolder)
+  }
+
   onDelete() {
     this.el.remove()
-    this.actions?.onDelete(this.pagePath)
+    this.actions?.onDelete([this.pagePath])
   }
 }

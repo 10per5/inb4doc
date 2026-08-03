@@ -1,4 +1,4 @@
-import { createNewItem, deletePage, renamePage, movePage, setPageWeight, setPageWeights } from "@/services/editor-actions";
+import { createNewItem, deletePages, renamePage, movePage, setPageWeights } from "@/services/editor-actions";
 import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
 import { storageService } from "@/services/storage";
@@ -35,14 +35,9 @@ export class NavigationService {
       appEvents.on(AppEvent.SidebarNewItemRequested, ({ parentPath, isFolder }) =>
         createNewItem(this.cache, parentPath, (p) => this.navigate(p), () => this.loadSidebar(), isFolder),
       ),
-      appEvents.on(AppEvent.SidebarDeleteRequested, ({ path }) => this.deletePage(path)),
+      appEvents.on(AppEvent.SidebarDeleteRequested, ({ paths }) => this.deletePages(paths)),
       appEvents.on(AppEvent.SidebarRenameRequested, ({ path }) => this.renamePage(path)),
       appEvents.on(AppEvent.SidebarMoveRequested, ({ from, to }) => this.movePage(from, to)),
-      appEvents.on(AppEvent.SidebarWeightRequested, ({ path, weight }) =>
-        setPageWeight(this.cache, path, weight, () => {
-          this.loadSidebar();
-        }),
-      ),
       appEvents.on(AppEvent.SidebarWeightsRequested, ({ weights }) =>
         setPageWeights(this.cache, weights, () => {
           this.loadSidebar();
@@ -195,19 +190,21 @@ export class NavigationService {
     }
   }
 
-  async deletePage(pagePath: string): Promise<void> {
-    const indexPath = pagePath + "/" + HOME_PATH;
+  async deletePages(pagePaths: string[]): Promise<void> {
     const openPath = this.currentPath;
-    const isRecursive = openPath === pagePath || openPath.startsWith(pagePath + "/");
-    const openHadPendingCreate = isRecursive && this.cache.getPendingOps().all.some(
+    const affected = pagePaths.find(p => openPath === p || openPath.startsWith(p + "/"));
+    const openHadPendingCreate = !!affected && this.cache.getPendingOps().all.some(
       o => o.type === PendingOpType.Create && o.path === openPath
     );
-    await deletePage(this.cache, pagePath, () => {
-      pagesStore.clearPath(pagePath);
-      if (indexPath !== pagePath) pagesStore.clearPath(indexPath);
+    await deletePages(this.cache, pagePaths, () => {
+      for (const pagePath of pagePaths) {
+        pagesStore.clearPath(pagePath);
+        const indexPath = pagePath + "/" + HOME_PATH;
+        if (indexPath !== pagePath) pagesStore.clearPath(indexPath);
+      }
       if (openHadPendingCreate) {
-        appEvents.emit(AppEvent.NoFileView, { lastPath: pagePath });
-      } else if (isRecursive) {
+        appEvents.emit(AppEvent.NoFileView, { lastPath: affected });
+      } else if (affected) {
         updateEditorTint(this.editor.element as HTMLElement, openPath, this.cache.getPendingOps());
       }
       this.loadSidebar();

@@ -3,6 +3,7 @@ import { undo, redo } from "@milkdown/kit/prose/history"
 import { TextSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList } from "prosemirror-schema-list"
+import { appEvents, AppEvent } from "@/stores/app-events"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
 // after Home), Milkdown binds both Backspace and Delete to `liftFirstListItem`
@@ -77,6 +78,20 @@ function moveBlock(
   return true
 }
 
+// Milkdown's DowngradeHeading keymap steps heading level down one `#` at a
+// time on Backspace/Delete at the line start (## → # → paragraph). Skip the
+// intermediate passes: convert straight to a paragraph so the next press
+// deletes the line.
+function headingToParagraph(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty || $from.parentOffset !== 0) return false
+  if ($from.parent.type.name !== "heading") return false
+  return setBlockType(state.schema.nodes.paragraph)(state, dispatch)
+}
+
 export function createKeymap() {
   return keymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
@@ -102,7 +117,11 @@ export function createKeymap() {
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-ArrowUp": (state, dispatch) => moveBlock(state, dispatch, -1),
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
-    "Delete": (state, dispatch) => deleteAtListItemStart(state, dispatch),
+    "Backspace": (state, dispatch) => headingToParagraph(state, dispatch),
+    "Delete": (state, dispatch) => {
+      if (deleteAtListItemStart(state, dispatch)) return true
+      return headingToParagraph(state, dispatch)
+    },
   })
 }
 
@@ -130,3 +149,26 @@ export function createCodeBlockMovePlugin() {
     },
   })
 }
+
+// ── Global key bindings ──────────────────────────────────────────────
+// Single owner of document-level keydown listeners. All global key handling
+// is declared here as a static list; handlers emit app events so controllers
+// subscribe to intent instead of binding their own document listeners.
+
+const globalKeyBindings: ReadonlyArray<{
+  matches: (e: KeyboardEvent) => boolean
+  handler: (e: KeyboardEvent) => void
+}> = [
+  {
+    matches: (e) => e.key === "Escape",
+    handler: () => appEvents.emit(AppEvent.SidebarCancel),
+  },
+]
+
+function dispatchGlobalKey(event: KeyboardEvent): void {
+  for (const binding of globalKeyBindings) {
+    if (binding.matches(event)) binding.handler(event)
+  }
+}
+
+document.addEventListener("keydown", dispatchGlobalKey)

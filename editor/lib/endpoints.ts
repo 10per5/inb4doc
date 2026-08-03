@@ -522,6 +522,52 @@ function handleDeleteImage(req: Request, path: string, ctx: ServerContext): Resp
   });
 }
 
+async function handleBulkDelete(req: Request, ctx: ServerContext): Promise<Response | null> {
+  const { paths } = await req.json();
+  if (!Array.isArray(paths) || paths.length === 0) {
+    return new Response("Missing paths", { status: 400 });
+  }
+
+  const docDirs = new Set<string>();
+  for (const raw of paths) {
+    if (typeof raw !== "string" || !raw) continue;
+    let p = raw.replace(/^\//, "");
+    if (!p.endsWith(".md")) p += ".md";
+    const base = resolveWithin(join(ctx.contentDir, p), ctx.contentDir);
+    if (!base) continue;
+
+    if (existsSync(base) && !statSync(base).isDirectory()) {
+      rmSync(base, { force: true });
+    } else if (existsSync(base) && statSync(base).isDirectory()) {
+      rmSync(base, { recursive: true, force: true });
+    } else {
+      const dirPath = base.replace(/\.md$/, "");
+      if (!existsSync(dirPath) || !statSync(dirPath).isDirectory()) continue;
+      rmSync(dirPath, { recursive: true, force: true });
+    }
+
+    const dir = p.includes("/") ? p.substring(0, p.lastIndexOf("/")) : "";
+    if (dir) docDirs.add(dir);
+
+    let prune = dirname(base);
+    while (prune.startsWith(ctx.contentDir)) {
+      try {
+        const entries = readdirSync(prune);
+        if (entries.length > 0) break;
+        rmSync(prune, { force: true });
+      } catch {
+        break;
+      }
+      prune = dirname(prune);
+    }
+  }
+
+  for (const dir of docDirs) {
+    try { removeOrphanedImages(dir, ctx); } catch {}
+  }
+  return new Response("ok");
+}
+
 async function handleMove(req: Request, ctx: ServerContext): Promise<Response | null> {
   const { from, to } = await req.json();
   const src = resolveWithin(join(ctx.contentDir, from.replace(/^\//, "")), ctx.contentDir);
@@ -581,6 +627,10 @@ export async function handleApiRoutes(
 
   if (path === "/api/move" && req.method === "POST") {
     return handleMove(req, ctx);
+  }
+
+  if (path === "/api/delete" && req.method === "POST") {
+    return handleBulkDelete(req, ctx);
   }
 
   if (path === "/api/images" && req.method === "GET") {

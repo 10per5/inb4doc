@@ -14,6 +14,7 @@ export enum SidebarAction {
   New,
   Rename,
   Delete,
+  Select,
 }
 
 /**
@@ -39,4 +40,5 @@ export const sidebarActions: Record<SidebarAction, string> = {
   [SidebarAction.New]: "onNew",
   [SidebarAction.Rename]: "onRename",
   [SidebarAction.Delete]: "onDelete",
+  [SidebarAction.Select]: "onSelect",
 };

@@ -24,8 +24,8 @@ export enum AppEvent {
   SidebarDeleteRequested = "sidebar-delete-requested",
   SidebarRenameRequested = "sidebar-rename-requested",
   SidebarMoveRequested = "sidebar-move-requested",
-  SidebarWeightRequested = "sidebar-weight-requested",
   SidebarWeightsRequested = "sidebar-weights-requested",
+  SidebarCancel = "sidebar-cancel",
 
   // Dirty / sync
   EditorChanged = "editor-changed",
@@ -88,11 +88,11 @@ export interface AppEventPayloads {
   [AppEvent.SidebarReload]:         void
   [AppEvent.SidebarActive]:         { path: string }
   [AppEvent.SidebarNewItemRequested]: { parentPath: string; isFolder: boolean }
-  [AppEvent.SidebarDeleteRequested]:  { path: string }
+  [AppEvent.SidebarDeleteRequested]:  { paths: string[] }
   [AppEvent.SidebarRenameRequested]:  { path: string }
   [AppEvent.SidebarMoveRequested]:    { from: string; to: string }
-  [AppEvent.SidebarWeightRequested]:  { path: string; weight: number }
   [AppEvent.SidebarWeightsRequested]: { weights: { path: string; weight: number }[] }
+  [AppEvent.SidebarCancel]:         void
 
   [AppEvent.EditorChanged]:         { path: string; md: string }
   [AppEvent.OutlineChanged]:        void

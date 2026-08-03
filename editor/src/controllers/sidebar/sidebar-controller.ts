@@ -42,6 +42,8 @@ export default class extends Controller {
     "newPageBtn",
     "providerLabel",
     "hideEmptyToggle",
+    "deleteSelectedBtn",
+    "cancelSelectionBtn",
   ];
 
   declare readonly innerTarget: HTMLElement;
@@ -50,6 +52,8 @@ export default class extends Controller {
   declare readonly newPageBtnTarget: HTMLElement;
   declare readonly providerLabelTarget: HTMLElement;
   declare readonly hideEmptyToggleTarget: HTMLElement;
+  declare readonly deleteSelectedBtnTarget: HTMLButtonElement;
+  declare readonly cancelSelectionBtnTarget: HTMLButtonElement;
 
   private actions: SidebarActions | null = null;
   private tree: TreeIndex | null = null;
@@ -70,6 +74,8 @@ export default class extends Controller {
   private reorderIndicator: HTMLElement | null = null;
   private reorderBelow = "";
   private reorderAbove = "";
+  private selectionMode = false;
+  private selected = new Set<string>();
 
   connect() {
     this.unsubs.push(
@@ -81,6 +87,9 @@ export default class extends Controller {
       }),
       appEvents.on(AppEvent.SidebarActive, ({ path }) => {
         this.setActive(path);
+      }),
+      appEvents.on(AppEvent.SidebarCancel, () => {
+        if (this.selectionMode) this.exitSelection();
       })
     );
   }
@@ -99,14 +108,13 @@ export default class extends Controller {
           parentPath,
           isFolder: isFolder ?? false,
         }),
-      onDelete: (path) =>
-        appEvents.emit(AppEvent.SidebarDeleteRequested, { path }),
+      onDelete: (paths) =>
+        appEvents.emit(AppEvent.SidebarDeleteRequested, { paths }),
+      onSelect: (path, isFolder) => this.enterSelection(path, isFolder),
       onRename: (path) =>
         appEvents.emit(AppEvent.SidebarRenameRequested, { path }),
       onMove: (from, to) =>
         appEvents.emit(AppEvent.SidebarMoveRequested, { from, to }),
-      onReorderWeight: (path, weight) =>
-        appEvents.emit(AppEvent.SidebarWeightRequested, { path, weight }),
       onReorderWeights: (weights) =>
         appEvents.emit(AppEvent.SidebarWeightsRequested, { weights }),
       onChangeProvider: () => appEvents.emit(AppEvent.ProviderChangeRequested),
@@ -159,6 +167,7 @@ export default class extends Controller {
       pendingSets: buildPendingSets(pendingOps.all),
       pendingOps: pendingOps.all,
       hideEmptyFolders: this.hideEmptyFolders,
+      selectionMode: this.selectionMode,
     };
 
     if (this.hideEmptyToggleTarget) {
@@ -184,6 +193,8 @@ export default class extends Controller {
         if (p) this.itemByPath.set(p, el);
       }
     }
+
+    this.updateSelectionUI();
 
     this.renderLiveUrl(provider.name, current);
 
@@ -267,6 +278,16 @@ export default class extends Controller {
       ".nav-link"
     ) as HTMLAnchorElement;
     if (!navLink) return;
+
+    if (this.selectionMode) {
+      const path =
+        navLink.closest(".nav-item")?.getAttribute("data-nav-path") ||
+        navLink.closest(".nav-section")?.getAttribute("data-nav-path") ||
+        "";
+      if (path) this.toggleSelect(path);
+      return;
+    }
+
     const linkPath = navLink.getAttribute("data-nav-path");
     const itemPath = navLink
       .closest(".nav-item")
@@ -321,10 +342,17 @@ export default class extends Controller {
 
   onKeydown(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement).tagName;
+
     if (tag === "INPUT" || tag === "TEXTAREA") {
       if (e.key === "Escape" && e.target === this.searchTarget) {
         this.clearSearch();
       }
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      this.selectAll();
       return;
     }
 
@@ -360,11 +388,93 @@ export default class extends Controller {
         }
         break;
       case "Delete":
-        if (idx >= 0) {
-          e.preventDefault();
+        e.preventDefault();
+        if (this.selectionMode && this.selected.size > 0) {
+          this.deleteSelected();
+        } else if (idx >= 0) {
           this.deleteFocusedItem(items[idx]);
         }
         break;
+    }
+  }
+
+  // --- Multi-select delete ---
+
+  private enterSelection(path?: string, isFolder?: boolean): void {
+    this.selectionMode = true;
+    if (path) this.selected.add(path);
+    this.load();
+  }
+
+  private exitSelection(): void {
+    if (!this.selectionMode) return;
+    this.selectionMode = false;
+    this.selected.clear();
+    this.load();
+  }
+
+  private toggleSelect(path: string): void {
+    if (this.selected.has(path)) {
+      this.selected.delete(path);
+    } else {
+      this.selected.add(path);
+    }
+    this.updateSelectionUI();
+  }
+
+  onDeleteSelected() {
+    this.deleteSelected();
+  }
+
+  onCancelSelection() {
+    this.exitSelection();
+  }
+
+  private deleteSelected(): void {
+    if (this.selected.size === 0) return;
+    const paths = Array.from(this.selected);
+    this.exitSelection();
+    this.actions?.onDelete(paths);
+  }
+
+  private selectAll(): void {
+    this.selectionMode = true;
+    this.selected.clear();
+    for (const a of this.getVisibleItems()) {
+      const path =
+        a.closest(".nav-item")?.getAttribute("data-nav-path") ||
+        a.closest(".nav-section")?.getAttribute("data-nav-path") ||
+        "";
+      if (path) this.selected.add(path);
+    }
+    this.load();
+  }
+
+  private updateSelectionUI(): void {
+    this.innerTarget.classList.toggle("selection-mode", this.selectionMode);
+
+    for (const el of this.innerTarget.querySelectorAll<HTMLElement>(
+      ".nav-item, .nav-section"
+    )) {
+      const path = el.getAttribute("data-nav-path") || "";
+      el.classList.toggle("is-selected", this.selected.has(path));
+    }
+    for (const cb of this.innerTarget.querySelectorAll<HTMLElement>(
+      ".sidebar-checkbox"
+    )) {
+      const host = cb.closest<HTMLElement>(".nav-item, .nav-section");
+      const path = host?.getAttribute("data-nav-path") || "";
+      const checked = this.selected.has(path);
+      cb.textContent = checked ? "☑" : "☐";
+      cb.classList.toggle("is-checked", checked);
+    }
+
+    if (this.deleteSelectedBtnTarget) {
+      this.deleteSelectedBtnTarget.hidden = !this.selectionMode;
+      this.deleteSelectedBtnTarget.textContent = `Delete selected (${this.selected.size})`;
+    }
+    if (this.cancelSelectionBtnTarget) {
+      this.cancelSelectionBtnTarget.hidden = !this.selectionMode;
     }
   }
 
@@ -375,7 +485,7 @@ export default class extends Controller {
       link.closest(".nav-item")?.getAttribute("data-nav-path") ||
       link.closest(".nav-section")?.getAttribute("data-nav-path") ||
       "";
-    if (path) this.actions?.onDelete(path);
+    if (path) this.actions?.onDelete([path]);
   }
 
   private getVisibleItems(): HTMLAnchorElement[] {
@@ -708,14 +818,14 @@ export default class extends Controller {
       //    op (single-op undo) instead of piling on a second weight.
       const revert = this.findAtomicRevert(parentPath, self, above, below);
       if (revert) {
-        this.actions?.onReorderWeight(revert.path, revert.weight);
+        this.actions?.onReorderWeights([{ path: revert.path, weight: revert.weight }]);
         return;
       }
 
       // 2) Plain insert — there is integer room between the neighbors.
       const weight = this.computeReorderWeight(parentPath, fromPath, above, below);
       if (weight != null) {
-        this.actions?.onReorderWeight(this.weightPathOf(self), weight);
+        this.actions?.onReorderWeights([{ path: this.weightPathOf(self), weight }]);
         return;
       }
 
@@ -784,7 +894,7 @@ export default class extends Controller {
   /**
    * Atomic revert: when `below` has a pending weight op and `self` is being
    * dragged back into the slot it left behind, cancelling `below`'s op restores
-   * the original order exactly. Returns the op to emit (setPageWeight turns a
+   * the original order exactly. Returns the op to emit (setPageWeights turns a
    * `weight === original` request into op removal).
    */
   private findAtomicRevert(

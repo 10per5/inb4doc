@@ -108,6 +108,28 @@ export class FileSystemProvider implements ContentProvider {
     await this.removeOrphanedImages(dir)
   }
 
+  async deleteFiles(paths: string[]): Promise<void> {
+    const dirs = new Set<string>()
+    for (const path of paths) {
+      const parts = path.split("/").filter(Boolean)
+      if (parts.length === 0) continue
+      let current: FileSystemDirectoryHandle = this.dirHandle!
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      const fileName = parts[parts.length - 1] + ".md"
+      try {
+        await current.removeEntry(fileName)
+        await this.cleanupEmptyParents(current, parts.slice(0, -1))
+      } catch {}
+      const dir = parts.slice(0, -1).join("/")
+      if (dir) dirs.add(dir)
+    }
+    for (const dir of dirs) {
+      await this.removeOrphanedImages(dir)
+    }
+  }
+
   private async cleanupEmptyParents(dir: FileSystemDirectoryHandle, parts: string[]): Promise<void> {
     if (parts.length === 0) return
     for await (const _ of dir.values()) {
