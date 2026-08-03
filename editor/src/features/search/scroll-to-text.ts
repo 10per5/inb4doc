@@ -12,6 +12,48 @@ export interface TextMatch {
   offset: number
   rect: DOMRect | null
   length: number
+  highlightLength?: number
+  /** When set, the flash covers the whole element (e.g. a full heading) instead of a text span. */
+  element?: Element
+}
+
+/**
+ * Compute the current viewport rect for a match. This is a separate helper so
+ * the rect can be recomputed *after* scrolling (rect coords change as the
+ * `.book-layout` container scrolls). Pure DOM, no Milkdown.
+ */
+export function matchRect(match: TextMatch): DOMRect | null {
+  if (match.element) {
+    try {
+      const range = document.createRange()
+      range.selectNodeContents(match.element)
+      return range.getBoundingClientRect()
+    } catch {
+      return match.element.getBoundingClientRect()
+    }
+  }
+
+  const span = Math.max(match.highlightLength ?? match.length, 1)
+  const endOff = Math.min(
+    match.offset + span,
+    (match.node.textContent || "").length,
+  )
+  let rect: DOMRect | null = null
+  try {
+    const range = document.createRange()
+    range.setStart(match.node, match.offset)
+    range.setEnd(match.node, endOff)
+    rect = range.getBoundingClientRect()
+  } catch {
+    rect = null
+  }
+
+  if (!rect || rect.width === 0) {
+    const parent = match.node.parentElement
+    if (parent) rect = parent.getBoundingClientRect()
+  }
+
+  return rect
 }
 
 /** Find a text match in the ProseMirror DOM. Pure DOM, no Milkdown. */
@@ -26,26 +68,50 @@ export function findTextMatch(
   const result = findTextInProseMirror(q, matchIndex, snippetText)
   if (!result) return null
 
-  const endOff = Math.min(
-    result.offset + q.length,
-    (result.node.textContent || "").length,
+  const match: TextMatch = {
+    node: result.node,
+    offset: result.offset,
+    rect: null,
+    length: q.length,
+  }
+  match.rect = matchRect(match)
+  return match
+}
+
+function getFirstTextNode(root: Node): Text | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+  return walker.nextNode() ? (walker.currentNode as Text) : null
+}
+
+/** Find a heading in the ProseMirror DOM by level + exact text. Pure DOM, no Milkdown. */
+export function findHeadingTarget(
+  text: string,
+  level: number,
+): TextMatch | null {
+  const pm = document.querySelector(".ProseMirror")
+  if (!pm) return null
+  const target = text.trim()
+  if (!target) return null
+  const tag = `H${level}`
+  const el = Array.from(
+    pm.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"),
+  ).find(
+    (h) => h.tagName === tag && (h.textContent || "").trim() === target,
   )
-  let rect: DOMRect | null = null
-  try {
-    const range = document.createRange()
-    range.setStart(result.node, result.offset)
-    range.setEnd(result.node, endOff)
-    rect = range.getBoundingClientRect()
-  } catch {
-    rect = null
-  }
+  if (!el) return null
+  const node = getFirstTextNode(el)
+  if (!node) return null
 
-  if (!rect || rect.width === 0) {
-    const parent = result.node.parentElement
-    if (parent) rect = parent.getBoundingClientRect()
+  const match: TextMatch = {
+    node,
+    offset: 0,
+    rect: null,
+    length: 0,
+    element: el,
   }
+  match.rect = matchRect(match)
 
-  return { node: result.node, offset: result.offset, rect, length: q.length }
+  return match
 }
 
 /** Flash a highlight overlay at a position. Pure DOM. */

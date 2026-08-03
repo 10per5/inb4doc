@@ -95,10 +95,22 @@ export class PendingOps {
   }
 
   queueRename(from: string, to: string, content?: string): void {
+    const existing = this.ops.get(from)
+    if (existing?.type === PendingOpType.Create) {
+      this.ops.delete(from)
+      this.ops.set(to, { type: PendingOpType.Create, path: to, content: content ?? existing.content })
+      return
+    }
     this.ops.set(from, { type: PendingOpType.Rename, from, to, ...(content ? { content } : {}) })
   }
 
   queueMove(from: string, to: string, content?: string): void {
+    const existing = this.ops.get(from)
+    if (existing?.type === PendingOpType.Create) {
+      this.ops.delete(from)
+      this.ops.set(to, { type: PendingOpType.Create, path: to, content: content ?? existing.content })
+      return
+    }
     this.ops.set(from, { type: PendingOpType.Move, from, to, ...(content ? { content } : {}) })
   }
 

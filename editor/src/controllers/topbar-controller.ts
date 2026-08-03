@@ -355,7 +355,7 @@ export default class extends Controller {
         pendingText: "Press again",
         variant: "danger",
         small: true,
-        idleBadge: `(${formatBytes(bytes)})`,
+        idleBadge: bytes !== 0 ? `(${formatBytes(bytes)})` : undefined,
         onConfirm: () =>
           appEvents.emit(AppEvent.SingleDiscardRequested, {
             path: singleDirtyPath,

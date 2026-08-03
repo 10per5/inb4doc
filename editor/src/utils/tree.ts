@@ -3,8 +3,14 @@ import { PendingOpType, type PendingOp } from "@/entities/PendingOps"
 export type { PendingOp }
 export { PendingOpType }
 
-/** Default weight for files/dirs without frontmatter weight (JSON-serializable Infinity). */
-export const DEFAULT_WEIGHT = 1_000_000
+/** Default weight for files/dirs without frontmatter weight — files default to 0 (sort first). */
+export const DEFAULT_WEIGHT = 0
+
+/** Default spacing: new files get `last item's weight + WEIGHT_STEP`; reorders cap at this. */
+export const WEIGHT_STEP = 100
+
+/** Bump applied to the displaced sibling during a tight-slot weight exchange. */
+export const WEIGHT_EXCHANGE_SHIFT = 5
 
 export interface ChildInfo {
   name: string       // "guide.md" or "subdir"
@@ -27,6 +33,13 @@ export function createEmptyTreeIndex(): TreeIndex {
     folderWeights: new Map(),
     fileWeights: new Map(),
   }
+}
+
+function extractWeightFromContent(content: string): number | undefined {
+  const fm = content.match(/^---\n([\s\S]*?)\n---/)
+  if (!fm) return undefined
+  const wm = fm[1].match(/^weight:\s*(\d+)/m)
+  return wm ? parseInt(wm[1], 10) : undefined
 }
 
 function getParentPrefix(path: string): string {
@@ -90,6 +103,44 @@ export function addPathToTree(tree: TreeIndex, path: string): void {
   }
   upsertChildForPath(tree, path)
   ensureAncestorDirectories(tree, path)
+}
+
+/**
+ * Set a path's explicit ordering weight (re-sorts the tree).
+ *
+ * For a nested `_index` page the parent folder's weight follows it, so the
+ * folder (and its own sort position) reorders with its index page. `weight`
+ * `undefined` restores the default ordering for that path.
+ */
+export function setPathWeight(tree: TreeIndex, path: string, weight: number | undefined): void {
+  if (weight === undefined) {
+    tree.fileWeights.delete(path)
+  } else {
+    tree.fileWeights.set(path, weight)
+  }
+  upsertChildForPath(tree, path)
+
+  const lastSlash = path.lastIndexOf("/")
+  const base = lastSlash === -1 ? path : path.slice(lastSlash + 1)
+  if (base !== "_index" || lastSlash === -1) return
+
+  const dirPath = path.slice(0, lastSlash)
+  if (weight === undefined) {
+    tree.folderWeights.delete(dirPath)
+  } else {
+    tree.folderWeights.set(dirPath, weight)
+  }
+
+  const parent = (() => {
+    const s = dirPath.lastIndexOf("/")
+    return s === -1 ? "" : dirPath.slice(0, s)
+  })()
+  const children = tree.children.get(parent)
+  const dirEntry = children?.find(c => c.isDir && c.path === dirPath)
+  if (dirEntry) {
+    dirEntry.weight = weight ?? DEFAULT_WEIGHT
+    sortChildren(children!)
+  }
 }
 
 export function removePathFromTree(tree: TreeIndex, path: string): void {
@@ -243,9 +294,12 @@ export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): Tre
 
   for (const op of ops) {
     switch (op.type) {
-      case PendingOpType.Create:
+      case PendingOpType.Create: {
         addPathToTree(result, op.path)
+        const w = extractWeightFromContent(op.content)
+        if (w !== undefined) setPathWeight(result, op.path, w)
         break
+      }
       case PendingOpType.Delete:
         break
       case PendingOpType.Rename:
@@ -254,6 +308,13 @@ export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): Tre
         removePathFromTree(result, op.from)
         addPathToTree(result, op.to)
         break
+      case PendingOpType.Edit: {
+        const w = op.frontmatterPatch?.weight
+        if (typeof w === "number") {
+          setPathWeight(result, op.path, w)
+        }
+        break
+      }
     }
   }
   return result

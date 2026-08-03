@@ -29,7 +29,8 @@ export function openChangesDialog(
   onClose: () => void
 ) {
   const enriched = items.map((c) => {
-    const size = c.size ?? 0
+    if (c.size === undefined) return { ...c }
+    const size = c.size
     return {
       ...c,
       sizeStr: formatBytes(size),

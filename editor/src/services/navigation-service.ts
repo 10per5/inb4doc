@@ -1,4 +1,4 @@
-import { createNewItem, deletePage, renamePage, movePage } from "@/services/editor-actions";
+import { createNewItem, deletePage, renamePage, movePage, setPageWeight, setPageWeights } from "@/services/editor-actions";
 import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
 import { storageService } from "@/services/storage";
@@ -38,6 +38,16 @@ export class NavigationService {
       appEvents.on(AppEvent.SidebarDeleteRequested, ({ path }) => this.deletePage(path)),
       appEvents.on(AppEvent.SidebarRenameRequested, ({ path }) => this.renamePage(path)),
       appEvents.on(AppEvent.SidebarMoveRequested, ({ from, to }) => this.movePage(from, to)),
+      appEvents.on(AppEvent.SidebarWeightRequested, ({ path, weight }) =>
+        setPageWeight(this.cache, path, weight, () => {
+          this.loadSidebar();
+        }),
+      ),
+      appEvents.on(AppEvent.SidebarWeightsRequested, ({ weights }) =>
+        setPageWeights(this.cache, weights, () => {
+          this.loadSidebar();
+        }),
+      ),
     );
   }
 

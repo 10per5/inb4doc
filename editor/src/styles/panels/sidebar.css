@@ -193,6 +193,24 @@
   opacity: 0.5;
 }
 
+/* ── Sibling Reorder Indicator ────────────────────────────────────── */
+
+.sidebar-inner,
+.sidebar-inner .nav-section-children {
+  position: relative;
+}
+
+.drop-reorder-indicator {
+  position: absolute;
+  left: 0.2rem;
+  right: 0.2rem;
+  height: 2px;
+  background: var(--color-accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* ── Depth Variants ─────────────────────────────────────────────── */
 
 .sidebar-inner .nav-section-title.depth-1 {

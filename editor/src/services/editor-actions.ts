@@ -1,12 +1,27 @@
 import { confirmDialog, promptDialog, promptCreateDialog } from "@/controllers/dialog/dialog"
 import { serializeFrontmatter } from "@/utils/frontmatter"
 import type { MetaPanelData } from "@/entities/Frontmatter"
+import { Frontmatter } from "@/entities/Frontmatter"
 import { pagesStore } from "@/stores/page-store"
 import type { FileSyncService } from "@/services/file-sync-service"
 import { showNotification } from "@/components/notification/notification"
+import { appEvents, AppEvent } from "@/stores/app-events"
 import { treeStore } from "@/stores/tree-store"
+import { pendingOpsStore } from "@/stores/pending-ops-store"
+import { dirtyTrackingService } from "@/services/dirty-tracking-service"
 import { HOME_PATH, HOME_FILENAME, validateHugoSlug } from "@/utils/hugo-compat"
-import type { TreeIndex } from "@/utils/tree"
+import { WEIGHT_STEP, type TreeIndex } from "@/utils/tree"
+
+/** Weight for a new sibling: the folder's current last item + WEIGHT_STEP. */
+function nextFolderWeight(parentDir: string): number {
+  const entries = treeStore.getTree().children.get(parentDir)
+  if (!entries || entries.length === 0) return WEIGHT_STEP
+  let max = -Infinity
+  for (const e of entries) {
+    if (e.weight > max) max = e.weight
+  }
+  return max + WEIGHT_STEP
+}
 
 function dirIsEmpty(parentDir: string): boolean {
   const tree = treeStore.getTree()
@@ -111,7 +126,7 @@ export async function createNewItem(
       return
     }
 
-    const fmData: MetaPanelData = { title: result.name, weight: 100 }
+    const fmData: MetaPanelData = { title: result.name, weight: nextFolderWeight(parentDir) }
     const fmStr = serializeFrontmatter(fmData)
     const body = `# ${result.name}\n\n`
     const content = `---\n${fmStr}\n---\n\n${body}`
@@ -130,7 +145,7 @@ export async function createNewItem(
       showNotification(`"${fullPath}" already exists.`, { title: "Duplicate", type: "warning" })
       return
     }
-    const fmData: MetaPanelData = { title: result.name, weight: 100 }
+    const fmData: MetaPanelData = { title: result.name, weight: nextFolderWeight(parentDir) }
     const fmStr = serializeFrontmatter(fmData)
     const body = `# ${result.name}\n\n`
     const content = `---\n${fmStr}\n---\n\n${body}`
@@ -288,7 +303,7 @@ export async function createDirectory(
     return
   }
 
-  const fmData: MetaPanelData = { title: name, weight: 100 }
+  const fmData: MetaPanelData = { title: name, weight: nextFolderWeight(parentPath) }
   const fmStr = serializeFrontmatter(fmData)
   const body = `# ${name}\n\n`
   const content = `---\n${fmStr}\n---\n\n${body}`
@@ -312,4 +327,91 @@ export async function movePage(
   if (from === to) return
   cacheService.queueMove(from, to)
   afterMove()
+}
+
+/**
+ * Reorder a page by writing a new frontmatter `weight` through the pending-Edit
+ * pipeline (same shape the meta panel produces, so it appears in the pending
+ * changes dialog and flushes like any metadata edit).
+ *
+ * `path` is the file that carries the weight — for a folder reorder that is the
+ * folder's `_index` page.
+ */
+export async function setPageWeight(
+  cacheService: FileSyncService,
+  path: string,
+  weight: number,
+  after: () => void
+): Promise<void> {
+  await queuePageWeight(cacheService, path, weight)
+  pendingOpsStore.save(cacheService.getPendingOps().all)
+  dirtyTrackingService.recompute()
+  appEvents.emit(AppEvent.MetaPanelReload)
+  after()
+}
+
+/**
+ * Batch reorder (e.g. a weight exchange between two siblings). All weights are
+ * queued first, then saved/recomputed/reloaded once so intermediate states
+ * never hit disk or the sidebar.
+ */
+export async function setPageWeights(
+  cacheService: FileSyncService,
+  weights: { path: string; weight: number }[],
+  after: () => void
+): Promise<void> {
+  for (const w of weights) {
+    await queuePageWeight(cacheService, w.path, w.weight)
+  }
+  pendingOpsStore.save(cacheService.getPendingOps().all)
+  dirtyTrackingService.recompute()
+  appEvents.emit(AppEvent.MetaPanelReload)
+  after()
+}
+
+async function queuePageWeight(
+  cacheService: FileSyncService,
+  path: string,
+  weight: number
+): Promise<void> {
+  const page = pagesStore.getOrCreate(path)
+  const ops = cacheService.getPendingOps()
+
+  if (page.bodyState.body === undefined) {
+    const ok = await page.flushIn()
+    if (!ok && !ops.hasPendingCreate(path)) return
+  }
+
+  const data: MetaPanelData = {
+    ...(page.getFrontmatter() ?? ({ title: "" } as MetaPanelData)),
+    weight,
+  }
+  page.frontmatter = Frontmatter.fromMeta(data)
+
+  const createOp = ops.findCreate(path)
+  if (createOp) {
+    ops.queueCreate(path, page.reconstructContent() ?? "")
+  } else {
+    const editOp = ops.findEdit(path)
+    const originalWeight = page.originalFrontmatter?.weight
+    if (originalWeight === weight) {
+      if (editOp) {
+        const fp = { ...(editOp.frontmatterPatch ?? {}) }
+        delete fp.weight
+        if (Object.keys(fp).length === 0) {
+          if (editOp.patch === (page.bodyState.baseline ?? "")) {
+            ops.remove(path)
+          } else {
+            editOp.frontmatterPatch = undefined
+          }
+        } else {
+          editOp.frontmatterPatch = fp
+        }
+      }
+    } else if (editOp) {
+      editOp.frontmatterPatch = { ...(editOp.frontmatterPatch ?? {}), weight }
+    } else {
+      ops.queueEdit(path, page.bodyState.body ?? "", { weight })
+    }
+  }
 }

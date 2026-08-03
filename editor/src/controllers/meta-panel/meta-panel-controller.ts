@@ -77,8 +77,13 @@ export default class extends Controller {
     )
     if (!item) return
     const pos = Number(item.dataset.pos)
-    if (Number.isNaN(pos)) return
-    this.editorOutlet?.scrollToHeading(pos)
+    const level = Number(item.dataset.level)
+    const text = decodeURIComponent(item.dataset.text ?? "")
+    this.editorOutlet?.scrollToHeading(
+      text,
+      level,
+      Number.isNaN(pos) ? undefined : pos
+    )
   }
 
   private scheduleOutlineUpdate(): void {
@@ -95,7 +100,7 @@ export default class extends Controller {
     this.outlineTarget.innerHTML = outline
       .map(
         (item) =>
-          `<button type="button" class="meta-outline-item" data-pos="${item.pos}" style="--outline-level: ${item.level}">` +
+          `<button type="button" class="meta-outline-item" data-pos="${item.pos}" data-level="${item.level}" data-text="${encodeURIComponent(item.text)}" style="--outline-level: ${item.level}">` +
           `${escapeHtml(item.text)}</button>`
       )
       .join("")

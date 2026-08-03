@@ -16,6 +16,13 @@ export class ConfirmDialogController extends BaseDialogController {
 
   connect() {
     this.element.innerHTML = renderConfirmDialog(this.payloadValue)
+    // Default focus on Cancel (the safe action) so one <Tab> reaches Delete,
+    // where <Enter> confirms.
+    requestAnimationFrame(() => {
+      this.element
+        .querySelector<HTMLButtonElement>(".inb4doc-dialog-cancel")
+        ?.focus()
+    })
   }
 
   onEnter() {

@@ -11,7 +11,7 @@ import {
   computeLiveUrl,
   liveIcon,
 } from "./sidebar";
-import type { TreeIndex } from "@/utils/tree";
+import { WEIGHT_STEP, WEIGHT_EXCHANGE_SHIFT, type TreeIndex, type ChildInfo } from "@/utils/tree";
 import { ProviderType } from "@/providers/index";
 import {
   folder,
@@ -32,6 +32,7 @@ import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps } from "@/entities/PendingOps";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { getCurrentPath } from "@/utils/url";
+import { HOME_PATH } from "@/utils/hugo-compat";
 
 export default class extends Controller {
   static targets = [
@@ -52,6 +53,7 @@ export default class extends Controller {
 
   private actions: SidebarActions | null = null;
   private tree: TreeIndex | null = null;
+  private rawTree: TreeIndex | null = null;
   private collapsedSections = new Map<string, boolean>();
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private currentQuery = "";
@@ -60,6 +62,14 @@ export default class extends Controller {
   private itemByPath = new Map<string, HTMLElement>();
   private prevDirty = new Set<string>();
   private hideEmptyFolders = false;
+
+  private dragFromPath = "";
+  private dragFromParent = "";
+  private dragFromIsDir = false;
+  private dragContainer: HTMLElement | null = null;
+  private reorderIndicator: HTMLElement | null = null;
+  private reorderBelow = "";
+  private reorderAbove = "";
 
   connect() {
     this.unsubs.push(
@@ -95,6 +105,10 @@ export default class extends Controller {
         appEvents.emit(AppEvent.SidebarRenameRequested, { path }),
       onMove: (from, to) =>
         appEvents.emit(AppEvent.SidebarMoveRequested, { from, to }),
+      onReorderWeight: (path, weight) =>
+        appEvents.emit(AppEvent.SidebarWeightRequested, { path, weight }),
+      onReorderWeights: (weights) =>
+        appEvents.emit(AppEvent.SidebarWeightsRequested, { weights }),
       onChangeProvider: () => appEvents.emit(AppEvent.ProviderChangeRequested),
     };
   }
@@ -118,6 +132,7 @@ export default class extends Controller {
     const rawTree = treeStore.getTree();
     const pendingOps = new PendingOps(pendingOpsStore.load());
     const mergedTree = pendingOps.applyToTree(rawTree);
+    this.rawTree = rawTree;
     this.tree = mergedTree;
 
     const provider = getProvider();
@@ -344,7 +359,23 @@ export default class extends Controller {
           items[idx].click();
         }
         break;
+      case "Delete":
+        if (idx >= 0) {
+          e.preventDefault();
+          this.deleteFocusedItem(items[idx]);
+        }
+        break;
     }
+  }
+
+  private deleteFocusedItem(link: HTMLAnchorElement): void {
+    // Mirror the context-menu delete: page items use their `.nav-item` path,
+    // folder titles delete the folder (`.nav-section`), not its `_index` page.
+    const path =
+      link.closest(".nav-item")?.getAttribute("data-nav-path") ||
+      link.closest(".nav-section")?.getAttribute("data-nav-path") ||
+      "";
+    if (path) this.actions?.onDelete(path);
   }
 
   private getVisibleItems(): HTMLAnchorElement[] {
@@ -476,17 +507,64 @@ export default class extends Controller {
 
   // --- Drag and drop ---
 
+  private get canReorder(): boolean {
+    if (!this.dragFromPath) return false;
+    // Root home page is pinned first — reordering it is a no-op.
+    if (this.dragFromPath === HOME_PATH) return false;
+    // Folders without an `_index` page have no weight to write.
+    if (this.dragFromIsDir) {
+      return this.tree?.paths.has(`${this.dragFromPath}/${HOME_PATH}`) ?? false;
+    }
+    return true;
+  }
+
+  private parentPathOf(el: Element): string {
+    const container = el.parentElement;
+    if (!container || container === this.innerTarget) return "";
+    return (
+      container.closest<HTMLElement>(".nav-section")?.getAttribute("data-nav-path") ??
+      ""
+    );
+  }
+
+  private resetDragState(): void {
+    this.dragFromPath = "";
+    this.dragFromParent = "";
+    this.dragFromIsDir = false;
+    this.dragContainer = null;
+    this.clearReorderIndicator();
+    this.innerTarget
+      .querySelectorAll(".drag-over")
+      .forEach((el) => el.classList.remove("drag-over"));
+  }
+
+  private clearReorderIndicator(): void {
+    this.reorderBelow = "";
+    this.reorderAbove = "";
+    this.reorderIndicator?.remove();
+    this.reorderIndicator = null;
+  }
+
   onDragStart(e: DragEvent) {
     const target = e.target as HTMLElement;
     const navItem = target.closest(".nav-item");
     const navSection = target.closest(".nav-section");
 
+    this.resetDragState();
     if (navItem) {
       const pagePath = navItem.getAttribute("data-nav-path");
       e.dataTransfer?.setData("text/plain", "file:" + pagePath);
-    } else if (navSection && target === navSection) {
+      this.dragFromPath = pagePath || "";
+      this.dragFromParent = this.parentPathOf(navItem);
+      this.dragFromIsDir = false;
+      this.dragContainer = navItem.parentElement as HTMLElement;
+    } else if (navSection && !navItem) {
       const path = navSection.getAttribute("data-nav-path");
       e.dataTransfer?.setData("text/plain", "dir:" + path);
+      this.dragFromPath = path || "";
+      this.dragFromParent = this.parentPathOf(navSection);
+      this.dragFromIsDir = true;
+      this.dragContainer = navSection.parentElement as HTMLElement;
     }
   }
 
@@ -496,7 +574,10 @@ export default class extends Controller {
     if (navSection) {
       e.stopPropagation();
       e.preventDefault();
-      navSection.classList.add("drag-over");
+      if (navSection.getAttribute("data-nav-path") !== this.dragFromParent) {
+        navSection.classList.add("drag-over");
+        this.clearReorderIndicator();
+      }
     }
   }
 
@@ -514,25 +595,151 @@ export default class extends Controller {
 
   onDragOver(e: DragEvent) {
     const target = e.target as HTMLElement;
-    if (target.closest(".nav-section")) {
+    if (!this.dragFromPath) return;
+
+    const itemEl = target.closest(".nav-item");
+    const sectionEl = target.closest(".nav-section");
+    const sectionPath = sectionEl?.getAttribute("data-nav-path") ?? "";
+
+    // Hovering a folder that is NOT the source's own parent → move-into-folder.
+    if (sectionEl && sectionPath !== this.dragFromParent) {
       e.stopPropagation();
       e.preventDefault();
+      sectionEl.classList.add("drag-over");
+      this.clearReorderIndicator();
+      return;
     }
+
+    // Reorder zone: an item within the source's own sibling container, empty
+    // space of that container, or root empty space.
+    const itemInOwnParent =
+      itemEl != null && itemEl.parentElement === this.dragContainer;
+    const spaceInOwnParent =
+      itemEl == null &&
+      (sectionPath === this.dragFromParent ||
+        (!sectionEl && this.dragFromParent === ""));
+    if (!itemInOwnParent && !spaceInOwnParent) return;
+    if (!this.canReorder) return;
+
+    e.stopPropagation();
+    e.preventDefault();
+    this.updateReorderIndicator(e.clientY);
+  }
+
+  private updateReorderIndicator(clientY: number): void {
+    if (!this.dragContainer) return;
+    const siblings = Array.from(
+      this.dragContainer.querySelectorAll<HTMLElement>(
+        ":scope > .nav-item, :scope > .nav-section"
+      )
+    ).filter(
+      (el) => (el.getAttribute("data-nav-path") || "") !== this.dragFromPath
+    );
+
+    if (siblings.length === 0) {
+      this.clearReorderIndicator();
+      return;
+    }
+
+    let belowEl: HTMLElement | null = null;
+    for (const s of siblings) {
+      const r = s.getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) {
+        belowEl = s;
+        break;
+      }
+    }
+
+    const containerRect = this.dragContainer.getBoundingClientRect();
+    let top = 0;
+    if (belowEl) {
+      const r = belowEl.getBoundingClientRect();
+      top = r.top - containerRect.top;
+      const idx = siblings.indexOf(belowEl);
+      this.reorderAbove =
+        idx > 0 ? siblings[idx - 1].getAttribute("data-nav-path") || "" : "";
+      this.reorderBelow = belowEl.getAttribute("data-nav-path") || "";
+    } else {
+      const last = siblings[siblings.length - 1];
+      const r = last.getBoundingClientRect();
+      top = r.bottom - containerRect.top;
+      this.reorderAbove = last.getAttribute("data-nav-path") || "";
+      this.reorderBelow = "";
+    }
+
+    if (!this.reorderIndicator) {
+      this.reorderIndicator = document.createElement("div");
+      this.reorderIndicator.className = "drop-reorder-indicator";
+      this.dragContainer.appendChild(this.reorderIndicator);
+    }
+    this.reorderIndicator.style.top = `${top}px`;
+    this.reorderIndicator.style.display = "block";
   }
 
   onDragEnd() {
-    this.innerTarget
-      .querySelectorAll(".drag-over")
-      .forEach((el) => el.classList.remove("drag-over"));
+    this.resetDragState();
   }
 
   async onDrop(e: DragEvent) {
     const target = e.target as HTMLElement;
-    const navSection = target.closest(".nav-section");
-    if (!navSection) return;
-
     e.stopPropagation();
     e.preventDefault();
+
+    // Sibling reorder within the source's own parent.
+    if (this.dragFromPath && (this.reorderBelow || this.reorderAbove)) {
+      const fromPath = this.dragFromPath;
+      const parentPath = this.dragFromParent;
+      const abovePath = this.reorderAbove;
+      const belowPath = this.reorderBelow;
+      this.resetDragState();
+
+      const children = this.tree?.children.get(parentPath) ?? [];
+      const self = children.find((c) => c.path === fromPath);
+      if (!self) return;
+      const above = abovePath
+        ? children.find((c) => c.path === abovePath)
+        : undefined;
+      const below = belowPath
+        ? children.find((c) => c.path === belowPath)
+        : undefined;
+
+      // 1) Atomic revert — dragging a sibling back into the slot it vacated
+      //    when `below` was previously reordered here cancels `below`'s pending
+      //    op (single-op undo) instead of piling on a second weight.
+      const revert = this.findAtomicRevert(parentPath, self, above, below);
+      if (revert) {
+        this.actions?.onReorderWeight(revert.path, revert.weight);
+        return;
+      }
+
+      // 2) Plain insert — there is integer room between the neighbors.
+      const weight = this.computeReorderWeight(parentPath, fromPath, above, below);
+      if (weight != null) {
+        this.actions?.onReorderWeight(this.weightPathOf(self), weight);
+        return;
+      }
+
+      // 3) Tight-slot exchange — adjacent weights, so the dragged item swaps
+      //    into `below`'s slot and `below` bumps down by WEIGHT_EXCHANGE_SHIFT.
+      const exchanged = this.trySlotExchange(parentPath, self, above, below);
+      if (exchanged && exchanged.length > 0) {
+        this.actions?.onReorderWeights(exchanged);
+        return;
+      }
+
+      // 4) Packed siblings (no integer room) — re-normalize the contiguous run
+      //    so the drop actually takes effect with distinct weights.
+      const renormalized = this.computeRenormalize(parentPath, self, above, below);
+      if (renormalized && renormalized.length > 0) {
+        this.actions?.onReorderWeights(renormalized);
+      }
+      return;
+    }
+
+    this.resetDragState();
+
+    const navSection = target.closest(".nav-section");
+    if (!navSection) return;
     navSection.classList.remove("drag-over");
 
     const from = e.dataTransfer?.getData("text/plain");
@@ -567,5 +774,184 @@ export default class extends Controller {
       }
       this.actions?.onMove(fromPath, destPath);
     }
+  }
+
+  /** File that carries the weight — a folder reorders via its `_index` page. */
+  private weightPathOf(c: { path: string; isDir: boolean }): string {
+    return c.isDir ? `${c.path}/${HOME_PATH}` : c.path;
+  }
+
+  /**
+   * Atomic revert: when `below` has a pending weight op and `self` is being
+   * dragged back into the slot it left behind, cancelling `below`'s op restores
+   * the original order exactly. Returns the op to emit (setPageWeight turns a
+   * `weight === original` request into op removal).
+   */
+  private findAtomicRevert(
+    parentPath: string,
+    self: { path: string; weight: number },
+    above?: { path: string; weight: number },
+    below?: { path: string; isDir: boolean; weight: number }
+  ): { path: string; weight: number } | null {
+    if (!above || !below) return null;
+    const rawBelow = this.rawTree?.children
+      .get(parentPath)
+      ?.find((c) => c.path === below.path);
+    if (!rawBelow) return null;
+    const rawW = rawBelow.weight;
+    // `below` must have a pending weight op (merged weight differs from disk).
+    if (rawW === below.weight) return null;
+    // Reverting `below` must place `self` directly above it.
+    if (!(above.weight < self.weight && self.weight < rawW)) return null;
+    // No other sibling may sit between `self` and `below`'s reverted position.
+    const between = (this.tree?.children.get(parentPath) ?? []).some(
+      (c) =>
+        c.path !== self.path &&
+        c.path !== below.path &&
+        c.weight > self.weight &&
+        c.weight < rawW
+    );
+    if (between) return null;
+    return { path: this.weightPathOf(below), weight: rawW };
+  }
+
+  private computeReorderWeight(
+    parentPath: string,
+    fromPath: string,
+    above?: ChildInfo,
+    below?: ChildInfo
+  ): number | null {
+    const tree = this.tree;
+    if (!tree) return null;
+    const children = tree.children.get(parentPath) ?? [];
+    const self = children.find((c) => c.path === fromPath);
+    if (!self) return null;
+
+    let weight: number;
+    if (below && above) {
+      const gap = below.weight - above.weight;
+      if (gap <= 1) {
+        // No integer room between packed siblings → slot exchange / re-normalization.
+        return null;
+      }
+      // Prefer round steps (10, then 5, then 1), centered on the slot, capped at
+      // WEIGHT_STEP so huge gaps don't balloon the weight values.
+      const offset = Math.min(Math.floor(gap / 2), WEIGHT_STEP);
+      let candidate = 0;
+      for (const step of [10, 5, 1]) {
+        candidate = Math.floor(offset / step) * step;
+        if (candidate >= 1) break;
+      }
+      weight = above.weight + candidate;
+    } else if (below) {
+      // Dropped at the top of the list — anchor at 0 (Hugo: lower weight = first).
+      weight = below.weight === 0 ? below.weight - 1 : 0;
+    } else if (above) {
+      weight = above.weight + WEIGHT_STEP;
+    } else {
+      return null;
+    }
+
+    return weight === self.weight ? null : weight;
+  }
+
+  /**
+   * Tight-slot exchange: neighbors are adjacent (gap of exactly 1), so nothing
+   * can be inserted between them. The dragged item takes `below`'s weight and
+   * `below` shifts down by WEIGHT_EXCHANGE_SHIFT, keeping the order while
+   * preserving distinct weights. Returns null when the shift would collide with
+   * the next sibling, when weights tie, or when the dragged item already sits at
+   * the target weight (revert / re-normalize handles those).
+   */
+  private trySlotExchange(
+    parentPath: string,
+    self: ChildInfo,
+    above?: ChildInfo,
+    below?: ChildInfo
+  ): { path: string; weight: number }[] | null {
+    if (!above || !below) return null;
+    const gap = below.weight - above.weight;
+    if (gap !== 1) return null;
+    if (below.weight === self.weight) return null;
+    const shifted = below.weight + WEIGHT_EXCHANGE_SHIFT;
+    const collide = (this.tree?.children.get(parentPath) ?? []).some(
+      (c) =>
+        c.path !== below.path &&
+        c.path !== self.path &&
+        c.weight > below.weight &&
+        c.weight <= shifted
+    );
+    if (collide) return null;
+    return [
+      { path: this.weightPathOf(self), weight: below.weight },
+      { path: this.weightPathOf(below), weight: shifted },
+    ];
+  }
+
+  /**
+   * Packed siblings (weights are consecutive integers, so no insert point
+   * exists): re-number the contiguous run around the slot so the dragged item
+   * lands exactly where dropped and the displaced siblings shift by one.
+   * Returns one weight op per sibling whose weight changes.
+   */
+  private computeRenormalize(
+    parentPath: string,
+    self: ChildInfo,
+    above?: ChildInfo,
+    below?: ChildInfo
+  ): { path: string; weight: number }[] | null {
+    if (!above || !below) return null;
+    const children = (this.tree?.children.get(parentPath) ?? [])
+      .slice()
+      .sort(
+        (a, b) => a.weight - b.weight || a.name.localeCompare(b.name)
+      );
+    const lo = Math.min(above.weight, below.weight);
+    const hi = Math.max(above.weight, below.weight);
+    if (hi - lo > 1) return null;
+
+    // Maximal contiguous integer run containing the insertion slot.
+    let min = lo;
+    let max = hi;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const c of children) {
+        if (c.weight === min - 1) {
+          min = c.weight;
+          changed = true;
+        } else if (c.weight === max + 1) {
+          max = c.weight;
+          changed = true;
+        }
+      }
+    }
+
+    const block = children.filter((c) => c.weight >= min && c.weight <= max);
+    // Final order: the block in current order, with `self` inserted right after `above`.
+    const finalOrder: ChildInfo[] = [];
+    let inserted = false;
+    for (const c of block) {
+      if (c.path === self.path) continue;
+      finalOrder.push(c);
+      if (c.path === above.path && !inserted) {
+        finalOrder.push(self);
+        inserted = true;
+      }
+    }
+    if (!inserted) {
+      const idx = finalOrder.findIndex((c) => c.path === above.path);
+      finalOrder.splice(idx + 1, 0, self);
+    }
+
+    const ops: { path: string; weight: number }[] = [];
+    for (let i = 0; i < finalOrder.length; i++) {
+      const w = min + i;
+      const c = finalOrder[i];
+      if (w !== c.weight) {
+        ops.push({ path: this.weightPathOf(c), weight: w });
+      }
+    }
+    return ops.length > 0 ? ops : null;
   }
 }

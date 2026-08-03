@@ -30,6 +30,8 @@ export interface SidebarActions {
   onDelete: (path: string) => void;
   onRename: (path: string) => void;
   onMove: (from: string, to: string) => void;
+  onReorderWeight: (path: string, weight: number) => void;
+  onReorderWeights: (weights: { path: string; weight: number }[]) => void;
   onChangeProvider: () => void;
 }
 

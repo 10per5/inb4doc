@@ -200,6 +200,7 @@ export class FileSyncService {
       this.pendingOps.cancelEdit(path);
       pendingOpsStore.save(this.pendingOps.all);
       this.recomputeDirty();
+      appEvents.emit(AppEvent.FlushComplete);
       showNotification("File saved", { type: "success" });
     } else {
       showNotification("Failed to save", { type: "danger" });
@@ -248,6 +249,7 @@ export class FileSyncService {
       page.setBody(bodyToWrite);
       await page.flushOut(imageUrlMap);
       this.pendingOps.cancelEdit(path);
+      treeStore.afterWrite(path, page.reconstructContent());
     }
 
     const flushedPaths = new Set(dirtyPaths);
@@ -434,6 +436,7 @@ export class FileSyncService {
     repo.clearPath(pagePath);
     this.recomputeDirty();
     this.editor.invalidateState(pagePath);
+    appEvents.emit(AppEvent.SidebarReload);
 
     if (pagePath === this.currentPath) {
       await this.reloadCurrentFromDisk(pagePath);
@@ -662,7 +665,9 @@ export class FileSyncService {
             kind: PendingOpType.Edit,
             currentPath: op.path === this.currentPath,
             md,
-            size: changeSize,
+            // Zero body delta (e.g. metadata-only weight change) can't be sized
+            // accurately — omit so the dialog doesn't show a misleading "+0 B".
+            size: changeSize === 0 ? undefined : changeSize,
           });
           break;
         }

@@ -28,8 +28,11 @@ import {
 } from "@/services/conflict-resolver";
 import {
   findTextMatch,
+  findHeadingTarget,
+  matchRect,
   flashHighlight,
   centerOnRect,
+  type TextMatch,
 } from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
 
@@ -329,7 +332,34 @@ export class EditorController extends Controller {
     if (!this.editor) return;
     const match = findTextMatch(query, matchIndex, snippetText);
     if (!match) return;
+    this.jumpToProseMirror(match);
+  }
 
+  /**
+   * Jump to a heading by re-locating it in the live DOM (same accurate
+   * reference technique as Ctrl+F search). `fallbackPos` is a stored doc
+   * position used only when the heading can't be found in the DOM.
+   */
+  scrollToHeading(text: string, level: number, fallbackPos?: number): void {
+    if (!this.editor) return;
+    const match = findHeadingTarget(text, level);
+    if (match) {
+      this.jumpToProseMirror(match);
+      return;
+    }
+    if (fallbackPos == null) return;
+    this.editor.action((ctx) => {
+      const view = ctx.get(editorContext.editorViewCtx);
+      const doc = view.state.doc;
+      if (fallbackPos < 0 || fallbackPos > doc.content.size) return;
+      const tr = view.state.tr.setSelection(
+        editorContext.TextSelection.near(doc.resolve(fallbackPos + 1)),
+      );
+      view.dispatch(tr.scrollIntoView());
+    });
+  }
+
+  private jumpToProseMirror(match: TextMatch): void {
     const proseMirror = document.querySelector(".ProseMirror");
     if (proseMirror) (proseMirror as HTMLElement).focus();
 
@@ -342,14 +372,20 @@ export class EditorController extends Controller {
           editorContext.TextSelection.create(
             view.state.doc,
             pos,
-            pos + match.length
-          )
+            pos + match.length,
+          ),
         );
         view.dispatch(tr);
       });
       if (match.rect) {
-        centerOnRect(match.rect);
-        flashHighlight(match.rect);
+        const initialRect = match.rect;
+        centerOnRect(initialRect);
+        // The scroll changes viewport coords, so recompute the rect after it
+        // settles and flash the target at its real on-screen position.
+        requestAnimationFrame(() => {
+          const rect = matchRect(match) ?? initialRect;
+          flashHighlight(rect);
+        });
       }
     });
   }
@@ -366,21 +402,6 @@ export class EditorController extends Controller {
         }
       });
       return items;
-    });
-  }
-
-  scrollToHeading(pos: number): void {
-    if (!this.editor) return;
-    const proseMirror = document.querySelector(".ProseMirror");
-    if (proseMirror) (proseMirror as HTMLElement).focus();
-    this.editor.action((ctx) => {
-      const view = ctx.get(editorContext.editorViewCtx);
-      const doc = view.state.doc;
-      if (pos < 0 || pos > doc.content.size) return;
-      const tr = view.state.tr.setSelection(
-        editorContext.TextSelection.create(doc, pos)
-      );
-      view.dispatch(tr.scrollIntoView());
     });
   }
 

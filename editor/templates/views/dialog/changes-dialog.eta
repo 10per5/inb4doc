@@ -9,7 +9,9 @@
         <div class="inb4doc-changes-header" data-action="click->changes-dialog#togglePreview" data-idx="<%= idx %>">
           <div class="inb4doc-changes-path" style="background:<%= data.currentPath ? '#eef4f9' : '' %>">
             <span style="flex:1"><%= data.label %></span>
+            <% if (data.sizeStr) { %>
             <span style="color:<%= data.sizeColor %>;font-size:0.8rem"><%= data.sizeStr %></span>
+            <% } %>
           </div>
           <button class="inb4doc-btn inb4doc-btn-primary" style="font-size:0.8rem;padding:0.2rem 0.6rem"
             data-op-path="<%= data.path %>"

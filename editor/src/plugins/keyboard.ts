@@ -4,6 +4,26 @@ import { TextSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList } from "prosemirror-schema-list"
 
+// When the caret sits at the start of a list item's first textblock (e.g.
+// after Home), Milkdown binds both Backspace and Delete to `liftFirstListItem`
+// which runs joinBackward — so Delete removes the list structure instead of
+// deleting the next character. Our keymap plugin runs before Milkdown's
+// internal keymap, so intercept Delete here and delete the char forward.
+function deleteAtListItemStart(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty || $from.parentOffset !== 0) return false
+  if ($from.parent.content.size === 0) return false
+  const parentItem = $from.node(-1)
+  if (!parentItem || parentItem.type.name !== "list_item") return false
+  if (dispatch) {
+    dispatch(state.tr.delete($from.pos, $from.pos + 1).scrollIntoView())
+  }
+  return true
+}
+
 function moveBlock(
   state: any,
   dispatch: any,
@@ -82,6 +102,7 @@ export function createKeymap() {
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-ArrowUp": (state, dispatch) => moveBlock(state, dispatch, -1),
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
+    "Delete": (state, dispatch) => deleteAtListItemStart(state, dispatch),
   })
 }
 

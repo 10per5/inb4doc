@@ -1,4 +1,5 @@
 import type { MetaPanelData } from "@/entities/Frontmatter"
+import { DEFAULT_WEIGHT } from "@/utils/tree"
 
 export function parseFrontmatter(raw: string): MetaPanelData {
   const data: MetaPanelData = { title: "" }
@@ -6,8 +7,10 @@ export function parseFrontmatter(raw: string): MetaPanelData {
     const m = line.match(/^(\w+):\s*(.*)/)
     if (m) {
       const val = m[2].trim()
-      if (m[1] === "weight") data.weight = parseInt(val) || undefined
-      else data[m[1]] = val
+      if (m[1] === "weight") {
+        const w = parseInt(val, 10)
+        data.weight = Number.isNaN(w) ? DEFAULT_WEIGHT : w
+      } else data[m[1]] = val
     }
   }
   return data

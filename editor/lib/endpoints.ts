@@ -129,7 +129,8 @@ interface FlatTreeResult {
   folderWeights: Record<string, number>;
 }
 
-const DEFAULT_WEIGHT = 1_000_000;
+/** Weight for files/dirs without frontmatter weight — files default to 0 (sort first). */
+const DEFAULT_WEIGHT = 0;
 
 function buildTree(
   dir: string,

@@ -4,6 +4,7 @@
 
 - **Never modify `node_modules/`** — use custom Milkdown plugins or project source files instead.
 - **Never create postinstall/patch scripts** that modify node_modules at install time.
+- **Do not run Playwright/E2E browser tests unless the user explicitly asks.** Verify changes with `bun --bun tsc --noEmit` and static reasoning; leave E2E repro scripts out of the repo (keep them in `/tmp/opencode/` only if asked).
 
 ## Content State Invariants (metadata / content-loss regressions)
 
