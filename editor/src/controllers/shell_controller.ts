@@ -8,10 +8,10 @@
 
 import { Controller } from "@hotwired/stimulus"
 import type { Editor } from "@milkdown/kit/core"
-import { openPrefsDialog, applyThemeFromPrefs } from "@/controllers/dialog/prefs-dialog";
+import { applyThemeFromPrefs } from "@/services/theme";
 import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";
-import { EditorController } from "@/controllers/editor-controller";
+import type { EditorController } from "@/controllers/editor-controller";
 import { FileSyncService } from "@/services/file-sync-service";
 import { ViewController } from "@/services/view-controller";
 import { NavigationService } from "@/services/navigation-service";
@@ -22,8 +22,6 @@ import { pagesStore } from "@/stores/page-store";
 import { HOME_PATH, isRootPath, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import { exportToZip, pickAndParseZip } from "@/utils/zip";
 import type { ZipEntry, ZipFileEntry } from "@/utils/zip";
-import { openImportZipDialog } from "@/controllers/dialog/import-zip-dialog";
-import { openImageManagerDialog } from "@/controllers/dialog/image-manager-dialog";
 import { showNotification } from "@/components/notification/notification";
 import { prefsStore } from "@/stores/preferences-store";
 import { getCurrentPath, replacePath } from "@/utils/url";
@@ -93,7 +91,8 @@ export default class extends Controller {
     this.unsubs.push(
       appEvents.on(AppEvent.FlushComplete, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.ModulesSwapped, () => this.nav.loadSidebar()),
-      appEvents.on(AppEvent.PrefsOpened, () => {
+      appEvents.on(AppEvent.PrefsOpened, async () => {
+        const { openPrefsDialog } = await import("@/controllers/dialog/prefs-dialog")
         openPrefsDialog({
           onStickyToolbarChange: (sticky) => this.toolbarStore!.setStickyPreference(sticky),
         })
@@ -104,7 +103,10 @@ export default class extends Controller {
         exportToZip().then(() => this.nav.loadSidebar())
       }),
       appEvents.on(AppEvent.LoadRequested, () => this.handleLoadZip()),
-      appEvents.on(AppEvent.ImageManagerOpened, () => openImageManagerDialog()),
+      appEvents.on(AppEvent.ImageManagerOpened, async () => {
+        const { openImageManagerDialog } = await import("@/controllers/dialog/image-manager-dialog")
+        openImageManagerDialog()
+      }),
       appEvents.on(AppEvent.SidebarToggle, () => this.uiService.toggleSidebar()),
       appEvents.on(AppEvent.MetaPanelToggle, () => this.uiService.toggleMetaPanel()),
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
@@ -254,6 +256,7 @@ export default class extends Controller {
       exists: existing.has(e.relPath.replace(/\.md$/, "")),
     }))
 
+    const { openImportZipDialog } = await import("@/controllers/dialog/import-zip-dialog")
     openImportZipDialog(
       entries,
       async (result) => {

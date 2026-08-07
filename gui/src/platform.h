@@ -13,3 +13,9 @@ std::string default_editor_root();
 
 /// Platform-standard writable data directory for inb4doc (e.g. ~/.local/share/inb4doc).
 std::string default_data_dir();
+
+/// The writable copy of the editor maintained by the fetch updater:
+/// default_data_dir()/editor. Empty when there is no data directory.
+/// scheme.cpp serves this before the read-only install shell; the updater
+/// bridge writes the live editor here (Part C.1 W3).
+std::string default_editor_data_dir();

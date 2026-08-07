@@ -1,2 +1,6 @@
 self.IMPORTANT = <%~ JSON.stringify(it.important) %>;
 self.CHUNKS = <%~ JSON.stringify(it.chunks) %>;
+self.APP_HASH = <%~ JSON.stringify(it.appHash) %>;
+self.INDEX_HASH = <%~ JSON.stringify(it.indexHash) %>;
+self.AFFECTED_BY = <%~ JSON.stringify(it.affectedBy) %>;
+self.COLD_ON_CHANGE = <%~ JSON.stringify(it.coldOnChange) %>;

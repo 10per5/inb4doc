@@ -1,0 +1,168 @@
+// updater-core.eta — transport-agnostic updater pieces, shared verbatim by the
+// Service Worker (inlined into sw.js via include) and the page/desktop/mobile
+// updaters (compiled to src/eta/updater-core.ts by lib/build/templates.ts).
+//
+// This file is pure JavaScript with NO Eta template tags and NO top-level
+// exports: the SW inlines it as-is, and the build emits the same source with an
+// export line appended. Keep it free of `self`/`window`/`document` (only the
+// fetch API, shared by every transport) so the same code runs in the SW, the
+// page, and the GuiDesktop/GuiMobile transports (Part E).
+
+function basenameOf(url) {
+  return url.split("/").pop() ?? url;
+}
+
+// Byte-counted GET of a single file into the given storage backend.
+// onTotal(size) fires once the file's expected size is known (before streaming
+// starts); onProgress(received) fires per chunk with the bytes actually
+// transferred so far. Returns the total bytes received.
+async function updaterFetch(url, storage, onTotal, onProgress) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Failed to fetch " + url);
+  const known =
+    Number(response.headers.get("content-length")) || (await storage.sizeOf(url));
+  if (known > 0) onTotal(known);
+  if (!response.body) {
+    await storage.put(url, response.clone());
+    return known;
+  }
+  const reader = response.body.getReader();
+  const parts = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    received += value.byteLength;
+    onProgress(received);
+  }
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const part of parts) {
+    body.set(part, offset);
+    offset += part.byteLength;
+  }
+  await storage.put(url, new Response(body, response));
+  return received;
+}
+
+// Transfer a URL list into `storage`, counting real bytes as they stream:
+// `loaded` is the cumulative streamed total, `total` the sum of every size known
+// so far (a file's content-length, or its previously cached copy's size). Files
+// of unknown size don't count toward the denominator until their GET reveals
+// one; if nothing is known yet the caller's UI falls back to an indeterminate
+// loader. `skipCached` skips URLs already on the `precached` set — content-hashed
+// chunk URLs are immutable, so a listed URL is byte-identical to the cached copy
+// and only genuinely new/changed files are fetched and counted. A missing asset
+// never aborts the loop. onProgress(loaded, total, done) fires once per file
+// after its transfer (done=true) and per chunk of bytes during streaming
+// (done=false). Returns { total, loaded }.
+async function updaterTransfer(urls, opts) {
+  const { storage, precached, skipCached = false, onProgress } = opts || {};
+  let total = 0;
+  let loaded = 0;
+  for (const url of urls) {
+    if (skipCached && precached?.has(url)) continue;
+    try {
+      loaded += await updaterFetch(
+        url,
+        storage,
+        (size) => {
+          total += size;
+        },
+        (received) => onProgress?.(loaded + received, total, false)
+      );
+    } catch (_) {
+      // A missing asset must not abort the transfer; the denominator just
+      // keeps whatever sizes it already knows.
+    }
+    onProgress?.(loaded, total, true);
+  }
+  return { total, loaded };
+}
+
+// Version guard shared by every transport: drop an activation older than one
+// already applied. (buildVersion is seeded from the previous sw.js on disk, so
+// it stays monotonic across dev-server restarts.)
+function isStaleVersion(version, appliedVersion) {
+  return appliedVersion !== null && version <= appliedVersion;
+}
+
+// Classify a new build manifest against the modules the page actually executed.
+//   next = { appHash, indexHash, chunks, chunkMap, affectedBy, coldOnChange }
+//   opts = { loadedNames, bootedAppHash, bootedIndexHash, sameGeneration }
+// Returns:
+//   entryChanged — "app" when app.js/__farm_runtime.js (appHash) changed since
+//                  boot, "shell" when index.html (indexHash) changed, or "" when
+//                  neither did. Neither is swappable: reload.
+//   coldChanged  — the name of a changed chunk that is a stateful singleton (or
+//                  whose import closure can't be re-executed): reload.
+//   hot          — { changed, toImport, toRemount, nameToUrl, idForChunk } when
+//                  the change is swappable, or null for a no-op activation
+//                  (every chunk already executed) which needs no swap at all.
+function updaterDiff(next, opts) {
+  const {
+    appHash, indexHash, chunks = [], chunkMap = {},
+    affectedBy = {}, coldOnChange = {},
+  } = next || {};
+  const {
+    loadedNames = [], bootedAppHash, bootedIndexHash, sameGeneration = false,
+  } = opts || {};
+
+  if (!sameGeneration && bootedAppHash && appHash && appHash !== bootedAppHash) {
+    return { entryChanged: "app", coldChanged: null, hot: null };
+  }
+  if (!sameGeneration && bootedIndexHash && indexHash && indexHash !== bootedIndexHash) {
+    return { entryChanged: "shell", coldChanged: null, hot: null };
+  }
+
+  const loaded = new Set(loadedNames);
+  const entryNames = new Set(["app.js", "__farm_runtime.js"]);
+  const nameToUrl = {};
+  for (const url of chunks) nameToUrl[basenameOf(url)] = url;
+  const idForChunk = {};
+  for (const id of Object.keys(chunkMap)) idForChunk[basenameOf(chunkMap[id])] = id;
+
+  // Changed chunks = non-entry chunks the page hasn't executed yet. On the
+  // build the page booted, every chunk is already loaded → no-op activation.
+  // Guard against a stale SW that never received the manifest (old build.ts +
+  // new sw-assets.eta mix renders `undefined` for these fields).
+  const changed = new Set();
+  for (const name of Object.keys(affectedBy)) {
+    if (!entryNames.has(name) && !loaded.has(name)) changed.add(name);
+  }
+  if (changed.size === 0) {
+    return { entryChanged: "", coldChanged: null, hot: null };
+  }
+
+  for (const f of changed) {
+    if (coldOnChange[f]) return { entryChanged: "", coldChanged: f, hot: null };
+  }
+
+  // toImport and toRemount stay disjoint: a controller chunk must go through
+  // the remount pass (unload identifier → re-import → re-register) or it stays
+  // the stale class forever. Feeding controller chunks into toImport too marks
+  // them "seen" in ModuleRegistry.swap(), which skips the remount — the old
+  // controller keeps its old module closure and the view never re-renders.
+  const toImport = new Set();
+  const toRemount = new Set();
+  for (const f of changed) {
+    for (const a of affectedBy[f] ?? []) {
+      if (idForChunk[a]) toRemount.add(a);
+      else if (!loaded.has(a)) toImport.add(a);
+    }
+    if (idForChunk[f]) toRemount.add(f);
+    else toImport.add(f);
+  }
+  return {
+    entryChanged: "",
+    coldChanged: null,
+    hot: {
+      changed: [...changed],
+      toImport: [...toImport],
+      toRemount: [...toRemount],
+      nameToUrl,
+      idForChunk,
+    },
+  };
+}

@@ -109,16 +109,12 @@ export class Page {
       ? `---\n${serializeFrontmatter(fmData)}\n---\n\n${body}`
       : body;
 
-    try {
-      await provider.writeFile(this.path, fullContent);
-      this.setBaseline(body);
-      this.originalFrontmatter = this.frontmatter;
-      this.bodyState.cacheBody(body);
-      const fileTime = await provider.getServerTime(this.path);
-      if (fileTime) this.setServerTime(fileTime);
-      return true;
-    } catch {
-      return false;
-    }
+    await provider.writeFile(this.path, fullContent);
+    this.setBaseline(body);
+    this.originalFrontmatter = this.frontmatter;
+    this.bodyState.cacheBody(body);
+    const fileTime = await provider.getServerTime(this.path);
+    if (fileTime) this.setServerTime(fileTime);
+    return true;
   }
 }

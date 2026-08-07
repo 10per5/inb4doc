@@ -23,11 +23,73 @@ function toPascalCase(str: string): string {
 }
 
 /**
+ * Emit src/eta/updater-core.ts from templates/partials/updater-core.eta.
+ *
+ * updater-core.eta is a build-time partial inlined verbatim into sw.js (the SW
+ * transport) — but it is also the shared source for the page/desktop/mobile
+ * updaters (Part C). It contains pure functions and NO Eta template tags, so the
+ * compiled module is simply the raw source with an export line appended: the SW
+ * and the page execute byte-identical logic (no duplication).
+ */
+function compileUpdaterCore(partialsDir: string, outDir: string): boolean {
+  const srcPath = join(partialsDir, "updater-core.eta");
+  if (!existsSync(srcPath)) return false;
+  const raw = readFileSync(srcPath, "utf-8");
+  const code = `// AUTO-GENERATED from partials/updater-core.eta — do not edit manually
+// @ts-nocheck
+${raw}
+export { updaterDiff, updaterTransfer, updaterFetch, isStaleVersion };
+`;
+  const tsPath = join(outDir, "updater-core.ts");
+  const existing = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : null;
+  if (existing === code) return false;
+  writeFileSync(tsPath, code);
+  return true;
+}
+
+/**
+ * Emit src/eta/bridge.ts from templates/partials/bridge.eta.
+ *
+ * bridge.eta IS an Eta template: it renders the native-bridge initializer for
+ * the ACTIVE build mode at compile time, so the import + call for the unused
+ * host bridge never appear in the emitted module at all — no runtime hasFunc
+ * gate, and the dead bridge module is absent from the bundle (Part D).
+ */
+function compileBridge(
+  templatesSrc: string,
+  outDir: string,
+  flags: TemplateFlags
+): boolean {
+  const srcPath = join(templatesSrc, "partials", "bridge.eta");
+  if (!existsSync(srcPath)) return false;
+  const source = readFileSync(srcPath, "utf-8");
+  const rendered = new Eta().renderString(source, flags);
+  const code = `// AUTO-GENERATED from partials/bridge.eta — do not edit manually
+// @ts-nocheck
+${rendered}`;
+  const tsPath = join(outDir, "bridge.ts");
+  const existing = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : null;
+  if (existing === code) return false;
+  writeFileSync(tsPath, code);
+  return true;
+}
+
+export interface TemplateFlags {
+  desktopBridge: boolean;
+  mobileBridge: boolean;
+}
+
+/**
  * @param srcDir   raw .eta template sources (e.g. editor/templates)
  * @param outDir   generated .ts modules (e.g. editor/src/eta)
+ * @param flags    build-mode flags for mode-conditional templates (bridge.eta)
  * @returns number of compiled templates
  */
-export function compileAll(srcDir: string, outDir: string): number {
+export function compileAll(
+  srcDir: string,
+  outDir: string,
+  flags: TemplateFlags = { desktopBridge: false, mobileBridge: false }
+): number {
   const eta = new Eta({ views: srcDir });
   let count = 0;
 
@@ -36,8 +98,13 @@ export function compileAll(srcDir: string, outDir: string): number {
       if (entry.isDirectory()) {
         if (entry.name === "partials") {
           // compile partials/menu/ subdirectory as runtime .ts modules
-          const menuDir = join(dir, entry.name, "menu");
+          const partialsDir = join(dir, entry.name);
+          const menuDir = join(partialsDir, "menu");
           try { walk(menuDir); } catch { /* no menu partials */ }
+          // the shared updater core is compiled as raw source (see above)
+          if (compileUpdaterCore(partialsDir, outDir)) count++;
+          // the mode-conditional native-bridge initializer (see above)
+          if (compileBridge(srcDir, outDir, flags)) count++;
           continue;
         }
         if (entry.name === "styles") continue; // build-time-only CSS templates

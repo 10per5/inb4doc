@@ -2,15 +2,41 @@
 #include "config.h"
 #include "app.h"
 #include "platform.h"
+#include "security.h"
 #include <print>
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 #include <optional>
+#include <regex>
+#include <sstream>
 namespace fs = std::filesystem;
 
 static bool mode_ambiguous(const parsed_args &args)
 {
     return !args.editor_root.empty() && !args.host.empty();
+}
+
+// The update-base URL is baked into the editor's index.html at build time as
+// <meta name="update-base" content="https://..."> (lib/build.ts, UPDATE_BASE).
+// Allow that host in the navigation policy so the fetch updater can reach the
+// static server — the configured value, never a verbatim string here.
+static void allow_update_base_host(const fs::path &editor_root)
+{
+    std::ifstream file(editor_root / "index.html");
+    if (!file)
+        return;
+    std::ostringstream buf;
+    buf << file.rdbuf();
+    static const std::regex meta_re(
+        R"(<meta[^>]+name\s*=\s*["']update-base["'][^>]*content\s*=\s*["']([^"']+)["'])");
+    std::smatch m;
+    const std::string html = buf.str();
+    if (!std::regex_search(html, m, meta_re))
+        return;
+    const auto host = security::parse_url(m[1].str()).host;
+    if (!host.empty())
+        security::allow_remote_host(host);
 }
 
 static std::optional<config> resolve_config(const parsed_args &args)
@@ -82,6 +108,8 @@ static std::optional<config> resolve_config(const parsed_args &args)
                   << "' does not contain 'index.html'\n";
         return std::nullopt;
     }
+
+    allow_update_base_host(cfg.editor_root);
 
     auto content_root = args.content_root;
     if (content_root.empty())

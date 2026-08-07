@@ -5,6 +5,8 @@
 
   <meta name="live-url-base" content="<%= it.LIVE_URL_BASE %>" />
 
+  <meta name="update-base" content="<%= it.UPDATE_BASE %>" />
+
   <meta name="app-version" content="<%= it.APP_VERSION %>" />
 
   <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.png" />

@@ -3,7 +3,6 @@ import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
 import { storageService } from "@/services/storage";
 import { getProvider, switchProvider, getProviderDisplayInfo } from "@/stores/provider-store";
-import { openProviderDialog } from "@/controllers/dialog/provider-dialog";
 import { showNotification } from "@/components/notification/notification";
 import { pagesStore } from "@/stores/page-store";
 import { pushPath, replacePath } from "@/utils/url";
@@ -23,6 +22,7 @@ export class NavigationService {
   private editor: EditorController;
   private cache: FileSyncService;
   private unsubs: (() => void)[] = [];
+  private navCleanup: (() => void) | null = null;
 
   constructor(editor: EditorController, cache: FileSyncService) {
     this.editor = editor;
@@ -57,6 +57,8 @@ export class NavigationService {
   destroy(): void {
     this.unsubs.forEach((unsub) => unsub());
     this.unsubs = [];
+    this.navCleanup?.();
+    this.navCleanup = null;
   }
 
   async navigate(path: string, pushHistory = true, searchQuery?: string, matchIndex?: number, snippetText?: string): Promise<void> {
@@ -146,7 +148,8 @@ export class NavigationService {
       const treeIndex = treeStore.getTree();
       const mergedTree = this.cache.getPendingOps().applyToTree(treeIndex);
 
-      setupNavListeners((path: string) => this.navigate(path));
+      this.navCleanup?.();
+      this.navCleanup = setupNavListeners((path: string) => this.navigate(path));
 
       const pages = Array.from(mergedTree.paths);
       this.editor.getMentionView()?.setPages(pages, {});
@@ -158,6 +161,7 @@ export class NavigationService {
 
   async changeProvider(): Promise<void> {
     const current = getProvider();
+    const { openProviderDialog } = await import("@/controllers/dialog/provider-dialog");
     const result = await openProviderDialog(current.name);
 
     if (!result) return;

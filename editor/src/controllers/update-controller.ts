@@ -3,6 +3,7 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { formatBytes } from "@/utils/format";
 import {
   showProgressToast,
+  showActionToast,
   type ProgressToastHandle,
 } from "@/components/notification/toast";
 
@@ -27,6 +28,9 @@ export default class UpdateController extends Controller {
       appEvents.on(AppEvent.ModulesSwapped, () => this.onSwapped()),
       appEvents.on(AppEvent.SWUpdatePending, () => this.onPending()),
       appEvents.on(AppEvent.SWUpdateResolved, () => this.dismiss()),
+      appEvents.on(AppEvent.UpdateRequiresReload, (data) =>
+        this.onRequiresReload(data)
+      ),
     ];
   }
 
@@ -84,6 +88,19 @@ export default class UpdateController extends Controller {
     if (this.dismissTimer) clearTimeout(this.dismissTimer);
     this.toast.setMessage("Updated");
     this.dismissTimer = setTimeout(() => this.dismiss(), UPDATED_MS);
+  }
+
+  private onRequiresReload(_data: { reason: string }): void {
+    // A change that cannot be applied in place (entry pot / shell / stateful
+    // pot). Production builds ask first — the page may hold unsaved edits — and
+    // let the user reload on their terms. Dev mode never emits this (it reloads
+    // immediately in sw-registrar).
+    if (this.toast) this.toast.remove();
+    this.toast = null;
+    if (this.dismissTimer) clearTimeout(this.dismissTimer);
+    showActionToast("Update requires a reload to apply", "OK", () =>
+      location.reload()
+    );
   }
 
   private dismiss(): void {

@@ -1,10 +1,14 @@
 #include "security.h"
 #include <algorithm>
+#include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
 namespace security
 {
+
+namespace fs = std::filesystem;
 
 static void parse_authority(std::string_view authority,
                             std::string &host,
@@ -87,6 +91,24 @@ url_parts parse_url(std::string_view url)
 
 // ── ─────────────────────────────────────────────────────────────────────
 
+namespace
+{
+std::mutex g_remote_hosts_mutex;
+std::vector<std::string> g_remote_hosts;
+} // namespace
+
+void allow_remote_host(std::string_view host)
+{
+    if (host.empty())
+        return;
+    std::lock_guard lock(g_remote_hosts_mutex);
+    if (std::find(g_remote_hosts.begin(), g_remote_hosts.end(), host) ==
+        g_remote_hosts.end())
+    {
+        g_remote_hosts.push_back(std::string(host));
+    }
+}
+
 verdict check(const url_parts &url)
 {
     if (url.scheme == "app")
@@ -97,6 +119,15 @@ verdict check(const url_parts &url)
 
     if (url.host == "localhost" || url.host == "127.0.0.1")
         return verdict::allow;
+
+    {
+        std::lock_guard lock(g_remote_hosts_mutex);
+        if (std::find(g_remote_hosts.begin(), g_remote_hosts.end(),
+                      url.host) != g_remote_hosts.end())
+        {
+            return verdict::allow;
+        }
+    }
 
     return verdict::prompt;
 }
@@ -170,6 +201,136 @@ void whitelist::remove(std::string_view domain)
 const std::vector<std::string> &whitelist::entries() const
 {
     return domains_;
+}
+
+// ── Filesystem safety rules ─────────────────────────────────────────────
+
+bool within_base(
+    const fs::path &target,
+    const fs::path &base,
+    fs::path &resolved)
+{
+    std::error_code ec;
+    resolved = fs::weakly_canonical(target, ec);
+    if (ec) return false;
+    auto base_canon = fs::weakly_canonical(base, ec);
+    if (ec) return false;
+    auto rel = resolved.lexically_relative(base_canon);
+    if (rel.empty()) return false;
+    auto rel_str = rel.string();
+    if (rel_str.find("..") != std::string::npos) return false;
+    return true;
+}
+
+bool is_image_file(const fs::path &path)
+{
+    auto dot = path.string().rfind('.');
+    if (dot == std::string::npos) return false;
+    auto ext = path.string().substr(dot);
+    for (auto &c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
+           ext == ".gif" || ext == ".svg" || ext == ".webp" ||
+           ext == ".bmp" || ext == ".ico";
+}
+
+bool dir_is_deletable(const fs::path &dir)
+{
+    std::error_code ec;
+    fs::recursive_directory_iterator it(dir, ec), end;
+    if (ec) return false;
+    for (; it != end; it.increment(ec))
+    {
+        if (ec) return false;
+        auto name = it->path().filename().string();
+        if (!name.empty() && name[0] == '.') continue;
+
+        std::error_code st_ec;
+        auto estatus = it->status(st_ec);
+        if (st_ec) return false;
+        if (fs::is_directory(estatus)) continue;
+        if (name.ends_with(".md")) continue;
+        if (is_image_file(it->path())) continue;
+        return false;
+    }
+    return true;
+}
+
+bool is_deletable(
+    const fs::path &base,
+    const fs::path &target,
+    fs::path &resolved)
+{
+    if (!within_base(target, base, resolved))
+        return false;
+    std::error_code ec;
+    if (fs::is_directory(resolved, ec) && !ec)
+        return dir_is_deletable(resolved);
+    return true;
+}
+
+bool dir_deletable(
+    const fs::path &content_root,
+    const fs::path &dir)
+{
+    auto rel = dir.lexically_relative(content_root);
+    if (rel.empty())
+        return false;
+
+    auto rel_str = rel.string();
+    auto &index = deletability::instance();
+    if (index.is_undeletable(content_root, rel_str))
+        return false;
+    if (index.is_known_deletable(content_root, rel_str))
+        return true;
+    return dir_is_deletable(dir);
+}
+
+// ── deletability cache ──────────────────────────────────────────────────
+
+deletability &deletability::instance()
+{
+    static deletability inst;
+    return inst;
+}
+
+void deletability::update(
+    const fs::path &content_root,
+    std::unordered_set<std::string> undeletable,
+    std::unordered_set<std::string> clean)
+{
+    std::lock_guard lock(mutex_);
+    content_root_ = content_root;
+    undeletable_ = std::move(undeletable);
+    clean_ = std::move(clean);
+}
+
+bool deletability::is_undeletable(
+    const fs::path &content_root,
+    const std::string &rel_path) const
+{
+    std::lock_guard lock(mutex_);
+    if (content_root != content_root_)
+        return false;
+    return undeletable_.contains(rel_path);
+}
+
+bool deletability::is_known_deletable(
+    const fs::path &content_root,
+    const std::string &rel_path) const
+{
+    std::lock_guard lock(mutex_);
+    if (content_root != content_root_)
+        return false;
+    return clean_.contains(rel_path);
+}
+
+void deletability::clear(const fs::path &content_root)
+{
+    std::lock_guard lock(mutex_);
+    if (content_root != content_root_)
+        return;
+    undeletable_.clear();
+    clean_.clear();
 }
 
 } // namespace security

@@ -37,6 +37,55 @@ export interface ProgressToastHandle {
   remove(): void
 }
 
+const ACTION_BTN_STYLE = [
+  "margin-left:0.75rem",
+  "padding:0.25rem 0.9rem",
+  "border:1px solid rgba(255,255,255,0.55)",
+  "border-radius:4px",
+  "background:transparent",
+  "color:inherit",
+  "font:inherit",
+  "font-weight:600",
+  "cursor:pointer",
+  "white-space:nowrap",
+].join(";");
+
+// A persistent toast with a single action button, used for updates that cannot
+// be applied in place (entry pot / shell / stateful pot changed). It replaces
+// any current toast via the shared #prdc-toast id and stays until the user
+// acts — no auto-dismiss, so the page never reloads (or loses the prompt)
+// while the user is mid-edit.
+export function showActionToast(
+  msg: string,
+  actionLabel: string,
+  onAction: () => void,
+  opts?: { type?: ToastType }
+): void {
+  const old = document.getElementById("prdc-toast");
+  if (old) old.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "prdc-toast";
+  toast.className = "prdc-toast prdc-toast-action";
+  toast.style.background = TOAST_BG[opts?.type ?? "danger"];
+
+  const msgEl = document.createElement("span");
+  msgEl.textContent = msg;
+  toast.appendChild(msgEl);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = actionLabel;
+  btn.style.cssText = ACTION_BTN_STYLE;
+  btn.addEventListener("click", () => {
+    toast.remove();
+    onAction();
+  });
+  toast.appendChild(btn);
+
+  document.body.appendChild(toast);
+}
+
 const PROGRESS_COLOR = "#388bf2";
 
 const INDETERMINATE_KEYFRAMES = `@keyframes prdc-toast-slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`;

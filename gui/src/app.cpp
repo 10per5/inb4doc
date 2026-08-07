@@ -1,6 +1,7 @@
 #include "app.h"
 #include "platform.h"
 #include "scheme.h"
+#include "bridge.h"
 #include "security.h"
 #include <saucer/smartview.hpp>
 #include <saucer/icon.hpp>
@@ -314,6 +315,11 @@ int run_app(config cfg)
             {
                 std::println(std::cerr, "  [js] {}\n", msg);
             });
+
+            // -- native fs bridge (replaces body-carrying app:// routes) --
+
+            if (safe->use_app_scheme)
+                register_bridge(wv, safe);
 
             // -- keyboard shortcuts --
 

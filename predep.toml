@@ -18,7 +18,7 @@ source_dir = "root://images"
 fail_if_missing = true
 files = [
   { source = "root://images/favicon.ico", dests = [
-      "root://editor/public/favicon.ico",
+      "root://editor/static/favicon.ico",
       "root://hugo-view/static/favicon.ico",
   ] },
   { source = "root://images/inb4doc-32.png", dests = [
@@ -36,7 +36,7 @@ files = [
       "root://hugo-view/static/favicon.png",
   ] },
   { source = "root://images/opengraph.png", dests = [
-      "root://editor/public/opengraph.png",
+      "root://editor/static/opengraph.png",
   ] },
 ]
 
@@ -79,7 +79,7 @@ bundle = "inb4doc"
 artifacts = [
     { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui", binary = true },
     { source = "root://images/inb4doc-32.png", dest = "icon.png" },
-    { source = "root://editor/public", dest = "editor" },
+    { source = "root://editor/dist", dest = "dist" },
 ]
 
 [install]
@@ -88,6 +88,6 @@ symlink = true
 artifacts = [
   { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui" },
   { source = "root://images/inb4doc-32.png", dest = "icon.png" },
-  { source = "root://editor/public/",      dest = "editor" },
-  { source = "root://content",            dest = "content" },
+  { source = "root://editor/dist/", dest = "editor", chown_user = true },
+  { source = "root://content", dest = "content", chown_user = true },
 ]

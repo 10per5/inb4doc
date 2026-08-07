@@ -1,6 +1,8 @@
 import { RemoteProvider } from "@/providers/remote-provider"
 import { ProviderType } from "@/providers/index"
 import { hasFunc, AppFunc } from "$/build/build-mode"
+import { backendError } from "@/utils/backend-error"
+import type { SearchResult } from "@/providers/provider"
 
 /**
  * MountProvider — serves content via the embedded `app://` scheme handler
@@ -10,6 +12,11 @@ import { hasFunc, AppFunc } from "$/build/build-mode"
  * Extends RemoteProvider with:
  *   - Relative paths (the app:// scheme routes requests to C++)
  *   - No HTTP probe (availability determined by AppFunc flag)
+ *
+ * Operations that carry a request body (PUT/POST) are routed through the
+ * native bridge (window.saucer.exposed.*, gui/src/bridge.cpp) because Qt
+ * WebEngine's custom-scheme body transport hangs. GET/HEAD/DELETE have no
+ * body and keep using the scheme via the inherited RemoteProvider fetch.
  */
 export class MountProvider extends RemoteProvider {
   readonly name = ProviderType.Mount
@@ -21,4 +28,79 @@ export class MountProvider extends RemoteProvider {
   async isAvailable(): Promise<boolean> {
     return hasFunc(AppFunc.MountProvider)
   }
+
+  async writeFile(path: string, content: string): Promise<void> {
+    await callBridge("writeFile", `${path}.md`, content)
+  }
+
+  async deleteFiles(paths: string[]): Promise<void> {
+    await callBridge("deleteFiles", paths.map((p) => `${p}.md`))
+  }
+
+  async moveFile(from: string, to: string): Promise<void> {
+    await callBridge("moveFile", `${from}.md`, `${to}.md`)
+  }
+
+  async search(query: string): Promise<SearchResult[]> {
+    const env = await callBridge("search", query)
+    const data = env.data as { results?: SearchResult[] } | undefined
+    return data?.results ?? []
+  }
+
+  async uploadImage(file: File, dir: string): Promise<string> {
+    const b64 = await fileToBase64(file)
+    const env = await callBridge("uploadImage", file.name, dir, b64)
+    const url = (env.data as { url?: string } | undefined)?.url
+    if (!url) throw backendError(500, "Upload returned no URL")
+    return url
+  }
+}
+
+interface BridgeEnvelope {
+  ok: boolean
+  status?: number
+  error?: string
+  data?: unknown
+}
+
+type BridgeFn = (...args: unknown[]) => Promise<string>
+
+async function callBridge(fn: string, ...args: unknown[]): Promise<BridgeEnvelope> {
+  const exposed = (window as any).saucer?.exposed as Record<string, BridgeFn> | undefined
+  const caller = exposed?.[fn]
+  if (typeof caller !== "function") {
+    throw backendError(500, `Native bridge function "${fn}" is unavailable`)
+  }
+  let raw: string
+  try {
+    raw = await caller(...args)
+  } catch (e) {
+    throw backendError(500, `Native bridge "${fn}" failed: ${String(e)}`)
+  }
+  let env: BridgeEnvelope
+  try {
+    env = JSON.parse(raw)
+  } catch {
+    throw backendError(500, `Native bridge "${fn}" returned invalid data`)
+  }
+  if (!env.ok) {
+    throw backendError(env.status ?? 500, env.error ?? `Native bridge "${fn}" failed`)
+  }
+  return env
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"))
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Failed to read file"))
+        return
+      }
+      const comma = reader.result.indexOf(",")
+      resolve(comma >= 0 ? reader.result.slice(comma + 1) : reader.result)
+    }
+    reader.readAsDataURL(file)
+  })
 }

@@ -3,6 +3,7 @@ import type { TreeIndex } from "@/utils/tree"
 import { buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { connectionStore } from "@/stores/connection-store"
+import { backendError } from "@/utils/backend-error"
 
 /**
  * ServerProvider — connects to a remote HTTP content server.
@@ -34,15 +35,21 @@ export class RemoteProvider implements ContentProvider {
   }
 
   async writeFile(path: string, content: string): Promise<void> {
-    await fetch(this.url(`/content/${path}.md`), {
+    const res = await fetch(this.url(`/content/${path}.md`), {
       method: "PUT",
       headers: { "Content-Type": "text/markdown" },
       body: content,
     })
+    if (!res.ok) {
+      throw backendError(res.status, `Write failed: ${res.status} ${res.statusText}`)
+    }
   }
 
   async deleteFile(path: string): Promise<void> {
-    await fetch(this.url(`/content/${path}.md`), { method: "DELETE" })
+    const res = await fetch(this.url(`/content/${path}.md`), { method: "DELETE" })
+    if (!res.ok) {
+      throw backendError(res.status, `Delete failed: ${res.status} ${res.statusText}`)
+    }
   }
 
   async deleteFiles(paths: string[]): Promise<void> {
@@ -51,7 +58,7 @@ export class RemoteProvider implements ContentProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paths }),
     })
-    if (!res.ok) throw new Error(`Bulk delete failed: ${res.status}`)
+    if (!res.ok) throw backendError(res.status, `Bulk delete failed: ${res.status}`)
   }
 
   async moveFile(from: string, to: string): Promise<void> {
@@ -60,7 +67,7 @@ export class RemoteProvider implements ContentProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from: `${from}.md`, to: `${to}.md` }),
     })
-    if (!res.ok) throw new Error(`Move failed: ${res.status}`)
+    if (!res.ok) throw backendError(res.status, `Move failed: ${res.status}`)
   }
 
   async search(query: string): Promise<SearchResult[]> {
@@ -87,7 +94,7 @@ export class RemoteProvider implements ContentProvider {
     form.append("file", file)
     form.append("dir", dir)
     const resp = await fetch(this.url("/api/upload"), { method: "POST", body: form })
-    if (!resp.ok) throw new Error(`Upload failed: ${resp.statusText}`)
+    if (!resp.ok) throw backendError(resp.status, `Upload failed: ${resp.statusText}`)
     const result = await resp.json()
     return result.url
   }
@@ -96,7 +103,7 @@ export class RemoteProvider implements ContentProvider {
     const params = new URLSearchParams({ dir })
     if (refs) params.set("refs", "true")
     const resp = await fetch(this.url(`/api/images?${params}`))
-    if (!resp.ok) throw new Error(`Failed to list images: ${resp.statusText}`)
+    if (!resp.ok) throw backendError(resp.status, `Failed to list images: ${resp.statusText}`)
     const data = await resp.json()
     return data.images.map((img: any) => ({
       name: img.name,
@@ -114,6 +121,6 @@ export class RemoteProvider implements ContentProvider {
     const resp = await fetch(this.url(`/api/images/${encodeURIComponent(name)}?dir=${encodeURIComponent(dir)}`), {
       method: "DELETE",
     })
-    if (!resp.ok) throw new Error(`Failed to delete image: ${resp.statusText}`)
+    if (!resp.ok) throw backendError(resp.status, `Failed to delete image: ${resp.statusText}`)
   }
 }

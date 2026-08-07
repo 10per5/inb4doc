@@ -195,8 +195,11 @@ saucer::scheme::response handle_search(
     // ones, so shallow results are prioritized over deeply nested files.
     struct Entry { fs::path dir; std::string prefix; };
     std::deque<Entry> queue;
-    if (fs::exists(cfg.content_root))
-        queue.push_back({cfg.content_root, ""});
+    {
+        std::error_code exist_ec;
+        if (fs::exists(cfg.content_root, exist_ec))
+            queue.push_back({cfg.content_root, ""});
+    }
 
     while (!queue.empty() && scanned < kMaxScanned)
     {
@@ -204,25 +207,27 @@ saucer::scheme::response handle_search(
         queue.pop_front();
 
         std::error_code ec;
-        for (const auto &e : fs::directory_iterator(dir, ec))
+        fs::directory_iterator it(dir, ec), end;
+        for (; !ec && it != end; it.increment(ec))
         {
             if (scanned >= kMaxScanned) break;
             scanned++;
 
-            auto name = e.path().filename().string();
+            auto name = it->path().filename().string();
             auto rel = prefix.empty() ? name : prefix + "/" + name;
             if (name[0] == '.') continue;
 
-            auto estatus = e.status(ec);
-            if (ec) continue;
+            std::error_code status_ec;
+            auto estatus = it->status(status_ec);
+            if (status_ec) continue;
             if (fs::is_directory(estatus))
             {
                 if (name == "image") continue;
-                queue.push_back({e.path(), rel});
+                queue.push_back({it->path(), rel});
             }
             else if (name.ends_with(".md"))
             {
-                std::ifstream f(e.path());
+                std::ifstream f(it->path());
                 if (!f) continue;
                 std::string content((std::istreambuf_iterator<char>(f)),
                                     std::istreambuf_iterator<char>());

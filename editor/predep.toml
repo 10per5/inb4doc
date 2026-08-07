@@ -29,10 +29,10 @@ dest = "root://public/"
 name = "docker-desktop"
 description = "Build editor static assets via Docker"
 type = "docker"
-outputs = ["root://public/"]
+outputs = ["root://dist/"]
 recipe = "images/desktop.Dockerfile"
-target = "/output/editor/public/"
-dest = "root://public/"
+target = "/output/editor/dist/"
+dest = "root://dist/"
 
 [[stages]]
 name = "android"

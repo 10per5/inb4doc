@@ -79,6 +79,7 @@ export enum AppEvent {
   SWSwapFailed = "sw-swap-failed",
   SWUpdatePending = "sw-update-pending",
   SWUpdateResolved = "sw-update-resolved",
+  UpdateRequiresReload = "update-requires-reload",
 }
 
 // ── Strict payload map ──
@@ -139,6 +140,7 @@ export interface AppEventPayloads {
   [AppEvent.SWSwapFailed]: { name: string }
   [AppEvent.SWUpdatePending]: void
   [AppEvent.SWUpdateResolved]: void
+  [AppEvent.UpdateRequiresReload]: { reason: string }
 }
 
 // ── EventBus ──

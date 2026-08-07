@@ -72,3 +72,9 @@ std::string default_data_dir()
     return home ? (fs::path(home) / ".local" / "share" / "inb4doc").string() : std::string{};
 #endif
 }
+
+std::string default_editor_data_dir()
+{
+    auto base = default_data_dir();
+    return base.empty() ? std::string{} : (fs::path(base) / "editor").string();
+}

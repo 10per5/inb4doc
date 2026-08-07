@@ -4,7 +4,6 @@ import {
   type MetaPanelData,
 } from "@/entities/Frontmatter";
 import {
-  openChangesDialog,
   type ChangesDialogItem,
 } from "@/controllers/dialog/changes-dialog";
 import { pagesStore } from "@/stores/page-store";
@@ -17,6 +16,7 @@ import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { getProvider, activeProviderId } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
 import { showNotification } from "@/components/notification/notification";
+import { surfaceBackendError } from "@/utils/backend-error";
 import type { TreeIndex } from "@/utils/tree";
 import { extractSnippets } from "@/utils/content-search";
 import { imageService } from "@/services/image-service";
@@ -201,17 +201,24 @@ export class FileSyncService {
     const page = repo.getOrCreate(path);
     page.setBody(content);
 
-    const ok = await page.flushOut(imageUrlMap);
-    if (ok) {
-      treeStore.afterWrite(path, page.reconstructContent());
-      this.pendingOps.cancelEdit(path);
-      pendingOpsStore.save(this.pendingOps.all);
-      this.recomputeDirty();
-      appEvents.emit(AppEvent.FlushComplete);
-      showNotification("File saved", { type: "success" });
-    } else {
-      showNotification("Failed to save", { type: "danger" });
+    try {
+      const ok = await page.flushOut(imageUrlMap);
+      if (!ok) {
+        showNotification("Failed to save", { type: "danger" });
+        return;
+      }
+    } catch (error) {
+      if (!surfaceBackendError(error)) {
+        showNotification("Failed to save", { type: "danger" });
+      }
+      return;
     }
+    treeStore.afterWrite(path, page.reconstructContent());
+    this.pendingOps.cancelEdit(path);
+    pendingOpsStore.save(this.pendingOps.all);
+    this.recomputeDirty();
+    appEvents.emit(AppEvent.FlushComplete);
+    showNotification("File saved", { type: "success" });
   }
 
   async flushDirtyFiles(): Promise<void> {
@@ -222,6 +229,8 @@ export class FileSyncService {
     const provider = getProvider();
 
     const imageUrlMap = await imageService.commitAllPendingImages();
+
+    let hadFailure = false;
 
     for (const path of dirtyPaths) {
       const page = repo.getOrCreate(path);
@@ -254,15 +263,21 @@ export class FileSyncService {
       }
 
       page.setBody(bodyToWrite);
-      await page.flushOut(imageUrlMap);
+      try {
+        await page.flushOut(imageUrlMap);
+      } catch (error) {
+        hadFailure = true;
+        surfaceBackendError(error);
+        continue;
+      }
       this.pendingOps.cancelEdit(path);
       treeStore.afterWrite(path, page.reconstructContent());
     }
 
     const flushedPaths = new Set(dirtyPaths);
-    const { deletedPaths, renamedPaths } = await this.executePendingOps(
-      flushedPaths
-    );
+    const { deletedPaths, renamedPaths, hadFailure: opFailed } =
+      await this.executePendingOps(flushedPaths);
+    hadFailure = hadFailure || opFailed;
 
     pendingOpsStore.save(this.pendingOps.all);
 
@@ -293,7 +308,11 @@ export class FileSyncService {
       );
     }
 
-    showNotification("All files saved", { type: "success" });
+    if (hadFailure) {
+      showNotification("Some files failed to save", { type: "danger" });
+    } else {
+      showNotification("All files saved", { type: "success" });
+    }
 
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
   }
@@ -375,9 +394,18 @@ export class FileSyncService {
 
   private async executePendingOps(
     flushedPaths?: Set<string>
-  ): Promise<{ deletedPaths: string[]; renamedPaths: Map<string, string> }> {
+  ): Promise<{
+    deletedPaths: string[];
+    renamedPaths: Map<string, string>;
+    hadFailure: boolean;
+  }> {
     if (this.pendingOps.count === 0)
-      return { deletedPaths: [], renamedPaths: new Map() };
+      return { deletedPaths: [], renamedPaths: new Map(), hadFailure: false };
+
+    const opId = (op: PendingOp) => ("path" in op ? op.path : op.from);
+    const before = new Map<string, PendingOp>();
+    for (const op of this.pendingOps.all) before.set(opId(op), op);
+    const succeeded = new Set<string>();
     const deletedPaths: string[] = [];
     const renamedPaths = new Map<string, string>();
 
@@ -398,7 +426,7 @@ export class FileSyncService {
     for (const op of sorted) {
       if (op.type === PendingOpType.Delete) {
         deleteOps.push(op);
-      } else {
+      } else if (op.type !== PendingOpType.Edit) {
         otherOps.push(op);
       }
     }
@@ -406,27 +434,33 @@ export class FileSyncService {
     for (const op of otherOps) {
       try {
         await this.executeOp(op, flushedPaths);
+        succeeded.add(opId(op));
         if (op.type === PendingOpType.Rename) {
           renamedPaths.set(op.from, op.to);
         }
       } catch (error) {
         console.error(
-          `Failed to execute pending op ${op.type} ${
-            "path" in op ? op.path : op.from
-          }:`,
+          `Failed to execute pending op ${op.type} ${opId(op)}:`,
           error
         );
+        surfaceBackendError(error);
       }
     }
 
     if (deleteOps.length > 0) {
       const deleted = await this.executeDeleteOps(deleteOps);
       deletedPaths.push(...deleted);
+      for (const op of deleteOps) {
+        if (deleted.includes(op.path)) succeeded.add(opId(op));
+      }
     }
 
     this.pendingOps.clear();
-    pendingOpsStore.clear();
-    return { deletedPaths, renamedPaths };
+    for (const [id, op] of before) {
+      if (!succeeded.has(id)) this.pendingOps.add(op);
+    }
+    pendingOpsStore.save(this.pendingOps.all);
+    return { deletedPaths, renamedPaths, hadFailure: this.pendingOps.count > 0 };
   }
 
   private async executeDeleteOps(
@@ -458,6 +492,7 @@ export class FileSyncService {
               `Failed to execute pending op delete ${op.path}:`,
               e
             );
+            surfaceBackendError(e);
           }
         }
         return deletedPaths;
@@ -485,6 +520,7 @@ export class FileSyncService {
           `Failed to execute pending op delete ${op.path}:`,
           error
         );
+        surfaceBackendError(error);
       }
     }
     return deletedPaths;
@@ -612,7 +648,9 @@ export class FileSyncService {
       }
     } catch (error) {
       console.error(`Failed to apply change for ${path}:`, error);
-      showNotification("Failed to apply change", { type: "danger" });
+      if (!surfaceBackendError(error)) {
+        showNotification("Failed to apply change", { type: "danger" });
+      }
       return;
     }
 
@@ -805,6 +843,7 @@ export class FileSyncService {
 
     if (items.length === 0) return;
 
+    const { openChangesDialog } = await import("@/controllers/dialog/changes-dialog");
     openChangesDialog(
       items,
       this.currentPath,

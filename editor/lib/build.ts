@@ -12,9 +12,10 @@ import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "../src/config/enums/toolbar-
 import { SidebarAction, SIDEBAR_ACTION_PREFIX, sidebarActions } from "../src/config/enums/sidebar-action"
 import { copyStaticAssets } from "./build/static"
 import { renderShell } from "./build/shell"
+import { writeThinShell } from "./build/thin"
 import { compileStyles } from "./build/styles"
 import { processThemeNordAssets } from "./build/theme-nord"
-import { runBundle, runBundleWatch, getChunkMap, pruneStaleChunks } from "./build/bundle"
+import { runBundle, runBundleWatch, getChunkMap, pruneStaleChunks, getLatestChunkGraphManifest, computeAppHash, computeIndexHash, injectHashMeta } from "./build/bundle"
 
 const __dir = dirname(fileURLToPath(import.meta.url))
 const root = join(__dir, "..")
@@ -40,6 +41,10 @@ const modeStr = process.env.BUILD_MODE || "web-local"
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
 const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
 
+// The remote deployment of public/ that fetch transports pull the live editor
+// from (Part C.1). Defaults to the GitHub Pages live URL; override per build.
+const UPDATE_BASE = (process.env.UPDATE_BASE || "https://10per5.github.io/inb4doc/editor-live").replace(/\/+$/, "")
+
 const criticalCss = [
   readFileSync(join(__dir, "style", "layout.css"), "utf-8"),
   readFileSync(join(__dir, "style", "loading.css"), "utf-8"),
@@ -50,6 +55,7 @@ const context = {
   criticalCss,
   EDITOR_SELF_BASE: SELF_BASE,
   LIVE_URL_BASE: process.env.LIVE_URL_BASE || "",
+  UPDATE_BASE,
   APP_VERSION: process.env.APP_VERSION || "",
   EDITOR_ACTION_PREFIX,
   editorAction: EditorAction,
@@ -75,7 +81,10 @@ const styleFlags = {
 }
 compileStyles(eta, templatesSrc, join(root, "src", "eta", "styles"), styleFlags)
 
-const templateCount = compileAll(templatesSrc, join(root, "src", "eta"))
+const templateCount = compileAll(templatesSrc, join(root, "src", "eta"), {
+  desktopBridge: hasFlag(AppFunc.DesktopBridge),
+  mobileBridge: hasFlag(AppFunc.MobileBridge),
+})
 if (templateCount > 0) console.log(`[build] Compiled ${templateCount} runtime template(s)`)
 
 if (!renderTemplates) {
@@ -105,6 +114,26 @@ if (!renderTemplates) {
 
   let buildVersion = readExistingBuildVersion()
 
+  // appHash/indexHash live in <meta> tags so a page can tell, on a later SW
+  // activation, whether the build it booted from changed the entry pot or the
+  // shell — the two things a hot swap can never apply. index-hash is computed
+  // on the html with the injected metas (and the emitted-css link list) removed,
+  // so an unrelated rebuild (a rotated chunk or css filename) keeps a stable
+  // index-hash and only structural shell edits move it. build-version is the
+  // generation marker the page booted with; it lets the registrar skip the
+  // entry/shell reload for activations of the same generation (rebuild churn),
+  // while a real entry/shell change always ships a newer marker.
+  function writeHashMetas(appHash: string, buildVersion: number): string {
+    const indexPath = join(publicDir, "index.html")
+    let html = readFileSync(indexPath, "utf8")
+    html = injectHashMeta(html, "app-hash", appHash)
+    const indexHash = computeIndexHash(html)
+    html = injectHashMeta(html, "index-hash", indexHash)
+    html = injectHashMeta(html, "build-version", String(buildVersion))
+    writeFileSync(indexPath, html)
+    return indexHash
+  }
+
   function generateSWFiles() {
     buildVersion++
     pruneStaleChunks(root, assetsDir)
@@ -119,8 +148,38 @@ if (!renderTemplates) {
 
     const chunkMap = getChunkMap(root, SW_PREFIX)
 
-    const swAssets = eta.renderString(readFileSync(join(templatesSrc, "sw-assets.eta"), "utf-8"), { important, chunks })
+    const appHash = computeAppHash(assetsDir)
+    const indexHash = writeHashMetas(appHash, buildVersion)
+    const manifest = getLatestChunkGraphManifest() ?? {
+      affectedBy: {},
+      coldOnChange: {},
+    }
+
+    const swAssets = eta.renderString(readFileSync(join(templatesSrc, "sw-assets.eta"), "utf-8"), {
+      important,
+      chunks,
+      appHash,
+      indexHash,
+      affectedBy: manifest.affectedBy,
+      coldOnChange: manifest.coldOnChange,
+    })
     writeFileSync(join(publicDir, "assets", "sw-assets.js"), swAssets)
+
+    // First-class JSON twin of sw-assets.js so fetch transports (GuiDesktop
+    // thin shell) get the same file/version data without eval'ing the SW
+    // script. The live deployment serves public/, so the URL
+    // ${UPDATE_BASE}/assets/manifest.json is valid.
+    const jsonManifest = {
+      buildVersion,
+      appHash,
+      indexHash,
+      affectedBy: manifest.affectedBy,
+      coldOnChange: manifest.coldOnChange,
+      important,
+      chunks,
+      chunkMap,
+    }
+    writeFileSync(join(publicDir, "assets", "manifest.json"), JSON.stringify(jsonManifest))
 
     const swJs = eta.renderString(readFileSync(join(templatesSrc, "sw.eta"), "utf-8"), {
       buildVersion, chunkMap, isDev: watch, appVersion: process.env.APP_VERSION || "",
@@ -131,6 +190,12 @@ if (!renderTemplates) {
       cacheMaps: Boolean(watch) || modeStr === "web-local",
     })
     writeFileSync(join(publicDir, "sw.js"), swJs)
+
+    // Thin-shell install set: the read-only GuiDesktop ship. Must run after
+    // generateSWFiles() so manifest.json/sw-assets.js carry this build's data.
+    if (hasFlag(AppFunc.ThinShell)) {
+      writeThinShell(publicDir, join(root, "dist"))
+    }
   }
 
   function linkEmittedCss() {

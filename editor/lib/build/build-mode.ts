@@ -16,6 +16,9 @@ export enum AppFunc {
   StaticSiteGeneration = 1 << 7,
   MountProvider = 1 << 8,
   ToolbarQuickNav = 1 << 9,
+  ThinShell = 1 << 10,
+  DesktopBridge = 1 << 11,
+  MobileBridge = 1 << 12,
 }
 
 export const BUILD_MODE_NAMES: Record<BuildMode, string> = {
@@ -47,6 +50,19 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.StaticSiteGeneration]: BuildMode.WebRemote,
   [AppFunc.MountProvider]: BuildMode.GuiDesktop,
   [AppFunc.ToolbarQuickNav]: BuildMode.GuiDesktop,
+  // Thin-shell packaging (Part C.1): the GuiDesktop/GuiMobile install ships only
+  // the core boot set + updater (index.html, app.js, sw/manifest, css); the
+  // first run downloads the live editor into the writable data dir. This flag
+  // ALSO drives the two-stage entry + lazy Milkdown (Part D): a thin shell ships
+  // the eager core chunks only, so the lazy-load mechanism keys off ThinShell —
+  // one flag, one build decision. Web modes always ship the full public/ (the
+  // SW serves it).
+  [AppFunc.ThinShell]: BuildMode.GuiDesktop | BuildMode.GuiMobile,
+  // Native-host bridges: desktop Saucer (window.saucer.exposed / inb4docUI)
+  // and Android WebView (window.NativeBridge). Web modes have no native host,
+  // so neither bridge runs there.
+  [AppFunc.DesktopBridge]: BuildMode.GuiDesktop,
+  [AppFunc.MobileBridge]: BuildMode.GuiMobile,
 };
 
 let _currentMode: BuildMode | null = null;
@@ -61,6 +77,36 @@ function getCurrentMode(): BuildMode {
 
 export function hasFunc(func: AppFunc): boolean {
   return !!(SUPPORTED_MODES[func] & getCurrentMode());
+}
+
+// Updater transport selection (Part C). The updater core
+// (templates/partials/updater-core.eta, compiled to src/eta/updater-core.ts) is
+// transport-agnostic — only the glue layers differ per deployment:
+//
+//   WebRemote / WebLocal → ServiceWorker: sw.js precaches via updaterTransfer
+//     (Cache Storage backend) and posts the manifest; the page's sw-registrar
+//     applies via updaterDiff + ModuleRegistry.swap. Selected implicitly by the
+//     protocol check in sw-registrar (http/https only).
+//
+//   GuiDesktop → fetch manifest from UPDATE_BASE + disk cache + NativeBridge
+//     reload (Part E). No ServiceWorker (app:// protocol).
+//
+//   GuiMobile  → fetch manifest from UPDATE_BASE + WebView
+//     shouldInterceptRequest cache + reload (Part E). No ServiceWorker.
+export enum UpdaterTransport {
+  ServiceWorker = 1,
+  FetchAndCache = 2,
+}
+
+export function updaterTransportFor(mode: BuildMode): UpdaterTransport {
+  switch (mode) {
+    case BuildMode.WebRemote:
+    case BuildMode.WebLocal:
+      return UpdaterTransport.ServiceWorker;
+    case BuildMode.GuiDesktop:
+    case BuildMode.GuiMobile:
+      return UpdaterTransport.FetchAndCache;
+  }
 }
 
 export function modeLabel(mode: BuildMode): string {

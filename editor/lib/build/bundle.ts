@@ -1,5 +1,14 @@
-import { relative, resolve, sep } from "path";
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "fs";
+import { createHash } from "crypto";
 import {
   resolveConfig,
   createCompiler,
@@ -18,6 +27,41 @@ export interface BundleResult {
   exitCode: number;
 }
 
+// Farm's writeResourcesToDisk() writes every chunk on every watch rebuild even
+// when nothing changed (content-hash names stay stable), which strips the
+// self-evict prelude and forces a full disk rewrite + re-injection per edit.
+// patchIncrementalWrite() swaps in a writer that skips resources byte-identical
+// to the previous compilation — the file on disk is already the injected
+// version of those exact bytes, so the prelude survives and injectSelfEvicting
+// no-ops. Only genuinely changed chunks (new content-hash names) get written.
+// The `prev !== resource` guard keeps it safe even if Farm ever reuses the same
+// Buffer object across compilations (we then fall back to writing it).
+let lastFarmResources: Record<string, Buffer> | null = null;
+
+function patchIncrementalWrite(compiler: any): void {
+  if (compiler.__farmIncrementalWrite) return;
+  compiler.__farmIncrementalWrite = true;
+  const outputPath = isAbsolute(compiler.config.config.output.path)
+    ? compiler.config.config.output.path
+    : join(compiler.config.config.root, compiler.config.config.output.path);
+  compiler.writeResourcesToDisk = function (this: any) {
+    const resources = this.resources() as Record<string, Buffer>;
+    for (const [name, resource] of Object.entries(resources)) {
+      const nameWithoutQuery = name.split("?")[0];
+      const nameWithoutHash = nameWithoutQuery.split("#")[0];
+      const filePath = join(outputPath, nameWithoutHash);
+      const prev = lastFarmResources?.[name];
+      if (prev && prev !== resource && prev.equals(resource)) continue;
+      if (!existsSync(dirname(filePath))) {
+        mkdirSync(dirname(filePath), { recursive: true });
+      }
+      writeFileSync(filePath, resource);
+    }
+    lastFarmResources = resources;
+    this.callWriteResourcesHook();
+  };
+}
+
 const CTRL_SUFFIX_RE = /[-_]controller$/;
 const EXT_TS = ".ts";
 const DIALOG_SUBDIR = "dialog";
@@ -32,6 +76,174 @@ interface ControllerReg {
   rel: string;
   isDialog: boolean;
   templateRel: string | null;
+}
+
+// ── Chunk-graph manifest (hot vs cold reload decision) ──
+
+// Chunks that can never be hot-swapped: the entry pot's import glue and the
+// Farm runtime. Their content is covered by appHash instead.
+const ENTRY_CHUNK_NAMES = new Set(["app.js", "__farm_runtime.js"]);
+
+// Stateful singleton pots. Re-running one of these re-initializes live state
+// (provider instances, stores, the desktop bridge, the Milkdown editor), so any
+// change that reaches them forces a full reload instead of a hot swap.
+const COLD_PREFIXES = [
+  "stores-",
+  "providers-",
+  "bridge-",
+  "node_imports-",
+  "editor-",
+  "migrations-",
+  "app_",
+];
+
+export interface ChunkGraphManifest {
+  // chunk filename -> chunk filenames that must re-execute when it changes
+  // (the reverse-dependency import closure mapped to chunks, itself included).
+  affectedBy: Record<string, string[]>;
+  // chunk filename -> true forces a full reload when that chunk changes.
+  coldOnChange: Record<string, boolean>;
+}
+
+let latestChunkGraphManifest: ChunkGraphManifest | null = null;
+
+export function getLatestChunkGraphManifest(): ChunkGraphManifest | null {
+  return latestChunkGraphManifest;
+}
+
+// app.js (and the runtime) embed the entry module map, but their text also
+// carries build noise: the static chunk import list, the runtime's array of
+// every chunk filename, and opaque module ids. Normalizing those away makes the
+// hash stable across unrelated rebuilds — it changes only when the entry pot's
+// own code changes (app.ts, controllers/index, boot glue), which is exactly
+// what must force a cold reload.
+export function normalizeEntrySource(text: string): string {
+  let s = text;
+  s = s.replace(/^(?:import "\.\/[^"]*\.js";)+/, "");
+  s = s.replace(/(["'])[^"']*\.js\1/g, '""');
+  s = s.replace(/([\(\[,])(["'])[0-9a-f]{8}\2/g, '$1""');
+  return s;
+}
+
+export function computeAppHash(assetsDir: string): string {
+  const parts: string[] = [];
+  for (const file of ["app.js", "__farm_runtime.js"]) {
+    const p = resolve(assetsDir, file);
+    parts.push(existsSync(p) ? normalizeEntrySource(readFileSync(p, "utf8")) : "");
+  }
+  return createHash("sha1").update(parts.join("\n")).digest("hex");
+}
+
+// build-version is stripped too: it increments on every generateSWFiles, so
+// including it in the index hash would rotate index-hash (and force a reload)
+// on every unrelated rebuild.
+const HASH_META_RE = /^\s*<meta name="(?:app-hash|index-hash|build-version)"[^>]*>\s*$/gm;
+// linkEmittedCss writes these lines into <head>; css edits rotate the filename,
+// and the runtime swaps the <link> href instead of reloading.
+const CSS_LINK_RE = /^\s*<link rel="stylesheet" href="assets\/[^"]+\.css" \/>\s*$/gm;
+
+// index.html's volatile bits (the injected hash metas and the emitted-css link
+// list) are stripped before hashing so unrelated rebuilds keep a stable hash;
+// structural changes (skeleton, baked enum ints, build mode) still move it.
+export function computeIndexHash(html: string): string {
+  const stripped = html
+    .replace(HASH_META_RE, "")
+    .replace(CSS_LINK_RE, "");
+  return createHash("sha1").update(stripped).digest("hex");
+}
+
+export function injectHashMeta(html: string, name: string, value: string): string {
+  const tag = `<meta name="${name}" content="${value}" />`;
+  const re = new RegExp(`<meta name="${name}"[^>]*>`, "g");
+  if (re.test(html)) return html.replace(re, tag);
+  return html.replace("</head>", `  ${tag}\n  </head>`);
+}
+
+function computeChunkManifest(
+  compiler: any,
+  cwd: string,
+  assetsDir: string
+): Promise<ChunkGraphManifest> {
+  return (async () => {
+    const resources = compiler.resourcesMap() as Record<
+      string,
+      { info?: { moduleIds?: string[] } }
+    >;
+    const graph = await compiler.traceModuleGraph();
+    const reverseEdges = (graph.reverseEdges ?? {}) as Record<string, string[]>;
+
+    // module id (source path) -> chunk filename. Entry chunks are excluded so
+    // the closure never tries to hot-swap the entry pot.
+    const moduleToChunk: Record<string, string> = {};
+    for (const name of Object.keys(resources)) {
+      if (!name.endsWith(".js") || ENTRY_CHUNK_NAMES.has(name)) continue;
+      for (const id of resources[name].info?.moduleIds ?? []) {
+        moduleToChunk[id] = name;
+      }
+    }
+
+    // Chunks that may be hot-swapped: controller chunks in the swap map (editor
+    // and the abstract base-dialog are deliberately excluded, matching
+    // getChunkMap).
+    const controllers = discoverControllers(
+      resolve(cwd, "src/controllers"),
+      resolve(cwd, "src")
+    );
+    const swappable = new Set<string>();
+    for (const { id } of controllers) {
+      if (EXCLUDED_CONTROLLER_IDS.has(id) || id === "editor") continue;
+      const file = findChunkFile(assetsDir, id);
+      if (file) swappable.add(file);
+    }
+
+    const affectedBy: Record<string, string[]> = {};
+    const coldOnChange: Record<string, boolean> = {};
+
+    // Sort for a deterministic manifest — resourcesMap key order varies between
+    // compiles, and an unordered object would rotate sw-assets.js on every
+    // identical rebuild (and re-transfer it through the cache-skip).
+    for (const name of Object.keys(resources).sort()) {
+      if (!name.endsWith(".js") || ENTRY_CHUNK_NAMES.has(name)) continue;
+      const moduleIds = resources[name].info?.moduleIds ?? [];
+      const seen = new Set<string>();
+      const affected = new Set<string>([name]);
+      const queue = [...moduleIds];
+      while (queue.length) {
+        const m = queue.pop()!;
+        if (seen.has(m)) continue;
+        seen.add(m);
+        for (const imp of reverseEdges[m] ?? []) {
+          if (seen.has(imp)) continue;
+          const chunk = moduleToChunk[imp];
+          if (chunk) affected.add(chunk);
+          queue.push(imp);
+        }
+      }
+      const closure = [...affected].sort();
+      affectedBy[name] = closure;
+      const selfCold = COLD_PREFIXES.some((p) => name.startsWith(p));
+      const reachesCold = closure.some((c) =>
+        COLD_PREFIXES.some((p) => c.startsWith(p))
+      );
+      // A chunk whose moduleIds are all .css (the styles-*.js pots) is a set of
+      // idempotent style injectors: re-importing it re-registers the css
+      // factories and the swap re-executes them, which replaces the matching
+      // <style> in place. It applies itself, so the !reachesController penalty
+      // below — meant for leaf modules whose only importers are entry modules —
+      // doesn't apply: a css-only chunk is hot even though nothing in its
+      // closure is a swappable controller.
+      const selfApplying =
+        moduleIds.length > 0 && moduleIds.every((id) => id.endsWith(".css"));
+      // A change is only hot if some chunk in the closure is a swappable
+      // controller that will re-execute it; a leaf module whose only importers
+      // are entry modules can't be applied without a reload.
+      const reachesController = closure.some((c) => swappable.has(c));
+      coldOnChange[name] =
+        selfCold || reachesCold || (!selfApplying && !reachesController);
+    }
+
+    return { affectedBy, coldOnChange };
+  })();
 }
 
 // Each Stimulus controller becomes its own chunk. A controller paired with a
@@ -206,6 +418,9 @@ function injectSelfEvicting(assetsDir: string): void {
     const m = text.match(loop)!;
     const evict = `for(var __farm_self_evict in _){var __farm_ms=window[${m[1]}].__farm_module_system__;if(__farm_ms&&__farm_ms.delete){__farm_ms.delete(__farm_self_evict)}}`;
     writeFileSync(full, text.replace(loop, `${evict}${m[0]}`));
+    // patchIncrementalWrite() skips rewriting byte-identical chunks on dev
+    // rebuilds, so unchanged files keep their prelude and only genuinely
+    // changed chunks land here.
     console.log(`[bundle] injected self-evict into ${file}`);
   }
 }
@@ -217,11 +432,33 @@ export function getControllerRegs(
   return discoverControllers(resolve(srcDir, "controllers"), srcDir);
 }
 
+// app.js lists every emitted chunk (verified: in a healthy build every .js file
+// except sw-assets.js appears in it), so any .js file outside that referenced
+// set is stale: a chunk that was renamed (content hash changed), an old
+// node_imports pot, or a leftover from a previous dev session. Dev runs with
+// clean:false so these accumulate per session; prune them so findChunkFile and
+// the SW never see ambiguous copies. Protected names: the entry (app.js), the
+// Farm runtime, and our generated SW manifest (not part of the bundle).
+function pruneStaleNonControllerChunks(assetsDir: string): void {
+  if (!existsSync(assetsDir)) return;
+  const keep = referencedChunkSet(assetsDir);
+  keep.add("app.js");
+  keep.add("__farm_runtime.js");
+  keep.add("sw-assets.js");
+  for (const file of readdirSync(assetsDir)) {
+    if (!file.endsWith(".js")) continue;
+    if (keep.has(file)) continue;
+    rmSync(resolve(assetsDir, file), { force: true });
+    rmSync(resolve(assetsDir, `${file}.map`), { force: true });
+  }
+}
+
 export function pruneStaleChunks(
   projectRoot: string,
   assetsDir: string
 ): void {
   pruneStaleControllerChunks(assetsDir, getControllerRegs(projectRoot));
+  pruneStaleNonControllerChunks(assetsDir);
 }
 
 export function getChunkMap(
@@ -256,6 +493,19 @@ function makeEnforceResources(
   );
   return [
     { name: "app", test: [".*src/app\\.ts", ".*src/controllers/index\\.ts"] },
+    // Stimulus + Eta + fflate are the only node_modules the eager shell needs
+    // (fflate via utils/zip, used by shell_controller's export/load-as-zip).
+    // Give them their own pot (all dependency-free leaves) so the node_imports
+    // pot — Milkdown / ProseKit / katex & friends — stays reachable ONLY via
+    // the lazy editor import and leaves the eager boot set (Part D thin shell).
+    {
+      name: "vendor",
+      test: [
+        ".*node_modules/@hotwired/stimulus/.*",
+        ".*node_modules/eta/.*",
+        ".*node_modules/fflate/.*",
+      ],
+    },
     { name: "node_imports", test: [".*node_modules.*"] },
     // Per-controller rules first so each controller claims its own chunk (and a
     // dialog controller claims its facade + compiled template). The trailing
@@ -340,6 +590,15 @@ export async function runBundle(options: BundleOptions): Promise<BundleResult> {
     await compiler.compile();
     compiler.writeResourcesToDisk();
     injectSelfEvicting(resolve(cwd, "public/assets"));
+    try {
+      latestChunkGraphManifest = await computeChunkManifest(
+        compiler,
+        cwd,
+        resolve(cwd, "public/assets")
+      );
+    } catch (err) {
+      console.error("[bundle] chunk-graph manifest failed:", err);
+    }
     options.onUpdate?.();
     return { exitCode: 0 };
   } catch (err) {
@@ -370,11 +629,26 @@ export async function runBundleWatch(
     // chunk set. Publish sw.js only after the burst settles so the browser sees
     // a single activation pointing at the final chunks instead of racing
     // several overlapping swaps. The self-evict injection stays immediate.
+    // createBundleHandler owns the Compiler (exposed as serverOrCompiler), so
+    // the debounced publish can recompute the chunk-graph manifest from the
+    // freshly written resources on every rebuild.
+    let compiler: any = null;
     let publishTimer: ReturnType<typeof setTimeout> | null = null;
     const publishSW = () => {
       if (publishTimer) clearTimeout(publishTimer);
-      publishTimer = setTimeout(() => {
+      publishTimer = setTimeout(async () => {
         publishTimer = null;
+        try {
+          if (compiler) {
+            latestChunkGraphManifest = await computeChunkManifest(
+              compiler,
+              cwd,
+              assetsDir
+            );
+          }
+        } catch (err) {
+          console.error("[bundle] watch chunk-graph manifest failed:", err);
+        }
         onUpdate();
       }, 300);
     };
@@ -382,6 +656,12 @@ export async function runBundleWatch(
       ...(resolvedConfig.jsPlugins ?? []),
       {
         name: "sw-refresh",
+        // Runs inside createCompiler (before the initial compile + every watch
+        // rebuild), so the incremental writer is in place before the first
+        // writeResourcesToDisk() and can seed its last-seen resource map.
+        configureCompiler: (compiler) => {
+          patchIncrementalWrite(compiler);
+        },
         writeResources: {
           executor: () => {
             try {
@@ -394,7 +674,8 @@ export async function runBundleWatch(
         },
       },
     ];
-    await createBundleHandler(resolvedConfig, logger, true);
+    const watcher = await createBundleHandler(resolvedConfig, logger, true);
+    compiler = (watcher as any).serverOrCompiler ?? null;
   } catch (err) {
     console.error("[bundle] Farm watch compile failed:", err);
   }

@@ -1,9 +1,10 @@
 #include "scheme.h"
 #include "config.h"
 #include "gitignore.h"
-#include "search.h"
 #include "images.h"
 #include "json.h"
+#include "platform.h"
+#include "security.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -11,6 +12,7 @@
 #include <filesystem>
 #include <deque>
 #include <vector>
+#include <unordered_set>
 #include <algorithm>
 #include <string>
 namespace fs = std::filesystem;
@@ -115,10 +117,16 @@ static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
                        const std::vector<GitIgnorePattern> &gi_patterns,
                        int depth, int current_depth,
                        bool no_ignore,
+                       std::unordered_set<std::string> &out_dirs,
+                       std::unordered_set<std::string> &out_undeletable,
                        const std::string &rel_prefix = "")
 {
     struct dir_entry { std::string name; std::string rel_path; int weight; };
     struct file_entry { std::string name; std::string rel_path; int weight; };
+
+    // Dirs whose subtree is not content-only (contains stray non-md /
+    // non-image files). Any ancestor of a flagged dir is also non-deletable.
+    std::unordered_set<std::string> non_content;
 
     // Hard cap on directory entries scanned, so tree building exits early
     // instead of oversearching huge content trees.
@@ -142,50 +150,68 @@ static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
         auto pd = queue.front();
         queue.pop_front();
 
+        if (!pd.rel_prefix.empty())
+            out_dirs.insert(pd.rel_prefix);
+
         bool recurse = depth == 0 || pd.cur_depth < depth;
 
         std::vector<dir_entry> dirs;
         std::vector<file_entry> files;
 
         std::error_code ec;
-        for (auto &e : fs::directory_iterator(pd.dir, ec))
+        fs::directory_iterator it(pd.dir, ec), end;
+        for (; !ec && it != end; it.increment(ec))
         {
             if (scanned >= kMaxScanned) break;
             scanned++;
 
-            auto name = e.path().filename().string();
+            auto name = it->path().filename().string();
             auto rel_path = pd.rel_prefix.empty() ? name : pd.rel_prefix + "/" + name;
 
             if (name[0] == '.')
                 continue;
 
-            auto estatus = e.status(ec);
-            if (ec) continue;
+            std::error_code status_ec;
+            auto estatus = it->status(status_ec);
+            if (status_ec) continue;
             auto is_dir = fs::is_directory(estatus);
 
+            // Stray files (including gitignored ones) make this dir — and
+            // every ancestor that would delete it — non-deletable.
+            if (!is_dir && !name.ends_with(".md") &&
+                !security::is_image_file(it->path()))
+                non_content.insert(pd.rel_prefix);
+
             if (!no_ignore && is_ignored(rel_path, is_dir, pd.gi))
+            {
+                // Ignored dirs are never scanned, so their contents can't be
+                // verified as content-only — keep the parent conservative.
+                if (is_dir)
+                    non_content.insert(pd.rel_prefix);
                 continue;
+            }
 
             if (is_dir)
             {
                 if (!recurse)
                     continue;
-                auto child_gi = load_gitignore(e.path());
+                auto child_gi = load_gitignore(it->path());
                 std::vector<GitIgnorePattern> merged = pd.gi;
                 merged.insert(merged.end(), child_gi.begin(), child_gi.end());
-                queue.push_back({e.path(), rel_path, merged, pd.cur_depth + 1});
+                queue.push_back({it->path(), rel_path, merged, pd.cur_depth + 1});
 
                 // Collect folder weight from _index.md if present
                 int folder_weight = -1;
-                auto index_file = e.path() / "_index.md";
-                if (fs::exists(index_file))
+                auto index_file = it->path() / "_index.md";
+                std::error_code fec;
+                if (fs::exists(index_file, fec))
                     folder_weight = extract_weight(index_file);
 
                 dirs.push_back({name, rel_path, folder_weight});
             }
             else if (name.ends_with(".md"))
             {
-                auto w = extract_weight(e.path());
+                auto w = extract_weight(it->path());
                 files.push_back({name, rel_path, w});
             }
         }
@@ -240,6 +266,19 @@ static void build_tree(const fs::path &dir, std::ostringstream &out_paths,
             out_children << "\n    ],\n";
         }
     }
+
+    // Fold: any ancestor of a non-content dir is also non-deletable.
+    for (const auto &rel : non_content)
+    {
+        std::string cur = rel;
+        while (!cur.empty())
+        {
+            out_undeletable.insert(cur);
+            auto slash = cur.rfind('/');
+            if (slash == std::string::npos) break;
+            cur = cur.substr(0, slash);
+        }
+    }
 }
 
 // ── ─────────────────────────────────────────────────────────────────────
@@ -269,9 +308,13 @@ saucer::scheme::response handle_app_request(
 
     if (path == "api/tree" && method == "GET")
     {
-        if (!fs::exists(cfg.content_root))
+        std::error_code exist_ec;
+        if (!fs::exists(cfg.content_root, exist_ec))
+        {
+            security::deletability::instance().clear(cfg.content_root);
             return {.data = saucer::stash::from_str("{}"),
                     .mime = "application/json", .status = 200};
+        }
 
         auto gi_patterns = cfg.no_ignore
             ? std::vector<GitIgnorePattern>{}
@@ -280,8 +323,21 @@ saucer::scheme::response handle_app_request(
         std::ostringstream out_paths;
         std::ostringstream out_children;
         std::ostringstream out_folder_weights;
+        std::unordered_set<std::string> visited_dirs;
+        std::unordered_set<std::string> undeletable;
         build_tree(cfg.content_root, out_paths, out_children, out_folder_weights,
-                   gi_patterns, cfg.depth, 0, cfg.no_ignore);
+                   gi_patterns, cfg.depth, 0, cfg.no_ignore,
+                   visited_dirs, undeletable);
+
+        // Record the scanned dirs so delete paths decide O(1): clean dirs are
+        // deletable, flagged dirs are refused, unscanned dirs fall back to a
+        // live subtree scan.
+        std::unordered_set<std::string> clean;
+        for (const auto &d : visited_dirs)
+            if (!undeletable.contains(d))
+                clean.insert(d);
+        security::deletability::instance().update(
+            cfg.content_root, std::move(undeletable), std::move(clean));
 
         // Strip trailing commas and wrap in proper JSON containers
         auto strip_trail = [](std::ostringstream &ss) -> std::string {
@@ -307,151 +363,6 @@ saucer::scheme::response handle_app_request(
                 .mime = "application/json", .status = 200};
     }
 
-    // -- API: bulk delete --
-
-    if (path == "api/delete" && method == "POST")
-    {
-        std::string body(req.content().str());
-        auto paths = json_string_array(body, "paths");
-        if (paths.empty())
-            return {.data = saucer::stash::from_str("Missing paths"),
-                    .mime = "text/plain", .status = 400};
-
-        std::vector<std::string> doc_dirs;
-        for (auto &raw : paths)
-        {
-            auto p = raw;
-            if (p.empty())
-                continue;
-            if (p[0] == '/')
-                p = p.substr(1);
-            if (!p.ends_with(".md"))
-                p += ".md";
-
-            fs::path resolved;
-            if (!resolve_within(fs::path(cfg.content_root) / p, cfg.content_root, resolved))
-                continue;
-
-            fs::path parent_to_prune;
-            if (fs::is_directory(resolved))
-            {
-                fs::remove_all(resolved);
-                parent_to_prune = resolved.parent_path();
-            }
-            else if (fs::exists(resolved))
-            {
-                fs::remove(resolved);
-                parent_to_prune = resolved.parent_path();
-            }
-            else
-            {
-                // `/content/docs.md` for an existing folder `docs` → delete the dir.
-                auto dir_target = resolved;
-                dir_target = fs::path(dir_target.string().substr(0, dir_target.string().size() - 3));
-                fs::path dir_resolved;
-                if (!resolve_within(dir_target, cfg.content_root, dir_resolved) ||
-                    !fs::is_directory(dir_resolved))
-                    continue;
-                fs::remove_all(dir_resolved);
-                parent_to_prune = dir_resolved.parent_path();
-            }
-
-            auto doc_dir = fs::path(p).parent_path().string();
-            if (!doc_dir.empty())
-                doc_dirs.push_back(doc_dir);
-
-            while (parent_to_prune != fs::path(cfg.content_root) &&
-                   fs::is_empty(parent_to_prune))
-            {
-                fs::remove(parent_to_prune);
-                parent_to_prune = parent_to_prune.parent_path();
-            }
-        }
-
-        for (auto &dir : doc_dirs)
-            remove_orphaned_images(cfg, dir);
-
-        return {.data = saucer::stash::from_str("ok"),
-                .mime = "text/plain", .status = 200};
-    }
-
-    // -- API: move --
-
-    if (path == "api/move" && method == "POST")
-    {
-        std::string body(req.content().str());
-
-        auto from = json_string_value(body, "from");
-        auto to = json_string_value(body, "to");
-
-        if (from.empty() || to.empty())
-            return {.data = saucer::stash::from_str("Missing from/to"),
-                    .mime = "text/plain", .status = 400};
-
-        if (from[0] == '/')
-            from = from.substr(1);
-        if (to[0] == '/')
-            to = to.substr(1);
-
-        if (!from.ends_with(".md") || !to.ends_with(".md"))
-            return {.data = saucer::stash::from_str("Invalid path"),
-                    .mime = "text/plain", .status = 400};
-
-        fs::path src, dst;
-        if (!resolve_within(fs::path(cfg.content_root) / from, cfg.content_root, src) ||
-            !resolve_within(fs::path(cfg.content_root) / to, cfg.content_root, dst))
-            return {.data = saucer::stash::from_str("Invalid path"),
-                    .mime = "text/plain", .status = 403};
-
-        if (src == dst)
-            return {.data = saucer::stash::from_str("ok"),
-                    .mime = "text/plain", .status = 200};
-
-        if (!fs::exists(src))
-            return {.data = saucer::stash::from_str("Source not found"),
-                    .mime = "text/plain", .status = 404};
-
-        fs::create_directories(dst.parent_path());
-
-        std::error_code rename_ec;
-        fs::rename(src, dst, rename_ec);
-        if (rename_ec)
-        {
-            // Cross-device fallback: copy + delete (handles EXDEV)
-            std::ifstream src_f(src, std::ios::binary);
-            if (!src_f)
-                return {.data = saucer::stash::from_str("Read failed"),
-                        .mime = "text/plain", .status = 500};
-            std::string content((std::istreambuf_iterator<char>(src_f)),
-                                std::istreambuf_iterator<char>());
-            src_f.close();
-            std::ofstream dst_f(dst, std::ios::binary);
-            if (!dst_f)
-                return {.data = saucer::stash::from_str("Write failed"),
-                        .mime = "text/plain", .status = 500};
-            dst_f << content;
-            dst_f.close();
-            fs::remove(src);
-        }
-
-        auto parent = src.parent_path();
-        while (parent != fs::path(cfg.content_root) && fs::is_empty(parent))
-        {
-            fs::remove(parent);
-            parent = parent.parent_path();
-        }
-
-        return {.data = saucer::stash::from_str("ok"),
-                .mime = "text/plain", .status = 200};
-    }
-
-    // -- API: search --
-
-    if (path == "api/search" && method == "POST")
-    {
-        return handle_search(cfg, req.content().str());
-    }
-
     // -- Content API: /content/{path} --
 
     const std::string content_prefix = "content/";
@@ -475,13 +386,14 @@ saucer::scheme::response handle_app_request(
 
         // Path traversal guard
         fs::path resolved;
-        if (!resolve_within(fpath, cfg.content_root, resolved))
+        if (!security::within_base(fpath, cfg.content_root, resolved))
             return {.data = saucer::stash::from_str("Forbidden"),
                     .mime = "text/plain", .status = 403};
 
         if (method == "GET")
         {
-            if (!fs::exists(resolved) || fs::is_directory(resolved))
+            std::error_code stat_ec;
+            if (!fs::exists(resolved, stat_ec) || fs::is_directory(resolved, stat_ec))
                 return {.data = saucer::stash::from_str(""),
                         .mime = "text/markdown", .status = 404};
 
@@ -491,7 +403,8 @@ saucer::scheme::response handle_app_request(
 
         if (method == "HEAD")
         {
-            if (!fs::exists(resolved) || !fs::is_regular_file(resolved))
+            std::error_code stat_ec;
+            if (!fs::exists(resolved, stat_ec) || !fs::is_regular_file(resolved, stat_ec))
                 return {.data = saucer::stash::from_str(""),
                         .mime = "text/markdown", .status = 404};
 
@@ -499,49 +412,37 @@ saucer::scheme::response handle_app_request(
                     .mime = "text/markdown; charset=utf-8", .status = 200};
         }
 
-        if (method == "PUT")
-        {
-            std::string body(req.content().str());
-
-            if (body.size() > cfg.max_content_size)
-                return {.data = saucer::stash::from_str("Content too large"),
-                        .mime = "text/plain", .status = 413};
-
-            fs::create_directories(resolved.parent_path());
-            std::ofstream f(resolved, std::ios::binary);
-            if (!f)
-                return {.data = saucer::stash::from_str("Write failed"),
-                        .mime = "text/plain", .status = 500};
-            f << body;
-            f.close();
-
-            // Remove orphaned images after document save
-            auto doc_dir = fs::path(spath).parent_path().string();
-            remove_orphaned_images(cfg, doc_dir);
-
-            return {.data = saucer::stash::from_str("ok"),
-                    .mime = "text/plain", .status = 200};
-        }
-
         if (method == "DELETE")
         {
-            if (!fs::exists(resolved))
+            std::error_code del_ec;
+            if (!fs::exists(resolved, del_ec))
                 return {.data = saucer::stash::from_str("Not found"),
                         .mime = "text/plain", .status = 404};
 
-            if (fs::is_directory(resolved))
-                fs::remove_all(resolved);
+            if (fs::is_directory(resolved, del_ec))
+            {
+                // Never wipe a folder that holds non-content files.
+                if (!security::dir_deletable(cfg.content_root, resolved))
+                    return {.data = saucer::stash::from_str(
+                                    "Folder contains non-content files"),
+                            .mime = "text/plain", .status = 403};
+                fs::remove_all(resolved, del_ec);
+            }
             else
-                fs::remove(resolved);
+                fs::remove(resolved, del_ec);
+            security::deletability::instance().clear(cfg.content_root);
 
             // Remove orphaned images after document delete
             auto doc_dir = fs::path(spath).parent_path().string();
             remove_orphaned_images(cfg, doc_dir);
 
             auto parent = resolved.parent_path();
-            while (parent != fs::path(cfg.content_root) && fs::is_empty(parent))
+            while (parent != fs::path(cfg.content_root))
             {
-                fs::remove(parent);
+                std::error_code pec;
+                if (!fs::is_empty(parent, pec) || pec) break;
+                fs::remove(parent, pec);
+                if (pec) break;
                 parent = parent.parent_path();
             }
 
@@ -567,15 +468,6 @@ saucer::scheme::response handle_app_request(
         return handle_serve_image(cfg, rel_path);
     }
 
-    // -- Image API: POST /api/upload --
-
-    if (path == "api/upload" && method == "POST")
-    {
-        auto headers = req.headers();
-        std::string body(req.content().str());
-        return handle_upload_image(cfg, body, headers);
-    }
-
     // -- Image API: GET /api/images --
 
     if (path == "api/images" && method == "GET")
@@ -597,20 +489,42 @@ saucer::scheme::response handle_app_request(
         return handle_delete_image(cfg, name, qs);
     }
 
-    // -- Static files --
-
-    fs::path file_target;
-    if (path.empty() || path == "index.html")
-        file_target = fs::path(cfg.editor_root) / "index.html";
-    else
-        file_target = fs::path(cfg.editor_root) / path;
+    // -- Static files (Part C.1 W3) --
+    //
+    // The read-only install (cfg.editor_root, the thin shell) ships only the
+    // boot set; the fetch updater downloads the live editor into the writable
+    // data-dir copy (default_editor_data_dir) and this handler serves that
+    // copy FIRST on every boot, so a populated data dir wins over the shipped
+    // shell — updates take effect without touching the install. Both roots are
+    // within_base-guarded.
+    const auto resolve_root = [&](const fs::path &root, const std::string &p)
+    {
+        if (p.empty() || p == "index.html")
+            return root / "index.html";
+        return root / p;
+    };
 
     fs::path file_resolved;
-    if (!resolve_within(file_target, cfg.editor_root, file_resolved))
+    auto updater_root = default_editor_data_dir();
+    if (!updater_root.empty())
+    {
+        auto target = resolve_root(fs::path(updater_root), path);
+        std::error_code within_ec;
+        if (security::within_base(target, fs::path(updater_root), file_resolved) &&
+            fs::is_regular_file(file_resolved, within_ec) && !within_ec)
+        {
+            return {.data = stash_from_file(file_resolved.string()),
+                    .mime = guess_mime(file_resolved.string()), .status = 200};
+        }
+    }
+
+    auto file_target = resolve_root(fs::path(cfg.editor_root), path);
+    if (!security::within_base(file_target, cfg.editor_root, file_resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
-    if (!fs::exists(file_resolved) || !fs::is_regular_file(file_resolved))
+    std::error_code stat_ec;
+    if (!fs::exists(file_resolved, stat_ec) || !fs::is_regular_file(file_resolved, stat_ec))
         return {.data = saucer::stash::from_str("Not Found"),
                 .mime = "text/plain", .status = 404};
 

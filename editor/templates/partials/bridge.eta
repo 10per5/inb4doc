@@ -1,0 +1,9 @@
+<% if (it.desktopBridge) { %>import { initDesktopBridge } from "@/bridge/desktop"
+<% } %><% if (it.mobileBridge) { %>import { initMobileBridge } from "@/bridge/mobile"
+<% } %>
+
+export function initNativeBridge(): void {
+<% if (it.desktopBridge) { %>  initDesktopBridge()
+<% } %><% if (it.mobileBridge) { %>  initMobileBridge()
+<% } %>
+}

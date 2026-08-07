@@ -3,14 +3,6 @@ import { prefsStore } from "@/stores/preferences-store"
 import { openDialog } from "@/services/dialog-service"
 import { PrefsDialogEvent } from "./prefs-dialog-controller"
 
-export function applyThemeFromPrefs() {
-  if (prefsStore.darkMode) {
-    document.documentElement.setAttribute("data-theme", "dark")
-  } else {
-    document.documentElement.removeAttribute("data-theme")
-  }
-}
-
 export interface PrefsDialogActions {
   onStickyToolbarChange: (sticky: boolean) => void
   onImageStorageModeChange?: (mode: ImageStorageMode) => void

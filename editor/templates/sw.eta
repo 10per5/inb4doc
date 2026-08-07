@@ -13,6 +13,10 @@ const CACHE_MAPS = <%= it.cacheMaps %>;
 
 console.info("[SW] v<%= it.appVersion %> build:<%= it.buildVersion %> networkFirst:", NETWORK_FIRST);
 
+// Transport-agnostic updater core (byte-counted transfer + manifest diff +
+// version guard), shared verbatim with the page-side updaters (Part C).
+<%~ include('partials/updater-core', it) %>
+
 function reportProgress(loaded, total, done) {
   self.clients.matchAll({ includeUncontrolled: true }).then((clients) => {
     for (const c of clients) {
@@ -21,52 +25,31 @@ function reportProgress(loaded, total, done) {
   });
 }
 
-// Size of a previously cached copy, 0 when absent. Fallback for servers that
-// don't send content-length on GET: lets the denominator reuse sizes we already
-// know from an earlier install.
-async function cachedCopySize(url) {
-  try {
-    const cached = await caches.match(url);
-    return Number(cached?.headers.get("content-length")) || 0;
-  } catch (_) {
-    return 0;
-  }
-}
-
-// GET a precache file, counting real bytes as they stream. `onTotal(size)` fires
-// once the file's expected size is known (before streaming starts);
-// `onProgress(received)` fires per chunk with the bytes actually transferred so
-// far. Returns the total bytes received.
-async function fetchAndPutCounted(url, onTotal, onProgress) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Failed to fetch " + url);
-  const known =
-    Number(response.headers.get("content-length")) || (await cachedCopySize(url));
-  if (known > 0) onTotal(known);
-  const cache = await caches.open(CACHE);
-  if (!response.body) {
-    await cache.put(url, response.clone());
-    return known;
-  }
-  const reader = response.body.getReader();
-  const parts = [];
-  let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    parts.push(value);
-    received += value.byteLength;
-    onProgress(received);
-  }
-  const body = new Uint8Array(received);
-  let offset = 0;
-  for (const part of parts) {
-    body.set(part, offset);
-    offset += part.byteLength;
-  }
-  await cache.put(url, new Response(body, response));
-  return received;
-}
+// Cache Storage backend for updaterTransfer (the byte-counted GET + skip-Cached
+// loop lives in the shared updater-core). sizeOf() is the fallback for servers
+// that don't send content-length on GET: it lets the transfer denominator reuse
+// sizes we already know from an earlier install.
+const cacheStorage = {
+  async sizeOf(url) {
+    try {
+      const cached = await caches.match(url);
+      return Number(cached?.headers.get("content-length")) || 0;
+    } catch (_) {
+      return 0;
+    }
+  },
+  async put(url, response) {
+    const cache = await caches.open(CACHE);
+    await cache.put(url, response);
+  },
+  async has(url) {
+    try {
+      return Boolean(await caches.match(url));
+    } catch (_) {
+      return false;
+    }
+  },
+};
 
 self.addEventListener("install", (event) => {
   // Take control immediately on every mode. Without this the new SW sits in
@@ -75,14 +58,6 @@ self.addEventListener("install", (event) => {
   self.skipWaiting()
   event.waitUntil(
     (async () => {
-      // Progress shows real transferred bytes: `loaded` is the cumulative
-      // streamed total, `total` the sum of every size we know so far (each
-      // file's content-length, or its previously cached copy's size). Files of
-      // unknown size don't count toward the denominator until their GET reveals
-      // one; if nothing is known yet the UI falls back to an indeterminate
-      // loader.
-      let total = 0;
-      let loaded = 0;
       // Chunk URLs precached by the last completed install. Content-hashed
       // chunk URLs are immutable, so a chunk already on this list is
       // byte-identical to the cached copy and can be skipped — only
@@ -99,45 +74,37 @@ self.addEventListener("install", (event) => {
       } catch (_) {
         // Corrupt/missing list — treat every chunk as not precached.
       }
+      const progress = (loaded, total, done) => reportProgress(loaded, total, done);
       // `skipCached` is for content-hashed chunks: once a chunk URL is on the
       // precached list it is byte-identical forever, so re-installs skip it
       // entirely — only genuinely new/changed chunks are fetched and counted.
       // IMPORTANT assets are build-versioned with stable URLs and change on
       // every build, so they always transfer.
-      const transfer = async (url, skipCached) => {
-        if (skipCached && precached.has(url)) return;
-        try {
-          loaded += await fetchAndPutCounted(
-            url,
-            (size) => {
-              total += size;
-            },
-            (received) => reportProgress(loaded + received, total, false)
-          );
-        } catch (_) {
-          // A missing asset must not abort activation; the denominator just
-          // keeps whatever sizes it already knows.
-        }
-        reportProgress(loaded, total, true);
-      };
+      //
       // Block activation only on the IMPORTANT assets (shell + entry + app.js);
       // first paint never waits on the lazy controller chunks.
-      for (const url of self.IMPORTANT) {
-        await transfer(url, false);
-      }
+      await updaterTransfer(self.IMPORTANT, {
+        storage: cacheStorage,
+        precached,
+        skipCached: false,
+        onProgress: progress,
+      });
       // Fill the remaining chunks in the background without delaying activation.
       // Already-precached chunks are skipped, so only changed files are fetched.
       self.backgroundFill = (async () => {
-        for (const url of self.CHUNKS) {
-          await transfer(url, true);
-        }
+        await updaterTransfer(self.CHUNKS, {
+          storage: cacheStorage,
+          precached,
+          skipCached: true,
+          onProgress: progress,
+        });
         // Persist the chunk set now in the cache so the next install skips
         // them. Only URLs actually present are recorded, so a failed transfer
         // is retried on the next install instead of skipped.
         try {
           const list = [];
           for (const url of self.CHUNKS) {
-            if (await caches.match(url)) list.push(url);
+            if (await cacheStorage.has(url)) list.push(url);
           }
           await cache.put(
             PRECACHED_KEY,
@@ -156,7 +123,17 @@ self.addEventListener("activate", (event) => {
     (async () => {
       await self.clients.claim();
       for (const client of await self.clients.matchAll()) {
-        client.postMessage({ type: "SW_ACTIVATED", version: self.BUILD_VERSION, chunkMap: self.CHUNK_MAP });
+        client.postMessage({
+          type: "SW_ACTIVATED",
+          version: self.BUILD_VERSION,
+          buildVersion: self.BUILD_VERSION,
+          chunkMap: self.CHUNK_MAP,
+          chunks: self.CHUNKS,
+          appHash: self.APP_HASH,
+          indexHash: self.INDEX_HASH,
+          affectedBy: self.AFFECTED_BY,
+          coldOnChange: self.COLD_ON_CHANGE,
+        });
       }
       for (const key of await caches.keys()) {
         if (key !== CACHE) await caches.delete(key);
@@ -223,6 +200,27 @@ function notifyStaleAsset(url) {
   });
 }
 
+// A fallback response when neither the network nor the cache can satisfy the
+// request. Everything here is guarded so event.respondWith() can never reject:
+// a rejected respondWith aborts the caller's fetch (a dynamic import mid-swap)
+// with a browser "unexpected error" instead of a graceful failure the page can
+// handle. Navigations fall back to the cached shell so deep links still load
+// the SPA offline; assets get a 504 that the registrar's swap-failed path (or a
+// later activation) recovers from.
+async function offlineFallback(request) {
+  if (request.mode === "navigate") {
+    try {
+      const shell = await caches.match(self.registration.scope);
+      if (shell) return shell;
+    } catch (_) {}
+  }
+  return new Response("", {
+    status: 504,
+    statusText: "Offline",
+    headers: { "Content-Type": "text/plain" },
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
@@ -242,31 +240,24 @@ self.addEventListener("fetch", (event) => {
           } catch {
             const cached = await caches.match(key);
             if (cached) return cached;
-            return await fetch(event.request);
+            // One retry — a dev-server restart drops the first connection, and
+            // the second attempt usually lands. Guarded so a second failure
+            // falls through to the graceful fallback instead of rejecting.
+            const retried = await fetch(event.request).catch(() => null);
+            if (retried) return retried;
           }
+        } else {
+          const cached = await caches.match(key);
+          if (cached) return cached;
+          const response = await fetch(event.request);
+          await putCacheable(key, response);
+          if (isStaleChunk(response, url)) notifyStaleAsset(event.request.url);
+          return response;
         }
-
-        const cached = await caches.match(key);
-        if (cached) return cached;
-        const response = await fetch(event.request);
-        await putCacheable(key, response);
-        if (isStaleChunk(response, url)) notifyStaleAsset(event.request.url);
-        return response;
       } catch (_) {
-        // Never let the respondWith promise reject: when neither the network
-        // nor the cache can satisfy a navigation, serve the cached app shell so
-        // deep links still load the SPA offline (the app restores the path via
-        // history). Non-navigation assets get a graceful 504 instead.
-        if (event.request.mode === "navigate") {
-          const shell = await caches.match(self.registration.scope);
-          if (shell) return shell;
-        }
-        return new Response("", {
-          status: 504,
-          statusText: "Offline",
-          headers: { "Content-Type": "text/plain" },
-        });
+        // Never let the respondWith promise reject.
       }
+      return offlineFallback(event.request);
     })()
   );
 });

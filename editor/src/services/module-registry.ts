@@ -91,87 +91,159 @@ function loadedChunkNames(ms: any): Set<string> {
   return new Set(Object.keys(ms?.resourceLoader?._loadedResources ?? {}));
 }
 
+export function getLoadedChunkNames(): Set<string> {
+  return loadedChunkNames(getFarmModuleSystem());
+}
+
 export class ModuleRegistry {
   private app: Application;
-  private lastApplied = new Map<string, string>();
 
   constructor(app: Application) {
     this.app = app;
   }
 
+  // Farm's runtime register() refuses to overwrite an already-known module id
+  // (it warns and keeps the OLD factory) unless the chunk's self-evict prelude
+  // deleted it first — a chunk fetched in the pre-injection window (served from
+  // a precache/cache-skip before injectSelfEvicting ran, or re-executed against
+  // a stale module map) registers without evicting and silently keeps the old
+  // code. Evict the chunk's module ids up front by __farm_resource_pot__
+  // membership, independent of the prelude, so the re-import installs fresh.
+  //
+  // The pot is the chunk's own filename (or its document.baseURI-resolved URL
+  // when loaded as a native module, where document.currentScript is null), with
+  // or without the content hash. Match on the hash-stripped stem so the old and
+  // new versions of the same controller/service pot identify each other.
+  private evictPotModules(ms: any, name: string): void {
+    if (!ms?.modules) return;
+    const stemOf = (pot: unknown): string => {
+      const seg =
+        String(pot ?? "").split("?")[0].split("#")[0].split("/").pop() ?? "";
+      return seg.replace(/(?:-[a-f0-9]{8,})?\.js$/, "");
+    };
+    const stem = stemOf(name);
+    for (const id of Object.keys(ms.modules)) {
+      if (stemOf(ms.modules[id]?.__farm_resource_pot__) === stem) {
+        ms.delete(id);
+      }
+    }
+  }
+
+  // Hot-swap for a chunk-graph activation.
+  //   importNames  — non-controller chunk names whose modules must be
+  //                  (re-)registered so downstream controllers pick up fresh
+  //                  code. Only newly-emitted chunks have new URLs, so loaded
+  //                  names are skipped.
+  //   remountNames — controller chunk names to re-import AND re-register in the
+  //                  Stimulus app, which disconnects and reconnects them and
+  //                  re-runs their factories (and the dependency chain those
+  //                  factories require). This is what applies a service change
+  //                  to controllers that merely imported it.
   async swap(
-    names: string[],
-    _version: number,
-    chunkUrls: Record<string, string>
+    importNames: string[],
+    remountNames: string[],
+    urlForChunk: (name: string) => string | undefined,
+    idForChunk: (name: string) => string | undefined
   ): Promise<string[]> {
     const ms = getFarmModuleSystem();
     const remounted: string[] = [];
+    const seen = new Set<string>();
 
-    for (const name of names) {
-      const url = chunkUrls[name];
-      if (!url) continue;
-      if (this.lastApplied.get(name) === url) continue;
-
-      // Baseline activation: this exact chunk is already loaded by app.js, so
-      // nothing changed — record it and skip the remount.
-      const chunkName = url.split("/").pop() ?? "";
-      if (loadedChunkNames(ms).has(chunkName)) {
-        this.lastApplied.set(name, url);
-        continue;
-      }
-
+    const importChunk = async (
+      name: string
+    ): Promise<{ mod: Record<string, unknown>; chunkIds: string[] }> => {
+      const url = urlForChunk(name);
+      if (!url) return { mod: {}, chunkIds: [] };
       let mod: Record<string, unknown> | undefined;
       let chunkIds: string[] = [];
 
-      try {
-        (this.app as any).router.unloadIdentifier(name);
-
-        // Capture exactly which module ids this chunk (re-)registers. The
-        // self-evict prelude deletes every id the chunk owns, then register()
-        // reinstalls all of them — so the ids seen here are the chunk's module
-        // set. Production hashes those ids (e.g. "63fb2e80"), so the controller
-        // can't be matched by name, and a view-only edit leaves the controller
-        // module's factory unchanged — a changed-ids diff would miss it.
-        const originalRegister = ms?.register;
-        const restoreRegister = () => {
-          if (ms && typeof originalRegister === "function") {
-            ms.register = originalRegister;
-          }
-        };
+      // Capture exactly which module ids this chunk (re-)registers. The
+      // self-evict prelude deletes every id the chunk owns, then register()
+      // reinstalls all of them — so the ids seen here are the chunk's module
+      // set. Production hashes those ids (e.g. "63fb2e80"), so the controller
+      // can't be matched by name, and a view-only edit leaves the controller
+      // module's factory unchanged — a changed-ids diff would miss it.
+      const originalRegister = ms?.register;
+      const prevReRegister = ms?.reRegisterModules ?? false;
+      const restoreRegister = () => {
         if (ms && typeof originalRegister === "function") {
-          ms.register = function (id: string, factory: unknown) {
-            chunkIds.push(id);
-            return originalRegister.call(ms, id, factory);
-          };
+          ms.register = originalRegister;
         }
-        try {
-          mod = await import(url);
-          // Farm's register() refuses to overwrite an already-registered module
-          // id (it warns and keeps the OLD factory), so a chunk that executes
-          // against a stale copy — or a module-cache hit that never re-executes —
-          // silently leaves the old controller in place. If nothing was
-          // re-registered, force a fresh execution.
-          if (chunkIds.length === 0) {
-            const sep = url.includes("?") ? "&" : "?";
-            mod = await import(`${url}${sep}t=${Date.now()}`);
-          }
-        } finally {
-          restoreRegister();
+        if (ms) ms.reRegisterModules = prevReRegister;
+      };
+      if (ms && typeof originalRegister === "function") {
+        ms.register = function (id: string, factory: unknown) {
+          chunkIds.push(id);
+          return originalRegister.call(ms, id, factory);
+        };
+      }
+      // Force re-registration even if a stale copy still holds this chunk's ids
+      // (the pre-injection window) and clear their module cache up front so the
+      // prelude's deletion is a no-op and the fresh factories always install.
+      if (ms) ms.reRegisterModules = true;
+      this.evictPotModules(ms, name);
+      try {
+        mod = await import(url);
+        // A css-only chunk (styles-*.js) is a set of idempotent style
+        // injectors: register() installs the factories but nothing re-executes
+        // them, so re-require each css module to run the injector and replace
+        // the matching <style> in place.
+        if (chunkIds.length > 0 && chunkIds.every((id) => id.endsWith(".css"))) {
+          for (const id of chunkIds) ms?.require(id);
         }
-        if (!mod) throw new Error(`No module loaded for "${name}"`);
+        // Farm's register() refuses to overwrite an already-registered module
+        // id (it warns and keeps the OLD factory), so a chunk that executes
+        // against a stale copy — or a module-cache hit that never re-executes —
+        // silently leaves the old controller in place. If nothing was
+        // re-registered, force a fresh execution.
+        if (chunkIds.length === 0) {
+          const sep = url.includes("?") ? "&" : "?";
+          mod = await import(`${url}${sep}t=${Date.now()}`);
+        }
+      } finally {
+        restoreRegister();
+      }
+      return { mod: mod ?? {}, chunkIds };
+    };
 
-        const CtrlClass = extractController(mod, name, chunkIds);
-        this.app.register(name, CtrlClass);
-        this.lastApplied.set(name, url);
-        remounted.push(name);
+    // Invalidate changed non-controller chunks (new names, so never loaded).
+    for (const name of importNames) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      if (loadedChunkNames(ms).has(name)) continue;
+      try {
+        await importChunk(name);
       } catch (err) {
-        console.error(`[sw] swap failed for "${name}":`, err, { chunkName });
+        console.error(`[sw] invalidation import failed for "${name}":`, err);
+        appEvents.emit(AppEvent.SWSwapFailed, { name });
+      }
+    }
+
+    // Re-import + re-register affected controller chunks.
+    for (const name of remountNames) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const id = idForChunk(name);
+      const url = urlForChunk(name);
+      if (!id || !url) continue;
+      let mod: Record<string, unknown> | undefined;
+      let chunkIds: string[] = [];
+      try {
+        (this.app as any).router.unloadIdentifier(id);
+        const loaded = await importChunk(name);
+        mod = loaded.mod;
+        chunkIds = loaded.chunkIds;
+        const CtrlClass = extractController(mod, id, chunkIds);
+        this.app.register(id, CtrlClass);
+        remounted.push(id);
+      } catch (err) {
+        console.error(`[sw] swap failed for "${name}":`, err, { url });
         appEvents.emit(AppEvent.SWSwapFailed, { name });
         // Don't leave the controller unloaded — re-register the previous
         // module so it reconnects.
         try {
-          const fallback = extractController(mod ?? {}, name, chunkIds);
-          this.app.register(name, fallback);
+          const fallback = extractController(mod ?? {}, id, chunkIds);
+          this.app.register(id, fallback);
         } catch {
           // no usable module — leave unloaded
         }

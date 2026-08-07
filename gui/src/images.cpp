@@ -1,29 +1,19 @@
 #include "images.h"
 #include "config.h"
+#include "security.h"
 #include "json.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <map>
 #include <vector>
 #include <algorithm>
 #include <random>
 #include <cctype>
-#include <print>
 
 namespace fs = std::filesystem;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
-
-static bool is_image_ext(const std::string &path)
-{
-    auto dot = path.rfind('.');
-    if (dot == std::string::npos) return false;
-    auto ext = path.substr(dot);
-    for (auto &c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
-           ext == ".gif" || ext == ".svg" || ext == ".webp" ||
-           ext == ".bmp" || ext == ".ico";
-}
 
 static std::string guess_image_mime(const std::string &path)
 {
@@ -51,23 +41,6 @@ static saucer::stash stash_from_file(const std::string &path)
     std::string content(static_cast<std::size_t>(sz), '\0');
     f.read(content.data(), sz);
     return saucer::stash::from_str(content);
-}
-
-bool resolve_within(
-    const fs::path &target,
-    const fs::path &base,
-    fs::path &resolved)
-{
-    std::error_code ec;
-    resolved = fs::weakly_canonical(target, ec);
-    if (ec) return false;
-    auto base_canon = fs::weakly_canonical(base, ec);
-    if (ec) return false;
-    auto rel = resolved.lexically_relative(base_canon);
-    if (rel.empty()) return false;
-    auto rel_str = rel.string();
-    if (rel_str.find("..") != std::string::npos) return false;
-    return true;
 }
 
 std::string url_decode(const std::string &s)
@@ -117,98 +90,6 @@ static std::map<std::string, std::string> parse_query(const std::string &qs)
         start = (amp == std::string::npos) ? qs.size() : amp + 1;
     }
     return result;
-}
-
-// ── Multipart/form-data parser ──────────────────────────────────────────
-
-struct MultipartPart {
-    std::map<std::string, std::string> headers;
-    std::string content;
-};
-
-static std::vector<MultipartPart> parse_multipart(
-    const std::string &body,
-    const std::string &boundary)
-{
-    std::vector<MultipartPart> parts;
-    if (boundary.empty() || body.empty()) return parts;
-
-    std::string delim = "--" + boundary;
-
-    size_t pos = 0;
-    while (true)
-    {
-        // Find the next part boundary
-        auto start = body.find(delim, pos);
-        if (start == std::string::npos) break;
-
-        // Advance past the boundary marker
-        auto content_start = start + delim.size();
-
-        // If followed by "--", this is the end boundary -- stop
-        if (content_start + 1 < body.size() &&
-            body[content_start] == '-' && body[content_start + 1] == '-')
-            break;
-
-        // Skip \r\n after the boundary
-        if (content_start < body.size() && body[content_start] == '\r') content_start++;
-        if (content_start < body.size() && body[content_start] == '\n') content_start++;
-
-        // Find the next occurrence of delim (which marks the next part)
-        auto next = body.find(delim, content_start);
-        if (next == std::string::npos) break;
-
-        auto part_data = body.substr(content_start, next - content_start);
-        // Remove trailing \r\n before next boundary
-        if (part_data.size() >= 2 && part_data.substr(part_data.size() - 2) == "\r\n")
-            part_data = part_data.substr(0, part_data.size() - 2);
-
-        // Split headers from content at \r\n\r\n
-        auto hdr_end = part_data.find("\r\n\r\n");
-        if (hdr_end == std::string::npos) { pos = next + delim.size(); continue; }
-
-        MultipartPart part;
-        auto hdr_section = part_data.substr(0, hdr_end);
-        auto content_part_start = hdr_end + 4;
-
-        // Parse headers
-        size_t hpos = 0;
-        while (hpos < hdr_section.size())
-        {
-            auto eol = hdr_section.find("\r\n", hpos);
-            auto line = (eol == std::string::npos)
-                ? hdr_section.substr(hpos)
-                : hdr_section.substr(hpos, eol - hpos);
-            auto colon = line.find(':');
-            if (colon != std::string::npos)
-            {
-                auto key = line.substr(0, colon);
-                auto val = line.substr(colon + 1);
-                auto vs = val.find_first_not_of(" \t");
-                if (vs != std::string::npos) val = val.substr(vs);
-                part.headers[key] = val;
-            }
-            if (eol == std::string::npos) break;
-            hpos = eol + 2;
-        }
-
-        part.content = part_data.substr(content_part_start);
-        parts.push_back(std::move(part));
-
-        pos = next + delim.size();
-    }
-    return parts;
-}
-
-static std::string extract_boundary(const std::string &content_type)
-{
-    auto pos = content_type.find("boundary=");
-    if (pos == std::string::npos) return "";
-    auto bstart = pos + 9;
-    auto bend = content_type.find_first_of("; \r\n", bstart);
-    if (bend == std::string::npos)
-        return content_type.substr(bstart);
-    return content_type.substr(bstart, bend - bstart);
 }
 
 // ── Filename sanitizer ──────────────────────────────────────────────────
@@ -276,23 +157,27 @@ saucer::scheme::response handle_serve_image(
     auto target = fs::path(cfg.content_root) / rel_path;
 
     fs::path resolved;
-    if (!resolve_within(target, cfg.content_root, resolved))
+    if (!security::within_base(target, cfg.content_root, resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
     // Check extension is allowed image type
-    if (!is_image_ext(resolved.string()))
+    if (!security::is_image_file(resolved.string()))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
     // Must contain /image/ or end with /image
-    auto resolved_str = resolved.string();
-    auto rel = resolved_str.substr(fs::weakly_canonical(cfg.content_root).string().size());
+    std::error_code rel_ec;
+    auto rel = fs::relative(resolved, cfg.content_root, rel_ec).string();
+    if (rel_ec)
+        return {.data = saucer::stash::from_str("Forbidden"),
+                .mime = "text/plain", .status = 403};
     if (rel.find("/image/") == std::string::npos && !rel.ends_with("/image"))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
-    if (!fs::exists(resolved) || fs::is_directory(resolved))
+    std::error_code exist_ec;
+    if (!fs::exists(resolved, exist_ec) || fs::is_directory(resolved, exist_ec))
         return {.data = saucer::stash::from_str("Not Found"),
                 .mime = "text/plain", .status = 404};
 
@@ -301,67 +186,12 @@ saucer::scheme::response handle_serve_image(
     return {.data = data, .mime = mime, .status = 200};
 }
 
-// ── Handle: POST /api/upload ────────────────────────────────────────────
-
-saucer::scheme::response handle_upload_image(
+saucer::scheme::response save_uploaded_image(
     const config &cfg,
-    const std::string &body,
-    const std::map<std::string, std::string> &headers)
+    const std::string &filename,
+    const std::string &doc_dir,
+    const std::string &file_content)
 {
-    // Extract boundary from Content-Type
-    auto ct_it = headers.find("Content-Type");
-    if (ct_it == headers.end())
-        return {.data = saucer::stash::from_str("Missing Content-Type"),
-                .mime = "text/plain", .status = 400};
-
-    auto boundary = extract_boundary(ct_it->second);
-    if (boundary.empty())
-        return {.data = saucer::stash::from_str("Invalid Content-Type"),
-                .mime = "text/plain", .status = 400};
-
-    auto parts = parse_multipart(body, boundary);
-
-    std::string file_content;
-    std::string filename;
-    std::string doc_dir;
-
-    for (const auto &part : parts)
-    {
-        auto cd_it = part.headers.find("Content-Disposition");
-        if (cd_it == part.headers.end()) continue;
-
-        // Extract name parameter
-        auto name_pos = cd_it->second.find("name=\"");
-        if (name_pos == std::string::npos) continue;
-        name_pos += 6;
-        auto name_end = cd_it->second.find('"', name_pos);
-        if (name_end == std::string::npos) continue;
-        auto field_name = cd_it->second.substr(name_pos, name_end - name_pos);
-
-        if (field_name == "file")
-        {
-            // Extract filename
-            auto fn_pos = cd_it->second.find("filename=\"");
-            if (fn_pos != std::string::npos)
-            {
-                fn_pos += 10;
-                auto fn_end = cd_it->second.find('"', fn_pos);
-                if (fn_end != std::string::npos)
-                    filename = cd_it->second.substr(fn_pos, fn_end - fn_pos);
-            }
-            file_content = part.content;
-        }
-        else if (field_name == "dir")
-        {
-            doc_dir = part.content;
-            // Trim trailing \r\n if present
-            if (!doc_dir.empty() && doc_dir.back() == '\n')
-                doc_dir.pop_back();
-            if (!doc_dir.empty() && doc_dir.back() == '\r')
-                doc_dir.pop_back();
-        }
-    }
-
     if (file_content.empty())
         return {.data = saucer::stash::from_str("No file"),
                 .mime = "text/plain", .status = 400};
@@ -380,7 +210,7 @@ saucer::scheme::response handle_upload_image(
         target_dir = fs::path(cfg.content_root) / "image";
 
     fs::path resolved;
-    if (!resolve_within(target_dir, cfg.content_root, resolved))
+    if (!security::within_base(target_dir, cfg.content_root, resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
@@ -420,31 +250,62 @@ static std::vector<std::string> find_image_refs(
 {
     std::vector<std::string> refs;
     auto scan_dir = image_dir.parent_path();
-    if (!fs::exists(scan_dir)) return refs;
+    {
+        std::error_code exist_ec;
+        if (!fs::exists(scan_dir, exist_ec)) return refs;
+    }
+
+    // Hard cap on entries scanned, so orphan checks exit early instead of
+    // walking huge trees on every save.
+    const std::size_t kMaxScanned = 10000;
+    std::size_t scanned = 0;
+
+    // True when `dir` resolves to a location strictly inside the content
+    // tree, so a symlinked directory can never drag the scan outside the
+    // content root (or back into the root itself via a self-symlink).
+    // cfg.content_root is already canonical (see main.cpp), so the base
+    // needs no re-resolution here.
+    auto within_root = [&](const fs::path &dir) -> bool {
+        std::error_code ec;
+        auto canon = fs::canonical(dir, ec);
+        if (ec) return false;
+        auto rel = fs::relative(canon, content_root, ec);
+        if (ec) return false;
+        auto s = rel.string();
+        return s != "." && s != ".." && !s.starts_with("../");
+    };
 
     auto recurse = [&](const fs::path &dir, auto &self) -> void {
         std::error_code ec;
-        for (const auto &e : fs::directory_iterator(dir, ec))
+        fs::directory_iterator it(dir, ec), end;
+        for (; !ec && it != end; it.increment(ec))
         {
-            auto ename = e.path().filename().string();
+            if (scanned >= kMaxScanned) break;
+            scanned++;
+
+            auto ename = it->path().filename().string();
             if (ename[0] == '.') continue;
-            auto estatus = e.status(ec);
-            if (ec) continue;
+
+            std::error_code status_ec;
+            auto estatus = it->status(status_ec);
+            if (status_ec) continue;
             if (fs::is_directory(estatus))
             {
                 if (ename == "image") continue;
-                self(e.path(), self);
+                if (!within_root(it->path())) continue;
+                self(it->path(), self);
             }
             else if (ename.ends_with(".md"))
             {
-                std::ifstream f(e.path());
+                std::ifstream f(it->path());
                 if (!f) continue;
                 std::string content((std::istreambuf_iterator<char>(f)),
                                     std::istreambuf_iterator<char>());
                 if (content.find(image_name) != std::string::npos)
                 {
-                    auto rel = fs::relative(e.path(), content_root).string();
-                    refs.push_back(rel);
+                    std::error_code rel_ec;
+                    auto rel = fs::relative(it->path(), content_root, rel_ec).string();
+                    if (!rel_ec) refs.push_back(rel);
                 }
             }
         }
@@ -470,11 +331,12 @@ saucer::scheme::response handle_list_images(
         image_dir = fs::path(cfg.content_root) / "image";
 
     fs::path resolved;
-    if (!resolve_within(image_dir, cfg.content_root, resolved))
+    if (!security::within_base(image_dir, cfg.content_root, resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
-    if (!fs::exists(resolved) || !fs::is_directory(resolved))
+    std::error_code exist_ec;
+    if (!fs::exists(resolved, exist_ec) || !fs::is_directory(resolved, exist_ec))
     {
         std::string empty = "{\"images\":[]}";
         return {.data = saucer::stash::from_str(empty),
@@ -483,12 +345,14 @@ saucer::scheme::response handle_list_images(
 
     std::vector<std::string> names;
     std::error_code ec;
-    for (const auto &e : fs::directory_iterator(resolved, ec))
+    fs::directory_iterator it(resolved, ec), end;
+    for (; !ec && it != end; it.increment(ec))
     {
-        auto estatus = e.status(ec);
-        if (ec || !fs::is_regular_file(estatus)) continue;
-        auto name = e.path().filename().string();
-        if (is_image_ext(name)) names.push_back(name);
+        std::error_code status_ec;
+        auto estatus = it->status(status_ec);
+        if (status_ec || !fs::is_regular_file(estatus)) continue;
+        auto name = it->path().filename().string();
+        if (security::is_image_file(name)) names.push_back(name);
     }
     std::sort(names.begin(), names.end());
 
@@ -541,6 +405,11 @@ saucer::scheme::response handle_delete_image(
     auto params = parse_query(query_str);
     auto doc_dir = params["dir"];
 
+    // Only image files are deletable through the image API.
+    if (!security::is_image_file(name))
+        return {.data = saucer::stash::from_str("Not found"),
+                .mime = "text/plain", .status = 404};
+
     fs::path image_dir;
     if (!doc_dir.empty())
         image_dir = fs::path(cfg.content_root) / doc_dir / "image";
@@ -548,17 +417,18 @@ saucer::scheme::response handle_delete_image(
         image_dir = fs::path(cfg.content_root) / "image";
 
     fs::path resolved_base;
-    if (!resolve_within(image_dir, cfg.content_root, resolved_base))
+    if (!security::within_base(image_dir, cfg.content_root, resolved_base))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
     auto target = resolved_base / name;
     fs::path resolved;
-    if (!resolve_within(target, cfg.content_root, resolved))
+    if (!security::within_base(target, cfg.content_root, resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
-    if (!fs::exists(resolved) || fs::is_directory(resolved))
+    std::error_code exist_ec;
+    if (!fs::exists(resolved, exist_ec) || fs::is_directory(resolved, exist_ec))
         return {.data = saucer::stash::from_str("Not found"),
                 .mime = "text/plain", .status = 404};
 
@@ -585,40 +455,57 @@ void remove_orphaned_images(
     else
         image_dir = fs::path(cfg.content_root) / "image";
 
-    if (!fs::exists(image_dir) || !fs::is_directory(image_dir)) return;
+    // Refuse to act if the image dir (or anything a caller passes via
+    // doc_rel_path) resolves outside the content root. Every delete/rm below
+    // is then guaranteed to stay inside the user-chosen content directory.
+    fs::path resolved_dir;
+    if (!security::within_base(image_dir, cfg.content_root, resolved_dir))
+        return;
+
+    {
+        std::error_code exist_ec;
+        if (!fs::exists(resolved_dir, exist_ec) ||
+            !fs::is_directory(resolved_dir, exist_ec))
+            return;
+    }
 
     // Remove unreferenced images
     std::error_code ec;
-    for (const auto &e : fs::directory_iterator(image_dir, ec))
+    fs::directory_iterator it(resolved_dir, ec), end;
+    for (; !ec && it != end; it.increment(ec))
     {
-        auto estatus = e.status(ec);
-        if (ec || !fs::is_regular_file(estatus)) continue;
-        auto name = e.path().filename().string();
-        if (!is_image_ext(name)) continue;
+        std::error_code status_ec;
+        auto estatus = it->status(status_ec);
+        if (status_ec || !fs::is_regular_file(estatus)) continue;
+        auto name = it->path().filename().string();
+        if (!security::is_image_file(name)) continue;
 
-        auto refs = find_image_refs(cfg.content_root, image_dir, name);
+        auto refs = find_image_refs(cfg.content_root, resolved_dir, name);
         if (refs.empty())
         {
-            std::error_code ec;
-            fs::remove(e.path(), ec);
+            std::error_code rm_ec;
+            fs::remove(it->path(), rm_ec);
         }
     }
 
     // Remove empty image/ directory
-    if (fs::is_empty(image_dir))
     {
-        std::error_code ec;
-        fs::remove(image_dir, ec);
-
-        // Clean empty parent directories up to content root
-        auto parent = image_dir.parent_path();
-        while (parent != fs::path(cfg.content_root))
+        std::error_code eec;
+        if (fs::is_empty(resolved_dir, eec) && !eec)
         {
-            std::error_code pec;
-            if (!fs::is_empty(parent, pec) || pec) break;
-            fs::remove(parent, pec);
-            if (pec) break;
-            parent = parent.parent_path();
+            std::error_code ec;
+            fs::remove(resolved_dir, ec);
+
+            // Clean empty parent directories up to content root
+            auto parent = resolved_dir.parent_path();
+            while (parent != fs::path(cfg.content_root))
+            {
+                std::error_code pec;
+                if (!fs::is_empty(parent, pec) || pec) break;
+                fs::remove(parent, pec);
+                if (pec) break;
+                parent = parent.parent_path();
+            }
         }
     }
 }
