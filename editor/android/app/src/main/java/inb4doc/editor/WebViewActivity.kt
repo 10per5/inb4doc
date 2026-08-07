@@ -6,9 +6,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
@@ -26,10 +28,14 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 
 class WebViewActivity : AppCompatActivity() {
 
@@ -78,11 +84,51 @@ class WebViewActivity : AppCompatActivity() {
         )
     }
 
+    // ── Project directory (SAF) ─────────────────────────────────────────
+    // The active content root is a persistable content:// tree Uri (the user's
+    // pick of "Open Project"). pickDirectory launches OpenDocumentTree on the
+    // main thread and latches the result for the JS caller, which runs on the
+    // JavaBridge thread. The tree Uri survives relaunch via SharedPreferences;
+    // the JS recent list doubles as the picker history.
+    private val projectPrefs by lazy {
+        getSharedPreferences("inb4doc_project_tree", Context.MODE_PRIVATE)
+    }
+    private var treeUri: Uri? = null
+    private var pendingPick: ((Uri?) -> Unit)? = null
+
+    private val safFs = SafFs(contentResolver)
+
+    private val treePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.data
+        if (uri != null) {
+            val flags = result.data?.flags ?: 0
+            val read = flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            val write = flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            try {
+                contentResolver.takePersistableUriPermission(uri, read or write)
+            } catch (e: Exception) {
+                Log.w("inb4doc", "takePersistableUriPermission failed", e)
+            }
+        }
+        pendingPick?.invoke(uri)
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+
+        // Restore the last Open-Project pick so a relaunch reopens the same
+        // content root (mirrors desktop inb4.config.toml content_root).
+        val savedTree = projectPrefs.getString("tree_uri", null)
+        if (savedTree != null) {
+            val uri = Uri.parse(savedTree)
+            val stillHeld = contentResolver.persistedUriPermissions.any { it.uri == uri }
+            treeUri = if (stillHeld) uri else null
+        }
 
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -334,6 +380,31 @@ class WebViewActivity : AppCompatActivity() {
             put("data", data)
         }.toString()
 
+    private fun activeTree(): Uri? = treeUri
+
+    private fun persistTree(uri: Uri) {
+        treeUri = uri
+        projectPrefs.edit().putString("tree_uri", uri.toString()).apply()
+    }
+
+    private fun projectRootObject(uri: Uri): JSONObject = JSONObject().apply {
+        put("path", uri.toString())
+        val docId = DocumentsContract.getTreeDocumentId(uri)
+        put("name", docId.substringAfterLast('/'))
+    }
+
+    private fun nullDataJson(): String = "{\"ok\":true,\"data\":null}"
+
+    private fun treeJson(
+        paths: List<String>,
+        folderWeights: Map<String, Int>,
+        fileWeights: Map<String, Int>,
+    ): JSONObject = JSONObject().apply {
+        put("paths", JSONArray(paths))
+        put("folderWeights", JSONObject().apply { folderWeights.forEach { put(it.key, it.value) } })
+        put("fileWeights", JSONObject().apply { fileWeights.forEach { put(it.key, it.value) } })
+    }
+
     inner class NativeBridge {
         @JavascriptInterface
         fun copyToClipboard(text: String) {
@@ -416,6 +487,237 @@ class WebViewActivity : AppCompatActivity() {
         fun reload(): String {
             runOnUiThread { webView.reload() }
             return jsonOk()
+        }
+
+        // ── Runtime directory reselection (File → Open Project…) + SAF FS ──
+        // Mirrors the desktop saucer.exposed envelope ({ok, status?, error?,
+        // data?}); every method is forwarded from src/bridge/mobile/index.ts.
+
+        // SAF project picker. Must hop to the main thread and block until the
+        // ActivityResult lands, since @JavascriptInterface runs off the UI
+        // thread. Returns {data:{path,name}} or {data:null} on cancel.
+        @JavascriptInterface
+        fun pickDirectory(): String {
+            val latch = CountDownLatch(1)
+            val result = AtomicReference<Uri?>()
+            runOnUiThread {
+                pendingPick = { uri ->
+                    result.set(uri)
+                    if (uri != null) persistTree(uri)
+                    latch.countDown()
+                }
+                try {
+                    treePickerLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+                } catch (e: Exception) {
+                    pendingPick = null
+                    result.set(null)
+                    latch.countDown()
+                    Log.w("inb4doc", "OpenDocumentTree launch failed", e)
+                }
+            }
+            try {
+                latch.await()
+            } catch (e: InterruptedException) {
+                return jsonError(500, "Interrupted")
+            }
+            val uri = result.get() ?: return nullDataJson()
+            return jsonData(projectRootObject(uri))
+        }
+
+        // Current content root — used by the editor to restore the last project.
+        @JavascriptInterface
+        fun getContentRoot(): String {
+            val uri = activeTree() ?: return nullDataJson()
+            return jsonData(projectRootObject(uri))
+        }
+
+        // Point the SAF layer at a new tree Uri. Validates + persists + sets it
+        // active, so a relaunch reopens the same project.
+        @JavascriptInterface
+        fun setContentRoot(path: String): String {
+            if (path.isEmpty()) return jsonError(400, "Invalid path")
+            val uri = try {
+                Uri.parse(path)
+            } catch (e: Exception) {
+                return jsonError(400, "Invalid path")
+            }
+            if (!DocumentsContract.isTreeUri(uri)) return jsonError(400, "Not a directory")
+            val held = contentResolver.persistedUriPermissions.any { it.uri == uri }
+            if (!held) {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                } catch (e: Exception) {
+                    return jsonError(403, "No access to directory")
+                }
+            }
+            persistTree(uri)
+            return jsonOk()
+        }
+
+        @JavascriptInterface
+        fun getTree(): String {
+            val tree = activeTree() ?: return jsonData(treeJson(emptyList(), emptyMap(), emptyMap()))
+            return try {
+                val t = safFs.buildTree(tree)
+                jsonData(treeJson(t.paths, t.folderWeights, t.fileWeights))
+            } catch (e: Exception) {
+                Log.w("inb4doc", "getTree failed", e)
+                jsonError(500, "getTree failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun readFile(path: String): String {
+            val tree = activeTree() ?: return nullDataJson()
+            return try {
+                val doc = safFs.resolve(tree, path) ?: return nullDataJson()
+                val content = safFs.readText(tree, doc.id)
+                if (content == null) nullDataJson() else jsonData(content)
+            } catch (e: Exception) {
+                Log.w("inb4doc", "readFile failed for $path", e)
+                jsonError(500, "Read failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun writeFile(path: String, content: String): String {
+            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            if (path.isEmpty() || path.contains("..")) return jsonError(403, "Forbidden")
+            return try {
+                safFs.writeText(tree, path, content)
+                jsonOk()
+            } catch (e: Exception) {
+                Log.w("inb4doc", "writeFile failed for $path", e)
+                jsonError(500, "Write failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun deleteFiles(paths: Array<String>): String {
+            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            return try {
+                val parents = safFs.deleteRelPaths(tree, paths.toList())
+                safFs.pruneEmptyDirs(tree, parents)
+                jsonOk()
+            } catch (e: Exception) {
+                Log.w("inb4doc", "deleteFiles failed", e)
+                jsonError(500, "Delete failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun moveFile(from: String, to: String): String {
+            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            return try {
+                safFs.move(tree, from, to)
+                jsonOk()
+            } catch (e: FileNotFoundException) {
+                jsonError(404, "Source not found")
+            } catch (e: IllegalStateException) {
+                jsonError(409, "Destination exists")
+            } catch (e: Exception) {
+                Log.w("inb4doc", "moveFile failed $from -> $to", e)
+                jsonError(500, "Move failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun getServerTime(path: String): String {
+            val tree = activeTree() ?: return nullDataJson()
+            return try {
+                val doc = safFs.resolve(tree, path)
+                if (doc == null || doc.lastModified <= 0L) {
+                    nullDataJson()
+                } else {
+                    jsonData(doc.lastModified)
+                }
+            } catch (e: Exception) {
+                Log.w("inb4doc", "getServerTime failed for $path", e)
+                jsonError(500, "getServerTime failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun search(query: String): String {
+            val tree = activeTree() ?: return jsonData(JSONObject().put("results", JSONArray()))
+            return try {
+                val hits = safFs.search(tree, query)
+                val arr = JSONArray()
+                for (h in hits) {
+                    arr.put(JSONObject().apply {
+                        put("path", h.path)
+                        put("snippets", JSONArray(h.snippets))
+                    })
+                }
+                jsonData(JSONObject().apply { put("results", arr) })
+            } catch (e: Exception) {
+                Log.w("inb4doc", "search failed", e)
+                jsonError(500, "Search failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun uploadImage(name: String, dir: String, dataB64: String): String {
+            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            return try {
+                val url = safFs.uploadImage(tree, name, dir, dataB64)
+                jsonData(JSONObject().apply { put("url", url) })
+            } catch (e: Exception) {
+                Log.w("inb4doc", "uploadImage failed $name", e)
+                jsonError(500, "Upload failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun listImages(dir: String, refs: Boolean): String {
+            val tree = activeTree() ?: return jsonData(JSONObject().put("images", JSONArray()))
+            return try {
+                val images = safFs.listImages(tree, dir, refs)
+                val arr = JSONArray()
+                for (img in images) {
+                    arr.put(JSONObject().apply {
+                        put("name", img.name)
+                        put("url", img.url)
+                        put("storageUrl", img.storageUrl)
+                        put("usedIn", JSONArray(img.usedIn))
+                    })
+                }
+                jsonData(JSONObject().apply { put("images", arr) })
+            } catch (e: Exception) {
+                Log.w("inb4doc", "listImages failed for $dir", e)
+                jsonError(500, "listImages failed")
+            }
+        }
+
+        @JavascriptInterface
+        fun deleteImage(name: String, dir: String): String {
+            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            return try {
+                val rel = if (dir.isEmpty()) "image/$name" else "$dir/image/$name"
+                val id = safFs.resolve(tree, rel)?.id ?: return jsonError(404, "Not found")
+                if (!safFs.delete(tree, id)) return jsonError(500, "Delete failed")
+                jsonOk()
+            } catch (e: Exception) {
+                Log.w("inb4doc", "deleteImage failed $name", e)
+                jsonError(500, "Delete failed")
+            }
+        }
+
+        // Map a markdown image URL to a loadable content:// URI, or null.
+        @JavascriptInterface
+        fun resolveImage(url: String): String {
+            val tree = activeTree() ?: return nullDataJson()
+            return try {
+                val uri = safFs.resolveImage(tree, url)
+                if (uri == null) nullDataJson() else jsonData(uri)
+            } catch (e: Exception) {
+                Log.w("inb4doc", "resolveImage failed for $url", e)
+                nullDataJson()
+            }
         }
     }
 }

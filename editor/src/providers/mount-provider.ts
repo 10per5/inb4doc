@@ -2,6 +2,7 @@ import { RemoteProvider } from "@/providers/remote-provider"
 import { ProviderType } from "@/providers/index"
 import { hasFunc, AppFunc } from "$/build/build-mode"
 import { backendError } from "@/utils/backend-error"
+import { callBridge, setContentRoot } from "@/bridge/native"
 import type { SearchResult } from "@/providers/provider"
 
 /**
@@ -54,39 +55,11 @@ export class MountProvider extends RemoteProvider {
     if (!url) throw backendError(500, "Upload returned no URL")
     return url
   }
-}
 
-interface BridgeEnvelope {
-  ok: boolean
-  status?: number
-  error?: string
-  data?: unknown
-}
-
-type BridgeFn = (...args: unknown[]) => Promise<string>
-
-async function callBridge(fn: string, ...args: unknown[]): Promise<BridgeEnvelope> {
-  const exposed = (window as any).saucer?.exposed as Record<string, BridgeFn> | undefined
-  const caller = exposed?.[fn]
-  if (typeof caller !== "function") {
-    throw backendError(500, `Native bridge function "${fn}" is unavailable`)
+  /** Point the native host at a new content root (runtime directory reselection). */
+  async setRoot(path: string): Promise<void> {
+    await setContentRoot(path)
   }
-  let raw: string
-  try {
-    raw = await caller(...args)
-  } catch (e) {
-    throw backendError(500, `Native bridge "${fn}" failed: ${String(e)}`)
-  }
-  let env: BridgeEnvelope
-  try {
-    env = JSON.parse(raw)
-  } catch {
-    throw backendError(500, `Native bridge "${fn}" returned invalid data`)
-  }
-  if (!env.ok) {
-    throw backendError(env.status ?? 500, env.error ?? `Native bridge "${fn}" failed`)
-  }
-  return env
 }
 
 function fileToBase64(file: File): Promise<string> {

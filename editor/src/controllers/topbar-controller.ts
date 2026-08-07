@@ -74,10 +74,17 @@ export default class extends Controller {
     for (const mount of mounts) {
       const name = mount.dataset.menuName!;
       const mnemonic = hasFunc(AppFunc.ToolbarQuickNav) ? mount.dataset.menuMnemonic?.toLowerCase() : undefined;
-      const items = menuRegistry.get(name);
-      if (!items) continue;
+      if (!menuRegistry.get(name)) continue;
       const label = name.charAt(0).toUpperCase() + name.slice(1);
-      const menu = new Menu({ mountEl: mount, label, title: label, items, mnemonic });
+      // Pass the resolver (not the resolved array) so dynamic items — e.g. the
+      // Recent Projects list — are re-read on every menu open.
+      const menu = new Menu({
+        mountEl: mount,
+        label,
+        title: label,
+        items: () => menuRegistry.get(name)!,
+        mnemonic,
+      });
       this.menus.push(menu);
       if (mnemonic) this.menusByMnemonic.set(mnemonic, menu);
     }

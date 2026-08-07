@@ -14,16 +14,16 @@ import { hasFunc, AppFunc } from "$/build/build-mode";
 
 // Farm's chunk loader bakes a publicPath at build time; override it before any
 // dynamic import. The default RELATIVE "assets/" resolves against the document
-// URL, which is correct under http(s) root/subpath (web-remote) and the desktop
-// app:// scheme. Android is the exception: the page loads from the bundled
-// file:///android_asset/editor/ shell, but WebView does NOT call
-// shouldInterceptRequest for file:///android_asset/ URLs (documented), and the
-// thin APK ships no lazy chunks — so a relative base would resolve every lazy
-// pot under android_asset and 404. Point the loader at the writable data dir
-// via the custom app://editor/ scheme instead: it has no native WebView
-// handler, so every request deterministically reaches shouldInterceptRequest,
-// which serves the updater-downloaded chunk. Everywhere else falls back to the
-// relative base.
+// URL, which is correct under http(s) root/subpath (web-remote), the desktop
+// app:// scheme, and FULL_BUNDLE mobile builds (where every chunk ships in the
+// APK under android_asset). The thin mobile shell is the one exception: the
+// page loads from the bundled file:///android_asset/editor/ shell, but WebView
+// does NOT call shouldInterceptRequest for file:///android_asset/ URLs
+// (documented), and the thin APK ships no lazy chunks — so a relative base
+// would resolve every lazy pot under android_asset and 404. Point the loader
+// at the writable data dir via the custom app://editor/ scheme instead: it has
+// no native WebView handler, so every request deterministically reaches
+// shouldInterceptRequest, which serves the updater-downloaded chunk.
 const ANDROID_MOUNT = (() => {
   try {
     const nb = (window as any).NativeBridge
@@ -33,10 +33,13 @@ const ANDROID_MOUNT = (() => {
     return ""
   }
 })()
+
 // The mount is the JsStaticFs ROOT; the updater stores chunks under its
-// assets/ subdir (pathForUrl keeps "assets/<name>"), so the loader base is the
-// mount + assets/. Everywhere else falls back to the relative base.
-initFarmCompat(ANDROID_MOUNT ? `${ANDROID_MOUNT}assets/` : "assets/")
+// assets/ subdir (pathForUrl keeps "assets/<name>"), so the thin loader base is
+// the mount + assets/. Everywhere else (web, desktop, FULL_BUNDLE mobile) falls
+// back to the relative base, which resolves under the bundled APK.
+const thinShell = hasFunc(AppFunc.ThinShell);
+initFarmCompat(thinShell && ANDROID_MOUNT ? `${ANDROID_MOUNT}assets/` : "assets/")
 
 const app = new Application();
 
@@ -60,8 +63,6 @@ const app = new Application();
 // editor-controller, any dialog controller, or @milkdown/* (type-only imports
 // are erased); interactive dialog opening goes through dynamic imports in the
 // handlers.
-const thinShell = hasFunc(AppFunc.ThinShell);
-
 const registry = new ModuleRegistry(app);
 setRegistry(registry);
 

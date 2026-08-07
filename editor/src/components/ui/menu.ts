@@ -16,15 +16,16 @@ export interface MenuItem {
   id?: string
   icon?: string
   label?: string
+  sublabel?: string
   checked?: boolean
   active?: boolean
   disabled?: boolean
   onClick?: () => void
   items?: MenuItem[]
-  onUpdate?: () => Partial<Pick<MenuItem, "icon" | "label" | "checked" | "active" | "disabled">>
+  onUpdate?: () => Partial<Pick<MenuItem, "icon" | "label" | "sublabel" | "checked" | "active" | "disabled">>
 }
 
-export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "active" | "disabled" | "checked"> {
+export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "sublabel" | "active" | "disabled" | "checked"> {
   childrenHtml?: string
   icons?: { check: string; arrowRight?: string }
 }
@@ -33,7 +34,7 @@ export interface MenuOptions {
   mountEl: HTMLElement
   label: string
   title?: string
-  items: MenuItem[]
+  items: MenuItem[] | (() => MenuItem[])
   mnemonic?: string
 }
 
@@ -82,6 +83,14 @@ function patchItem(el: HTMLElement, changes: Partial<MenuItem>) {
     const labelEl = el.querySelector(".menu-item-label")
     if (labelEl) labelEl.textContent = changes.label
   }
+  if (changes.sublabel !== undefined) {
+    const sublabelEl = el.querySelector(".menu-item-sublabel")
+    if (changes.sublabel) {
+      if (sublabelEl) sublabelEl.textContent = changes.sublabel
+    } else {
+      sublabelEl?.remove()
+    }
+  }
   if (changes.checked !== undefined) {
     const checkEl = el.querySelector(".check") as HTMLElement | null
     if (checkEl) checkEl.style.display = changes.checked ? "inline" : "none"
@@ -109,6 +118,7 @@ export class Menu {
   private mountEl: HTMLElement
   private triggerEl!: HTMLElement
   private panelEl!: HTMLElement
+  private itemResolver: MenuItem[] | (() => MenuItem[])
   private items: MenuItem[]
   private _isOpen = false
   private boundOutsideClick: (e: MouseEvent) => void
@@ -117,7 +127,8 @@ export class Menu {
 
   constructor(opts: MenuOptions) {
     this.mountEl = opts.mountEl
-    this.items = opts.items
+    this.itemResolver = opts.items
+    this.items = this.resolveItems()
     this.mnemonic = opts.mnemonic
     this.boundOutsideClick = this.onOutsideClick.bind(this)
     this.boundPanelKeyDown = this.onPanelKeyDown.bind(this)
@@ -134,6 +145,10 @@ export class Menu {
 
   open() {
     closeAllMenus(this)
+    // Re-resolve dynamic items (e.g. the Recent Projects list) so the menu is
+    // fresh on every open, then apply onUpdate patches for stateful items.
+    this.items = this.resolveItems()
+    this.render()
     this.refresh()
     this.panelEl.classList.add("open")
     this.triggerEl.classList.add("is-open")
@@ -195,6 +210,10 @@ export class Menu {
     this.close()
     this.mountEl.removeEventListener("click", this.onItemClick)
     this.mountEl.innerHTML = ""
+  }
+
+  private resolveItems(): MenuItem[] {
+    return typeof this.itemResolver === "function" ? this.itemResolver() : this.itemResolver
   }
 
   private build(label: string, title?: string) {

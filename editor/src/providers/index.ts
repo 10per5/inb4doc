@@ -3,12 +3,14 @@ import { RemoteProvider } from "@/providers/remote-provider";
 import { MountProvider } from "@/providers/mount-provider";
 import { FileSystemProvider } from "@/providers/fs-provider";
 import { LocalStorageProvider } from "@/providers/local-storage-provider";
+import { SafProvider } from "@/providers/saf-provider";
 
 export enum ProviderType {
   Remote = 0,
   Filesystem = 1,
   LocalStorage = 2,
   Mount = 3,
+  Saf = 4,
 }
 
 export function createProviderByType(type: ProviderType): ContentProvider {
@@ -21,5 +23,7 @@ export function createProviderByType(type: ProviderType): ContentProvider {
       return new FileSystemProvider();
     case ProviderType.LocalStorage:
       return new LocalStorageProvider();
+    case ProviderType.Saf:
+      return new SafProvider();
   }
 }

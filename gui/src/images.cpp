@@ -154,10 +154,10 @@ saucer::scheme::response handle_serve_image(
         return {.data = saucer::stash::from_str("Not Found"),
                 .mime = "text/plain", .status = 404};
 
-    auto target = fs::path(cfg.content_root) / rel_path;
+    auto target = fs::path(cfg.root()) / rel_path;
 
     fs::path resolved;
-    if (!security::within_base(target, cfg.content_root, resolved))
+    if (!security::within_base(target, cfg.root(), resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
@@ -168,7 +168,7 @@ saucer::scheme::response handle_serve_image(
 
     // Must contain /image/ or end with /image
     std::error_code rel_ec;
-    auto rel = fs::relative(resolved, cfg.content_root, rel_ec).string();
+    auto rel = fs::relative(resolved, cfg.root(), rel_ec).string();
     if (rel_ec)
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
@@ -205,12 +205,12 @@ saucer::scheme::response save_uploaded_image(
     // Build target directory
     fs::path target_dir;
     if (!doc_dir.empty())
-        target_dir = fs::path(cfg.content_root) / doc_dir / "image";
+        target_dir = fs::path(cfg.root()) / doc_dir / "image";
     else
-        target_dir = fs::path(cfg.content_root) / "image";
+        target_dir = fs::path(cfg.root()) / "image";
 
     fs::path resolved;
-    if (!security::within_base(target_dir, cfg.content_root, resolved))
+    if (!security::within_base(target_dir, cfg.root(), resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
@@ -263,7 +263,7 @@ static std::vector<std::string> find_image_refs(
     // True when `dir` resolves to a location strictly inside the content
     // tree, so a symlinked directory can never drag the scan outside the
     // content root (or back into the root itself via a self-symlink).
-    // cfg.content_root is already canonical (see main.cpp), so the base
+    // cfg.root() is already canonical (see main.cpp), so the base
     // needs no re-resolution here.
     auto within_root = [&](const fs::path &dir) -> bool {
         std::error_code ec;
@@ -326,12 +326,12 @@ saucer::scheme::response handle_list_images(
 
     fs::path image_dir;
     if (!doc_dir.empty())
-        image_dir = fs::path(cfg.content_root) / doc_dir / "image";
+        image_dir = fs::path(cfg.root()) / doc_dir / "image";
     else
-        image_dir = fs::path(cfg.content_root) / "image";
+        image_dir = fs::path(cfg.root()) / "image";
 
     fs::path resolved;
-    if (!security::within_base(image_dir, cfg.content_root, resolved))
+    if (!security::within_base(image_dir, cfg.root(), resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
@@ -372,7 +372,7 @@ saucer::scheme::response handle_list_images(
         if (refs)
         {
             out << ",\"usedIn\":[";
-            auto ref_list = find_image_refs(cfg.content_root, resolved, name);
+            auto ref_list = find_image_refs(cfg.root(), resolved, name);
             bool rfirst = true;
             for (const auto &r : ref_list)
             {
@@ -412,18 +412,18 @@ saucer::scheme::response handle_delete_image(
 
     fs::path image_dir;
     if (!doc_dir.empty())
-        image_dir = fs::path(cfg.content_root) / doc_dir / "image";
+        image_dir = fs::path(cfg.root()) / doc_dir / "image";
     else
-        image_dir = fs::path(cfg.content_root) / "image";
+        image_dir = fs::path(cfg.root()) / "image";
 
     fs::path resolved_base;
-    if (!security::within_base(image_dir, cfg.content_root, resolved_base))
+    if (!security::within_base(image_dir, cfg.root(), resolved_base))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
     auto target = resolved_base / name;
     fs::path resolved;
-    if (!security::within_base(target, cfg.content_root, resolved))
+    if (!security::within_base(target, cfg.root(), resolved))
         return {.data = saucer::stash::from_str("Forbidden"),
                 .mime = "text/plain", .status = 403};
 
@@ -451,15 +451,15 @@ void remove_orphaned_images(
 {
     fs::path image_dir;
     if (!doc_rel_path.empty())
-        image_dir = fs::path(cfg.content_root) / doc_rel_path / "image";
+        image_dir = fs::path(cfg.root()) / doc_rel_path / "image";
     else
-        image_dir = fs::path(cfg.content_root) / "image";
+        image_dir = fs::path(cfg.root()) / "image";
 
     // Refuse to act if the image dir (or anything a caller passes via
     // doc_rel_path) resolves outside the content root. Every delete/rm below
     // is then guaranteed to stay inside the user-chosen content directory.
     fs::path resolved_dir;
-    if (!security::within_base(image_dir, cfg.content_root, resolved_dir))
+    if (!security::within_base(image_dir, cfg.root(), resolved_dir))
         return;
 
     {
@@ -480,7 +480,7 @@ void remove_orphaned_images(
         auto name = it->path().filename().string();
         if (!security::is_image_file(name)) continue;
 
-        auto refs = find_image_refs(cfg.content_root, resolved_dir, name);
+        auto refs = find_image_refs(cfg.root(), resolved_dir, name);
         if (refs.empty())
         {
             std::error_code rm_ec;
@@ -498,7 +498,7 @@ void remove_orphaned_images(
 
             // Clean empty parent directories up to content root
             auto parent = resolved_dir.parent_path();
-            while (parent != fs::path(cfg.content_root))
+            while (parent != fs::path(cfg.root()))
             {
                 std::error_code pec;
                 if (!fs::is_empty(parent, pec) || pec) break;

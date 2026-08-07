@@ -197,8 +197,8 @@ saucer::scheme::response handle_search(
     std::deque<Entry> queue;
     {
         std::error_code exist_ec;
-        if (fs::exists(cfg.content_root, exist_ec))
-            queue.push_back({cfg.content_root, ""});
+        if (fs::exists(cfg.root(), exist_ec))
+            queue.push_back({cfg.root(), ""});
     }
 
     while (!queue.empty() && scanned < kMaxScanned)

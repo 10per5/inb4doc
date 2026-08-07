@@ -30,4 +30,6 @@ export interface ContentProvider {
   listImages?(dir: string, refs?: boolean): Promise<ImageEntry[]>
   deleteImage?(name: string, dir: string): Promise<void>
   resolveImageUrl?(url: string): string | undefined
+  /** Point the provider at a new content root (runtime directory reselection). */
+  setRoot?(path: string): Promise<void>
 }

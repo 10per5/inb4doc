@@ -49,6 +49,21 @@ export function initMobileBridge(): void {
     "updaterSizeOf",
     "reload",
     "log",
+    // Runtime directory reselection + SAF content provider (Part F)
+    "pickDirectory",
+    "setContentRoot",
+    "getContentRoot",
+    "getTree",
+    "readFile",
+    "writeFile",
+    "deleteFiles",
+    "moveFile",
+    "getServerTime",
+    "search",
+    "uploadImage",
+    "listImages",
+    "deleteImage",
+    "resolveImage",
   ]) {
     forward(exposed, native, name)
   }

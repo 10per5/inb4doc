@@ -44,6 +44,8 @@ export const STORE_PENDING_OPS = "pending-ops"
 export const STORE_PREFS = "prefs"
 /** Storage entity type for connection config. */
 export const STORE_CONNECTIONS = "connections"
+/** Storage entity type for the global recent-projects list. */
+export const STORE_RECENT_PROJECTS = "recent-projects"
 
 /** Per-file patch key prefix. */
 export const PATCH_PREFIX = "inb4doc:patch:"

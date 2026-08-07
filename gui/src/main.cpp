@@ -61,6 +61,15 @@ static std::optional<config> resolve_config(const parsed_args &args)
     cfg.live_port = args.live_port;
     cfg.live_url = "http://127.0.0.1:" + std::to_string(args.live_port);
 
+    // Parse inb4.config.toml once at startup; the app and bridge share this
+    // instance and persist it on change (zoom on quit, setContentRoot). The
+    // content root lives behind root_state so File → Open Project… can
+    // reselect it at runtime (bridge.cpp setContentRoot). Both are created for
+    // every mode — remote mode leaves root() empty and never calls the bridge.
+    auto data_dir = default_data_dir();
+    cfg.settings = std::make_shared<settings>(settings::load(data_dir));
+    cfg.root_state = std::make_shared<content_root_state>();
+
     if (mode_ambiguous(args))
     {
         std::cerr << "error: --editor-root and --host are mutually exclusive\n";
@@ -112,17 +121,6 @@ static std::optional<config> resolve_config(const parsed_args &args)
     allow_update_base_host(cfg.editor_root);
 
     auto content_root = args.content_root;
-    if (content_root.empty())
-    {
-        // No content directory was passed. Default to the current directory
-        // and let the editor fall back to local storage (e.g. browser
-        // localStorage) when there are no markdown files to open — this is
-        // no longer a fatal condition.
-        content_root = ".";
-        if (!fs::exists(content_root) || !fs::is_directory(content_root))
-            content_root.clear();
-    }
-
     if (!content_root.empty())
     {
         if (!fs::exists(content_root) || !fs::is_directory(content_root))
@@ -131,7 +129,27 @@ static std::optional<config> resolve_config(const parsed_args &args)
                       << "' is not a valid directory\n";
             return std::nullopt;
         }
-        cfg.content_root = fs::canonical(content_root).string();
+        auto canonical = fs::canonical(content_root).string();
+        cfg.root_state->set(canonical);
+        // Persist the CLI choice so a bare `inb4doc` launch reuses it.
+        cfg.settings->content_root = canonical;
+        cfg.settings->save(data_dir);
+    }
+    else
+    {
+        // No content directory was passed. Reuse the last project selected via
+        // File → Open Project… if it still exists, else default to the current
+        // directory and let the editor fall back to local storage (e.g.
+        // browser localStorage) when there are no markdown files to open — this
+        // is no longer a fatal condition.
+        content_root = (!cfg.settings->content_root.empty() &&
+                        fs::is_directory(cfg.settings->content_root))
+            ? cfg.settings->content_root
+            : ".";
+        if (!fs::exists(content_root) || !fs::is_directory(content_root))
+            content_root.clear();
+        if (!content_root.empty())
+            cfg.root_state->set(fs::canonical(content_root).string());
     }
 
     cfg.editor_url = "app://_/";
@@ -177,6 +195,7 @@ int main(int argc, char **argv)
         std::println(std::cerr, "  [debug]   disable_gpu = {}", cfg->disable_gpu);
         std::println(std::cerr, "  [debug]   no_ignore  = {}", cfg->no_ignore);
         std::println(std::cerr, "  [debug]   depth      = {}", cfg->depth);
+        std::println(std::cerr, "  [debug]   content_root = {}", cfg->root().empty() ? "(none)" : cfg->root());
     }
 
     return run_app(std::move(*cfg));

@@ -45,6 +45,10 @@ export enum AppEvent {
   ProviderChangeRequested = "provider-change-requested",
   TreeChanged = "tree-changed",
 
+  // Project (runtime directory reselection)
+  OpenProjectRequested = "open-project-requested",
+  RecentProjectRequested = "recent-project-requested",
+
   // UI toggles
   SidebarToggle = "sidebar-toggle",
   MetaPanelToggle = "meta-panel-toggle",
@@ -110,6 +114,9 @@ export interface AppEventPayloads {
   [AppEvent.ProviderChanged]:       { type: ProviderType; icon: string; label: string }
   [AppEvent.ProviderChangeRequested]: void
   [AppEvent.TreeChanged]:           void
+
+  [AppEvent.OpenProjectRequested]:  void
+  [AppEvent.RecentProjectRequested]: { path: string }
 
   [AppEvent.SidebarToggle]:         void
   [AppEvent.MetaPanelToggle]:       void

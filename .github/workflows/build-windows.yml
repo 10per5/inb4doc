@@ -2,8 +2,7 @@ name: Build Windows GUI
 
 on:
   push:
-    # branches: ["main"]
-    branches: ["**"]
+    branches: ["main"]
   workflow_dispatch:
 
 env:

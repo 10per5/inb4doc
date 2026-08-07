@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-build-mode="<%= it.BUILD_MODE %>">
+<html lang="en" data-build-mode="<%= it.BUILD_MODE %>"<% if (it.fullBundle) { %> data-full-bundle="1"<% } %>>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

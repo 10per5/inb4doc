@@ -18,7 +18,13 @@ const ETA_OUT = join(root, "src", "eta")
 // non-thin register entry).
 const modeStr = process.env.BUILD_MODE || "web-local"
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
-const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
+// Same FULL_BUNDLE override as build.ts: force ThinShell off so .eta recompiles
+// agree with the spawned build (dev spawns build.ts --watch with process.env).
+const fullBundle = process.env.FULL_BUNDLE === "1"
+const hasFlag = (func: AppFunc): boolean => {
+  if (fullBundle && func === AppFunc.ThinShell) return false
+  return !!(SUPPORTED_MODES[func] & modeNum)
+}
 
 // ── Leftover-process guard ───────────────────────────────────────────
 // A stale `build.ts --watch` / `serve.ts` / `dev.ts` left over from a previous

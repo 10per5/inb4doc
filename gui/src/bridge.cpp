@@ -88,7 +88,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
     wv.expose("writeFile", [cfg](const std::string &path, const std::string &content)
     {
         auto p = normalize_path(path);
-        auto fpath = fs::path(cfg->content_root) / p;
+        auto fpath = fs::path(cfg->root()) / p;
         if (fpath.extension().empty())
             fpath += ".md";
         if (fpath.extension() != ".md")
@@ -101,7 +101,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
                 return err_json(400, "Invalid path");
 
         fs::path resolved;
-        if (!security::within_base(fpath, cfg->content_root, resolved))
+        if (!security::within_base(fpath, cfg->root(), resolved))
             return err_json(403, "Forbidden");
 
         if (content.size() > cfg->max_content_size)
@@ -119,7 +119,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
         f.close();
 
         remove_orphaned_images(*cfg, fs::path(p).parent_path().string());
-        security::deletability::instance().clear(cfg->content_root);
+        security::deletability::instance().clear(cfg->root());
         return ok_json();
     });
 
@@ -139,7 +139,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
                 p += ".md";
 
             fs::path resolved;
-            if (!security::within_base(fs::path(cfg->content_root) / p, cfg->content_root, resolved))
+            if (!security::within_base(fs::path(cfg->root()) / p, cfg->root(), resolved))
                 continue;
 
             fs::path parent_to_prune;
@@ -147,7 +147,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
             if (fs::is_directory(resolved, del_ec))
             {
                 // Never wipe a folder that holds non-content files.
-                if (!security::dir_deletable(cfg->content_root, resolved))
+                if (!security::dir_deletable(cfg->root(), resolved))
                     return err_json(403, "Folder contains non-content files");
                 fs::remove_all(resolved, del_ec);
                 parent_to_prune = resolved.parent_path();
@@ -163,10 +163,10 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
                 auto dir_target = resolved;
                 dir_target = fs::path(dir_target.string().substr(0, dir_target.string().size() - 3));
                 fs::path dir_resolved;
-                if (!security::within_base(dir_target, cfg->content_root, dir_resolved) ||
+                if (!security::within_base(dir_target, cfg->root(), dir_resolved) ||
                     !fs::is_directory(dir_resolved, del_ec))
                     continue;
-                if (!security::dir_deletable(cfg->content_root, dir_resolved))
+                if (!security::dir_deletable(cfg->root(), dir_resolved))
                     return err_json(403, "Folder contains non-content files");
                 fs::remove_all(dir_resolved, del_ec);
                 parent_to_prune = dir_resolved.parent_path();
@@ -176,7 +176,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
             if (!doc_dir.empty())
                 doc_dirs.push_back(doc_dir);
 
-            while (parent_to_prune != fs::path(cfg->content_root))
+            while (parent_to_prune != fs::path(cfg->root()))
             {
                 std::error_code pec;
                 if (!fs::is_empty(parent_to_prune, pec) || pec) break;
@@ -189,7 +189,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
         for (auto &dir : doc_dirs)
             remove_orphaned_images(*cfg, dir);
 
-        security::deletability::instance().clear(cfg->content_root);
+        security::deletability::instance().clear(cfg->root());
         return ok_json();
     });
 
@@ -206,8 +206,8 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
             return err_json(400, "Invalid path");
 
         fs::path src, dst;
-        if (!security::within_base(fs::path(cfg->content_root) / from, cfg->content_root, src) ||
-            !security::within_base(fs::path(cfg->content_root) / to, cfg->content_root, dst))
+        if (!security::within_base(fs::path(cfg->root()) / from, cfg->root(), src) ||
+            !security::within_base(fs::path(cfg->root()) / to, cfg->root(), dst))
             return err_json(403, "Invalid path");
 
         if (src == dst)
@@ -248,7 +248,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
         }
 
         auto parent = src.parent_path();
-        while (parent != fs::path(cfg->content_root))
+        while (parent != fs::path(cfg->root()))
         {
             std::error_code pec;
             if (!fs::is_empty(parent, pec) || pec) break;
@@ -257,7 +257,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
             parent = parent.parent_path();
         }
 
-        security::deletability::instance().clear(cfg->content_root);
+        security::deletability::instance().clear(cfg->root());
         return ok_json();
     });
 
@@ -283,6 +283,58 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
         if (json.empty())
             return err_json(res.status, "Upload failed");
         return data_json(json);
+    });
+
+    // ── Runtime directory reselection (File → Open Project…) ──
+
+    // Native folder picker. Returns null when the user cancels.
+    wv.expose("pickDirectory", []() -> std::string
+    {
+        auto picked = pick_directory();
+        if (picked.empty())
+            return data_json("null");
+        std::error_code ec;
+        if (!fs::is_directory(picked, ec) || ec)
+            return data_json("null");
+        auto canonical = fs::canonical(picked, ec);
+        if (ec)
+            return data_json("null");
+        std::ostringstream out;
+        out << "{\"path\":\"" << json_escape(canonical.string())
+            << "\",\"name\":\""
+            << json_escape(canonical.filename().string()) << "\"}";
+        return data_json(out.str());
+    });
+
+    // Point the app:// scheme at a new content root. Validates + canonicalizes
+    // the dir, persists it as the launch default, and drops the deletability
+    // cache so delete decisions re-scan against the new tree.
+    wv.expose("setContentRoot", [cfg](const std::string &raw) -> std::string
+    {
+        std::error_code ec;
+        if (!fs::is_directory(raw, ec) || ec)
+            return err_json(400, "Not a directory");
+        auto canonical = fs::canonical(raw, ec);
+        if (ec)
+            return err_json(400, "Invalid path");
+        cfg->root_state->set(canonical.string());
+        security::deletability::instance().clear(cfg->root());
+        cfg->settings->content_root = cfg->root();
+        cfg->settings->save(default_data_dir());
+        return ok_json();
+    });
+
+    // Current content root — used by the editor to restore the last project.
+    wv.expose("getContentRoot", [cfg]() -> std::string
+    {
+        auto root = cfg->root();
+        if (root.empty())
+            return data_json("null");
+        std::ostringstream out;
+        out << "{\"path\":\"" << json_escape(root)
+            << "\",\"name\":\""
+            << json_escape(fs::path(root).filename().string()) << "\"}";
+        return data_json(out.str());
     });
 
     // ── Part C.1 W3 updater storage bridge ──
