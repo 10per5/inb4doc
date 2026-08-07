@@ -164,22 +164,18 @@ jobs:
           premake5 vs2022
           msbuild inb4doc-gui.sln /p:Configuration=release /p:Platform=x64 /m:$env:NUMBER_OF_PROCESSORS
 
-      - name: Cache bun
-        id: cache-bun
+      - name: Cache Bun packages
         uses: actions/cache@v4
         with:
-          path: ~/.bun
-          key: bun-latest
-          restore-keys: bun-
+          path: ~/.bun/install/cache
+          key: bun-${{ hashFiles('editor/bun.lock', 'editor/package.json') }}
+          restore-keys: |
+            bun-
 
-      - name: Install bun
-        if: steps.cache-bun.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: powershell -c "iwr bun.sh/install.ps1 -useb | iex"
-
-      - name: Add bun to PATH
-        shell: pwsh
-        run: echo "$env:USERPROFILE\.bun\bin" >> $env:GITHUB_PATH
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
 
       - name: Build editor
         env:
@@ -205,9 +201,9 @@ jobs:
           echo "version=$ver" >> $env:GITHUB_OUTPUT
 
       - name: Install NSIS
-        uses: negrutiu/nsis-install@v2
+        uses: negrutiu/nsis-install@9c575d44c2938a43e38a305caeb403de90303c60
         with:
-          distro: 'official'
+          distro: "official"
 
       - name: Build NSIS installer
         shell: pwsh
@@ -248,7 +244,7 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.version.outputs.version != 'dev'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
