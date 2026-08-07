@@ -16,11 +16,13 @@ initFarmCompat(editorSelfBase + "assets/");
 
 const app = new Application();
 
-// Part D two-stage entry. app.ts must never statically import
-// controllers/index (its registerControllers pulls controllers/lazy → editor →
+// Part D two-stage entry. app.ts must never statically import the single-stage
+// registration glue (its registerControllers pulls controllers/lazy → editor →
 // node_imports, which would keep every @milkdown/* in the eager boot set). The
 // eager graph ends at controllers/core; the editor + dialog controllers are
-// always reached through a dynamic import.
+// always reached through a dynamic import. The glue itself is generated per
+// build mode (templates/partials/register.eta → src/eta/register.ts): non-thin
+// builds get the registerControllers used below, thin shells get a no-op.
 //
 // Thin shells (ThinShell — GuiDesktop) register core synchronously, start, then
 // register the lazy controllers so node_imports leaves the shipped boot set and
@@ -54,13 +56,28 @@ async function registerLazy(app: Application, retried = false): Promise<void> {
   } catch (err) {
     if (retried) return;
     console.warn("[boot] lazy controllers unavailable — waiting for updater:", err);
-    const retry = (): void => {
-      void registerLazy(app, true).catch((e) =>
-        console.warn("[boot] lazy controllers still unavailable after update:", e)
-      );
+    // Re-attempt after an in-place update (hot swap) AND on a short timer: if
+    // the updater's reload is suppressed (the reload guard) or the swap events
+    // never fire, the shell must still self-heal once the data dir populates.
+    // Stops on the first success or after ~3 minutes.
+    let timer: number | undefined;
+    let attempts = 0;
+    const done = (): void => {
+      if (timer !== undefined) window.clearInterval(timer);
+      appEvents.off(AppEvent.SWUpdateReady, attempt);
+      appEvents.off(AppEvent.ModulesSwapped, attempt);
     };
-    appEvents.on(AppEvent.SWUpdateReady, retry);
-    appEvents.on(AppEvent.ModulesSwapped, retry);
+    const attempt = (): void => {
+      registerLazy(app, true)
+        .then(done)
+        .catch(() => {
+          attempts += 1;
+          if (attempts >= 18) done();
+        });
+    };
+    appEvents.on(AppEvent.SWUpdateReady, attempt);
+    appEvents.on(AppEvent.ModulesSwapped, attempt);
+    timer = window.setInterval(attempt, 10_000);
   }
 }
 
@@ -72,8 +89,12 @@ async function init() {
   if (thinShell) {
     registerCoreControllers(app);
   } else {
-    const { registerControllers } = await import("@/controllers/index");
-    registerControllers(app);
+    // The single-stage registration entry is generated per build mode from
+    // templates/partials/register.eta (src/eta/register.ts); non-thin builds
+    // register core synchronously and load the lazy controllers through a
+    // dynamic import so Farm resolves the lazy pot via its async loader.
+    const { registerControllers } = await import("@/eta/register");
+    await registerControllers(app);
   }
 
   await app.start();

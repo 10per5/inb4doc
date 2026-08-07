@@ -84,6 +84,7 @@ compileStyles(eta, templatesSrc, join(root, "src", "eta", "styles"), styleFlags)
 const templateCount = compileAll(templatesSrc, join(root, "src", "eta"), {
   desktopBridge: hasFlag(AppFunc.DesktopBridge),
   mobileBridge: hasFlag(AppFunc.MobileBridge),
+  thinShell: hasFlag(AppFunc.ThinShell),
 })
 if (templateCount > 0) console.log(`[build] Compiled ${templateCount} runtime template(s)`)
 

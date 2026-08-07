@@ -492,7 +492,7 @@ function makeEnforceResources(
     srcDir
   );
   return [
-    { name: "app", test: [".*src/app\\.ts", ".*src/controllers/index\\.ts"] },
+    { name: "app", test: [".*src/app\\.ts"] },
     // Stimulus + Eta + fflate are the only node_modules the eager shell needs
     // (fflate via utils/zip, used by shell_controller's export/load-as-zip).
     // Give them their own pot (all dependency-free leaves) so the node_imports
