@@ -2,7 +2,9 @@ import type { ModuleRegistry } from "@/services/module-registry"
 import { getLoadedChunkNames } from "@/services/module-registry"
 import { updaterDiff, updaterTransfer, isStaleVersion } from "@/eta/updater-core"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { updateBase, isDev, bootedAppHash, bootedIndexHash, bootedBuildVersion } from "@/config"
+import { updateBase, isDev, bootedAppHash, bootedIndexHash } from "@/config"
+import { hasFunc, AppFunc } from "$/build/build-mode"
+import { logger } from "@/utils/logger"
 
 // Part C.1 fetch updater transport (GuiDesktop thin shell). Where the Service
 // Worker owns updates over http(s), the desktop/mobile WebViews (app://, file://)
@@ -76,7 +78,7 @@ function forceReload(reason: string): boolean {
   } catch {
     // sessionStorage unavailable — allow the single reload.
   }
-  console.warn("[updater] reload:", reason)
+  logger.warn("updater", "reload:", reason)
   // Prefer the native bridge reload (the whole window reloads as one unit);
   // fall back to location.reload.
   const nativeReload = (window as any).saucer?.exposed?.reload as (() => void) | undefined
@@ -225,16 +227,18 @@ export async function applyRemoteUpdate(
   const { storage, registry } = deps
   const { chunks = [], important = [], buildVersion } = manifest
 
-  const sameGeneration =
-    bootedBuildVersion !== "" &&
-    buildVersion !== undefined &&
-    String(buildVersion) === bootedBuildVersion
-
+  // The fetch transport always adopts the remote entry. A thin shell ships a
+  // partial build whose buildVersion collides with independent rebuilds of the
+  // remote (both start at 1), so a same-generation skip here would suppress the
+  // entry/shell reload — the one step that swaps the thin shell for the
+  // downloaded editor — and instead hot-swap foreign chunks into it. When the
+  // booted build already matches the remote (hashes equal) updaterDiff reports
+  // no entry change regardless of this flag, so nothing reloads needlessly.
   const { entryChanged, coldChanged, hot } = updaterDiff(manifest, {
     loadedNames: getLoadedChunkNames(),
     bootedAppHash,
     bootedIndexHash,
-    sameGeneration,
+    sameGeneration: false,
   }) as unknown as UpdaterDiffResult
 
   if (!entryChanged && !coldChanged && !hot) return "none"
@@ -244,7 +248,14 @@ export async function applyRemoteUpdate(
     urls.map(async (u) => ((await storage.has(u)) ? u : null))
   )
   const precached = new Set(stored.filter((u): u is string => u !== null))
-  if (urls.some((u) => !precached.has(u))) {
+  // First run (thin shells only): the data dir holds no downloaded index yet,
+  // so the whole editor is coming down in one pull. The full-screen loader
+  // (updater-loader-controller, gated on AppFunc.ThinShell) owns the screen for
+  // that pull, so don't also raise the update toast — its progress/ready events
+  // still drive the loader. `important[0]` is the site root ("/" → index.html).
+  const indexUrl = remoteUrl(manifest.important[0] ?? "/")
+  const firstRun = hasFunc(AppFunc.ThinShell) && !precached.has(indexUrl)
+  if (!firstRun && urls.some((u) => !precached.has(u))) {
     appEvents.emit(AppEvent.UpdateAvailable)
   }
   await updaterTransfer(urls, {
@@ -343,8 +354,12 @@ export function startUpdater(registry: ModuleRegistry): void {
     if (applying || inFlight) return
     inFlight = true
     try {
-      const res = await fetch(`${updateBase}/assets/manifest.json`, { cache: "no-store" })
-      if (!res.ok) return
+      const manifestUrl = `${updateBase}/assets/manifest.json`
+      const res = await fetch(manifestUrl, { cache: "no-store" })
+      if (!res.ok) {
+        console.warn(`[updater] manifest check failed (HTTP ${res.status}): ${manifestUrl}`)
+        return
+      }
       const manifest = (await res.json()) as RemoteManifest
       if (!manifest || typeof manifest.buildVersion !== "number") return
       runApply(manifest)

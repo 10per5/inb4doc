@@ -9,6 +9,8 @@
 
   <meta name="app-version" content="<%= it.APP_VERSION %>" />
 
+  <meta name="debug-logging" content="<%= it.DEBUG_LOGGING ? "1" : "0" %>" />
+
   <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.png" />
   <link rel="apple-touch-icon" href="<%= it.EDITOR_SELF_BASE || '' %>/inb4doc-256.png" />
   <link rel="manifest" href="<%= it.EDITOR_SELF_BASE || '' %>/manifest.json" />

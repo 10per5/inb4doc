@@ -42,8 +42,18 @@ const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
 const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
 
 // The remote deployment of public/ that fetch transports pull the live editor
-// from (Part C.1). Defaults to the GitHub Pages live URL; override per build.
-const UPDATE_BASE = (process.env.UPDATE_BASE || "https://10per5.github.io/inb4doc/editor-live").replace(/\/+$/, "")
+// from (Part C.1). Defaults to the GitHub Pages live URL, mode-aware so a
+// gui-desktop/gui-mobile build resolves its own deployment subdir (desktop →
+// /desktop, mobile → /mobile) without static.yml having to pass UPDATE_BASE.
+// An explicit UPDATE_BASE always wins (per-mode CI override).
+const LIVE_BASE = "https://10per5.github.io/inb4doc/editor-live"
+const MODE_UPDATE_SUBDIR: Partial<Record<BuildMode, string>> = {
+  [BuildMode.GuiDesktop]: "/desktop",
+  [BuildMode.GuiMobile]: "/mobile",
+}
+const UPDATE_BASE = (
+  process.env.UPDATE_BASE || `${LIVE_BASE}${MODE_UPDATE_SUBDIR[modeNum] ?? ""}`
+).replace(/\/+$/, "")
 
 const criticalCss = [
   readFileSync(join(__dir, "style", "layout.css"), "utf-8"),
@@ -57,6 +67,7 @@ const context = {
   LIVE_URL_BASE: process.env.LIVE_URL_BASE || "",
   UPDATE_BASE,
   APP_VERSION: process.env.APP_VERSION || "",
+  DEBUG_LOGGING: process.env.DEBUG_LOGGING === "1",
   EDITOR_ACTION_PREFIX,
   editorAction: EditorAction,
   TOOLBAR_ACTION_PREFIX,
@@ -70,6 +81,7 @@ const context = {
   icons: icons as Record<string, string>,
   mobileCss: hasFlag(AppFunc.MobileCss),
   toolbarQuickNav: hasFlag(AppFunc.ToolbarQuickNav),
+  thinShell: hasFlag(AppFunc.ThinShell),
 }
 
 const html = renderShell(eta, templatesSrc, context as Record<string, unknown>)
@@ -84,6 +96,7 @@ compileStyles(eta, templatesSrc, join(root, "src", "eta", "styles"), styleFlags)
 const templateCount = compileAll(templatesSrc, join(root, "src", "eta"), {
   desktopBridge: hasFlag(AppFunc.DesktopBridge),
   mobileBridge: hasFlag(AppFunc.MobileBridge),
+  thinShell: hasFlag(AppFunc.ThinShell),
 })
 if (templateCount > 0) console.log(`[build] Compiled ${templateCount} runtime template(s)`)
 

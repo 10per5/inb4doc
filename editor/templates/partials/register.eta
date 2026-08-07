@@ -1,0 +1,20 @@
+import { Application } from "@hotwired/stimulus"
+<% if (!it.thinShell) { %>
+import { registerCoreControllers } from "@/controllers/core"
+
+// Single-stage registration for non-thin builds (web / web-local). Core
+// controllers register synchronously; the lazy editor/dialog controllers are
+// reached through a dynamic import so Farm resolves the index_ff0c pot via its
+// async module loader. (A static `import "./lazy"` would compile to a sync
+// cross-chunk require the eager app pot can't satisfy at boot — that was the
+// "registerLazyControllers is not a function" crash on fresh loads.) Thin
+// shells keep a no-op: their boot registers core directly and pulls lazy in
+// through app.ts's registerLazy() dynamic import instead.
+export async function registerControllers(app: Application): Promise<void> {
+  registerCoreControllers(app)
+  const { registerLazyControllers } = await import("@/controllers/lazy")
+  registerLazyControllers(app)
+}
+<% } else { %>
+export async function registerControllers(_app: Application): Promise<void> {}
+<% } %>

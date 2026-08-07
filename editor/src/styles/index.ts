@@ -29,3 +29,4 @@ import "../eta/styles/conditions.css"
 /* ── Views ──────────────────────────────────────────────────────── */
 import "./views/no-file.css"
 import "./views/dir-index-empty.css"
+import "./views/updater-loader.css"

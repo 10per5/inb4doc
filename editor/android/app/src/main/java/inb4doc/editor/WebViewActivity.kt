@@ -29,12 +29,14 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var webView: WebView
 
     // Bundled editor: the thin shell ships inside the APK at assets/editor/.
-    // The fetch updater downloads the live editor into filesDir/editor (the
+    // The fetch updater downloads the live editor into filesDir/JsStaticFs (the
     // writable data dir); shouldInterceptRequest serves that copy first, so a
-    // populated data dir wins over the bundled shell (Part C.1 W3).
+    // populated data dir wins over the bundled shell (Part C.1 W3). The URL
+    // path stays /editor/ (the APK asset mount); only the physical data dir is
+    // JsStaticFs, matching the desktop data layout (gui/src/platform.cpp).
     private val assetEditorBase = "file:///android_asset/editor/"
 
-    private fun dataEditorDir(): File = File(filesDir, "editor")
+    private fun dataEditorDir(): File = File(filesDir, "JsStaticFs")
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -188,8 +190,8 @@ class WebViewActivity : AppCompatActivity() {
         // ── Part C.1 W3 updater storage bridge ──
         // Mirrors the desktop saucer.exposed envelope ({ok, status?, error?,
         // data?}); the fetch updater downloads the live editor into the writable
-        // data dir (filesDir/editor) keyed by the app-relative path the webview
-        // serves (e.g. "assets/node_imports-abc.js").
+        // data dir (filesDir/JsStaticFs) keyed by the app-relative path the
+        // webview serves (e.g. "assets/node_imports-abc.js").
 
         @JavascriptInterface
         fun updaterPut(path: String, dataB64: String): String {

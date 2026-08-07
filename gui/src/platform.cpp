@@ -76,5 +76,11 @@ std::string default_data_dir()
 std::string default_editor_data_dir()
 {
     auto base = default_data_dir();
-    return base.empty() ? std::string{} : (fs::path(base) / "editor").string();
+    return base.empty() ? std::string{} : (fs::path(base) / "JsStaticFs").string();
+}
+
+std::string default_browser_data_dir()
+{
+    auto base = default_data_dir();
+    return base.empty() ? std::string{} : (fs::path(base) / "Browser").string();
 }

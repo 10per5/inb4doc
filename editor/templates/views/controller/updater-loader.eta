@@ -1,0 +1,21 @@
+<div class="updater-loader" data-updater-loader-target="root" hidden>
+  <div class="updater-loader-card">
+    <div class="updater-loader-logo" aria-hidden="true">
+      <img src="inb4doc-256.png" alt="inb4doc" width="96" height="96" />
+    </div>
+    <h1 class="updater-loader-title">inb4doc</h1>
+    <p class="updater-loader-desc">Setting up the editor for the first time — this only happens once.</p>
+    <div class="updater-loader-endless" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="updater-loader-progress">
+      <div class="updater-loader-track">
+        <div class="updater-loader-fill is-indeterminate" data-updater-loader-target="fill"></div>
+      </div>
+      <div class="updater-loader-meta">
+        <span class="updater-loader-status" data-updater-loader-target="status" role="status">Downloading the editor…</span>
+        <span class="updater-loader-counter" data-updater-loader-target="counter" aria-hidden="true"></span>
+      </div>
+    </div>
+  </div>
+</div>

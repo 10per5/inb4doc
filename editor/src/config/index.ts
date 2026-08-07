@@ -10,6 +10,12 @@ export const isDev: boolean =
   window.location.hostname === "localhost" ||
   window.location.hostname === "127.0.0.1";
 
+// Build-time verbosity flag (DEBUG_LOGGING=1) rendered into the debug-logging
+// meta tag. Gates the normal-flow logs in logger() (src/utils/logger.ts) so
+// shipped builds stay quiet unless explicitly built verbose.
+export const debugLogging: boolean =
+  document.querySelector('meta[name="debug-logging"]')?.getAttribute("content") === "1";
+
 export const staticSiteGeneration: boolean = hasFunc(AppFunc.StaticSiteGeneration);
 
 export const appVersion: string =

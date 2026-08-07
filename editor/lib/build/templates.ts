@@ -74,9 +74,40 @@ ${rendered}`;
   return true;
 }
 
+/**
+ * Emit src/eta/register.ts from templates/partials/register.eta.
+ *
+ * register.eta renders the single-stage controller-registration entry for the
+ * ACTIVE build mode at compile time: non-thin builds get a registerControllers
+ * that registers core synchronously and pulls the lazy editor/dialog
+ * controllers in through a dynamic import (so Farm loads the lazy pot via its
+ * async module loader — a static import would compile to a sync cross-chunk
+ * require that crashes boot); thin shells get a no-op, since their boot never
+ * calls registerControllers and pulls lazy in through app.ts's registerLazy.
+ */
+function compileRegister(
+  templatesSrc: string,
+  outDir: string,
+  flags: TemplateFlags
+): boolean {
+  const srcPath = join(templatesSrc, "partials", "register.eta");
+  if (!existsSync(srcPath)) return false;
+  const source = readFileSync(srcPath, "utf-8");
+  const rendered = new Eta().renderString(source, flags);
+  const code = `// AUTO-GENERATED from partials/register.eta — do not edit manually
+// @ts-nocheck
+${rendered}`;
+  const tsPath = join(outDir, "register.ts");
+  const existing = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : null;
+  if (existing === code) return false;
+  writeFileSync(tsPath, code);
+  return true;
+}
+
 export interface TemplateFlags {
   desktopBridge: boolean;
   mobileBridge: boolean;
+  thinShell: boolean;
 }
 
 /**
@@ -88,7 +119,7 @@ export interface TemplateFlags {
 export function compileAll(
   srcDir: string,
   outDir: string,
-  flags: TemplateFlags = { desktopBridge: false, mobileBridge: false }
+  flags: TemplateFlags = { desktopBridge: false, mobileBridge: false, thinShell: false }
 ): number {
   const eta = new Eta({ views: srcDir });
   let count = 0;
@@ -105,6 +136,8 @@ export function compileAll(
           if (compileUpdaterCore(partialsDir, outDir)) count++;
           // the mode-conditional native-bridge initializer (see above)
           if (compileBridge(srcDir, outDir, flags)) count++;
+          // the mode-conditional single-stage registration entry (see above)
+          if (compileRegister(srcDir, outDir, flags)) count++;
           continue;
         }
         if (entry.name === "styles") continue; // build-time-only CSS templates

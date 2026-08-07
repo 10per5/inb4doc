@@ -5,11 +5,20 @@ import { fileURLToPath } from "url"
 import { stdin as input, stdout as output } from "process"
 import readline from "node:readline/promises"
 import { compileAll } from "./build/templates"
+import { AppFunc, BuildMode, SUPPORTED_MODES, NAME_TO_BUILD_MODE } from "./build/build-mode"
 
 const __dir = dirname(fileURLToPath(import.meta.url))
 const root = join(__dir, "..")
 const TEMPLATES_DIR = join(root, "templates")
 const ETA_OUT = join(root, "src", "eta")
+
+// Same mode-conditional flags build.ts passes to compileAll(), so an .eta edit
+// recompiles bridge.ts / register.ts for the active BUILD_MODE instead of the
+// all-false defaults (which would drop the desktop/mobile bridge and render the
+// non-thin register entry).
+const modeStr = process.env.BUILD_MODE || "web-local"
+const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
+const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
 
 // ── Leftover-process guard ───────────────────────────────────────────
 // A stale `build.ts --watch` / `serve.ts` / `dev.ts` left over from a previous
@@ -165,7 +174,11 @@ watch(TEMPLATES_DIR, { recursive: true }, (_event, filename) => {
   etaTimer = setTimeout(() => {
     etaTimer = null
     console.log(`[dev] ${filename} changed — recompiling templates`)
-    compileAll(TEMPLATES_DIR, ETA_OUT)
+    compileAll(TEMPLATES_DIR, ETA_OUT, {
+      desktopBridge: hasFlag(AppFunc.DesktopBridge),
+      mobileBridge: hasFlag(AppFunc.MobileBridge),
+      thinShell: hasFlag(AppFunc.ThinShell),
+    })
   }, 200)
 })
 
