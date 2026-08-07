@@ -35,12 +35,9 @@ std::string default_editor_root()
 {
     auto dir = fs::path(exe_path()).parent_path();
 
-    for (const auto &candidate : {dir / ".." / "editor", dir / "editor"})
-    {
-        auto norm = candidate.lexically_normal();
-        if (fs::exists(norm) && fs::is_directory(norm))
-            return norm.string();
-    }
+    auto candidate = (dir / "editor").lexically_normal();
+    if (fs::exists(candidate) && fs::is_directory(candidate))
+        return candidate.string();
 
 #ifdef _WIN32
     return "C:/Program Files/inb4doc/editor";

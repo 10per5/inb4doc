@@ -13,15 +13,14 @@
 #
 # The install tree matches default_editor_root() (gui/src/platform.cpp):
 #
-#   <prefix>/bin/inb4doc-gui   <- the GUI binary
-#   <prefix>/bin/icon.png      <- window/desktop icon
-#   <prefix>/editor/           <- read-only thin-shell copy (editor/dist/)
+#   <prefix>/inb4doc-gui   <- the GUI binary
+#   <prefix>/icon.png      <- window/desktop icon
+#   <prefix>/editor/       <- read-only thin-shell copy (editor/dist/)
 #
 # The installer NEVER creates or writes the writable data dir
 # (~/.local/share/inb4doc/JsStaticFs, Browser/...); the app does that on first
-# run. The release payload is a canonical tree (bin/ + editor/) or the flat
-# predep layout (inb4doc-gui + icon.png + dist/); both are normalized to the
-# canonical tree above.
+# run. The release payload is the flat predep layout (inb4doc-gui + icon.png +
+# dist/) and is installed as-is.
 #
 # Usage:
 #   install.sh [--prefix DIR] [--editor-root DIR] [--version TAG] [--source SRC]
@@ -148,18 +147,13 @@ payload_url() {
 }
 
 # Resolve the payload inside a directory into PAYLOAD_BIN/PAYLOAD_EDITOR.
-# Accepts the canonical release layout (bin/ + editor/) and the flat predep
-# layout (inb4doc-gui + dist/), plus archives wrapped in a top-level directory.
+# Accepts the flat predep layout (inb4doc-gui + dist/), plus archives wrapped in
+# a top-level directory.
 PAYLOAD_BIN=""
 PAYLOAD_EDITOR=""
 
 resolve_payload() {
     local base="$1"
-    if [ -f "$base/bin/inb4doc-gui" ] && [ -d "$base/editor" ]; then
-        PAYLOAD_BIN="$base/bin"
-        PAYLOAD_EDITOR="$base/editor"
-        return 0
-    fi
     if [ -f "$base/inb4doc-gui" ] && [ -d "$base/dist" ]; then
         PAYLOAD_BIN="$base"
         PAYLOAD_EDITOR="$base/dist"
@@ -184,7 +178,7 @@ obtain_payload() {
             download "$src" "$TMP_DIR/payload.tar.gz"
             tar -xf "$TMP_DIR/payload.tar.gz" -C "$TMP_DIR"
             if ! resolve_payload "$TMP_DIR"; then
-                echo "error: no usable payload in archive (expected bin/ + editor/)" >&2
+                echo "error: no usable payload in archive (expected inb4doc-gui + dist/)" >&2
                 exit 1
             fi
             ;;
@@ -198,7 +192,7 @@ obtain_payload() {
             ;;
         *)
             if ! resolve_payload "$src"; then
-                echo "error: no usable payload in '$src' (expected bin/ + editor/)" >&2
+                echo "error: no usable payload in '$src' (expected inb4doc-gui + dist/)" >&2
                 exit 1
             fi
             ;;
@@ -210,7 +204,7 @@ obtain_payload() {
 install_desktop() {
     mkdir -p "$DATA_HOME/applications"
 
-    local exec_line="\"$PREFIX/bin/inb4doc-gui\""
+    local exec_line="\"$PREFIX/inb4doc-gui\""
     if [ -n "$EDITOR_ROOT" ]; then
         exec_line="$exec_line --content-root \"$EDITOR_ROOT\""
     fi
@@ -221,7 +215,7 @@ install_desktop() {
         echo "Name=inb4doc"
         echo "Comment=Local-first Markdown editor"
         echo "Exec=$exec_line"
-        echo "Icon=$PREFIX/bin/icon.png"
+        echo "Icon=$PREFIX/icon.png"
         echo "Terminal=false"
         echo "Categories=Office;"
     } > "$DESKTOP_FILE"
@@ -262,12 +256,12 @@ install() {
     echo "Installing inb4doc ($label) into $PREFIX"
 
     rm -rf "${PREFIX:?}/bin" "${PREFIX:?}/editor"
-    mkdir -p "$PREFIX/bin"
+    mkdir -p "$PREFIX"
 
-    put_file 755 "$PAYLOAD_BIN/inb4doc-gui" "$PREFIX/bin/inb4doc-gui"
+    put_file 755 "$PAYLOAD_BIN/inb4doc-gui" "$PREFIX/inb4doc-gui"
 
     if [ -f "$PAYLOAD_BIN/icon.png" ]; then
-        put_file 644 "$PAYLOAD_BIN/icon.png" "$PREFIX/bin/icon.png"
+        put_file 644 "$PAYLOAD_BIN/icon.png" "$PREFIX/icon.png"
     else
         echo "warning: no icon.png in payload; skipping icon" >&2
     fi
@@ -277,8 +271,8 @@ install() {
     echo "Copied thin-shell editor to $PREFIX/editor/"
 
     mkdir -p "$BIN_LINK_DIR"
-    ln -sfn "$PREFIX/bin/inb4doc-gui" "$BIN_LINK_DIR/inb4doc"
-    echo "Linked $BIN_LINK_DIR/inb4doc -> $PREFIX/bin/inb4doc-gui"
+    ln -sfn "$PREFIX/inb4doc-gui" "$BIN_LINK_DIR/inb4doc"
+    echo "Linked $BIN_LINK_DIR/inb4doc -> $PREFIX/inb4doc-gui"
 
     case ":$PATH:" in
         *":$BIN_LINK_DIR:"*) : ;;
@@ -296,14 +290,14 @@ install() {
 
 verify() {
     echo "Verifying install at $PREFIX ..."
-    [ -x "$PREFIX/bin/inb4doc-gui" ] || { echo "FAIL: missing executable $PREFIX/bin/inb4doc-gui" >&2; return 1; }
+    [ -x "$PREFIX/inb4doc-gui" ] || { echo "FAIL: missing executable $PREFIX/inb4doc-gui" >&2; return 1; }
     [ -f "$PREFIX/editor/index.html" ] || { echo "FAIL: missing thin shell $PREFIX/editor/index.html" >&2; return 1; }
     echo "OK: binary and thin-shell editor present."
-    echo "Launch with: $PREFIX/bin/inb4doc-gui --debug"
+    echo "Launch with: $PREFIX/inb4doc-gui --debug"
     if [ "$VERIFY" = 1 ]; then
         echo "Running --debug (a window will open; Ctrl+C to quit)."
         echo "After ~30s, $DATA_HOME/inb4doc/JsStaticFs should populate."
-        "$PREFIX/bin/inb4doc-gui" --debug || true
+        "$PREFIX/inb4doc-gui" --debug || true
     fi
 }
 

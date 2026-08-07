@@ -5,7 +5,7 @@ name = "build-install"
 description = "Install local bun dependencies"
 type = "binary"
 binary = "bun"
-args = ["install"]
+args = ["install", "--frozen-lockfile"]
 
 [[stages]]
 name = "build"
