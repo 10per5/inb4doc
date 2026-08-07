@@ -204,20 +204,10 @@ jobs:
           }
           echo "version=$ver" >> $env:GITHUB_OUTPUT
 
-      - name: Cache NSIS
-        id: cache-nsis
-        uses: actions/cache@v4
-        with:
-          path: C:\nsis
-          key: nsis-3.10
-
       - name: Install NSIS
-        if: steps.cache-nsis.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri 'https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10.zip/download' -OutFile nsis.zip
-          Expand-Archive nsis.zip -DestinationPath C:\nsis
-          echo "C:\nsis\nsis-3.10" >> $env:GITHUB_PATH
+        uses: negrutiu/nsis-install@v2
+        with:
+          distro: 'official'
 
       - name: Build NSIS installer
         shell: pwsh
