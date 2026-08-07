@@ -14,6 +14,10 @@ inputs:
     description: Editor build mode (web-remote, web-local, gui-desktop, gui-mobile)
     required: false
     default: "web-remote"
+  update-base:
+    description: Update base URL the fetch updater pulls the live editor from (per-buildmode deployment subdir)
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -38,6 +42,7 @@ runs:
         BUILD_MODE: ${{ inputs.build-mode }}
         LIVE_URL_BASE: ${{ inputs.live-url-base }}
         EDITOR_SELF_BASE: ${{ inputs.editor-self-base }}
+        UPDATE_BASE: ${{ inputs.update-base }}
       run: |
         bun install --frozen-lockfile
         bun run build

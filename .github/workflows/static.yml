@@ -31,6 +31,30 @@ jobs:
           editor-self-base: https://10per5.github.io/inb4doc/editor-live/
           build-mode: web-remote
 
+      - uses: ./.github/actions/build-editor
+        with:
+          live-url-base: /inb4doc
+          build-mode: gui-desktop
+          update-base: https://10per5.github.io/inb4doc/editor-live/desktop
+
+      - name: Copy desktop editor into site output
+        shell: bash
+        run: |
+          mkdir -p hugo-view/build/editor-live/desktop
+          cp -r editor/public/. hugo-view/build/editor-live/desktop
+
+      - uses: ./.github/actions/build-editor
+        with:
+          live-url-base: /inb4doc
+          build-mode: gui-mobile
+          update-base: https://10per5.github.io/inb4doc/editor-live/mobile
+
+      - name: Copy mobile editor into site output
+        shell: bash
+        run: |
+          mkdir -p hugo-view/build/editor-live/mobile
+          cp -r editor/public/. hugo-view/build/editor-live/mobile
+
       - uses: ./.github/actions/build-hugo
         with:
           baseurl: /inb4doc/
