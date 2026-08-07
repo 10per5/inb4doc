@@ -15,7 +15,6 @@
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
-!include "UserInfo.nsh"
 
 !ifndef PAYLOAD
   !define PAYLOAD "payload"
