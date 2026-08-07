@@ -37,6 +37,11 @@ const templatesSrc = join(root, "templates")
 const eta = new Eta({ views: templatesSrc, autoTrim: [false, false] })
 
 const SELF_BASE = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "")
+// Path prefix for page assets when the editor deploys under a self base
+// (web-remote subpath); empty when the page lives at its own origin root
+// (web-local, gui-desktop, gui-mobile), where relative URLs are correct.
+// Derived here so templates stay declarative — no string sanitization in Eta.
+const ASSET_BASE = SELF_BASE ? `${SELF_BASE}/` : ""
 const modeStr = process.env.BUILD_MODE || "web-local"
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
 const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
@@ -64,6 +69,7 @@ const context = {
   BUILD_MODE: modeStr,
   criticalCss,
   EDITOR_SELF_BASE: SELF_BASE,
+  ASSET_BASE,
   LIVE_URL_BASE: process.env.LIVE_URL_BASE || "",
   UPDATE_BASE,
   APP_VERSION: process.env.APP_VERSION || "",

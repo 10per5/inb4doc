@@ -121,11 +121,22 @@ function remoteUrl(path: string): string {
   return `${updateBase}${path.startsWith("/") ? "" : "/"}${path}`
 }
 function localUrlForChunk(name: string): string {
-  // Android WebView (GuiMobile): the bundled editor lives under
-  // file:///android_asset/editor/ and shouldInterceptRequest serves the
-  // updater's data-dir copy at the same path (data dir first) — location.origin
-  // of a file:// page is unreliable, so pin the known mount.
+  // Android WebView (GuiMobile): the updater stores chunks in the writable data
+  // dir; the browser must fetch them through the custom app://editor/ scheme,
+  // which has no native WebView handler and so deterministically reaches
+  // shouldInterceptRequest (which serves the data-dir copy). Plain
+  // file:///android_asset/ URLs bypass shouldInterceptRequest and hold no lazy
+  // chunks in the thin APK. location.origin of a file:// page is unreliable, so
+  // the native side exposes the data-dir mount URL.
   if ((window as any).NativeBridge) {
+    try {
+      const nb = (window as any).NativeBridge
+      const mount =
+        typeof nb.editorMountUrl === "function" ? nb.editorMountUrl() : ""
+      if (typeof mount === "string" && mount) return `${mount}assets/${name}`
+    } catch {
+      // fall through to the old pin
+    }
     return `file:///android_asset/editor/assets/${name}`
   }
   return `${location.origin}/assets/${name}`
@@ -265,6 +276,24 @@ export async function applyRemoteUpdate(
     onProgress: (loaded: number, total: number, done: boolean) =>
       appEvents.emit(AppEvent.SWInstallProgress, { loaded, total, done }),
   })
+
+  // Android thin-shell debug: confirm the transfer actually wrote every file to
+  // the data dir (updaterTransfer swallows per-file errors silently, so a
+  // "completed" progress bar can mask a failed write).
+  if ((window as any).NativeBridge) {
+    try {
+      const missing: string[] = []
+      for (const u of urls) {
+        if (!(await storage.has(u))) missing.push(pathForUrl(u))
+      }
+      console.info(
+        `[updater] data-dir verification: ${urls.length - missing.length}/${urls.length} present` +
+          (missing.length ? `; missing: ${missing.slice(0, 5).join(", ")}` : "")
+      )
+    } catch {
+      // verification is best-effort
+    }
+  }
 
   if (entryChanged || coldChanged) {
     forceReload(

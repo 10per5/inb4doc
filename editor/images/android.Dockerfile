@@ -51,8 +51,13 @@ ENV PATH="${PATH}:/opt/gradle-8.11.1/bin"
 
 WORKDIR /build
 
-# Editor static assets (from editor-build stage)
-COPY --from=editor-build /src/public/ editor-public/
+# Editor static assets (from editor-build stage). dist/ is the THIN shell
+# (GuiMobile): the eager core boot set + updater loader only. The first run
+# downloads the live editor from update-base into the writable data dir via the
+# fetch updater, exactly like GuiDesktop. Bundling the full public/ here would
+# defeat the thin wrapper AND re-trigger a redundant first-run download on top
+# of a complete bundle (gui-mobile now carries a default update-base).
+COPY --from=editor-build /src/dist/ editor-public/
 
 # Android project source
 COPY android/build.gradle.kts android/settings.gradle.kts android/gradle.properties ./

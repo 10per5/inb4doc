@@ -20,7 +20,12 @@ function forward(
   to = from
 ): void {
   if (typeof native[from] === "function" && typeof exposed[to] !== "function") {
-    exposed[to] = native[from]
+    // Must invoke the method ON the injected object. WebView rejects a detached
+    // or bound reference with "Java bridge method can't be invoked on a
+    // non-injected object"; the arrow re-looks up native[from] per call so the
+    // injected object is always the receiver.
+    exposed[to] = (...args: unknown[]) =>
+      (native as Record<string, (...a: unknown[]) => unknown>)[from](...args)
   }
 }
 
@@ -53,9 +58,9 @@ export function initMobileBridge(): void {
   w.saucer.exposed = exposed
 
   // Pipe console output to the native log (available immediately on Android,
-  // no polling needed).
-  const nativeLog = native["log"] as ((msg: string) => void) | undefined
-  if (typeof nativeLog === "function") {
+  // no polling needed). Same receiver rule as forward(): call native["log"]
+  // directly instead of hoisting the Java method.
+  if (typeof native["log"] === "function") {
     const methods = ["log", "warn", "error", "debug"] as const
     const format = (args: unknown[]) =>
       args.map((a) => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ")
@@ -63,7 +68,9 @@ export function initMobileBridge(): void {
       const orig = (console as any)[level].bind(console)
       ;(console as any)[level] = (...args: unknown[]) => {
         orig(...args)
-        try { nativeLog(`[${level}] ${format(args)}`) } catch {}
+        try {
+          ;(native as any)["log"](`[${level}] ${format(args)}`)
+        } catch {}
       }
     }
   }

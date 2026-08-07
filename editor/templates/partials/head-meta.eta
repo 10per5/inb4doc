@@ -1,6 +1,4 @@
-<% const SELF_BASE = (it.EDITOR_SELF_BASE || "").replace(/\/+$/, ""); %>
-<% const BASE_HREF = SELF_BASE ? `${SELF_BASE}/` : "/"; %>
-<base href="<%= BASE_HREF %>" />
+<% if (it.ASSET_BASE) { %><base href="<%= it.ASSET_BASE %>" /><% } %>
   <meta name="editor-self-base" content="<%= it.EDITOR_SELF_BASE %>" />
 
   <meta name="live-url-base" content="<%= it.LIVE_URL_BASE %>" />
@@ -11,9 +9,9 @@
 
   <meta name="debug-logging" content="<%= it.DEBUG_LOGGING ? "1" : "0" %>" />
 
-  <link rel="icon" type="image/png" href="<%= it.EDITOR_SELF_BASE || '' %>/favicon.png" />
-  <link rel="apple-touch-icon" href="<%= it.EDITOR_SELF_BASE || '' %>/inb4doc-256.png" />
-  <link rel="manifest" href="<%= it.EDITOR_SELF_BASE || '' %>/manifest.json" />
+  <link rel="icon" type="image/png" href="<%= it.ASSET_BASE %>favicon.png" />
+  <link rel="apple-touch-icon" href="<%= it.ASSET_BASE %>inb4doc-256.png" />
+  <link rel="manifest" href="<%= it.ASSET_BASE %>manifest.json" />
 
   <title>inb4doc - Your notes, where you need them</title>
   <meta name="description" content="Live markdown editor for browser, desktop, and mobile. Connect providers to export wikis, static sites, and more.">
