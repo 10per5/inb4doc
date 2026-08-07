@@ -294,6 +294,13 @@ saucer::scheme::response handle_app_request(
     if (!path.empty() && path[0] == '/')
         path = path.substr(1);
 
+    // WebView2's path() keeps the query string (e.g. "assets/app.js?ver=0.0.5p1"),
+    // which must never be part of the on-disk file path. Qt strips it already;
+    // stripping here is idempotent and fixes the Windows 404s for ?ver assets.
+    auto qm = path.find('?');
+    if (qm != std::string::npos)
+        path = path.substr(0, qm);
+
     if (path == ".")
         path.clear();
 

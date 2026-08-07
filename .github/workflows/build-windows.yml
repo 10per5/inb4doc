@@ -2,7 +2,8 @@ name: Build Windows GUI
 
 on:
   push:
-    branches: ["main"]
+    # branches: ["main"]
+    branches: ["**"]
   workflow_dispatch:
 
 env:
@@ -215,10 +216,10 @@ jobs:
           $cands += Get-ChildItem staging-raw -Directory | ForEach-Object { $_.FullName }
           $src = $null
           foreach ($c in $cands) {
-            if ((Test-Path (Join-Path $c 'inb4doc-gui.exe')) -and (Test-Path (Join-Path $c 'dist\index.html'))) {
+            if ((Test-Path (Join-Path $c 'inb4doc-gui.exe')) -and (Test-Path (Join-Path $c 'editor\index.html'))) {
               Copy-Item (Join-Path $c 'inb4doc-gui.exe') $payload -Force
               if (Test-Path (Join-Path $c 'icon.png')) { Copy-Item (Join-Path $c 'icon.png') $payload -Force }
-              Copy-Item (Join-Path $c 'dist\*') $editor -Recurse -Force
+              Copy-Item (Join-Path $c 'editor\*') $editor -Recurse -Force
               $src = $c
               break
             }
