@@ -233,7 +233,9 @@ jobs:
           }
           if (-not $src) { throw 'no usable payload in archive' }
           Write-Host "payload from: $src"
-          makensis "/DPAYLOAD=$payload" "/DAPP_VERSION=${{ steps.version.outputs.version }}" scripts\inb4doc.nsi
+          $out = Join-Path $pwd 'inb4doc-windows-installer-x86_64.exe'
+          makensis "/DPAYLOAD=$payload" "/DAPP_VERSION=${{ steps.version.outputs.version }}" "/DOUTFILE=$out" scripts\inb4doc.nsi
+          if (-not (Test-Path $out)) { throw "makensis did not produce $out" }
 
       # - name: Upload artifact
       #   uses: actions/upload-artifact@v4
