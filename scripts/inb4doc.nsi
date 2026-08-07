@@ -4,12 +4,12 @@
 ; Mirrors scripts/install.cmd:
 ;   - installs to %LOCALAPPDATA%\Programs\inb4doc, or %ProgramFiles%\inb4doc
 ;     when the installer is run elevated
-;   - shortcuts point straight at bin\inb4doc-gui.exe (embedded icon)
+;   - shortcuts point straight at inb4doc-gui.exe (embedded icon)
 ;   - per-user uninstall + Add/Remove Programs entry; user data in %APPDATA% is
 ;     never touched
 ;
-; The payload staging dir must contain the canonical tree:
-;   bin\inb4doc-gui.exe, bin\icon.png, editor\...
+; The payload staging dir must contain the flat tree:
+;   inb4doc-gui.exe, icon.png, editor\...
 ;
 ;   makensis /DPAYLOAD=C:\path\to\payload /DAPP_VERSION=0.0.5 inb4doc.nsi
 
@@ -70,7 +70,7 @@ Section "Install" SecMain
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\inb4doc" \
       "Publisher" "10per5"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\inb4doc" \
-      "DisplayIcon" "$INSTDIR\bin\inb4doc-gui.exe,0"
+      "DisplayIcon" "$INSTDIR\inb4doc-gui.exe,0"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\inb4doc" \
       "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\inb4doc" \
@@ -82,9 +82,9 @@ Section "Install" SecMain
 
   CreateDirectory "$SMPROGRAMS\inb4doc"
   CreateShortcut "$SMPROGRAMS\inb4doc\inb4doc.lnk" \
-      "$INSTDIR\bin\inb4doc-gui.exe" "" "$INSTDIR\bin\inb4doc-gui.exe" 0
+      "$INSTDIR\inb4doc-gui.exe" "" "$INSTDIR\inb4doc-gui.exe" 0
   CreateShortcut "$DESKTOP\inb4doc.lnk" \
-      "$INSTDIR\bin\inb4doc-gui.exe" "" "$INSTDIR\bin\inb4doc-gui.exe" 0
+      "$INSTDIR\inb4doc-gui.exe" "" "$INSTDIR\inb4doc-gui.exe" 0
 SectionEnd
 
 Section "Uninstall"

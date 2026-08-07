@@ -17,9 +17,9 @@ rem  Payload: <releases>/latest/download/inb4doc-windows-x86_64.zip
 rem  Default prefix (no admin): %LOCALAPPDATA%\Programs\inb4doc
 rem  If run elevated:           %ProgramFiles%\inb4doc
 rem
-rem  Shortcuts point straight at bin\inb4doc-gui.exe (extra flags go in the
-rem  shortcut's Target/Arguments, e.g. --debug). The icon is derived from
-rem  bin\icon.png into bin\inb4doc.ico at install time.
+rem  Shortcuts point straight at inb4doc-gui.exe (extra flags go in the
+rem  shortcut's Target/Arguments, e.g. --debug). The shortcut icon comes from
+rem  the exe's embedded icon (images/favicon.ico via gui/src/app.rc).
 rem
 rem  Usage:
 rem    install.cmd [--prefix DIR] [--version TAG] [--source SRC]
@@ -193,8 +193,8 @@ call :expand "%PAYLOAD_ZIP%" "%PAYLOAD_BASE%"
 exit /b 0
 
 rem ===========================================================================
-rem Locate bin\ + editor\ (canonical) or inb4doc-gui.exe + dist\ (flat legacy)
-rem inside PAYLOAD_BASE; sets PAYLOAD_BIN / PAYLOAD_EDITOR.
+rem Locate the flat payload (inb4doc-gui.exe + dist\) or the legacy canonical
+rem tree (bin\ + editor\) inside PAYLOAD_BASE; sets PAYLOAD_BIN / PAYLOAD_EDITOR.
 :find_payload
 set "PAYLOAD_BIN="
 set "PAYLOAD_EDITOR="
@@ -246,12 +246,13 @@ if errorlevel 1 exit /b 1
 call :find_payload
 if errorlevel 1 exit /b 1
 
-if not exist "%PREFIX%\bin" mkdir "%PREFIX%\bin"
-call :copy_tree "%PAYLOAD_BIN%" "%PREFIX%\bin"
+if exist "%PREFIX%\bin" rmdir /s /q "%PREFIX%\bin"
+copy /y "%PAYLOAD_BIN%\inb4doc-gui.exe" "%PREFIX%\" >nul
 if errorlevel 1 (
-  echo error: failed to copy %PAYLOAD_BIN% to %PREFIX%\bin
+  echo error: failed to copy %PAYLOAD_BIN%\inb4doc-gui.exe to %PREFIX%
   exit /b 1
 )
+if exist "%PAYLOAD_BIN%\icon.png" copy /y "%PAYLOAD_BIN%\icon.png" "%PREFIX%\" >nul
 call :copy_tree "%PAYLOAD_EDITOR%" "%PREFIX%\editor"
 if errorlevel 1 (
   echo error: failed to copy %PAYLOAD_EDITOR% to %PREFIX%\editor
@@ -267,18 +268,18 @@ if "%NO_SHORTCUTS%"=="1" (
 exit /b 0
 
 rem ===========================================================================
-rem Start Menu + Desktop shortcuts. Target is bin\inb4doc-gui.exe directly (no
-rem launcher .cmd needed — extra flags go on the shortcut's Target). Icon is
-rem derived from bin\icon.png into bin\inb4doc.ico at install time. Written
-rem inline so install.cmd stays a single self-contained file that works when
-rem eval'd from a console.
+rem Start Menu + Desktop shortcuts. Target is inb4doc-gui.exe directly (no
+rem launcher .cmd needed — extra flags go on the shortcut's Target). Shortcut
+rem icon comes from the exe's embedded icon (images/favicon.ico via app.rc).
+rem Written inline so install.cmd stays a single self-contained file that works
+rem when eval'd from a console.
 :create_shortcuts
 echo Creating Start Menu / Desktop shortcuts ...
 call :write_shortcuts_script
 if errorlevel 1 exit /b 0
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" "%PREFIX%" create
 if errorlevel 1 (
-  echo warning: shortcut creation failed. Launch the app via %PREFIX%\bin\inb4doc-gui.exe
+  echo warning: shortcut creation failed. Launch the app via %PREFIX%\inb4doc-gui.exe
 )
 exit /b 0
 
@@ -296,27 +297,8 @@ set "PS_SCRIPT=%TEMP%\inb4doc-shortcuts.ps1"
 >>"%PS_SCRIPT%" echo $mode = $args[1]
 >>"%PS_SCRIPT%" echo $apps = [Environment]::GetFolderPath('Programs')
 >>"%PS_SCRIPT%" echo $desk = [Environment]::GetFolderPath('Desktop')
->>"%PS_SCRIPT%" echo $exe = Join-Path $p 'bin\inb4doc-gui.exe'
->>"%PS_SCRIPT%" echo $iconPng = Join-Path $p 'bin\icon.png'
->>"%PS_SCRIPT%" echo $ico = Join-Path $p 'bin\inb4doc.ico'
+>>"%PS_SCRIPT%" echo $exe = Join-Path $p 'inb4doc-gui.exe'
 >>"%PS_SCRIPT%" echo $iconLoc = $exe + ',0'
->>"%PS_SCRIPT%" echo if ($mode -eq 'create') {
->>"%PS_SCRIPT%" echo   if (Test-Path $iconPng) {
->>"%PS_SCRIPT%" echo     try {
->>"%PS_SCRIPT%" echo       Add-Type -AssemblyName System.Drawing
->>"%PS_SCRIPT%" echo       $img = [System.Drawing.Image]::FromFile($iconPng)
->>"%PS_SCRIPT%" echo       $ic = [System.Drawing.Icon]::FromHandle($img.GetHicon())
->>"%PS_SCRIPT%" echo       $fs = [System.IO.File]::Open($ico, [System.IO.FileMode]::Create)
->>"%PS_SCRIPT%" echo       $ic.Save($fs)
->>"%PS_SCRIPT%" echo       $fs.Close()
->>"%PS_SCRIPT%" echo       $ic.Dispose()
->>"%PS_SCRIPT%" echo       $img.Dispose()
->>"%PS_SCRIPT%" echo       $iconLoc = $ico
->>"%PS_SCRIPT%" echo     } catch {
->>"%PS_SCRIPT%" echo       $iconLoc = $iconPng
->>"%PS_SCRIPT%" echo     }
->>"%PS_SCRIPT%" echo   }
->>"%PS_SCRIPT%" echo }
 >>"%PS_SCRIPT%" echo foreach ($dir in @($apps, $desk)) {
 >>"%PS_SCRIPT%" echo   $lnkPath = Join-Path $dir 'inb4doc.lnk'
 >>"%PS_SCRIPT%" echo   if ($mode -eq 'remove') {
@@ -347,8 +329,8 @@ exit /b 0
 
 rem ===========================================================================
 :verify
-if not exist "%PREFIX%\bin\inb4doc-gui.exe" (
-  echo FAIL: %PREFIX%\bin\inb4doc-gui.exe missing
+if not exist "%PREFIX%\inb4doc-gui.exe" (
+  echo FAIL: %PREFIX%\inb4doc-gui.exe missing
   exit /b 1
 )
 if not exist "%PREFIX%\editor\index.html" (
@@ -358,8 +340,8 @@ if not exist "%PREFIX%\editor\index.html" (
 echo OK: binary and thin-shell editor present.
 if "%VERIFY%"=="1" (
   echo Starting inb4doc... after ~30s check %APPDATA%\inb4doc\JsStaticFs for the live editor.
-  start "" "%PREFIX%\bin\inb4doc-gui.exe"
+  start "" "%PREFIX%\inb4doc-gui.exe"
 ) else (
-  echo Launch with: %PREFIX%\bin\inb4doc-gui.exe
+  echo Launch with: %PREFIX%\inb4doc-gui.exe
 )
 exit /b 0

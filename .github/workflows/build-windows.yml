@@ -210,22 +210,22 @@ jobs:
         run: |
           Expand-Archive -Path inb4doc-windows-x86_64.zip -DestinationPath staging-raw -Force
           $payload = Join-Path $pwd 'payload'
-          $bin = Join-Path $payload 'bin'
           $editor = Join-Path $payload 'editor'
-          New-Item -ItemType Directory -Force -Path $bin, $editor | Out-Null
+          New-Item -ItemType Directory -Force -Path $editor | Out-Null
           $cands = @((Resolve-Path staging-raw).Path)
           $cands += Get-ChildItem staging-raw -Directory | ForEach-Object { $_.FullName }
           $src = $null
           foreach ($c in $cands) {
             if ((Test-Path (Join-Path $c 'bin\inb4doc-gui.exe')) -and (Test-Path (Join-Path $c 'editor\index.html'))) {
-              Copy-Item (Join-Path $c 'bin\*') $bin -Recurse -Force
+              Copy-Item (Join-Path $c 'bin\inb4doc-gui.exe') $payload -Force
+              if (Test-Path (Join-Path $c 'bin\icon.png')) { Copy-Item (Join-Path $c 'bin\icon.png') $payload -Force }
               Copy-Item (Join-Path $c 'editor\*') $editor -Recurse -Force
               $src = $c
               break
             }
             if ((Test-Path (Join-Path $c 'inb4doc-gui.exe')) -and (Test-Path (Join-Path $c 'dist\index.html'))) {
-              Copy-Item (Join-Path $c 'inb4doc-gui.exe') $bin -Force
-              if (Test-Path (Join-Path $c 'icon.png')) { Copy-Item (Join-Path $c 'icon.png') $bin -Force }
+              Copy-Item (Join-Path $c 'inb4doc-gui.exe') $payload -Force
+              if (Test-Path (Join-Path $c 'icon.png')) { Copy-Item (Join-Path $c 'icon.png') $payload -Force }
               Copy-Item (Join-Path $c 'dist\*') $editor -Recurse -Force
               $src = $c
               break
