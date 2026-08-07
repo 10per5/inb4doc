@@ -193,8 +193,8 @@ call :expand "%PAYLOAD_ZIP%" "%PAYLOAD_BASE%"
 exit /b 0
 
 rem ===========================================================================
-rem Locate the flat payload (inb4doc-gui.exe + dist\) or the legacy canonical
-rem tree (bin\ + editor\) inside PAYLOAD_BASE; sets PAYLOAD_BIN / PAYLOAD_EDITOR.
+rem Locate the flat payload (inb4doc-gui.exe + dist\) inside PAYLOAD_BASE;
+rem sets PAYLOAD_BIN / PAYLOAD_EDITOR.
 :find_payload
 set "PAYLOAD_BIN="
 set "PAYLOAD_EDITOR="
@@ -210,13 +210,6 @@ exit /b 1
 exit /b 0
 
 :probe_payload
-if exist "%~1\bin\inb4doc-gui.exe" (
-  if exist "%~1\editor\index.html" (
-    set "PAYLOAD_BIN=%~1\bin"
-    set "PAYLOAD_EDITOR=%~1\editor"
-    exit /b 0
-  )
-)
 if exist "%~1\inb4doc-gui.exe" (
   if exist "%~1\dist\index.html" (
     set "PAYLOAD_BIN=%~1"

@@ -20,8 +20,7 @@
 # The installer NEVER creates or writes the writable data dir
 # (~/.local/share/inb4doc/JsStaticFs, Browser/...); the app does that on first
 # run. The release payload is the flat predep layout (inb4doc-gui + icon.png +
-# dist/); the legacy canonical tree (bin/ + editor/) is also accepted; both are
-# normalized to the flat tree above.
+# dist/) and is installed as-is.
 #
 # Usage:
 #   install.sh [--prefix DIR] [--editor-root DIR] [--version TAG] [--source SRC]
@@ -148,18 +147,13 @@ payload_url() {
 }
 
 # Resolve the payload inside a directory into PAYLOAD_BIN/PAYLOAD_EDITOR.
-# Accepts the flat predep layout (inb4doc-gui + dist/) and the legacy canonical
-# layout (bin/ + editor/), plus archives wrapped in a top-level directory.
+# Accepts the flat predep layout (inb4doc-gui + dist/), plus archives wrapped in
+# a top-level directory.
 PAYLOAD_BIN=""
 PAYLOAD_EDITOR=""
 
 resolve_payload() {
     local base="$1"
-    if [ -f "$base/bin/inb4doc-gui" ] && [ -d "$base/editor" ]; then
-        PAYLOAD_BIN="$base/bin"
-        PAYLOAD_EDITOR="$base/editor"
-        return 0
-    fi
     if [ -f "$base/inb4doc-gui" ] && [ -d "$base/dist" ]; then
         PAYLOAD_BIN="$base"
         PAYLOAD_EDITOR="$base/dist"
@@ -184,7 +178,7 @@ obtain_payload() {
             download "$src" "$TMP_DIR/payload.tar.gz"
             tar -xf "$TMP_DIR/payload.tar.gz" -C "$TMP_DIR"
             if ! resolve_payload "$TMP_DIR"; then
-                echo "error: no usable payload in archive (expected bin/ + editor/)" >&2
+                echo "error: no usable payload in archive (expected inb4doc-gui + dist/)" >&2
                 exit 1
             fi
             ;;
@@ -198,7 +192,7 @@ obtain_payload() {
             ;;
         *)
             if ! resolve_payload "$src"; then
-                echo "error: no usable payload in '$src' (expected bin/ + editor/)" >&2
+                echo "error: no usable payload in '$src' (expected inb4doc-gui + dist/)" >&2
                 exit 1
             fi
             ;;
