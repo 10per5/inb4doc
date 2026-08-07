@@ -42,8 +42,18 @@ const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
 const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
 
 // The remote deployment of public/ that fetch transports pull the live editor
-// from (Part C.1). Defaults to the GitHub Pages live URL; override per build.
-const UPDATE_BASE = (process.env.UPDATE_BASE || "https://10per5.github.io/inb4doc/editor-live").replace(/\/+$/, "")
+// from (Part C.1). Defaults to the GitHub Pages live URL, mode-aware so a
+// gui-desktop/gui-mobile build resolves its own deployment subdir (desktop →
+// /desktop, mobile → /mobile) without static.yml having to pass UPDATE_BASE.
+// An explicit UPDATE_BASE always wins (per-mode CI override).
+const LIVE_BASE = "https://10per5.github.io/inb4doc/editor-live"
+const MODE_UPDATE_SUBDIR: Partial<Record<BuildMode, string>> = {
+  [BuildMode.GuiDesktop]: "/desktop",
+  [BuildMode.GuiMobile]: "/mobile",
+}
+const UPDATE_BASE = (
+  process.env.UPDATE_BASE || `${LIVE_BASE}${MODE_UPDATE_SUBDIR[modeNum] ?? ""}`
+).replace(/\/+$/, "")
 
 const criticalCss = [
   readFileSync(join(__dir, "style", "layout.css"), "utf-8"),
