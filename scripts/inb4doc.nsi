@@ -38,9 +38,17 @@ SetCompressor /SOLID lzma
 InstallDir "$LOCALAPPDATA\Programs\inb4doc"
 InstallDirRegKey HKCU "Software\inb4doc" "InstallDir"
 
+; Launch the freshly installed app from the Finish page. The checkbox is
+; checked by default (define MUI_FINISHPAGE_RUN_NOTCHECKED to invert). A
+; RUN_FUNCTION is used so the app is launched with the "open" verb — never
+; "runas" — so it does not inherit an elevated installer's privileges.
+!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchInb4doc"
+!define MUI_FINISHPAGE_RUN_TEXT "Run inb4doc now"
+
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
@@ -52,6 +60,12 @@ Function .onInit
   ${AndIf} $INSTDIR == "$LOCALAPPDATA\Programs\inb4doc"
     StrCpy $INSTDIR "$PROGRAMFILES\inb4doc"
   ${EndIf}
+FunctionEnd
+
+; Finish-page launcher. ExecShell with the "open" verb (never "runas"), so the
+; app runs unelevated even when the installer itself was elevated.
+Function LaunchInb4doc
+  ExecShell "open" "$INSTDIR\inb4doc-gui.exe"
 FunctionEnd
 
 Section "Install" SecMain
