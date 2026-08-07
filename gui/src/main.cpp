@@ -159,7 +159,7 @@ int main(int argc, char **argv)
         {
             std::filesystem::create_directories(data_dir);
             static std::ofstream debug_log;
-            debug_log.open(data_dir / "debug.log",
+            debug_log.open(std::filesystem::path(data_dir) / "debug.log",
                            std::ios::out | std::ios::app);
             if (debug_log)
                 std::cerr.rdbuf(debug_log.rdbuf());
