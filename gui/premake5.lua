@@ -27,6 +27,7 @@ filter("system:macosx")
 files({ "src/**.mm", "src/**.h" })
 
 filter("system:windows")
+files({ "src/app.rc" })
 includedirs({ "vendor" })
 includedirs({ saucer_dir .. "/include" })
 libdirs({ saucer_dir .. "/lib" })

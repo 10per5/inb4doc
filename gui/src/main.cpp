@@ -148,6 +148,25 @@ int main(int argc, char **argv)
     if (!cfg)
         return 1;
 
+    // Windows release builds are WindowedApp (no attached console), so stderr
+    // goes nowhere. When --debug is set, tee it into the data dir so the logs
+    // are actually readable (see also set_dev_tools in app.cpp).
+#if defined(_WIN32)
+    if (cfg->debug)
+    {
+        auto data_dir = default_data_dir();
+        if (!data_dir.empty())
+        {
+            std::filesystem::create_directories(data_dir);
+            static std::ofstream debug_log;
+            debug_log.open(data_dir / "debug.log",
+                           std::ios::out | std::ios::app);
+            if (debug_log)
+                std::cerr.rdbuf(debug_log.rdbuf());
+        }
+    }
+#endif
+
     if (cfg->debug)
     {
         std::println(std::cerr, "  [debug] final config:");

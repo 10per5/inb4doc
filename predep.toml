@@ -18,6 +18,7 @@ source_dir = "root://images"
 fail_if_missing = true
 files = [
   { source = "root://images/favicon.ico", dests = [
+      "root://gui/src/favicon.ico",
       "root://editor/static/favicon.ico",
       "root://hugo-view/static/favicon.ico",
   ] },
@@ -49,14 +50,6 @@ depends = [
     "editor::build",
     "hugo-view::build",
     "gui::build",
-]
-
-[[stages]]
-name = "copy-images"
-description = "Copy content images into Hugo build output"
-type = "copy"
-files = [
-  { source = "root://content/docs/image/", dests = ["root://hugo-view/build/docs/image/"] },
 ]
 
 [[stages]]

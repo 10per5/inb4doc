@@ -1,0 +1,2 @@
+// Windows application icon (Explorer/taskbar, shortcut fallback).
+IDI_ICON1 ICON "favicon.ico"

@@ -17,6 +17,10 @@ rem  Payload: <releases>/latest/download/inb4doc-windows-x86_64.zip
 rem  Default prefix (no admin): %LOCALAPPDATA%\Programs\inb4doc
 rem  If run elevated:           %ProgramFiles%\inb4doc
 rem
+rem  Shortcuts point straight at bin\inb4doc-gui.exe (extra flags go in the
+rem  shortcut's Target/Arguments, e.g. --debug). The icon is derived from
+rem  bin\icon.png into bin\inb4doc.ico at install time.
+rem
 rem  Usage:
 rem    install.cmd [--prefix DIR] [--version TAG] [--source SRC]
 rem                [--no-shortcuts] [--uninstall] [--verify] [--help]
@@ -255,8 +259,6 @@ if errorlevel 1 (
 )
 echo Copied thin-shell editor to %PREFIX%\editor\
 
-call :write_launcher
-
 if "%NO_SHORTCUTS%"=="1" (
   echo Skipped shortcuts.
 ) else (
@@ -265,25 +267,18 @@ if "%NO_SHORTCUTS%"=="1" (
 exit /b 0
 
 rem ===========================================================================
-:write_launcher
-(
-  echo @echo off
-  echo rem inb4doc launcher - robust to double-click path issues
-  echo start "" "%%~dp0bin\inb4doc-gui.exe" %%*
-) > "%PREFIX%\inb4doc.cmd"
-echo Created launcher %PREFIX%\inb4doc.cmd
-exit /b 0
-
-rem ===========================================================================
-rem Start Menu + Desktop shortcuts, written inline so install.cmd stays a
-rem single self-contained file that works when eval'd from a console.
+rem Start Menu + Desktop shortcuts. Target is bin\inb4doc-gui.exe directly (no
+rem launcher .cmd needed — extra flags go on the shortcut's Target). Icon is
+rem derived from bin\icon.png into bin\inb4doc.ico at install time. Written
+rem inline so install.cmd stays a single self-contained file that works when
+rem eval'd from a console.
 :create_shortcuts
 echo Creating Start Menu / Desktop shortcuts ...
 call :write_shortcuts_script
 if errorlevel 1 exit /b 0
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%" "%PREFIX%" create
 if errorlevel 1 (
-  echo warning: shortcut creation failed. The launcher is still available at %PREFIX%\inb4doc.cmd
+  echo warning: shortcut creation failed. Launch the app via %PREFIX%\bin\inb4doc-gui.exe
 )
 exit /b 0
 
@@ -301,6 +296,27 @@ set "PS_SCRIPT=%TEMP%\inb4doc-shortcuts.ps1"
 >>"%PS_SCRIPT%" echo $mode = $args[1]
 >>"%PS_SCRIPT%" echo $apps = [Environment]::GetFolderPath('Programs')
 >>"%PS_SCRIPT%" echo $desk = [Environment]::GetFolderPath('Desktop')
+>>"%PS_SCRIPT%" echo $exe = Join-Path $p 'bin\inb4doc-gui.exe'
+>>"%PS_SCRIPT%" echo $iconPng = Join-Path $p 'bin\icon.png'
+>>"%PS_SCRIPT%" echo $ico = Join-Path $p 'bin\inb4doc.ico'
+>>"%PS_SCRIPT%" echo $iconLoc = $exe + ',0'
+>>"%PS_SCRIPT%" echo if ($mode -eq 'create') {
+>>"%PS_SCRIPT%" echo   if (Test-Path $iconPng) {
+>>"%PS_SCRIPT%" echo     try {
+>>"%PS_SCRIPT%" echo       Add-Type -AssemblyName System.Drawing
+>>"%PS_SCRIPT%" echo       $img = [System.Drawing.Image]::FromFile($iconPng)
+>>"%PS_SCRIPT%" echo       $ic = [System.Drawing.Icon]::FromHandle($img.GetHicon())
+>>"%PS_SCRIPT%" echo       $fs = [System.IO.File]::Open($ico, [System.IO.FileMode]::Create)
+>>"%PS_SCRIPT%" echo       $ic.Save($fs)
+>>"%PS_SCRIPT%" echo       $fs.Close()
+>>"%PS_SCRIPT%" echo       $ic.Dispose()
+>>"%PS_SCRIPT%" echo       $img.Dispose()
+>>"%PS_SCRIPT%" echo       $iconLoc = $ico
+>>"%PS_SCRIPT%" echo     } catch {
+>>"%PS_SCRIPT%" echo       $iconLoc = $iconPng
+>>"%PS_SCRIPT%" echo     }
+>>"%PS_SCRIPT%" echo   }
+>>"%PS_SCRIPT%" echo }
 >>"%PS_SCRIPT%" echo foreach ($dir in @($apps, $desk)) {
 >>"%PS_SCRIPT%" echo   $lnkPath = Join-Path $dir 'inb4doc.lnk'
 >>"%PS_SCRIPT%" echo   if ($mode -eq 'remove') {
@@ -308,9 +324,9 @@ set "PS_SCRIPT=%TEMP%\inb4doc-shortcuts.ps1"
 >>"%PS_SCRIPT%" echo     continue
 >>"%PS_SCRIPT%" echo   }
 >>"%PS_SCRIPT%" echo   $lnk = $wsh.CreateShortcut($lnkPath)
->>"%PS_SCRIPT%" echo   $lnk.TargetPath = Join-Path $p 'inb4doc.cmd'
+>>"%PS_SCRIPT%" echo   $lnk.TargetPath = $exe
 >>"%PS_SCRIPT%" echo   $lnk.WorkingDirectory = $p
->>"%PS_SCRIPT%" echo   $lnk.IconLocation = (Join-Path $p 'bin\inb4doc-gui.exe') + ',0'
+>>"%PS_SCRIPT%" echo   $lnk.IconLocation = $iconLoc
 >>"%PS_SCRIPT%" echo   $lnk.Description = 'inb4doc - local-first Markdown editor'
 >>"%PS_SCRIPT%" echo   $lnk.Save()
 >>"%PS_SCRIPT%" echo }
