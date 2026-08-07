@@ -4,8 +4,17 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
+#include <shobjidl.h>
 #else
 #include <unistd.h>
+#endif
+#if defined(__linux__)
+#include <QFileDialog>
+#include <QDir>
+#endif
+#if defined(__APPLE__)
+#include <objc/runtime.h>
+#include <objc/message.h>
 #endif
 namespace fs = std::filesystem;
 
@@ -80,4 +89,74 @@ std::string default_browser_data_dir()
 {
     auto base = default_data_dir();
     return base.empty() ? std::string{} : (fs::path(base) / "Browser").string();
+}
+
+std::string pick_directory(const std::string &initial_dir)
+{
+#if defined(__linux__)
+    auto start = initial_dir.empty() ? QDir::homePath()
+                                     : QString::fromStdString(initial_dir);
+    auto dir = QFileDialog::getExistingDirectory(
+        nullptr, QStringLiteral("Open Project"), start,
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    if (dir.isEmpty())
+        return {};
+    return dir.toStdString();
+#elif defined(_WIN32)
+    if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)))
+        return {};
+    std::string result;
+    IFileDialog *pfd = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr,
+                                  CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+    if (SUCCEEDED(hr))
+    {
+        DWORD opts = 0;
+        pfd->GetOptions(&opts);
+        pfd->SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+        hr = pfd->Show(nullptr);
+        if (SUCCEEDED(hr))
+        {
+            IShellItem *item = nullptr;
+            if (SUCCEEDED(pfd->GetResult(&item)) && item)
+            {
+                PWSTR path = nullptr;
+                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path)
+                {
+                    int len = WideCharToMultiByte(CP_UTF8, 0, path, -1,
+                                                  nullptr, 0, nullptr, nullptr);
+                    if (len > 0)
+                    {
+                        result.resize(static_cast<std::size_t>(len - 1));
+                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(),
+                                            len, nullptr, nullptr);
+                    }
+                    CoTaskMemFree(path);
+                }
+                item->Release();
+            }
+        }
+        pfd->Release();
+    }
+    CoUninitialize();
+    return result;
+#elif defined(__APPLE__)
+    auto send = reinterpret_cast<id (*)(id, SEL, ...)>(&objc_msgSend);
+    id panel = send(objc_getClass("NSOpenPanel"), sel_getUid("openPanel"));
+    send(panel, sel_getUid("setCanChooseDirectories:"), true);
+    send(panel, sel_getUid("setCanChooseFiles:"), false);
+    send(panel, sel_getUid("setAllowsMultipleSelection:"), false);
+    id resp = send(panel, sel_getUid("runModal"));
+    if (reinterpret_cast<long>(resp) != 1) // NSModalResponseOK
+        return {};
+    id url = send(panel, sel_getUid("URL"));
+    if (!url)
+        return {};
+    id path = send(url, sel_getUid("path"));
+    auto c = reinterpret_cast<const char *>(send(path, sel_getUid("UTF8String")));
+    return c ? std::string(c) : std::string{};
+#else
+    (void)initial_dir;
+    return {};
+#endif
 }

@@ -3,34 +3,81 @@ import type { MenuItem } from "@/components/ui/menu";
 import { MenuType } from "@/components/ui/menu";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { ViewType } from "@/services/view-controller";
-import { mediaImage, floppyDisk, folder } from "@/eta/icons";
+import { hasFunc, AppFunc } from "$/build/build-mode";
+import { recentProjectsStore } from "@/stores/recent-projects-store";
+import { mediaImage, floppyDisk, folder, folderOpen, clockRotateRight } from "@/eta/icons";
 
 export const menuRegistry = createRegistry();
 
-menuRegistry.register("file", () => [
-  {
+function recentProjectItems(): MenuItem[] {
+  const recents = recentProjectsStore.list();
+  if (recents.length === 0) {
+    return [
+      {
+        type: MenuType.Item,
+        id: "recent-none",
+        label: "No recent projects",
+        disabled: true,
+      },
+    ];
+  }
+  return recents.map((recent, i) => ({
     type: MenuType.Item,
-    id: "img-mgr",
-    icon: mediaImage,
-    label: "Image Manager",
-    onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
-  },
-  { type: MenuType.Separator },
-  {
-    type: MenuType.Item,
-    id: "save",
-    icon: floppyDisk,
-    label: "Save as Zip",
-    onClick: () => appEvents.emit(AppEvent.SaveRequested),
-  },
-  {
-    type: MenuType.Item,
-    id: "load",
+    id: `recent-${i}`,
     icon: folder,
-    label: "Load from Zip",
-    onClick: () => appEvents.emit(AppEvent.LoadRequested),
-  },
-]);
+    label: recent.name,
+    sublabel: recent.path,
+    onClick: () =>
+      appEvents.emit(AppEvent.RecentProjectRequested, { path: recent.path }),
+  }));
+}
+
+menuRegistry.register("file", (): MenuItem[] => {
+  const projectItems: MenuItem[] = hasFunc(AppFunc.ProjectPicker)
+    ? [
+        {
+          type: MenuType.Item,
+          id: "open-project",
+          icon: folderOpen,
+          label: "Open Project…",
+          onClick: () => appEvents.emit(AppEvent.OpenProjectRequested),
+        },
+        {
+          type: MenuType.Submenu,
+          id: "recent-projects",
+          icon: clockRotateRight,
+          label: "Recent Projects",
+          items: recentProjectItems(),
+        },
+        { type: MenuType.Separator },
+      ]
+    : [];
+  return [
+    ...projectItems,
+    {
+      type: MenuType.Item,
+      id: "img-mgr",
+      icon: mediaImage,
+      label: "Image Manager",
+      onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
+    },
+    { type: MenuType.Separator },
+    {
+      type: MenuType.Item,
+      id: "save",
+      icon: floppyDisk,
+      label: "Save as Zip",
+      onClick: () => appEvents.emit(AppEvent.SaveRequested),
+    },
+    {
+      type: MenuType.Item,
+      id: "load",
+      icon: folder,
+      label: "Load from Zip",
+      onClick: () => appEvents.emit(AppEvent.LoadRequested),
+    },
+  ];
+});
 
 // Part D hygiene: the topbar chunk is hot (updatable without a reload), so a
 // module-level subscription here would stack a new handler on every hot swap

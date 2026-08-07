@@ -19,6 +19,8 @@ export enum AppFunc {
   ThinShell = 1 << 10,
   DesktopBridge = 1 << 11,
   MobileBridge = 1 << 12,
+  ProjectPicker = 1 << 13,
+  SafProvider = 1 << 14,
 }
 
 export const BUILD_MODE_NAMES: Record<BuildMode, string> = {
@@ -63,6 +65,11 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   // so neither bridge runs there.
   [AppFunc.DesktopBridge]: BuildMode.GuiDesktop,
   [AppFunc.MobileBridge]: BuildMode.GuiMobile,
+  // Runtime directory reselection (File → Open Project… + Recent Projects):
+  // desktop via the native folder dialog + app:// scheme, mobile via SAF.
+  [AppFunc.ProjectPicker]: BuildMode.GuiDesktop | BuildMode.GuiMobile,
+  // SAF (Storage Access Framework) content provider over the Android bridge.
+  [AppFunc.SafProvider]: BuildMode.GuiMobile,
 };
 
 let _currentMode: BuildMode | null = null;
@@ -76,6 +83,17 @@ function getCurrentMode(): BuildMode {
 }
 
 export function hasFunc(func: AppFunc): boolean {
+  if (func === AppFunc.ThinShell) {
+    // FULL_BUNDLE=1 builds (lib/build.ts) emit data-full-bundle="1" and force
+    // the thin-shell flag off at compile time; mirror it here so the runtime
+    // two-stage/lazy decision agrees even though the mode bit is still set.
+    // try/catch keeps node imports of this module (build/dev tools) safe.
+    try {
+      if (document.documentElement.dataset.fullBundle === "1") return false;
+    } catch {
+      // not in a browser — never reached at runtime
+    }
+  }
   return !!(SUPPORTED_MODES[func] & getCurrentMode());
 }
 

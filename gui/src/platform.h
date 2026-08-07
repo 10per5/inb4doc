@@ -25,3 +25,7 @@ std::string default_editor_data_dir();
 /// out of the data-dir root so they can't be confused with the editor data or
 /// other gui files. Empty when there is no data directory.
 std::string default_browser_data_dir();
+
+/// Show a native directory picker (File → Open Project…). Returns the chosen
+/// canonical path, or empty when the user cancels. Blocks on the UI thread.
+std::string pick_directory(const std::string &initial_dir = {});

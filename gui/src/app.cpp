@@ -10,7 +10,6 @@
 #include <print>
 #include <string>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <optional>
 #include <memory>
@@ -31,8 +30,7 @@
 #include <windows.h>
 
 static std::filesystem::path g_data_dir;
-
-static void save_zoom(const std::filesystem::path &data_dir, float zoom);
+static std::shared_ptr<settings> g_settings;
 
 static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
@@ -48,7 +46,11 @@ static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 {
                     double zoom;
                     w->native<true>().controller->get_ZoomFactor(&zoom);
-                    save_zoom(g_data_dir, static_cast<float>(zoom));
+                    if (g_settings)
+                    {
+                        g_settings->zoom = static_cast<float>(zoom);
+                        g_settings->save(g_data_dir.string());
+                    }
                 }
                 a->quit();
                 return 0;
@@ -105,70 +107,9 @@ static void toast(saucer::smartview &wv, const std::string &msg)
 }
 
 // inb4.config.toml is the gui settings file (key = value) in the data-dir root.
-// Currently the only key is zoom, applied on boot and written on quit.
-static const std::string ZOOM_CONFIG_FILE = "inb4.config.toml";
-
-static void save_zoom(const std::filesystem::path &data_dir, float zoom);
-
-static float load_zoom(const std::filesystem::path &data_dir)
-{
-    auto path = data_dir / ZOOM_CONFIG_FILE;
-    std::ifstream ifs(path);
-    if (!ifs)
-    {
-        // Pre-Gui.ini builds wrote the raw zoom float into a file named "zoom";
-        // migrate it once so existing installs keep their zoom setting.
-        auto legacy = data_dir / "zoom";
-        std::ifstream old(legacy);
-        if (old)
-        {
-            float v{};
-            old >> v;
-            if (!old.fail())
-            {
-                save_zoom(data_dir, v);
-                std::error_code ec;
-                std::filesystem::remove(legacy, ec);
-                return v;
-            }
-        }
-        return 1.0f;
-    }
-
-    std::string line;
-    while (std::getline(ifs, line))
-    {
-        auto eq = line.find('=');
-        if (eq == std::string::npos)
-            continue;
-        auto key = line.substr(0, eq);
-        auto val = line.substr(eq + 1);
-        auto trim = [](std::string s)
-        {
-            s.erase(0, s.find_first_not_of(" \t"));
-            s.erase(s.find_last_not_of(" \t") + 1);
-            return s;
-        };
-        if (trim(key) != "zoom")
-            continue;
-        try
-        {
-            return std::stof(trim(val));
-        }
-        catch (...)
-        {
-            return 1.0f;
-        }
-    }
-    return 1.0f;
-}
-
-static void save_zoom(const std::filesystem::path &data_dir, float zoom)
-{
-    if (auto ofs = std::ofstream(data_dir / ZOOM_CONFIG_FILE))
-        ofs << "zoom = " << zoom << "\n";
-}
-
+// Keys: zoom (applied on boot, written on quit) and content_root (the last
+// project dir from File → Open Project…). Parsed once into config.settings
+// (settings.h/.cpp); the app mutates + persists it, never re-reads the file.
 static bool is_allowed(const saucer::url &url)
 {
     return security::check(security::parse_url(url.string()))
@@ -223,7 +164,7 @@ int run_app(config cfg)
             auto wv = saucer::smartview::create(opts).value();
 
             {
-                auto zoom = load_zoom(data_dir);
+                auto zoom = safe->settings->zoom;
                 if (zoom != 1.0f)
                 {
 #if defined(__linux__)
@@ -391,15 +332,16 @@ int run_app(config cfg)
             // -- keyboard shortcuts --
 
             window->on<saucer::window::event::closed>({{
-                .func = [&wv, data_dir]
+                .func = [safe, &wv, data_dir]
                 {
 #if defined(__linux__)
-                    save_zoom(data_dir, wv.native<true>().webview->page()->zoomFactor());
+                    safe->settings->zoom = wv.native<true>().webview->page()->zoomFactor();
 #elif defined(_WIN32)
                     double zoom;
                     wv.native<true>().controller->get_ZoomFactor(&zoom);
-                    save_zoom(data_dir, static_cast<float>(zoom));
+                    safe->settings->zoom = static_cast<float>(zoom);
 #endif
+                    safe->settings->save(data_dir);
                 },
                 .clearable = false,
             }});
@@ -409,9 +351,10 @@ int run_app(config cfg)
                 auto *main_win = window->native<true>().window;
 
                 auto *sq = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), main_win);
-                QObject::connect(sq, &QShortcut::activated, [&wv, app, data_dir]()
+                QObject::connect(sq, &QShortcut::activated, [safe, &wv, app, data_dir]()
                 {
-                    save_zoom(data_dir, wv.native<true>().webview->page()->zoomFactor());
+                    safe->settings->zoom = wv.native<true>().webview->page()->zoomFactor();
+                    safe->settings->save(data_dir);
                     app->quit();
                 });
 
@@ -439,6 +382,7 @@ int run_app(config cfg)
 #elif defined(_WIN32)
             {
                 g_data_dir = data_dir;
+                g_settings = safe->settings;
                 auto hwnd = window->native<true>().hwnd;
 
                 SetPropW(hwnd, L"PD_APP", reinterpret_cast<HANDLE>(app));

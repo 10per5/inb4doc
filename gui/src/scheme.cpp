@@ -316,23 +316,23 @@ saucer::scheme::response handle_app_request(
     if (path == "api/tree" && method == "GET")
     {
         std::error_code exist_ec;
-        if (!fs::exists(cfg.content_root, exist_ec))
+        if (!fs::exists(cfg.root(), exist_ec))
         {
-            security::deletability::instance().clear(cfg.content_root);
+            security::deletability::instance().clear(cfg.root());
             return {.data = saucer::stash::from_str("{}"),
                     .mime = "application/json", .status = 200};
         }
 
         auto gi_patterns = cfg.no_ignore
             ? std::vector<GitIgnorePattern>{}
-            : load_gitignore(cfg.content_root);
+            : load_gitignore(cfg.root());
 
         std::ostringstream out_paths;
         std::ostringstream out_children;
         std::ostringstream out_folder_weights;
         std::unordered_set<std::string> visited_dirs;
         std::unordered_set<std::string> undeletable;
-        build_tree(cfg.content_root, out_paths, out_children, out_folder_weights,
+        build_tree(cfg.root(), out_paths, out_children, out_folder_weights,
                    gi_patterns, cfg.depth, 0, cfg.no_ignore,
                    visited_dirs, undeletable);
 
@@ -344,7 +344,7 @@ saucer::scheme::response handle_app_request(
             if (!undeletable.contains(d))
                 clean.insert(d);
         security::deletability::instance().update(
-            cfg.content_root, std::move(undeletable), std::move(clean));
+            cfg.root(), std::move(undeletable), std::move(clean));
 
         // Strip trailing commas and wrap in proper JSON containers
         auto strip_trail = [](std::ostringstream &ss) -> std::string {
@@ -381,7 +381,7 @@ saucer::scheme::response handle_app_request(
         if (qm != std::string::npos)
             spath = spath.substr(0, qm);
 
-        auto fpath = fs::path(cfg.content_root) / spath;
+        auto fpath = fs::path(cfg.root()) / spath;
 
         // Auto-append .md if the path has no extension (matching Node.js behavior)
         if (fpath.extension().empty())
@@ -393,7 +393,7 @@ saucer::scheme::response handle_app_request(
 
         // Path traversal guard
         fs::path resolved;
-        if (!security::within_base(fpath, cfg.content_root, resolved))
+        if (!security::within_base(fpath, cfg.root(), resolved))
             return {.data = saucer::stash::from_str("Forbidden"),
                     .mime = "text/plain", .status = 403};
 
@@ -429,7 +429,7 @@ saucer::scheme::response handle_app_request(
             if (fs::is_directory(resolved, del_ec))
             {
                 // Never wipe a folder that holds non-content files.
-                if (!security::dir_deletable(cfg.content_root, resolved))
+                if (!security::dir_deletable(cfg.root(), resolved))
                     return {.data = saucer::stash::from_str(
                                     "Folder contains non-content files"),
                             .mime = "text/plain", .status = 403};
@@ -437,14 +437,14 @@ saucer::scheme::response handle_app_request(
             }
             else
                 fs::remove(resolved, del_ec);
-            security::deletability::instance().clear(cfg.content_root);
+            security::deletability::instance().clear(cfg.root());
 
             // Remove orphaned images after document delete
             auto doc_dir = fs::path(spath).parent_path().string();
             remove_orphaned_images(cfg, doc_dir);
 
             auto parent = resolved.parent_path();
-            while (parent != fs::path(cfg.content_root))
+            while (parent != fs::path(cfg.root()))
             {
                 std::error_code pec;
                 if (!fs::is_empty(parent, pec) || pec) break;

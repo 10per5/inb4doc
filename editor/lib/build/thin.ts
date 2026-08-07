@@ -1,5 +1,5 @@
 import { join } from "path"
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, existsSync, rmSync } from "fs"
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, cpSync } from "fs"
 
 // Part C.1 thin-shell packaging: the GuiDesktop install ships only the core boot
 // set + updater. The first run downloads the live editor into the writable data
@@ -71,4 +71,17 @@ export function writeThinShell(publicDir: string, outDir: string): void {
   }
 
   console.log(`[thin] wrote ${outDir}`)
+}
+
+// FULL_BUNDLE=1 counterpart to writeThinShell: dist/ carries the complete
+// public/ — index.html, every chunk (including Part D's lazy editor /
+// node_imports / dialog pots), all css, sw.js, and the static icons. The
+// Android assets/editor/ dir is built from this, so the APK serves every
+// resource locally with nothing to fetch. sw.js / assets/manifest.json are
+// inert here (the SW never registers under file:// and the empty update-base
+// disables the fetch updater), but keeping a pure copy costs nothing.
+export function writeFullBundle(publicDir: string, outDir: string): void {
+  rmSync(outDir, { recursive: true, force: true })
+  cpSync(publicDir, outDir, { recursive: true })
+  console.log(`[thin] wrote full bundle to ${outDir}`)
 }

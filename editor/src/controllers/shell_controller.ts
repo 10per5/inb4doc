@@ -110,6 +110,8 @@ export default class extends Controller {
       appEvents.on(AppEvent.SidebarToggle, () => this.uiService.toggleSidebar()),
       appEvents.on(AppEvent.MetaPanelToggle, () => this.uiService.toggleMetaPanel()),
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
+      appEvents.on(AppEvent.OpenProjectRequested, () => this.nav.openProject()),
+      appEvents.on(AppEvent.RecentProjectRequested, ({ path }) => this.nav.openProject(path)),
       appEvents.on(AppEvent.SaveCurrentFile, () => this.saveCurrentFile()),
       appEvents.on(AppEvent.FlushAll, () => this.cache.flushDirtyFiles()),
       appEvents.on(AppEvent.NoFileView, ({ lastPath }) => {

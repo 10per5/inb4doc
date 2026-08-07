@@ -12,7 +12,7 @@ import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "../src/config/enums/toolbar-
 import { SidebarAction, SIDEBAR_ACTION_PREFIX, sidebarActions } from "../src/config/enums/sidebar-action"
 import { copyStaticAssets } from "./build/static"
 import { renderShell } from "./build/shell"
-import { writeThinShell } from "./build/thin"
+import { writeThinShell, writeFullBundle } from "./build/thin"
 import { compileStyles } from "./build/styles"
 import { processThemeNordAssets } from "./build/theme-nord"
 import { runBundle, runBundleWatch, getChunkMap, pruneStaleChunks, getLatestChunkGraphManifest, computeAppHash, computeIndexHash, injectHashMeta } from "./build/bundle"
@@ -44,7 +44,15 @@ const SELF_BASE = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "")
 const ASSET_BASE = SELF_BASE ? `${SELF_BASE}/` : ""
 const modeStr = process.env.BUILD_MODE || "web-local"
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
-const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
+// FULL_BUNDLE=1 ships the complete local bundle: force the thin-shell flag off
+// (and empty UPDATE_BASE below) so the APK carries every chunk and never fetches
+// remotely. Build-time only — the runtime side keys off data-full-bundle in the
+// emitted html (see build-mode.ts hasFunc).
+const fullBundle = process.env.FULL_BUNDLE === "1"
+const hasFlag = (func: AppFunc): boolean => {
+  if (fullBundle && func === AppFunc.ThinShell) return false
+  return !!(SUPPORTED_MODES[func] & modeNum)
+}
 
 // The remote deployment of public/ that fetch transports pull the live editor
 // from (Part C.1). Defaults to the GitHub Pages live URL, mode-aware so a
@@ -56,8 +64,10 @@ const MODE_UPDATE_SUBDIR: Partial<Record<BuildMode, string>> = {
   [BuildMode.GuiDesktop]: "/desktop",
   [BuildMode.GuiMobile]: "/mobile",
 }
+// An explicit UPDATE_BASE always wins (per-mode CI override). FULL_BUNDLE
+// overrides both: an empty base disables the fetch updater entirely.
 const UPDATE_BASE = (
-  process.env.UPDATE_BASE || `${LIVE_BASE}${MODE_UPDATE_SUBDIR[modeNum] ?? ""}`
+  fullBundle ? "" : process.env.UPDATE_BASE || `${LIVE_BASE}${MODE_UPDATE_SUBDIR[modeNum] ?? ""}`
 ).replace(/\/+$/, "")
 
 const criticalCss = [
@@ -88,6 +98,7 @@ const context = {
   mobileCss: hasFlag(AppFunc.MobileCss),
   toolbarQuickNav: hasFlag(AppFunc.ToolbarQuickNav),
   thinShell: hasFlag(AppFunc.ThinShell),
+  fullBundle,
 }
 
 const html = renderShell(eta, templatesSrc, context as Record<string, unknown>)
@@ -212,8 +223,12 @@ if (!renderTemplates) {
 
     // Thin-shell install set: the read-only GuiDesktop ship. Must run after
     // generateSWFiles() so manifest.json/sw-assets.js carry this build's data.
+    // FULL_BUNDLE builds ship the complete public/ instead (all chunks served
+    // locally from the APK, no updater).
     if (hasFlag(AppFunc.ThinShell)) {
       writeThinShell(publicDir, join(root, "dist"))
+    } else if (fullBundle) {
+      writeFullBundle(publicDir, join(root, "dist"))
     }
   }
 

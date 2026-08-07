@@ -75,6 +75,18 @@
   height: 100%;
 }
 
+.toolbar-menu .menu-item .menu-item-sublabel {
+  margin-left: auto;
+  padding-left: 16px;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
 .toolbar-menu .menu-item .menu-submenu-arrow {
   margin-left: auto;
   font-size: 0.6rem;

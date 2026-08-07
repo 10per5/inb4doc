@@ -2,7 +2,7 @@ import type { ContentProvider } from "@/providers/provider";
 import { ProviderType, createProviderByType } from "@/providers/index";
 import { treeStore } from "@/stores/tree-store";
 import { createEmptyTreeIndex } from "@/utils/tree";
-import { cloud, packageIcon, laptop, database, helpCircle } from "@/eta/icons";
+import { cloud, packageIcon, laptop, database, helpCircle, smartphoneDevice } from "@/eta/icons";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 
@@ -70,8 +70,11 @@ export async function initializeProvider(): Promise<void> {
   const last = loadLastProvider();
   const defaultToRemote = hasFunc(AppFunc.DefaultToRemote);
   const useMount = hasFunc(AppFunc.MountProvider);
+  const useSaf = hasFunc(AppFunc.SafProvider);
 
-  const base: ProviderType[] = useMount
+  const base: ProviderType[] = useSaf
+    ? [ProviderType.Saf, ProviderType.LocalStorage]
+    : useMount
     ? [ProviderType.Mount, ProviderType.LocalStorage]
     : defaultToRemote
     ? [ProviderType.Remote, ProviderType.LocalStorage]
@@ -138,15 +141,18 @@ export async function getAvailableProviders(): Promise<
   }[]
 > {
   const useMount = hasFunc(AppFunc.MountProvider);
+  const useSaf = hasFunc(AppFunc.SafProvider);
   const remote = createProviderByType(ProviderType.Remote);
   const mount = createProviderByType(ProviderType.Mount);
   const fs = createProviderByType(ProviderType.Filesystem);
   const ls = createProviderByType(ProviderType.LocalStorage);
+  const saf = createProviderByType(ProviderType.Saf);
 
-  const [mountAvailable, fsOk, lsOk] = await Promise.all([
+  const [mountAvailable, fsOk, lsOk, safOk] = await Promise.all([
     mount.isAvailable(),
     fs.isAvailable(),
     ls.isAvailable(),
+    saf.isAvailable(),
   ]);
 
   const entries: {
@@ -162,6 +168,15 @@ export async function getAvailableProviders(): Promise<
       type: ProviderType.Mount,
       description: "Files served by the inb4doc GUI (app:// scheme)",
       available: mountAvailable,
+    });
+  }
+
+  // SAF is only available in GUI Mobile builds (Android Storage Access Framework)
+  if (useSaf) {
+    entries.push({
+      type: ProviderType.Saf,
+      description: "Project folders on this device (Android Storage Access)",
+      available: safOk,
     });
   }
 
@@ -218,6 +233,11 @@ export function getProviderDisplayInfo(type: ProviderType): {
       icon: laptop,
       label: "Local Files",
       type: ProviderType.Filesystem,
+    },
+    [ProviderType.Saf]: {
+      icon: smartphoneDevice,
+      label: "On This Device",
+      type: ProviderType.Saf,
     },
     [ProviderType.LocalStorage]: {
       icon: database,

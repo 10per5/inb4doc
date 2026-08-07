@@ -15,6 +15,10 @@ import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
 import type { FileSyncService } from "@/services/file-sync-service";
+import { hasFunc, AppFunc } from "$/build/build-mode";
+import { pickProjectDirectory } from "@/bridge/native";
+import { recentProjectsStore } from "@/stores/recent-projects-store";
+import { confirmDialog } from "@/controllers/dialog/dialog";
 
 export class NavigationService {
   private currentPath: string = "";
@@ -156,6 +160,69 @@ export class NavigationService {
       appEvents.emit(AppEvent.SidebarReload);
     } catch (error) {
       console.error("Failed to load sidebar:", error);
+    }
+  }
+
+  /** Runtime directory reselection: switch the active provider to a new content root. */
+  async openProject(path?: string): Promise<void> {
+    if (this.loading) return;
+    if (!hasFunc(AppFunc.ProjectPicker)) return;
+
+    const provider = getProvider();
+    if (!provider.setRoot) return;
+
+    let targetPath = path;
+    if (!targetPath) {
+      const info = await pickProjectDirectory();
+      if (!info) return; // user cancelled — stay put, silently
+      targetPath = info.path;
+    }
+
+    const ops = this.cache.getPendingOps();
+    if (ops.all.length > 0) {
+      const confirmed = await confirmDialog({
+        title: "Switch project?",
+        message:
+          `Opening another project will discard ${ops.all.length} pending change` +
+          `${ops.all.length === 1 ? "" : "s"} that have not been flushed to disk. Continue?`,
+        confirmLabel: "Switch Project",
+        confirmClass: "danger",
+      });
+      if (!confirmed) return;
+    }
+
+    this.loading = true;
+    try {
+      this.editor.showSkeleton();
+      clearEditorTint(this.editor.element as HTMLElement);
+      // Fold editor-local edits into pending ops, then discard everything so no
+      // stale ops from the old root survive the switch.
+      dirtyTrackingService.flush();
+      pagesStore.clearAll();
+      this.cache.clearPendingOps();
+
+      await provider.setRoot(targetPath);
+      recentProjectsStore.add(targetPath);
+      treeStore.setTree(await provider.getTree());
+    } catch (error) {
+      console.error("Failed to open project:", error);
+      showNotification("Failed to switch project", { type: "danger" });
+      return;
+    } finally {
+      this.loading = false;
+    }
+
+    await this.loadSidebar();
+    dirtyTrackingService.recompute();
+
+    const pages = Array.from(treeStore.getTree().paths);
+    const home = resolveHomePageFromPaths(pages);
+    if (home) {
+      await this.navigate(home);
+    } else {
+      this.currentPath = "";
+      this.editor.hideSkeleton();
+      appEvents.emit(AppEvent.NoFileView, {});
     }
   }
 

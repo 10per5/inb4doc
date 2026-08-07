@@ -11,6 +11,7 @@ import {
   helpCircle,
   infoCircle,
   warningCircle,
+  smartphoneDevice,
 } from "@/eta/icons";
 
 export interface ProviderDialogResult {
@@ -27,6 +28,7 @@ export async function openProviderDialog(
     [ProviderType.Remote]: { icon: cloud, label: "Server (Remote)" },
     [ProviderType.Mount]: { icon: packageIcon, label: "Mounted (GUI)" },
     [ProviderType.Filesystem]: { icon: laptop, label: "Local Files" },
+    [ProviderType.Saf]: { icon: smartphoneDevice, label: "On This Device" },
     [ProviderType.LocalStorage]: { icon: database, label: "Browser Storage" },
   };
 
