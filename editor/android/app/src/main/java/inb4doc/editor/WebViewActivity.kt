@@ -1,10 +1,15 @@
 package inb4doc.editor
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.View
@@ -12,12 +17,14 @@ import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
 import java.io.File
@@ -50,6 +57,26 @@ class WebViewActivity : AppCompatActivity() {
     // bundled file:///android_asset/editor/ shell; only the updater's data-dir
     // chunks go through this scheme.
     private val editorMountScheme = "app://editor/"
+
+    // File-chooser plumbing for WebChromeClient.onShowFileChooser (Load-from-Zip
+    // and any <input type="file">): WebView shows no picker without it, and the
+    // delivered content:// Uri is what WebView wires into the input's files list
+    // (readable from JS via file.arrayBuffer()).
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = fileChooserCallback ?: return@registerForActivityResult
+        fileChooserCallback = null
+        val data = result.data
+        callback.onReceiveValue(
+            if (result.resultCode == Activity.RESULT_OK && data?.data != null) {
+                arrayOf(data.data!!)
+            } else {
+                null
+            }
+        )
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -166,6 +193,24 @@ class WebViewActivity : AppCompatActivity() {
             }
 
             webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    filePathCallback ?: return false
+                    val intent = fileChooserParams?.createIntent() ?: return false
+                    fileChooserCallback = filePathCallback
+                    return try {
+                        fileChooserLauncher.launch(intent)
+                        true
+                    } catch (e: Exception) {
+                        fileChooserCallback = null
+                        Log.w("inb4doc", "file chooser launch failed", e)
+                        false
+                    }
+                }
+
                 override fun onConsoleMessage(cm: ConsoleMessage?): Boolean {
                     cm ?: return true
                     val tag = "inb4doc-js"
@@ -220,6 +265,33 @@ class WebViewActivity : AppCompatActivity() {
         return WebResourceResponse(
             guessMime(rel), null, 200, "OK", headers, FileInputStream(file)
         )
+    }
+
+    // Persist a generated file into the user-visible Downloads collection. On
+    // API 29+ (scoped storage) that's a MediaStore.Downloads insert — no
+    // permission needed. Older releases write to the app's external Download
+    // dir (also permission-free; visible under Android/data/<pkg>/files).
+    private fun writeDownload(fileName: String, bytes: ByteArray): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("MediaStore insert failed")
+            try {
+                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    ?: throw IllegalStateException("openOutputStream failed")
+            } catch (e: Exception) {
+                contentResolver.delete(uri, null, null)
+                throw e
+            }
+            return uri.toString()
+        }
+        val dir = File(getExternalFilesDir(null), "Download").apply { mkdirs() }
+        val out = File(dir, fileName)
+        FileOutputStream(out).use { it.write(bytes) }
+        return out.absolutePath
     }
 
     // Chromium enforces a JS MIME type for <script type="module">, so the asset
@@ -318,6 +390,26 @@ class WebViewActivity : AppCompatActivity() {
             if (path.isEmpty() || path.contains("..")) return jsonData(0)
             val target = resolveWithin(dataEditorDir(), path) ?: return jsonData(0)
             return jsonData(target.takeIf { it.isFile }?.length() ?: 0L)
+        }
+
+        // Save-as-Zip (mobile): the desktop/browser path uses an <a download>
+        // on a blob: URL, which Android WebView silently drops (no download
+        // manager). Write the archive through here into the user's Downloads
+        // instead; returns the standard {ok} envelope.
+        @JavascriptInterface
+        fun saveZip(dataB64: String, fileName: String): String {
+            if (fileName.isEmpty() || fileName.contains("..") || fileName.contains("/")) {
+                return jsonError(400, "Invalid file name")
+            }
+            return try {
+                val bytes = Base64.decode(dataB64, Base64.DEFAULT)
+                val saved = writeDownload(fileName, bytes)
+                Log.i("inb4doc", "saveZip -> $saved ($bytes bytes)")
+                jsonOk()
+            } catch (e: Exception) {
+                Log.w("inb4doc", "saveZip failed for $fileName", e)
+                jsonError(500, "Write failed")
+            }
         }
 
         @JavascriptInterface
