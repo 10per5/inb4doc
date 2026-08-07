@@ -1,10 +1,15 @@
 package inb4doc.editor
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.View
@@ -12,12 +17,14 @@ import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
 import java.io.File
@@ -29,14 +36,47 @@ class WebViewActivity : AppCompatActivity() {
     private lateinit var webView: WebView
 
     // Bundled editor: the thin shell ships inside the APK at assets/editor/.
-    // The fetch updater downloads the live editor into filesDir/JsStaticFs (the
-    // writable data dir); shouldInterceptRequest serves that copy first, so a
-    // populated data dir wins over the bundled shell (Part C.1 W3). The URL
-    // path stays /editor/ (the APK asset mount); only the physical data dir is
-    // JsStaticFs, matching the desktop data layout (gui/src/platform.cpp).
+    // The fetch updater downloads the live editor into the writable data dir
+    // (app-specific external storage: /sdcard/Android/data/<pkg>/files/JsStaticFs,
+    // visible to the user like the desktop ~/.local/share/inb4doc/JsStaticFs);
+    // shouldInterceptRequest serves that copy first, so a populated data dir wins
+    // over the bundled shell (Part C.1 W3). The URL path stays /editor/ (the APK
+    // asset mount); only the physical data dir is JsStaticFs, matching the desktop
+    // data layout (gui/src/platform.cpp).
     private val assetEditorBase = "file:///android_asset/editor/"
 
-    private fun dataEditorDir(): File = File(filesDir, "JsStaticFs")
+    private fun dataEditorDir(): File =
+        getExternalFilesDir(null)?.let { File(it, "JsStaticFs") }
+            ?: File(filesDir, "JsStaticFs")
+
+    // Custom scheme for the writable data-dir mount. Unlike plain file:// URLs
+    // — which WebView can serve via its native file loader without consulting
+    // shouldInterceptRequest, or block outright — a custom scheme has NO native
+    // handler, so every request is routed through shouldInterceptRequest
+    // deterministically. The page's own eager assets still load from the
+    // bundled file:///android_asset/editor/ shell; only the updater's data-dir
+    // chunks go through this scheme.
+    private val editorMountScheme = "app://editor/"
+
+    // File-chooser plumbing for WebChromeClient.onShowFileChooser (Load-from-Zip
+    // and any <input type="file">): WebView shows no picker without it, and the
+    // delivered content:// Uri is what WebView wires into the input's files list
+    // (readable from JS via file.arrayBuffer()).
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = fileChooserCallback ?: return@registerForActivityResult
+        fileChooserCallback = null
+        val data = result.data
+        callback.onReceiveValue(
+            if (result.resultCode == Activity.RESULT_OK && data?.data != null) {
+                arrayOf(data.data!!)
+            } else {
+                null
+            }
+        )
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,25 +111,106 @@ class WebViewActivity : AppCompatActivity() {
                     view: WebView?,
                     request: WebResourceRequest?
                 ): WebResourceResponse? {
-                    val url = request?.url?.toString() ?: return null
+                    val uri = request?.url ?: return null
+                    val url = uri.toString()
+
+                    // Custom-scheme mount (app://editor/): no native WebView
+                    // handler, so every request lands here deterministically —
+                    // unlike plain file:// URLs, which WebView may serve itself
+                    // or block outright. The part below the mount is the
+                    // data-dir-relative path the updater stored chunks under
+                    // (e.g. "assets/node_imports-<hash>.js").
+                    if (url.startsWith(editorMountScheme)) {
+                        val rel = url
+                            .removePrefix(editorMountScheme)
+                            .substringBefore('?')
+                            .substringBefore('#')
+                        if (rel.isEmpty()) return null
+                        val dataFile = resolveWithin(dataEditorDir(), rel)
+                        Log.i("inb4doc", "SIR scheme $rel exists=${dataFile?.isFile}")
+                        if (dataFile?.isFile == true) {
+                            return try {
+                                serveFile(rel, dataFile)
+                            } catch (e: Exception) {
+                                Log.w("inb4doc", "intercept failed for $rel", e)
+                                null
+                            }
+                        }
+                        return null
+                    }
+
+                    // Updater-downloaded editor files (lazy chunks, css, the
+                    // downloaded index/app): served explicitly from the writable
+                    // data dir by their plain file:// path too. Match on the
+                    // decoded path (NOT a string prefix): Android's File.toURI()
+                    // emits the RFC 8089 local form "file:/storage/..." (no
+                    // "//"), so "file:///..." prefixes never match.
+                    val path = uri.path ?: return null
+                    val dataRoot = dataEditorDir().absolutePath
+                    if (path.startsWith("$dataRoot/")) {
+                        val rel = path.removePrefix("$dataRoot/")
+                        if (rel.isEmpty()) return null
+                        val dataFile = resolveWithin(dataEditorDir(), rel)
+                        Log.i("inb4doc", "SIR data-dir $rel exists=${dataFile?.isFile}")
+                        if (dataFile?.isFile == true) {
+                            return try {
+                                serveFile(rel, dataFile)
+                            } catch (e: Exception) {
+                                Log.w("inb4doc", "intercept failed for $rel", e)
+                                null
+                            }
+                        }
+                        return null
+                    }
+
                     if (!url.startsWith(assetEditorBase)) return null
                     val rel = url.removePrefix(assetEditorBase).substringBefore('?').substringBefore('#')
                     if (rel.isEmpty()) return null
 
-                    val dataFile = resolveWithin(dataEditorDir(), rel) ?: return null
-                    if (!dataFile.isFile) return null
-
                     val mime = guessMime(rel)
+
+                    // Writable data dir first: a populated data dir wins over the
+                    // bundled shell (Part C.1 W3).
+                    val dataFile = resolveWithin(dataEditorDir(), rel)
+                    if (dataFile?.isFile == true) {
+                        try {
+                            return serveFile(rel, dataFile)
+                        } catch (e: Exception) {
+                            Log.w("inb4doc", "intercept failed for $rel", e)
+                        }
+                    }
+
+                    // Fall back to the bundled asset. Served explicitly rather than
+                    // through WebView's built-in file:///android_asset loader, whose
+                    // asset lookup is unreliable for URLs carrying a query string or
+                    // fragment (the build emits assets/app.js?ver=0.0.5).
                     try {
-                        return WebResourceResponse(mime, null, FileInputStream(dataFile))
+                        return WebResourceResponse(mime, null, assets.open("editor/$rel"))
                     } catch (e: Exception) {
-                        Log.w("inb4doc", "intercept failed for $rel", e)
                         return null
                     }
                 }
             }
 
             webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    filePathCallback ?: return false
+                    val intent = fileChooserParams?.createIntent() ?: return false
+                    fileChooserCallback = filePathCallback
+                    return try {
+                        fileChooserLauncher.launch(intent)
+                        true
+                    } catch (e: Exception) {
+                        fileChooserCallback = null
+                        Log.w("inb4doc", "file chooser launch failed", e)
+                        false
+                    }
+                }
+
                 override fun onConsoleMessage(cm: ConsoleMessage?): Boolean {
                     cm ?: return true
                     val tag = "inb4doc-js"
@@ -132,6 +253,45 @@ class WebViewActivity : AppCompatActivity() {
         val base = root.canonicalFile
         val canon = target.canonicalFile
         return if (canon.path.startsWith(base.path)) canon else null
+    }
+
+    // Serve a data-dir file with the guessed MIME plus permissive CORS. The
+    // page boots from a file:// document but loads updater chunks from the
+    // custom app:// scheme; WebView's allowUniversalAccessFromFileURLs already
+    // relaxes cross-origin access, and the explicit header covers dynamic
+    // import() in updater hot-swaps and any webview where the flag is reset.
+    private fun serveFile(rel: String, file: File): WebResourceResponse {
+        val headers = mapOf("Access-Control-Allow-Origin" to "*")
+        return WebResourceResponse(
+            guessMime(rel), null, 200, "OK", headers, FileInputStream(file)
+        )
+    }
+
+    // Persist a generated file into the user-visible Downloads collection. On
+    // API 29+ (scoped storage) that's a MediaStore.Downloads insert — no
+    // permission needed. Older releases write to the app's external Download
+    // dir (also permission-free; visible under Android/data/<pkg>/files).
+    private fun writeDownload(fileName: String, bytes: ByteArray): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("MediaStore insert failed")
+            try {
+                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    ?: throw IllegalStateException("openOutputStream failed")
+            } catch (e: Exception) {
+                contentResolver.delete(uri, null, null)
+                throw e
+            }
+            return uri.toString()
+        }
+        val dir = File(getExternalFilesDir(null), "Download").apply { mkdirs() }
+        val out = File(dir, fileName)
+        FileOutputStream(out).use { it.write(bytes) }
+        return out.absolutePath
     }
 
     // Chromium enforces a JS MIME type for <script type="module">, so the asset
@@ -187,11 +347,20 @@ class WebViewActivity : AppCompatActivity() {
             Log.i("inb4doc", message)
         }
 
+        // The writable data-dir mount URL (trailing slash) under the custom
+        // app:// scheme. The page loads from the bundled android_asset shell,
+        // but Farm's lazy chunk loader must resolve chunks against this base so
+        // they reach the updater's downloaded copies. A custom scheme has no
+        // native WebView handler, so every request deterministically lands in
+        // shouldInterceptRequest, which serves the matching data-dir file.
+        @JavascriptInterface
+        fun editorMountUrl(): String = editorMountScheme
+
         // ── Part C.1 W3 updater storage bridge ──
         // Mirrors the desktop saucer.exposed envelope ({ok, status?, error?,
         // data?}); the fetch updater downloads the live editor into the writable
-        // data dir (filesDir/JsStaticFs) keyed by the app-relative path the
-        // webview serves (e.g. "assets/node_imports-abc.js").
+        // data dir (app-specific external storage JsStaticFs) keyed by the
+        // app-relative path the webview serves (e.g. "assets/node_imports-abc.js").
 
         @JavascriptInterface
         fun updaterPut(path: String, dataB64: String): String {
@@ -201,6 +370,7 @@ class WebViewActivity : AppCompatActivity() {
                 target.parentFile?.mkdirs()
                 val bytes = Base64.decode(dataB64, Base64.DEFAULT)
                 FileOutputStream(target).use { it.write(bytes) }
+                Log.i("inb4doc", "updaterPut $path -> ${target.absolutePath} ($bytes bytes)")
                 jsonOk()
             } catch (e: Exception) {
                 Log.w("inb4doc", "updaterPut failed for $path", e)
@@ -220,6 +390,26 @@ class WebViewActivity : AppCompatActivity() {
             if (path.isEmpty() || path.contains("..")) return jsonData(0)
             val target = resolveWithin(dataEditorDir(), path) ?: return jsonData(0)
             return jsonData(target.takeIf { it.isFile }?.length() ?: 0L)
+        }
+
+        // Save-as-Zip (mobile): the desktop/browser path uses an <a download>
+        // on a blob: URL, which Android WebView silently drops (no download
+        // manager). Write the archive through here into the user's Downloads
+        // instead; returns the standard {ok} envelope.
+        @JavascriptInterface
+        fun saveZip(dataB64: String, fileName: String): String {
+            if (fileName.isEmpty() || fileName.contains("..") || fileName.contains("/")) {
+                return jsonError(400, "Invalid file name")
+            }
+            return try {
+                val bytes = Base64.decode(dataB64, Base64.DEFAULT)
+                val saved = writeDownload(fileName, bytes)
+                Log.i("inb4doc", "saveZip -> $saved ($bytes bytes)")
+                jsonOk()
+            } catch (e: Exception) {
+                Log.w("inb4doc", "saveZip failed for $fileName", e)
+                jsonError(500, "Write failed")
+            }
         }
 
         @JavascriptInterface

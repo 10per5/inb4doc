@@ -519,7 +519,9 @@ function makeEnforceResources(
 async function makeConfig(cwd: string, dev: boolean): Promise<any> {
   // The live site is deployed under a subpath (e.g. /inb4doc/editor-live/),
   // so chunk URLs must be prefixed with the editor base rather than root-
-  // absolute. Locally EDITOR_SELF_BASE is unset and this stays "/assets/".
+  // absolute. Locally EDITOR_SELF_BASE is unset and this stays relative
+  // ("assets/") — correct for the desktop app:// and Android
+  // file:///android_asset/editor/ hosts, where "/assets/" would miss.
   const selfBase = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "");
   return {
     root: cwd,
@@ -537,7 +539,7 @@ async function makeConfig(cwd: string, dev: boolean): Promise<any> {
       },
       output: {
         path: resolve(cwd, "public/assets"),
-        publicPath: `${selfBase}/assets/`,
+        publicPath: `${selfBase ? `${selfBase}/` : ""}assets/`,
         entryFilename: "[entryName].[ext]",
         filename: "[name]-[hash].[ext]",
         assetsFilename: "[name]-[hash].[ext]",

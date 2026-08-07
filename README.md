@@ -6,7 +6,7 @@
 [![Sponsors](https://img.shields.io/badge/Sponsors-BECOME%20A%20SPONSOR-ea4aaa?style=for-the-badge\&logo=github-sponsors)](https://github.com/sponsors/10per5)
 [![Stars](https://img.shields.io/github/stars/10per5/inb4doc?style=for-the-badge\&logo=github)](https://github.com/10per5/inb4doc/stargazers)
 
-[Live Demo](https://10per5.github.io/inb4doc/)
+[Live Demo](https://10per5.github.io/inb4doc/editor-live/)
 
 </div>
 
@@ -14,21 +14,40 @@ A markdown wiki with live WYSIWYG editing and static site export via Hugo Book.
 
 ## Quick Start
 
+Install the desktop app from the latest release.
+
+* **Linux** (eval from a console):
+
 ```bash
-# Build editor assets (bun → npm → Docker)
-predep editor::build
-
-# Live editor with inline markdown editing
-cd editor && bun dev
-
-# Generate static site
-predep hugo-view::build
-
-# Serve the static site
-cd hugo-view && python3 -m http.server -d build 8080
+curl -fsSL https://raw.githubusercontent.com/10per5/inb4doc/main/scripts/install.sh | bash
 ```
 
-Hugo and the Book theme are downloaded automatically on first build by predep.
+* **Windows** (cmd):
+
+```bat
+curl.exe -fsSL https://raw.githubusercontent.com/10per5/inb4doc/main/scripts/install.cmd -o %TEMP%\inb4doc-install.cmd && %TEMP%\inb4doc-install.cmd
+```
+
+* **Windows** (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/10per5/inb4doc/main/scripts/install.cmd -o $env:TEMP\inb4doc-install.cmd; & $env:TEMP\inb4doc-install.cmd
+```
+
+Both installers accept the same options:
+
+| Flag                              | Purpose                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `--prefix DIR`                    | Install location (default `~/.local/share/inb4doc`, `%LOCALAPPDATA%\Programs\inb4doc`) |
+| `--version TAG`                   | Pin a release tag instead of `latest`                                                  |
+| `--source URL\|FILE\|DIR`         | Install from a specific URL, archive, or directory                                     |
+| `--no-desktop` / `--no-shortcuts` | Skip desktop integration                                                               |
+| `--uninstall`                     | Remove the install and desktop entries                                                 |
+| `--verify`                        | Launch the app with `--debug` after installing                                         |
+| `--help`                          | Show all options                                                                       |
+
+The writable data dir (`~/.local/share/inb4doc` / `%APPDATA%\inb4doc`) is
+created by the app on first run.
 
 ## Git Hooks
 

@@ -9,11 +9,34 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { initNativeBridge } from "@/eta/bridge";
 import { setSessionStarted } from "@/controllers/shell_controller";
 import { initFarmCompat } from "$/farmfe-compat";
-import { editorSelfBase } from "@/config";
 import { logger } from "@/utils/logger";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 
-initFarmCompat(editorSelfBase + "assets/");
+// Farm's chunk loader bakes a publicPath at build time; override it before any
+// dynamic import. The default RELATIVE "assets/" resolves against the document
+// URL, which is correct under http(s) root/subpath (web-remote) and the desktop
+// app:// scheme. Android is the exception: the page loads from the bundled
+// file:///android_asset/editor/ shell, but WebView does NOT call
+// shouldInterceptRequest for file:///android_asset/ URLs (documented), and the
+// thin APK ships no lazy chunks — so a relative base would resolve every lazy
+// pot under android_asset and 404. Point the loader at the writable data dir
+// via the custom app://editor/ scheme instead: it has no native WebView
+// handler, so every request deterministically reaches shouldInterceptRequest,
+// which serves the updater-downloaded chunk. Everywhere else falls back to the
+// relative base.
+const ANDROID_MOUNT = (() => {
+  try {
+    const nb = (window as any).NativeBridge
+    const url = typeof nb?.editorMountUrl === "function" ? nb.editorMountUrl() : ""
+    return typeof url === "string" && url ? url : ""
+  } catch {
+    return ""
+  }
+})()
+// The mount is the JsStaticFs ROOT; the updater stores chunks under its
+// assets/ subdir (pathForUrl keeps "assets/<name>"), so the loader base is the
+// mount + assets/. Everywhere else falls back to the relative base.
+initFarmCompat(ANDROID_MOUNT ? `${ANDROID_MOUNT}assets/` : "assets/")
 
 const app = new Application();
 
