@@ -10,6 +10,7 @@ import { initNativeBridge } from "@/eta/bridge";
 import { setSessionStarted } from "@/controllers/shell_controller";
 import { initFarmCompat } from "$/farmfe-compat";
 import { editorSelfBase } from "@/config";
+import { logger } from "@/utils/logger";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 
 initFarmCompat(editorSelfBase + "assets/");
@@ -41,21 +42,56 @@ const thinShell = hasFunc(AppFunc.ThinShell);
 const registry = new ModuleRegistry(app);
 setRegistry(registry);
 
+// Thin-shell first run: the lazy chunks exist only once the fetch updater has
+// populated the writable data dir. Probe the updater storage BEFORE attempting
+// the dynamic import, so boot never fetches chunks that 404 — the scheme serves
+// an empty JS body for them, Farm's loader eval's it, and the resulting "module
+// not registered" errors spam the console before the updater's reload. A
+// missing bridge (plain-browser testing) means nothing can store an editor, so
+// assume present and let the import try.
+async function dataDirHasEditor(): Promise<boolean> {
+  const exposed = (window as any).saucer?.exposed as
+    | Record<string, unknown>
+    | undefined;
+  if (typeof exposed?.updaterHas !== "function") return true;
+  try {
+    const raw = (await (exposed.updaterHas as (p: string) => Promise<string>)(
+      "index.html"
+    )) as string;
+    let data: unknown = raw;
+    if (typeof raw === "string") {
+      try {
+        data = (JSON.parse(raw) as { data?: unknown })?.data ?? JSON.parse(raw);
+      } catch {
+        data = raw;
+      }
+    }
+    return data === true || data === "true";
+  } catch {
+    return true;
+  }
+}
+
 // Part D lazy registration for thin shells. The editor + dialog controllers
 // live in lazy chunks that are never in the shipped dist/; on a thin shell's
 // FIRST run the fetch updater hasn't populated the data dir yet, so the dynamic
-// import fails here — and that must never abort boot, or startUpdater never
-// runs and the shell stays broken. The updater's transfer + reload boots a
-// complete editor from the data-dir copy (the scheme serves it first); if it
-// instead applies in place (hot swap), retry once after the swap so the editor
-// still wires up.
+// import would fail here — and that must never abort boot, or startUpdater never
+// runs and the shell stays broken. dataDirHasEditor() skips the import entirely
+// until the updater has stored the live editor (a probe, not a failed fetch), so
+// first run boots clean; the updater's transfer + reload then boots a complete
+// editor from the data-dir copy (the scheme serves it first). If it instead
+// applies in place (hot swap), retry once after the swap so the editor still
+// wires up.
 async function registerLazy(app: Application, retried = false): Promise<void> {
   try {
+    if (thinShell && !(await dataDirHasEditor())) {
+      throw new Error("editor not in data dir yet — updater must populate it first");
+    }
     const { registerLazyControllers } = await import("@/controllers/lazy");
     registerLazyControllers(app);
   } catch (err) {
     if (retried) return;
-    console.warn("[boot] lazy controllers unavailable — waiting for updater:", err);
+    logger.warn("boot", "lazy controllers unavailable — waiting for updater:", err);
     // Re-attempt after an in-place update (hot swap) AND on a short timer: if
     // the updater's reload is suppressed (the reload guard) or the swap events
     // never fire, the shell must still self-heal once the data dir populates.

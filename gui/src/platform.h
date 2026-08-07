@@ -15,7 +15,13 @@ std::string default_editor_root();
 std::string default_data_dir();
 
 /// The writable copy of the editor maintained by the fetch updater:
-/// default_data_dir()/editor. Empty when there is no data directory.
+/// default_data_dir()/JsStaticFs. Empty when there is no data directory.
 /// scheme.cpp serves this before the read-only install shell; the updater
 /// bridge writes the live editor here (Part C.1 W3).
 std::string default_editor_data_dir();
+
+/// Qt WebEngine's persistent storage + cache root: default_data_dir()/Browser.
+/// Keeps the browser's profile files (Cache, GPUCache, Local Storage, Cookies)
+/// out of the data-dir root so they can't be confused with the editor data or
+/// other gui files. Empty when there is no data directory.
+std::string default_browser_data_dir();

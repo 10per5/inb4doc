@@ -3,6 +3,7 @@ import { getLoadedChunkNames } from "@/services/module-registry"
 import { updaterDiff, updaterTransfer, isStaleVersion } from "@/eta/updater-core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { updateBase, isDev, bootedAppHash, bootedIndexHash } from "@/config"
+import { logger } from "@/utils/logger"
 
 // Part C.1 fetch updater transport (GuiDesktop thin shell). Where the Service
 // Worker owns updates over http(s), the desktop/mobile WebViews (app://, file://)
@@ -76,7 +77,7 @@ function forceReload(reason: string): boolean {
   } catch {
     // sessionStorage unavailable — allow the single reload.
   }
-  console.warn("[updater] reload:", reason)
+  logger.warn("updater", "reload:", reason)
   // Prefer the native bridge reload (the whole window reloads as one unit);
   // fall back to location.reload.
   const nativeReload = (window as any).saucer?.exposed?.reload as (() => void) | undefined

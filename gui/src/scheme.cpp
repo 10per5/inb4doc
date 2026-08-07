@@ -525,8 +525,19 @@ saucer::scheme::response handle_app_request(
 
     std::error_code stat_ec;
     if (!fs::exists(file_resolved, stat_ec) || !fs::is_regular_file(file_resolved, stat_ec))
+    {
+        // Farm's dynamic chunk loader eval's whatever body it receives. A thin
+        // shell ships without the lazy editor chunks, so their first-run fetch
+        // misses here; a text/plain body ("Not Found") then parses as JS and
+        // spams one `Unexpected identifier 'Found'` SyntaxError per chunk. An
+        // empty body is valid JS — the loader fails cleanly with "module not
+        // registered" and the boot's updater-wait path handles it.
+        auto ext = file_resolved.extension().string();
+        if (ext == ".js" || ext == ".mjs")
+            return {.data = saucer::stash::from_str(""), .mime = "application/javascript", .status = 404};
         return {.data = saucer::stash::from_str("Not Found"),
                 .mime = "text/plain", .status = 404};
+    }
 
     return {.data = stash_from_file(file_resolved.string()),
             .mime = guess_mime(file_resolved.string()), .status = 200};

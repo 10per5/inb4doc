@@ -15,7 +15,22 @@ export default class extends Controller {
 
   declare readonly outlineTarget: HTMLElement
   declare readonly outlineSectionTarget: HTMLElement
-  declare readonly editorOutlet: EditorController | null
+  declare readonly editorOutletElement: Element
+  declare readonly hasEditorOutlet: boolean
+
+  // editorOutlet is a blessed Stimulus getter that THROWS when the outlet
+  // element lacks a connected "editor" controller instance — which is the case
+  // on thin shells before the lazy editor chunk registers (first GUI run, and
+  // every boot until registerLazy completes). Route every access through this
+  // so connect()/renderOutline never throw on that window; the outlet callback
+  // re-renders the outline once the editor actually connects.
+  private editor(): EditorController | null {
+    if (!this.hasEditorOutlet) return null
+    return this.application.getControllerForElementAndIdentifier(
+      this.editorOutletElement,
+      "editor"
+    ) as EditorController | null
+  }
 
   private ui: MetaPanelUI | null = null
   private unsubs: (() => void)[] = []
@@ -79,7 +94,7 @@ export default class extends Controller {
     const pos = Number(item.dataset.pos)
     const level = Number(item.dataset.level)
     const text = decodeURIComponent(item.dataset.text ?? "")
-    this.editorOutlet?.scrollToHeading(
+    this.editor()?.scrollToHeading(
       text,
       level,
       Number.isNaN(pos) ? undefined : pos
@@ -95,7 +110,7 @@ export default class extends Controller {
   }
 
   private renderOutline(): void {
-    const outline = this.editorOutlet?.getOutline() ?? []
+    const outline = this.editor()?.getOutline() ?? []
     this.outlineSectionTarget.hidden = outline.length === 0
     this.outlineTarget.innerHTML = outline
       .map(

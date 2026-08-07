@@ -57,6 +57,7 @@ const context = {
   LIVE_URL_BASE: process.env.LIVE_URL_BASE || "",
   UPDATE_BASE,
   APP_VERSION: process.env.APP_VERSION || "",
+  DEBUG_LOGGING: process.env.DEBUG_LOGGING === "1",
   EDITOR_ACTION_PREFIX,
   editorAction: EditorAction,
   TOOLBAR_ACTION_PREFIX,

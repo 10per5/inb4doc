@@ -291,7 +291,7 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
     // editor into the writable data dir through these. `path` is the
     // app://-relative key the scheme serves (e.g. "assets/node_imports-abc.js");
     // updaterPut receives base64 bytes. All writes stay inside
-    // default_data_dir()/editor via within_base.
+    // default_data_dir()/Editor via within_base.
     wv.expose("updaterPut", [](const std::string &path, const std::string &data_b64)
     {
         std::filesystem::path dir = default_editor_data_dir();

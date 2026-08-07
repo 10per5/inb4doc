@@ -104,21 +104,69 @@ static void toast(saucer::smartview &wv, const std::string &msg)
     static_cast<saucer::webview &>(wv).execute(js.c_str());
 }
 
+// inb4.config.toml is the gui settings file (key = value) in the data-dir root.
+// Currently the only key is zoom, applied on boot and written on quit.
+static const std::string ZOOM_CONFIG_FILE = "inb4.config.toml";
+
+static void save_zoom(const std::filesystem::path &data_dir, float zoom);
+
 static float load_zoom(const std::filesystem::path &data_dir)
 {
-    auto path = data_dir / "zoom";
+    auto path = data_dir / ZOOM_CONFIG_FILE;
     std::ifstream ifs(path);
     if (!ifs)
+    {
+        // Pre-Gui.ini builds wrote the raw zoom float into a file named "zoom";
+        // migrate it once so existing installs keep their zoom setting.
+        auto legacy = data_dir / "zoom";
+        std::ifstream old(legacy);
+        if (old)
+        {
+            float v{};
+            old >> v;
+            if (!old.fail())
+            {
+                save_zoom(data_dir, v);
+                std::error_code ec;
+                std::filesystem::remove(legacy, ec);
+                return v;
+            }
+        }
         return 1.0f;
-    float v{};
-    ifs >> v;
-    return ifs.fail() ? 1.0f : v;
+    }
+
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+        auto eq = line.find('=');
+        if (eq == std::string::npos)
+            continue;
+        auto key = line.substr(0, eq);
+        auto val = line.substr(eq + 1);
+        auto trim = [](std::string s)
+        {
+            s.erase(0, s.find_first_not_of(" \t"));
+            s.erase(s.find_last_not_of(" \t") + 1);
+            return s;
+        };
+        if (trim(key) != "zoom")
+            continue;
+        try
+        {
+            return std::stof(trim(val));
+        }
+        catch (...)
+        {
+            return 1.0f;
+        }
+    }
+    return 1.0f;
 }
 
 static void save_zoom(const std::filesystem::path &data_dir, float zoom)
 {
-    if (auto ofs = std::ofstream(data_dir / "zoom"))
-        ofs << zoom;
+    if (auto ofs = std::ofstream(data_dir / ZOOM_CONFIG_FILE))
+        ofs << "zoom = " << zoom << "\n";
 }
 
 static bool is_allowed(const saucer::url &url)
@@ -143,9 +191,28 @@ int run_app(config cfg)
             if (!data_dir.empty())
                 std::filesystem::create_directories(data_dir);
 
+            // The updater's writable editor copy moved from a lowercase "editor"
+            // dir to "JsStaticFs" (the editor's writable data dir). Rename the
+            // legacy dir once so existing installs don't re-download.
+            {
+                auto editor_dir = std::filesystem::path(default_editor_data_dir());
+                auto legacy_editor = std::filesystem::path(data_dir) / "editor";
+                std::error_code ec;
+                if (!editor_dir.empty() && !std::filesystem::exists(editor_dir, ec) &&
+                    std::filesystem::is_directory(legacy_editor, ec))
+                    std::filesystem::rename(legacy_editor, editor_dir, ec);
+            }
+
+            // Qt WebEngine's profile/cache lives in its own Browser subdir so
+            // the data-dir root stays readable: JsStaticFs/ (updater copy) and
+            // Browser/ (webview storage) are cleanly separated.
+            auto browser_dir = default_browser_data_dir();
+            if (!browser_dir.empty())
+                std::filesystem::create_directories(browser_dir);
+
             saucer::smartview::options opts{
                 .window = window,
-                .storage_path = data_dir.empty() ? std::nullopt : std::optional<std::filesystem::path>(data_dir),
+                .storage_path = browser_dir.empty() ? std::nullopt : std::optional<std::filesystem::path>(browser_dir),
             };
             if (safe->disable_gpu)
                 opts.hardware_acceleration = false;
