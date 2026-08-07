@@ -164,11 +164,22 @@ jobs:
           premake5 vs2022
           msbuild inb4doc-gui.sln /p:Configuration=release /p:Platform=x64 /m:$env:NUMBER_OF_PROCESSORS
 
+      - name: Cache bun
+        id: cache-bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun
+          key: bun-latest
+          restore-keys: bun-
+
       - name: Install bun
+        if: steps.cache-bun.outputs.cache-hit != 'true'
         shell: pwsh
-        run: |
-          powershell -c "iwr bun.sh/install.ps1 -useb | iex"
-          echo "$env:USERPROFILE\.bun\bin" >> $env:GITHUB_PATH
+        run: powershell -c "iwr bun.sh/install.ps1 -useb | iex"
+
+      - name: Add bun to PATH
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.bun\bin" >> $env:GITHUB_PATH
 
       - name: Build editor
         env:
