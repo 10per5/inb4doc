@@ -151,6 +151,10 @@ jobs:
           echo "editor=$(get_sha editor)" >> $GITHUB_OUTPUT
           echo "package=$(get_sha package)" >> $GITHUB_OUTPUT
 
+      - name: Distribute shared assets
+        shell: bash
+        run: predep --privileged ${{ steps.predep-shas.outputs.package }} init
+
       - name: Build inb4doc-gui
         shell: pwsh
         working-directory: gui
