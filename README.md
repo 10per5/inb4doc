@@ -3,10 +3,10 @@
 <div align="center">
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
-[![Sponsors](https://img.shields.io/badge/Sponsors-BECOME%20A%20SPONSOR-ea4aaa?style=for-the-badge\&logo=github-sponsors)](https://github.com/sponsors/10per5)
-[![Stars](https://img.shields.io/github/stars/10per5/inb4doc?style=for-the-badge\&logo=github)](https://github.com/10per5/inb4doc/stargazers)
+[![Sponsors](https://img.shields.io/badge/Sponsors-BECOME%20A%20SPONSOR-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/10per5)
+[![Stars](https://img.shields.io/github/stars/10per5/inb4doc?style=for-the-badge&logo=github)](https://github.com/10per5/inb4doc/stargazers)
 
-[Live Demo](https://10per5.github.io/inb4doc/)
+[Live Demo](https://10per5.github.io/inb4doc/editor-live/)
 
 </div>
 
@@ -69,13 +69,13 @@ See `predep/README.md` for full documentation on the stage engine.
 
 Each subproject declares its own stages in `predep.toml`:
 
-* `editor/predep.toml` — editor build → `editor::build`
+- `editor/predep.toml` — editor build → `editor::build`
 
-* `hugo-view/predep.toml` — Hugo binary, theme, and site generation → `hugo-view::build`
+- `hugo-view/predep.toml` — Hugo binary, theme, and site generation → `hugo-view::build`
 
-* `gui/predep.toml` — GUI binary build → `gui::build`
+- `gui/predep.toml` — GUI binary build → `gui::build`
 
-* `predep.toml` (root) — parent manifest linking subprojects via `[[include]]`
+- `predep.toml` (root) — parent manifest linking subprojects via `[[include]]`
 
 ## Tech Stack
 
