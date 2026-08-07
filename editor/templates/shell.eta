@@ -32,6 +32,9 @@
       </div>
     </div>
     <div data-controller="update"></div>
+<% if (it.thinShell) { %>
+    <div id="updater-loader" data-controller="updater-loader"></div>
+<% } %>
     <script type="module" src="assets/app.js?ver=<%= it.APP_VERSION %>"></script>
   </body>
 </html>

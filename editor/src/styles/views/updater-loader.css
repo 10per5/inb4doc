@@ -1,0 +1,195 @@
+/* Updater first-run loader — ThinShell builds only (GuiDesktop / GuiMobile).
+   The loader markup is rendered by updater-loader-controller into the
+   #updater-loader mount (shell.eta, gated on thinShell), so this CSS is inert
+   on web builds. */
+
+[hidden] {
+  display: none !important;
+}
+
+.updater-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(2rem + env(safe-area-inset-top))
+    calc(2rem + env(safe-area-inset-right))
+    calc(2rem + env(safe-area-inset-bottom))
+    calc(2rem + env(safe-area-inset-left));
+  overflow-y: auto;
+  background: rgb(248 249 250 / 84%);
+  background: color-mix(in srgb, var(--color-bg-primary) 84%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.updater-loader-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.15);
+}
+
+.updater-loader-logo {
+  margin-bottom: 1rem;
+}
+
+.updater-loader-logo img {
+  width: 96px;
+  height: 96px;
+  border-radius: 18px;
+  opacity: 0.95;
+}
+
+.updater-loader-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.updater-loader-desc {
+  margin: 0.5rem 0 1.5rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+/* Endless loader: we don't know the bundle size up front, so the pulsing dots
+   read as "in progress" while the bar below converges to real bytes. */
+.updater-loader-endless {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.updater-loader-endless span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: updater-bounce 1.2s ease-in-out infinite;
+}
+
+.updater-loader-endless span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.updater-loader-endless span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes updater-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+
+.updater-loader-progress {
+  width: 100%;
+}
+
+.updater-loader-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-bg-tertiary);
+}
+
+.updater-loader-fill {
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+.updater-loader-fill.is-indeterminate {
+  width: 40%;
+  animation: updater-slide 1.3s ease-in-out infinite;
+}
+
+@keyframes updater-slide {
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+
+.updater-loader-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Mobile (GuiMobile WebView): tighter spacing so the card fits small phones
+   and short / landscape viewports without clipping — the overlay scrolls as a
+   last resort. */
+@media (max-width: 767px) {
+  .updater-loader {
+    padding: calc(1rem + env(safe-area-inset-top))
+      calc(1rem + env(safe-area-inset-right))
+      calc(1rem + env(safe-area-inset-bottom))
+      calc(1rem + env(safe-area-inset-left));
+  }
+
+  .updater-loader-card {
+    padding: 2rem 1.25rem;
+  }
+
+  .updater-loader-logo {
+    margin-bottom: 0.75rem;
+  }
+
+  .updater-loader-logo img {
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+  }
+
+  .updater-loader-title {
+    font-size: 1.2rem;
+  }
+
+  .updater-loader-desc {
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+
+  .updater-loader-endless {
+    margin-bottom: 1.25rem;
+  }
+}
+
+/* Compact vertical: landscape phones and very short windows. */
+@media (max-height: 560px) {
+  .updater-loader-logo img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .updater-loader-endless span {
+    width: 8px;
+    height: 8px;
+  }
+}

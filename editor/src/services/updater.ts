@@ -3,6 +3,7 @@ import { getLoadedChunkNames } from "@/services/module-registry"
 import { updaterDiff, updaterTransfer, isStaleVersion } from "@/eta/updater-core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { updateBase, isDev, bootedAppHash, bootedIndexHash } from "@/config"
+import { hasFunc, AppFunc } from "$/build/build-mode"
 import { logger } from "@/utils/logger"
 
 // Part C.1 fetch updater transport (GuiDesktop thin shell). Where the Service
@@ -247,7 +248,14 @@ export async function applyRemoteUpdate(
     urls.map(async (u) => ((await storage.has(u)) ? u : null))
   )
   const precached = new Set(stored.filter((u): u is string => u !== null))
-  if (urls.some((u) => !precached.has(u))) {
+  // First run (thin shells only): the data dir holds no downloaded index yet,
+  // so the whole editor is coming down in one pull. The full-screen loader
+  // (updater-loader-controller, gated on AppFunc.ThinShell) owns the screen for
+  // that pull, so don't also raise the update toast — its progress/ready events
+  // still drive the loader. `important[0]` is the site root ("/" → index.html).
+  const indexUrl = remoteUrl(manifest.important[0] ?? "/")
+  const firstRun = hasFunc(AppFunc.ThinShell) && !precached.has(indexUrl)
+  if (!firstRun && urls.some((u) => !precached.has(u))) {
     appEvents.emit(AppEvent.UpdateAvailable)
   }
   await updaterTransfer(urls, {

@@ -81,6 +81,7 @@ const context = {
   icons: icons as Record<string, string>,
   mobileCss: hasFlag(AppFunc.MobileCss),
   toolbarQuickNav: hasFlag(AppFunc.ToolbarQuickNav),
+  thinShell: hasFlag(AppFunc.ThinShell),
 }
 
 const html = renderShell(eta, templatesSrc, context as Record<string, unknown>)

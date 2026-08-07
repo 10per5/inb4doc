@@ -1,4 +1,5 @@
 import { Application, type Controller } from "@hotwired/stimulus"
+import { hasFunc, AppFunc } from "$/build/build-mode"
 
 import ShellController from "./shell_controller"
 import TopbarController from "./topbar-controller"
@@ -9,6 +10,7 @@ import NoFileController from "./no-file-controller"
 import DirIndexEmptyController from "./dir-index-empty-controller"
 import DiskUsageController from "./disk-usage-controller"
 import UpdateController from "./update-controller"
+import UpdaterLoaderController from "./updater-loader-controller"
 import MetaPanelController from "./meta-panel/meta-panel-controller"
 
 export interface ControllerRegistration {
@@ -36,5 +38,11 @@ const coreRegistrations: ControllerRegistration[] = [
 export function registerCoreControllers(app: Application): void {
   for (const { name, controller } of coreRegistrations) {
     app.register(name, controller)
+  }
+  // Thin-shell first-run loader. Registered only for thin builds — the mount
+  // element (shell.eta) only exists there, so web builds never see it; the
+  // hasFunc gate keeps the eager boot set free of the loader's event wiring.
+  if (hasFunc(AppFunc.ThinShell)) {
+    app.register("updater-loader", UpdaterLoaderController)
   }
 }
