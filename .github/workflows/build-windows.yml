@@ -153,6 +153,7 @@ jobs:
 
       - name: Distribute shared assets
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: predep --privileged ${{ steps.predep-shas.outputs.package }} init
 
       - name: Build inb4doc-gui
