@@ -119,7 +119,7 @@ jobs:
 
       - name: Install predep
         run: |
-          wget -qO- 'https://github.com/10per5/predep/releases/download/v0.0.1/predep-linux-x86_64.tar.gz' \
+          wget -qO- 'https://github.com/10per5/predep/releases/latest/download/predep-linux-x86_64.tar.gz' \
             | tar xz -C /usr/local/bin
           predep --help > /dev/null
 
