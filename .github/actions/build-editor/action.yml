@@ -18,6 +18,10 @@ inputs:
     description: Update base URL the fetch updater pulls the live editor from (per-buildmode deployment subdir)
     required: false
     default: ""
+  output-path:
+    description: Directory (relative to repo root) to copy the built editor/public/ into. Leave empty to skip.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -46,3 +50,15 @@ runs:
       run: |
         bun install --frozen-lockfile
         bun run build
+
+    # Every build writes to editor/public/, so concurrent/sequential calls
+    # overwrite each other. Snapshot each build into its own directory here so
+    # the workflow assembles the site from distinct, atomic outputs.
+    - name: Copy editor output
+      if: ${{ inputs.output-path != '' }}
+      shell: bash
+      run: |
+        mkdir -p "$OUTPUT_PATH"
+        cp -r editor/public/. "$OUTPUT_PATH/"
+      env:
+        OUTPUT_PATH: ${{ inputs.output-path }}

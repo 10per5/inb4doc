@@ -2,7 +2,8 @@ name: Deploy static content to Pages
 
 on:
   push:
-    branches: ["main"]
+    # branches: ["main"]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
@@ -30,30 +31,21 @@ jobs:
           live-url-base: /inb4doc
           editor-self-base: https://10per5.github.io/inb4doc/editor-live/
           build-mode: web-remote
+          output-path: build/editor-web
 
       - uses: ./.github/actions/build-editor
         with:
           live-url-base: /inb4doc
           build-mode: gui-desktop
           update-base: https://10per5.github.io/inb4doc/editor-live/desktop
-
-      - name: Copy desktop editor into site output
-        shell: bash
-        run: |
-          mkdir -p hugo-view/build/editor-live/desktop
-          cp -r editor/public/. hugo-view/build/editor-live/desktop
+          output-path: build/editor-desktop
 
       - uses: ./.github/actions/build-editor
         with:
           live-url-base: /inb4doc
           build-mode: gui-mobile
           update-base: https://10per5.github.io/inb4doc/editor-live/mobile
-
-      - name: Copy mobile editor into site output
-        shell: bash
-        run: |
-          mkdir -p hugo-view/build/editor-live/mobile
-          cp -r editor/public/. hugo-view/build/editor-live/mobile
+          output-path: build/editor-mobile
 
       - uses: ./.github/actions/build-hugo
         with:
@@ -71,11 +63,18 @@ jobs:
         shell: bash
         run: predep --privileged ${{ steps.predep-copy-images-sha.outputs.sha }} copy-images
 
-      - name: Copy editor into site output
+      # Assemble the three per-mode editor builds into the site output. Each
+      # build-editor call snapshots into its own directory (output-path), so the
+      # root /editor-live gets the web-remote build and never a stale overwrite.
+      - name: Copy editor builds into site output
         shell: bash
         run: |
           mkdir -p hugo-view/build/editor-live
-          cp -r editor/public/. hugo-view/build/editor-live
+          cp -r build/editor-web/. hugo-view/build/editor-live
+          mkdir -p hugo-view/build/editor-live/desktop
+          cp -r build/editor-desktop/. hugo-view/build/editor-live/desktop
+          mkdir -p hugo-view/build/editor-live/mobile
+          cp -r build/editor-mobile/. hugo-view/build/editor-live/mobile
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
