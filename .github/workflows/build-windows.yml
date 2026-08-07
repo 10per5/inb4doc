@@ -193,6 +193,51 @@ jobs:
           }
           echo "version=$ver" >> $env:GITHUB_OUTPUT
 
+      - name: Cache NSIS
+        id: cache-nsis
+        uses: actions/cache@v4
+        with:
+          path: C:\nsis
+          key: nsis-3.10
+
+      - name: Install NSIS
+        if: steps.cache-nsis.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri 'https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10.zip/download' -OutFile nsis.zip
+          Expand-Archive nsis.zip -DestinationPath C:\nsis
+          echo "C:\nsis\nsis-3.10" >> $env:GITHUB_PATH
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          Expand-Archive -Path inb4doc-windows-x86_64.zip -DestinationPath staging-raw -Force
+          $payload = Join-Path $pwd 'payload'
+          $bin = Join-Path $payload 'bin'
+          $editor = Join-Path $payload 'editor'
+          New-Item -ItemType Directory -Force -Path $bin, $editor | Out-Null
+          $cands = @((Resolve-Path staging-raw).Path)
+          $cands += Get-ChildItem staging-raw -Directory | ForEach-Object { $_.FullName }
+          $src = $null
+          foreach ($c in $cands) {
+            if ((Test-Path (Join-Path $c 'bin\inb4doc-gui.exe')) -and (Test-Path (Join-Path $c 'editor\index.html'))) {
+              Copy-Item (Join-Path $c 'bin\*') $bin -Recurse -Force
+              Copy-Item (Join-Path $c 'editor\*') $editor -Recurse -Force
+              $src = $c
+              break
+            }
+            if ((Test-Path (Join-Path $c 'inb4doc-gui.exe')) -and (Test-Path (Join-Path $c 'dist\index.html'))) {
+              Copy-Item (Join-Path $c 'inb4doc-gui.exe') $bin -Force
+              if (Test-Path (Join-Path $c 'icon.png')) { Copy-Item (Join-Path $c 'icon.png') $bin -Force }
+              Copy-Item (Join-Path $c 'dist\*') $editor -Recurse -Force
+              $src = $c
+              break
+            }
+          }
+          if (-not $src) { throw 'no usable payload in archive' }
+          Write-Host "payload from: $src"
+          makensis "/DPAYLOAD=$payload" "/DAPP_VERSION=${{ steps.version.outputs.version }}" scripts\inb4doc.nsi
+
       # - name: Upload artifact
       #   uses: actions/upload-artifact@v4
       #   with:
@@ -206,5 +251,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
-          files: inb4doc-windows-x86_64.zip
+          files: |
+            inb4doc-windows-x86_64.zip
+            inb4doc-windows-installer-x86_64.exe
           generate_release_notes: false
