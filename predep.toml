@@ -72,7 +72,7 @@ bundle = "inb4doc"
 artifacts = [
     { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui", binary = true },
     { source = "root://images/inb4doc-32.png", dest = "icon.png" },
-    { source = "root://editor/dist", dest = "dist" },
+    { source = "root://editor/dist", dest = "editor" },
 ]
 
 [install]

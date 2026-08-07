@@ -193,7 +193,7 @@ call :expand "%PAYLOAD_ZIP%" "%PAYLOAD_BASE%"
 exit /b 0
 
 rem ===========================================================================
-rem Locate the flat payload (inb4doc-gui.exe + dist\) inside PAYLOAD_BASE;
+rem Locate the flat payload (inb4doc-gui.exe + editor\) inside PAYLOAD_BASE;
 rem sets PAYLOAD_BIN / PAYLOAD_EDITOR.
 :find_payload
 set "PAYLOAD_BIN="
@@ -211,9 +211,9 @@ exit /b 0
 
 :probe_payload
 if exist "%~1\inb4doc-gui.exe" (
-  if exist "%~1\dist\index.html" (
+  if exist "%~1\editor\index.html" (
     set "PAYLOAD_BIN=%~1"
-    set "PAYLOAD_EDITOR=%~1\dist"
+    set "PAYLOAD_EDITOR=%~1\editor"
     exit /b 0
   )
 )
@@ -239,7 +239,7 @@ if errorlevel 1 exit /b 1
 call :find_payload
 if errorlevel 1 exit /b 1
 
-if exist "%PREFIX%\bin" rmdir /s /q "%PREFIX%\bin"
+if not exist "%PREFIX%\" mkdir "%PREFIX%"
 copy /y "%PAYLOAD_BIN%\inb4doc-gui.exe" "%PREFIX%\" >nul
 if errorlevel 1 (
   echo error: failed to copy %PAYLOAD_BIN%\inb4doc-gui.exe to %PREFIX%
