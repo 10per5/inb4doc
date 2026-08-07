@@ -25,9 +25,12 @@
 !ifndef INSTALLER_NAME
   !define INSTALLER_NAME "inb4doc-windows-installer-x86_64.exe"
 !endif
+!ifndef OUTFILE
+  !define OUTFILE "${INSTALLER_NAME}"
+!endif
 
 Name "inb4doc"
-OutFile "${INSTALLER_NAME}"
+OutFile "${OUTFILE}"
 Unicode true
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
