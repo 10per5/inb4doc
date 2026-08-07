@@ -30,7 +30,6 @@ Name "inb4doc"
 OutFile "${INSTALLER_NAME}"
 Unicode true
 RequestExecutionLevel user
-SetShellVarContext current
 SetCompressor /SOLID lzma
 
 InstallDir "$LOCALAPPDATA\Programs\inb4doc"
@@ -53,6 +52,7 @@ Function .onInit
 FunctionEnd
 
 Section "Install" SecMain
+  SetShellVarContext current
   SetOutPath "$INSTDIR"
   File /r "${PAYLOAD}\*"
 
@@ -85,6 +85,7 @@ Section "Install" SecMain
 SectionEnd
 
 Section "Uninstall"
+  SetShellVarContext current
   Delete "$SMPROGRAMS\inb4doc\inb4doc.lnk"
   RMDir "$SMPROGRAMS\inb4doc"
   Delete "$DESKTOP\inb4doc.lnk"
