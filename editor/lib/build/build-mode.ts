@@ -32,22 +32,21 @@ export const BUILD_MODE_NAMES: Record<BuildMode, string> = {
 };
 
 export const NAME_TO_BUILD_MODE = Object.fromEntries(
-  Object.entries(BUILD_MODE_NAMES).map(([mode, name]) => [name, Number(mode)]),
+  Object.entries(BUILD_MODE_NAMES).map(([mode, name]) => [name, Number(mode)])
 ) as Record<string, BuildMode>;
 
 export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.AllowProbe]:
-    BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiDesktop | BuildMode.GuiMobile,
-  [AppFunc.DefaultToRemote]:
-    BuildMode.WebLocal,
+    BuildMode.WebRemote |
+    BuildMode.WebLocal |
+    BuildMode.GuiDesktop |
+    BuildMode.GuiMobile,
+  [AppFunc.DefaultToRemote]: BuildMode.WebLocal,
   [AppFunc.MobileCss]:
     BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiMobile,
-  [AppFunc.SidebarGestures]:
-    BuildMode.GuiMobile,
-  [AppFunc.MetaPanelCompact]:
-    BuildMode.GuiMobile,
-  [AppFunc.DevOverlay]:
-    BuildMode.GuiDesktop,
+  [AppFunc.SidebarGestures]: BuildMode.GuiMobile,
+  [AppFunc.MetaPanelCompact]: BuildMode.GuiMobile,
+  [AppFunc.DevOverlay]: BuildMode.GuiDesktop,
   [AppFunc.LivePreview]:
     BuildMode.WebRemote | BuildMode.WebLocal | BuildMode.GuiDesktop,
   [AppFunc.StaticSiteGeneration]: BuildMode.WebRemote,
@@ -68,7 +67,8 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   // dev/test mode, but the runtime hasFunc() gate turns it on only for a mobile
   // viewport/UA (see hasFunc) — desktop stays desktop by default. WebRemote
   // (the live site) and GuiDesktop stay desktop.
-  [AppFunc.MobileDock]: BuildMode.GuiMobile | BuildMode.WebLocal,
+  [AppFunc.MobileDock]:
+    BuildMode.GuiMobile | BuildMode.WebLocal | BuildMode.WebRemote,
   // Build-time-only packaging flag: ship the complete local bundle (no thin
   // shell, empty UPDATE_BASE) so the build never fetches remotely. Default-on
   // for web-local (`bun dev` serves a full self-contained bundle and updates
@@ -78,7 +78,8 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   // the core boot set + updater and downloads the editor on first run, so the
   // lazy-load mechanism keys off !FullBundle — one flag, one build decision.
   // FULL_BUNDLE=1 is gone — this mask is the only switch.
-  [AppFunc.FullBundle]: BuildMode.WebLocal | BuildMode.WebRemote | BuildMode.GuiDesktop,
+  [AppFunc.FullBundle]:
+    BuildMode.WebLocal | BuildMode.WebRemote | BuildMode.GuiDesktop,
 };
 
 let _currentMode: BuildMode | null = null;
@@ -102,9 +103,12 @@ const MOBILE_VIEWPORT_MQ = "(max-width: 767px)";
 // desktop browsers keep the desktop chrome by default. Must mirror the inline
 // pre-paint script in shell.eta (mobile-layout/desktop-layout classes).
 export function isMobileViewport(): boolean {
-  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  if (typeof window === "undefined" || typeof navigator === "undefined")
+    return false;
   if (window.matchMedia(MOBILE_VIEWPORT_MQ).matches) return true;
-  return /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+  return /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(
+    navigator.userAgent
+  );
 }
 
 // A thin shell is simply the absence of FullBundle (GuiMobile only).
@@ -115,7 +119,7 @@ export function hasFunc(func: AppFunc): boolean {
   if (func === AppFunc.MobileDock && mode === BuildMode.WebLocal) {
     return isMobileViewport();
   }
-  return !!(SUPPORTED_MODES[func] & mode)
+  return !!(SUPPORTED_MODES[func] & mode);
 }
 
 // Updater transport selection (Part C). The updater core
