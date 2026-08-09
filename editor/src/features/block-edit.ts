@@ -1,19 +1,14 @@
 import type { Ctx } from "@milkdown/kit/ctx";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { TextSelection, type EditorState } from "@milkdown/kit/prose/state";
-import { editorViewCtx, commandsCtx } from "@milkdown/kit/core";
+import { editorViewCtx } from "@milkdown/kit/core";
 import { block, BlockProvider, blockConfig } from "@milkdown/kit/plugin/block";
 import { slashFactory, SlashProvider } from "@milkdown/kit/plugin/slash";
 import { paragraphSchema } from "@milkdown/kit/preset/commonmark";
-import {
-  wrapInHeadingCommand,
-  wrapInBulletListCommand,
-  wrapInOrderedListCommand,
-  wrapInBlockquoteCommand,
-  insertHrCommand,
-} from "@milkdown/kit/preset/commonmark";
-import { createTable } from "@milkdown/kit/preset/gfm";
-import type { Node } from "@milkdown/kit/prose/model";
+import { Menu } from "@/components/ui/menu";
+import { menuRegistry } from "@/config/menu-definitions";
+import { hasFunc, AppFunc } from "$/build/build-mode";
+import { executeInsertCommand } from "@/features/insert-command";
 import { menuAPI, type MenuAPI } from "@/features/menu-api";
 import {
   plus,
@@ -62,6 +57,8 @@ class BlockHandleView {
   #content: HTMLElement;
   #provider: BlockProvider;
   #ctx: Ctx;
+  #menu: Menu | null = null;
+  #menuAnchor: HTMLElement | null = null;
 
   constructor(ctx: Ctx) {
     this.#ctx = ctx;
@@ -149,6 +146,8 @@ class BlockHandleView {
   destroy = () => {
     this.#provider.destroy();
     this.#content.remove();
+    this.#menu?.destroy();
+    this.#menuAnchor?.remove();
   };
 
   private onAdd = () => {
@@ -163,8 +162,38 @@ class BlockHandleView {
     tr.setSelection(TextSelection.near(tr.doc.resolve(pos)));
     view.dispatch(tr.scrollIntoView());
     this.#provider.hide();
-    (ctx.get(menuAPI.key) as any).show(tr.selection.from);
+    this.openAddMenu();
   };
+
+  // Open the shared "add-block" menu (same definition the mobile FAB "+"
+  // popup uses) anchored at the block-handle add button. The panel lives in a
+  // body-level position:fixed mount — NOT inside the floating handle, which
+  // fades on mouse-leave and would hide the panel. The caret already sits in
+  // the fresh empty paragraph below the active block, so the menu's commands
+  // (appendBelow) convert it in place.
+  private openAddMenu() {
+    if (!this.#menu) {
+      const anchor = document.createElement("div");
+      anchor.className = "block-handle-menu-anchor";
+      document.body.appendChild(anchor);
+      this.#menuAnchor = anchor;
+      this.#menu = new Menu({
+        mountEl: anchor,
+        triggerEl: this.#content.querySelector(
+          ".block-handle-add",
+        ) as HTMLElement,
+        label: "Add",
+        items: () => menuRegistry.get("add-block")!,
+      });
+    }
+    const btn = this.#content.querySelector<HTMLElement>(".block-handle-add");
+    const rect = btn?.getBoundingClientRect();
+    if (rect && this.#menuAnchor) {
+      this.#menuAnchor.style.left = `${rect.left}px`;
+      this.#menuAnchor.style.top = `${rect.bottom}px`;
+    }
+    this.#menu?.openAndFocusFirst();
+  }
 }
 
 class SlashView {
@@ -431,200 +460,11 @@ class SlashView {
       view.dispatch(view.state.tr.delete(deleteFrom, $from.pos));
     }
 
-    const { state } = view;
-    const { schema } = state;
-    const { $from: afterDel } = view.state.selection;
-
-    if (afterDel.parent.content.size === 0) {
-      let parentType: ProseNodeType | null = null;
-      let parentDepth = 0;
-      for (let d = afterDel.depth; d > 0; d--) {
-        const node = afterDel.node(d);
-        if (
-          node.type === schema.nodes.bullet_list ||
-          node.type === schema.nodes.ordered_list ||
-          node.type === schema.nodes.blockquote
-        ) {
-          parentType = proseNodeTypeByName.get(node.type.name) ?? null;
-          parentDepth = d;
-          break;
-        }
-      }
-      const isHeading = afterDel.parent.type === schema.nodes.heading;
-      if (parentType || isHeading) {
-        this.replaceBlock(cmd, level, view, parentType, parentDepth, isHeading);
-        return;
-      }
-    }
-
-    if (cmd === SlashCommand.ThematicBreak) {
-      this.insertDivider(view);
-      view.focus();
-      return;
-    }
-
-    const commands = this.milkdownCtx.get(commandsCtx);
-    if (cmd === SlashCommand.Heading) commands.call(wrapInHeadingCommand.key, level);
-    else if (cmd === SlashCommand.BulletList) commands.call(wrapInBulletListCommand.key);
-    else if (cmd === SlashCommand.OrderedList)
-      commands.call(wrapInOrderedListCommand.key);
-    else if (cmd === SlashCommand.Blockquote) commands.call(wrapInBlockquoteCommand.key);
-    else if (cmd === SlashCommand.TodoList) this.convertToTodoList(view);
-    else if (cmd === SlashCommand.CodeBlock) this.convertToCodeBlock(view);
-    else if (cmd === SlashCommand.MathBlock) this.convertToMathBlock(view);
-    else if (cmd === SlashCommand.Table) this.insertTable(view);
-    view.focus();
-  }
-
-  private replaceBlock(
-    cmd: SlashCommand,
-    level: number,
-    view: EditorView,
-    parentType: ProseNodeType | null,
-    parentDepth: number,
-    isHeading: boolean,
-  ) {
-    const { state, dispatch } = view;
-    const { schema } = state;
-    const { $from } = state.selection;
-
-    if (cmd === SlashCommand.ThematicBreak || cmd === SlashCommand.Image) {
-      this.insertBelow(cmd, level, view);
-      return;
-    }
-    if (parentType === ProseNodeType.BulletList && cmd === SlashCommand.OrderedList) {
-      const pos = $from.before(parentDepth);
-      const node = $from.node(parentDepth);
-      dispatch(
-        state.tr.replaceWith(
-          pos,
-          pos + node.nodeSize,
-          schema.nodes.ordered_list.create(null, node.content),
-        ),
-      );
-      return;
-    }
-    if (parentType === ProseNodeType.OrderedList && cmd === SlashCommand.BulletList) {
-      const pos = $from.before(parentDepth);
-      const node = $from.node(parentDepth);
-      dispatch(
-        state.tr.replaceWith(
-          pos,
-          pos + node.nodeSize,
-          schema.nodes.bullet_list.create(null, node.content),
-        ),
-      );
-      return;
-    }
-    if (parentType === ProseNodeType.Blockquote && cmd === SlashCommand.Blockquote) return;
-
-    if (cmd === SlashCommand.Heading) {
-      const heading = schema.nodes.heading.create({ level });
-      const pos = parentType
-        ? $from.before(parentDepth)
-        : $from.before($from.depth);
-      dispatch(
-        state.tr.replaceWith(
-          pos,
-          pos +
-            (parentType ? $from.node(parentDepth) : $from.node($from.depth))
-              .nodeSize,
-          heading,
-        ),
-      );
-      return;
-    }
-
-    const pos =
-      isHeading || parentType
-        ? $from.before(parentType ? parentDepth : $from.depth)
-        : $from.before($from.depth);
-    const block = parentType
-      ? $from.node(parentType ? parentDepth : $from.depth)
-      : $from.node($from.depth);
-    const para = schema.nodes.paragraph.create();
-    let newBlock: Node;
-    if (cmd === SlashCommand.BulletList)
-      newBlock = schema.nodes.bullet_list.create(
-        null,
-        schema.nodes.list_item.create(null, para),
-      );
-    else if (cmd === SlashCommand.OrderedList)
-      newBlock = schema.nodes.ordered_list.create(
-        null,
-        schema.nodes.list_item.create(null, para),
-      );
-    else newBlock = schema.nodes.blockquote.create(null, para);
-    dispatch(state.tr.replaceWith(pos, pos + block.nodeSize, newBlock));
-  }
-
-  private insertBelow(cmd: SlashCommand, level: number, view: EditorView) {
-    const { state, dispatch } = view;
-    const { schema } = state;
-    const { $from } = state.selection;
-    const afterPos = $from.after($from.depth);
-    if (cmd === SlashCommand.Heading) {
-      const heading = schema.nodes.heading.create({ level });
-      const tr = state.tr.insert(afterPos, heading);
-      dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 1)));
-      return;
-    }
-    if (cmd === SlashCommand.ThematicBreak) {
-      const hr = schema.nodes.hr.create();
-      const para = schema.nodes.paragraph.create();
-      const tr = state.tr.insert(afterPos, hr).insert(afterPos + 2, para);
-      dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
-      return;
-    }
-    if (cmd === SlashCommand.Image) {
-      const img = schema.nodes["image-block"]?.create({
-        src: "",
-        caption: "",
-        ratio: 1,
-      });
-      const para = schema.nodes.paragraph.create();
-      if (img) {
-        const tr = state.tr.insert(afterPos, img).insert(afterPos + 2, para);
-        dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
-      }
-      return;
-    }
-    const para = schema.nodes.paragraph.create();
-    let newBlock: Node;
-    if (cmd === SlashCommand.BulletList)
-      newBlock = schema.nodes.bullet_list.create(
-        null,
-        schema.nodes.list_item.create(null, para),
-      );
-    else if (cmd === SlashCommand.OrderedList)
-      newBlock = schema.nodes.ordered_list.create(
-        null,
-        schema.nodes.list_item.create(null, para),
-      );
-    else newBlock = schema.nodes.blockquote.create(null, para);
-    const tr = state.tr.insert(afterPos, newBlock);
-    const selPos = cmd === SlashCommand.Blockquote ? afterPos + 2 : afterPos + 3;
-    dispatch(tr.setSelection(TextSelection.create(tr.doc, selPos)));
-  }
-
-  private insertDivider(view: EditorView) {
-    const { state, dispatch } = view;
-    const { schema } = state;
-    const { $from } = state.selection;
-
-    const pos = $from.before($from.depth);
-    const blockSize = $from.node($from.depth).nodeSize;
-    const hr = schema.nodes.hr.create();
-    const para = schema.nodes.paragraph.create();
-    const tr = state.tr.replaceWith(pos, pos + blockSize, [hr, para]);
-    dispatch(
-      tr.setSelection(TextSelection.create(tr.doc, pos + 2)).scrollIntoView(),
-    );
-  }
-
-  private insertImage(view: EditorView) {
-    this.#editState = { type: "create" };
-    this.renderImagePicker();
+    // Everything past the "/text" deletion is shared with the insert menus
+    // (mobile FAB "+" / desktop block-handle "+"): same special cases for
+    // empty blocks in lists/headings, divider, and wrap/list/code/table
+    // commands. Image/Video keep their in-content picker/dialog paths above.
+    executeInsertCommand(this.milkdownCtx, cmd, level);
   }
 
   private openImageEditor(pos: number, src: string) {
@@ -803,71 +643,6 @@ class SlashView {
     });
   }
 
-  private convertToTodoList(view: EditorView) {
-    const { state, dispatch } = view;
-    const { $from } = state.selection;
-    const para = state.schema.nodes.paragraph.create();
-    const listItem = state.schema.nodes.list_item.create(
-      { checked: false },
-      para,
-    );
-    const bulletList = state.schema.nodes.bullet_list.create(null, listItem);
-    const pos = $from.before($from.depth);
-    dispatch(
-      state.tr
-        .replaceWith(pos, pos + $from.node($from.depth).nodeSize, bulletList)
-        .scrollIntoView(),
-    );
-  }
-
-  private convertToCodeBlock(view: EditorView) {
-    const { state, dispatch } = view;
-    const { $from } = state.selection;
-    const codeBlock = state.schema.nodes.code_block.create({ language: "" });
-    const pos = $from.before($from.depth);
-    const tr = state.tr.replaceWith(
-      pos,
-      pos + $from.node($from.depth).nodeSize,
-      codeBlock,
-    );
-    dispatch(
-      tr
-        .setSelection(TextSelection.near(tr.doc.resolve(pos + 1)))
-        .scrollIntoView(),
-    );
-  }
-
-  private convertToMathBlock(view: EditorView) {
-    const { state, dispatch } = view;
-    const { $from } = state.selection;
-    const codeBlock = state.schema.nodes.code_block.create({
-      language: "LaTeX",
-    });
-    const pos = $from.before($from.depth);
-    const tr = state.tr.replaceWith(
-      pos,
-      pos + $from.node($from.depth).nodeSize,
-      codeBlock,
-    );
-    dispatch(
-      tr
-        .setSelection(TextSelection.near(tr.doc.resolve(pos + 1)))
-        .scrollIntoView(),
-    );
-  }
-
-  private insertTable(view: EditorView) {
-    const { state, dispatch } = view;
-    const { $from } = state.selection;
-    const pos = $from.before($from.depth);
-    const tbl = createTable(this.milkdownCtx, 3, 3);
-    dispatch(
-      state.tr
-        .replaceWith(pos, pos + $from.node($from.depth).nodeSize, tbl)
-        .scrollIntoView(),
-    );
-  }
-
   private highlight(items: NodeListOf<HTMLElement>) {
     for (let i = 0; i < items.length; i++) {
       items[i].style.background = i === this.activeIndex ? "var(--color-bg-tertiary)" : "";
@@ -876,12 +651,18 @@ class SlashView {
 }
 
 export function configureBlockEdit(ctx: Ctx) {
-  ctx.set(block.key, {
-    view: () => new BlockHandleView(ctx),
-  });
+  // Mobile (AppFunc.MobileDock — gui-mobile always, web-local on a mobile
+  // viewport/UA) has no hover affordance: the block handle is disabled and the
+  // FAB "+" is the insert entry point. Desktop keeps the hover block handle.
+  if (!hasFunc(AppFunc.MobileDock)) {
+    ctx.set(block.key, {
+      view: () => new BlockHandleView(ctx),
+    });
+  }
   ctx.update(blockConfig.key, (prev) => ({
     ...prev,
     filterNodes: (pos) => {
+      if (hasFunc(AppFunc.MobileDock)) return false;
       for (let d = pos.depth; d > 0; d--) {
         const node = pos.node(d);
         const typeName = proseNodeTypeByName.get(node.type.name);

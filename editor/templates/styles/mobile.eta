@@ -1,5 +1,6 @@
-<% if (it.mobileCss) { %>
-/* ── Mobile / Tablet Overrides ──────────────────────────────────────── */
+<% if (it.mobileCss && !it.mobileDock) { %>
+/* ── Mobile / Tablet Overrides (responsive builds) ─────────────────── */
+/* GuiMobile (dock layout) uses the slim topbar in mobile-dock.eta. */
 
 @media (max-width: 767px) {
   .app-toolbar {

@@ -1,10 +1,11 @@
 import { join } from "path"
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, existsSync, rmSync, cpSync } from "fs"
 
-// Part C.1 thin-shell packaging: the GuiDesktop install ships only the core boot
-// set + updater. The first run downloads the live editor into the writable data
-// dir; this copy is read-only and never written back. Web modes always ship the
-// full public/, so only ThinShell builds call this.
+// Part C.1 thin-shell packaging: a non-FullBundle build (GuiMobile) ships only
+// the core boot set + updater. The first run downloads the live editor into the
+// writable data dir; the install copy is read-only and never written back.
+// FullBundle builds always ship the full public/, so only non-FullBundle builds
+// call this.
 //
 // Core set = index.html, sw.js, the SW's asset inventory (sw-assets.js +
 // manifest.json), the entry pot (app.js + __farm_runtime.js), every emitted css
@@ -73,7 +74,7 @@ export function writeThinShell(publicDir: string, outDir: string): void {
   console.log(`[thin] wrote ${outDir}`)
 }
 
-// FULL_BUNDLE=1 counterpart to writeThinShell: dist/ carries the complete
+// FullBundle counterpart to writeThinShell: dist/ carries the complete
 // public/ — index.html, every chunk (including Part D's lazy editor /
 // node_imports / dialog pots), all css, sw.js, and the static icons. The
 // Android assets/editor/ dir is built from this, so the APK serves every

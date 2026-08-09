@@ -35,7 +35,7 @@ target = "/output/editor/dist/"
 dest = "root://dist/"
 
 [[stages]]
-name = "android"
+name = "apk"
 description = "Build Android APK via Docker"
 type = "docker"
 outputs = ["root://android/bin/inb4doc.apk"]

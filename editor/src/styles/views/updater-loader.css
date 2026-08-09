@@ -1,7 +1,7 @@
-/* Updater first-run loader — ThinShell builds only (GuiDesktop / GuiMobile).
+/* Updater first-run loader — non-FullBundle builds only (GuiMobile).
    The loader markup is rendered by updater-loader-controller into the
    #updater-loader mount (shell.eta, gated on thinShell), so this CSS is inert
-   on web builds. */
+   on full bundles. */
 
 [hidden] {
   display: none !important;

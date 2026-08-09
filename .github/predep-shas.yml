@@ -1,6 +1,6 @@
 # Predep pinned SHAs
 # Update via: scripts/check-privilege-shas.sh --update
 gui: 47013fa25120d76e3cba8fa980d426832eddfb200dbbd6450163a2cfe461c1aa
-editor: 333e1a3df9173e2ce5074b0a0712a070e858f4b49505da961b50fe41932d4f43
+editor: a35a8a56c996df3236cbb1eaa0a4c4cea52e5d65c8fc93ec2e74dba86274f8fa
 hugo: 73e2778a08f4f6955fb5016c476020f63ff07b767ef077323051ebbec635442c
 package: 15eba7224834afe3c458842e2c113391a534f905dc9600cc1b6be7a8fa88fec3

@@ -16,11 +16,12 @@ export enum AppFunc {
   StaticSiteGeneration = 1 << 7,
   MountProvider = 1 << 8,
   ToolbarQuickNav = 1 << 9,
-  ThinShell = 1 << 10,
+  FullBundle = 1 << 10,
   DesktopBridge = 1 << 11,
   MobileBridge = 1 << 12,
   ProjectPicker = 1 << 13,
   SafProvider = 1 << 14,
+  MobileDock = 1 << 15,
 }
 
 export const BUILD_MODE_NAMES: Record<BuildMode, string> = {
@@ -52,14 +53,6 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.StaticSiteGeneration]: BuildMode.WebRemote,
   [AppFunc.MountProvider]: BuildMode.GuiDesktop,
   [AppFunc.ToolbarQuickNav]: BuildMode.GuiDesktop,
-  // Thin-shell packaging (Part C.1): the GuiDesktop/GuiMobile install ships only
-  // the core boot set + updater (index.html, app.js, sw/manifest, css); the
-  // first run downloads the live editor into the writable data dir. This flag
-  // ALSO drives the two-stage entry + lazy Milkdown (Part D): a thin shell ships
-  // the eager core chunks only, so the lazy-load mechanism keys off ThinShell —
-  // one flag, one build decision. Web modes always ship the full public/ (the
-  // SW serves it).
-  [AppFunc.ThinShell]: BuildMode.GuiDesktop | BuildMode.GuiMobile,
   // Native-host bridges: desktop Saucer (window.saucer.exposed / inb4docUI)
   // and Android WebView (window.NativeBridge). Web modes have no native host,
   // so neither bridge runs there.
@@ -70,6 +63,22 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   [AppFunc.ProjectPicker]: BuildMode.GuiDesktop | BuildMode.GuiMobile,
   // SAF (Storage Access Framework) content provider over the Android bridge.
   [AppFunc.SafProvider]: BuildMode.GuiMobile,
+  // Mobile bottom dock + context-aware editing toolbar. Native mobile host is
+  // the primary target. WebLocal ships the dock markup/CSS for the local
+  // dev/test mode, but the runtime hasFunc() gate turns it on only for a mobile
+  // viewport/UA (see hasFunc) — desktop stays desktop by default. WebRemote
+  // (the live site) and GuiDesktop stay desktop.
+  [AppFunc.MobileDock]: BuildMode.GuiMobile | BuildMode.WebLocal,
+  // Build-time-only packaging flag: ship the complete local bundle (no thin
+  // shell, empty UPDATE_BASE) so the build never fetches remotely. Default-on
+  // for web-local (`bun dev` serves a full self-contained bundle and updates
+  // from itself), web-remote (the SW serves the whole public/) and gui-desktop
+  // (self-contained read-only install — the Dockerfile/editor_root payload).
+  // A thin shell is just the absence of FullBundle (GuiMobile only): it ships
+  // the core boot set + updater and downloads the editor on first run, so the
+  // lazy-load mechanism keys off !FullBundle — one flag, one build decision.
+  // FULL_BUNDLE=1 is gone — this mask is the only switch.
+  [AppFunc.FullBundle]: BuildMode.WebLocal | BuildMode.WebRemote | BuildMode.GuiDesktop,
 };
 
 let _currentMode: BuildMode | null = null;
@@ -82,19 +91,31 @@ function getCurrentMode(): BuildMode {
   return _currentMode;
 }
 
+export function currentBuildMode(): BuildMode {
+  return getCurrentMode();
+}
+
+const MOBILE_VIEWPORT_MQ = "(max-width: 767px)";
+
+// Web-local is the local dev/test mode, not a mobile target: the dock layout
+// engages only on a mobile viewport OR a mobile UA (phone in landscape), so
+// desktop browsers keep the desktop chrome by default. Must mirror the inline
+// pre-paint script in shell.eta (mobile-layout/desktop-layout classes).
+export function isMobileViewport(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  if (window.matchMedia(MOBILE_VIEWPORT_MQ).matches) return true;
+  return /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+}
+
+// A thin shell is simply the absence of FullBundle (GuiMobile only).
 export function hasFunc(func: AppFunc): boolean {
-  if (func === AppFunc.ThinShell) {
-    // FULL_BUNDLE=1 builds (lib/build.ts) emit data-full-bundle="1" and force
-    // the thin-shell flag off at compile time; mirror it here so the runtime
-    // two-stage/lazy decision agrees even though the mode bit is still set.
-    // try/catch keeps node imports of this module (build/dev tools) safe.
-    try {
-      if (document.documentElement.dataset.fullBundle === "1") return false;
-    } catch {
-      // not in a browser — never reached at runtime
-    }
+  const mode = getCurrentMode();
+  // Web-local responsive-web (Part F): the dock layout is UA/viewport-gated,
+  // not enabled by default — desktop stays desktop, mobile gets the dock.
+  if (func === AppFunc.MobileDock && mode === BuildMode.WebLocal) {
+    return isMobileViewport();
   }
-  return !!(SUPPORTED_MODES[func] & getCurrentMode());
+  return !!(SUPPORTED_MODES[func] & mode)
 }
 
 // Updater transport selection (Part C). The updater core

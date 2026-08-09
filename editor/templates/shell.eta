@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="en" data-build-mode="<%= it.BUILD_MODE %>"<% if (it.fullBundle) { %> data-full-bundle="1"<% } %>>
+<html lang="en" data-build-mode="<%= it.BUILD_MODE %>">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <%~ include('partials/head-meta', it) %>
+<% if (it.webAdaptive) { %>
+    <script>
+      // Web-local responsive-web: pick mobile/desktop chrome before first paint.
+      // Must mirror isMobileViewport() in lib/build/build-mode.ts.
+      (function () {
+        var mobile = window.matchMedia("(max-width: 767px)").matches ||
+          /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+        document.documentElement.classList.add(mobile ? "mobile-layout" : "desktop-layout");
+      })();
+    </script>
+<% } %>
     <style><%~ it.criticalCss %></style>
     <link rel="stylesheet" href="assets/katex.css?ver=<%= it.APP_VERSION %>" />
     <link rel="stylesheet" href="assets/theme-nord.css?ver=<%= it.APP_VERSION %>" />
@@ -11,11 +22,13 @@
   <body>
     <div id="app" data-controller="shell" data-shell-editor-outlet="#editor-area">
       <div class="book-layout">
+<% if (!it.dockReplacesChrome) { %>
         <nav class="book-menu">
           <div id="sidebar-nav" data-controller="sidebar" data-shell-target="sidebar" data-action="keydown->sidebar#onKeydown">
             <%~ include('partials/skeleton-sidebar', it) %>
           </div>
         </nav>
+<% } %>
         <div class="book-content">
           <div id="app-toolbar" class="app-toolbar toolbar-skeleton" data-controller="topbar">
             <%~ include('partials/skeleton-topbar', it) %>
@@ -26,10 +39,18 @@
             </div>
           </div>
         </div>
+        <% if (!it.dockReplacesChrome) { %>
         <aside class="book-aside" id="meta-panel-mount" data-controller="meta-panel" data-meta-panel-editor-outlet="#editor-area">
           <%~ include('partials/skeleton-meta', it) %>
         </aside>
+        <% } %>
       </div>
+<% if (it.mobileDock) { %>
+      <div id="dock" data-controller="dock">
+        <div id="edit-toolbar" data-controller="edit-toolbar"></div>
+        <div data-dock-target="nav"></div>
+      </div>
+<% } %>
     </div>
     <div data-controller="update"></div>
 <% if (it.thinShell) { %>

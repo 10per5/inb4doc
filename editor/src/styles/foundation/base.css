@@ -47,6 +47,7 @@ body {
   --color-text-tertiary: #6b7280;
   --color-accent: #5e81ac;
   --color-accent-hover: #4a7098;
+  --color-accent-soft: rgba(94, 129, 172, 0.15);
   --color-success: #a3be8c;
   --color-warning: #d08770;
   --color-error: #bf616a;
@@ -74,6 +75,7 @@ body {
   --color-text-tertiary: #9ca0b0;
   --color-accent: #81a1c1;
   --color-accent-hover: #88c0d0;
+  --color-accent-soft: rgba(129, 161, 193, 0.2);
 
   --color-btn-bg: #434c5e;
   --color-btn-text: #d8dee9;

@@ -61,6 +61,22 @@ class CommandService {
     return this._cm!.insertHrCommand
   }
 
+  get sinkListItemCommand(): $Command<unknown> {
+    return this._cm!.sinkListItemCommand
+  }
+
+  get liftListItemCommand(): $Command<unknown> {
+    return this._cm!.liftListItemCommand
+  }
+
+  get wrapInBulletListCommand(): $Command<unknown> {
+    return this._cm!.wrapInBulletListCommand
+  }
+
+  get wrapInOrderedListCommand(): $Command<unknown> {
+    return this._cm!.wrapInOrderedListCommand
+  }
+
   get toggleStrikethroughCommand(): $Command<unknown> {
     return this._gfm!.toggleStrikethroughCommand
   }

@@ -1,0 +1,30 @@
+<div class="fullview-inner">
+  <header class="fullview-header">
+    <h1 class="fullview-title">More</h1>
+    <button type="button" class="fullview-close" data-action="more#close" aria-label="Close more">
+      <%~ it.icons.xmark %>
+    </button>
+  </header>
+  <div class="more-list">
+    <button type="button" class="more-item" data-action="more#openDiskUsage">
+      <span class="more-icon"><%~ it.icons.hardDrive %></span>
+      <span class="more-label">Disk Stats</span>
+      <span class="more-chevron"><%~ it.icons.navArrowRight %></span>
+    </button>
+    <button type="button" class="more-item" data-action="more#openMeta">
+      <span class="more-icon"><%~ it.icons.book %></span>
+      <span class="more-label">Meta Panel</span>
+      <span class="more-chevron"><%~ it.icons.navArrowRight %></span>
+    </button>
+    <button type="button" class="more-item" data-action="more#openPrefs">
+      <span class="more-icon"><%~ it.icons.settings %></span>
+      <span class="more-label">Preferences</span>
+      <span class="more-chevron"><%~ it.icons.navArrowRight %></span>
+    </button>
+    <button type="button" class="more-item" data-action="more#openImageManager">
+      <span class="more-icon"><%~ it.icons.mediaImage %></span>
+      <span class="more-label">Image Manager</span>
+      <span class="more-chevron"><%~ it.icons.navArrowRight %></span>
+    </button>
+  </div>
+</div>

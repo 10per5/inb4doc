@@ -1,0 +1,16 @@
+<nav class="dock" role="tablist" aria-label="Primary">
+  <button type="button" class="dock-item" role="tab" data-dock-target="item" data-dock-item="navigation" data-action="dock#activate">
+    <span class="dock-icon"><%~ it.icons.bookStack %></span>
+    <span class="dock-label">Files</span>
+  </button>
+  <button type="button" class="dock-item dock-item--fab" role="tab" data-dock-target="item" data-dock-item="editor" data-action="dock#activate" data-dock-state="add" aria-label="Add block" title="Add block">
+    <span class="dock-icon dock-icon--plus"><%~ it.icons.plus %></span>
+    <span class="dock-icon dock-icon--pencil" hidden><%~ it.icons.editPencil %></span>
+    <span class="dock-label" hidden>Editor</span>
+  </button>
+  <button type="button" class="dock-item" role="tab" data-dock-target="item" data-dock-item="more" data-action="dock#activate">
+    <span class="dock-icon"><%~ it.icons.menuScale %></span>
+    <span class="dock-label">More</span>
+  </button>
+  <div class="dock-fab-menu-anchor toolbar-relative" data-dock-target="fabMenu"></div>
+</nav>

@@ -2,6 +2,16 @@
   position: relative;
 }
 
+/* Body-level mount for a Menu anchored to arbitrary viewport coordinates
+   (e.g. the sidebar overflow, which opens over any row in the tree). The
+   panel itself is absolute within this zero-size fixed point. */
+.menu-anchor-fixed {
+  position: fixed;
+  width: 0;
+  height: 0;
+  z-index: 200;
+}
+
 .toolbar-menu-trigger {
   cursor: pointer;
   user-select: none;
@@ -47,6 +57,22 @@
   display: block;
 }
 
+/* Right-edge alignment — toggled by Menu.positionPanel() when the panel
+   would overflow the viewport at its natural `left: 0` position. */
+.toolbar-menu--right {
+  left: auto;
+  right: 0;
+}
+
+/* Opens upward — toggled by Menu.positionPanel() when the panel would
+   overflow the viewport at its natural `top: 100%` position. Combines with
+   --right for corner-anchored menus; leaves left/right alone so it stacks
+   with custom panel classes. */
+.toolbar-menu--up {
+  top: auto;
+  bottom: calc(100% + 12px);
+}
+
 .toolbar-menu .menu-item {
   display: flex;
   align-items: center;
@@ -60,8 +86,15 @@
   position: relative;
 }
 
-.toolbar-menu .menu-item:hover {
+/* Hover and focus share the same highlight so opening a menu onto its first
+   item (focus-first, mobile/"+" popups) reads the same as hovering it. */
+.toolbar-menu .menu-item:hover,
+.toolbar-menu .menu-item:focus {
   background: var(--color-bg-tertiary);
+}
+
+.toolbar-menu .menu-item--danger {
+  color: var(--color-error);
 }
 
 .toolbar-menu .menu-item .menu-item-icon {

@@ -479,8 +479,9 @@ export default class extends Controller {
   }
 
   private deleteFocusedItem(link: HTMLAnchorElement): void {
-    // Mirror the context-menu delete: page items use their `.nav-item` path,
-    // folder titles delete the folder (`.nav-section`), not its `_index` page.
+    // Same path semantics as the "..." overflow Delete: page items use their
+    // `.nav-item` path, folder titles delete the folder (`.nav-section`), not
+    // its `_index` page.
     const path =
       link.closest(".nav-item")?.getAttribute("data-nav-path") ||
       link.closest(".nav-section")?.getAttribute("data-nav-path") ||

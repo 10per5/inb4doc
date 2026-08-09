@@ -20,22 +20,25 @@ export interface MenuItem {
   checked?: boolean
   active?: boolean
   disabled?: boolean
+  danger?: boolean
   onClick?: () => void
   items?: MenuItem[]
   onUpdate?: () => Partial<Pick<MenuItem, "icon" | "label" | "sublabel" | "checked" | "active" | "disabled">>
 }
 
-export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "sublabel" | "active" | "disabled" | "checked"> {
+export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "sublabel" | "active" | "disabled" | "checked" | "danger"> {
   childrenHtml?: string
   icons?: { check: string; arrowRight?: string }
 }
 
 export interface MenuOptions {
   mountEl: HTMLElement
+  triggerEl?: HTMLElement
   label: string
   title?: string
   items: MenuItem[] | (() => MenuItem[])
   mnemonic?: string
+  panelClass?: string
 }
 
 export interface MenuRegistry {
@@ -124,18 +127,27 @@ export class Menu {
   private boundOutsideClick: (e: MouseEvent) => void
   private boundPanelKeyDown: (e: KeyboardEvent) => void
   private mnemonic?: string
+  private panelClass?: string
 
   constructor(opts: MenuOptions) {
     this.mountEl = opts.mountEl
     this.itemResolver = opts.items
     this.items = this.resolveItems()
     this.mnemonic = opts.mnemonic
+    this.panelClass = opts.panelClass
     this.boundOutsideClick = this.onOutsideClick.bind(this)
     this.boundPanelKeyDown = this.onPanelKeyDown.bind(this)
-    this.build(opts.label, opts.title)
+    this.build(opts.label, opts.title, opts.triggerEl)
   }
 
   get isOpen() { return this._isOpen }
+
+  // Re-point the trigger element. Needed when the triggering element is
+  // re-created (e.g. the sidebar re-renders while its overflow menu is open)
+  // so outside-click still ignores the current button and toggles work.
+  setTriggerEl(el: HTMLElement): void {
+    this.triggerEl = el
+  }
 
   toggle() { this._isOpen ? this.close() : this.open() }
 
@@ -150,6 +162,7 @@ export class Menu {
     this.items = this.resolveItems()
     this.render()
     this.refresh()
+    this.positionPanel()
     this.panelEl.classList.add("open")
     this.triggerEl.classList.add("is-open")
     this._isOpen = true
@@ -209,6 +222,7 @@ export class Menu {
   destroy() {
     this.close()
     this.mountEl.removeEventListener("click", this.onItemClick)
+    this.mountEl.removeEventListener("click", this.onSubmenuClick)
     this.mountEl.innerHTML = ""
   }
 
@@ -216,29 +230,38 @@ export class Menu {
     return typeof this.itemResolver === "function" ? this.itemResolver() : this.itemResolver
   }
 
-  private build(label: string, title?: string) {
+  private build(label: string, title?: string, triggerEl?: HTMLElement) {
     const id = ++menuCounter
-    let displayLabel = label
-    if (this.mnemonic) {
-      const idx = label.toLowerCase().indexOf(this.mnemonic.toLowerCase())
-      if (idx >= 0) {
-        displayLabel = label.slice(0, idx) + "<u>" + label[idx] + "</u>" + label.slice(idx + 1)
+    const panelClass = this.panelClass ? ` ${this.panelClass}` : ""
+    if (triggerEl) {
+      // External trigger (caller owns its click behavior) — mount only the panel.
+      this.triggerEl = triggerEl
+      this.mountEl.innerHTML = `<div class="toolbar-menu${panelClass}" id="menu-panel-${id}"></div>`
+      this.panelEl = this.mountEl.querySelector(".toolbar-menu")!
+    } else {
+      let displayLabel = label
+      if (this.mnemonic) {
+        const idx = label.toLowerCase().indexOf(this.mnemonic.toLowerCase())
+        if (idx >= 0) {
+          displayLabel = label.slice(0, idx) + "<u>" + label[idx] + "</u>" + label.slice(idx + 1)
+        }
       }
+      this.mountEl.innerHTML = `
+        <button class="toolbar-menu-trigger" title="${title ?? label}">
+          ${displayLabel}<span class="arrow">${navArrowDown}</span>
+        </button>
+        <div class="toolbar-menu${panelClass}" id="menu-panel-${id}"></div>
+      `
+      this.triggerEl = this.mountEl.querySelector(".toolbar-menu-trigger")!
+      this.panelEl = this.mountEl.querySelector(".toolbar-menu")!
+      this.triggerEl.addEventListener("click", (e) => {
+        e.stopPropagation()
+        this.toggle()
+      })
     }
-    this.mountEl.innerHTML = `
-      <button class="toolbar-menu-trigger" title="${title ?? label}">
-        ${displayLabel}<span class="arrow">${navArrowDown}</span>
-      </button>
-      <div class="toolbar-menu" id="menu-panel-${id}"></div>
-    `
-    this.triggerEl = this.mountEl.querySelector(".toolbar-menu-trigger")!
-    this.panelEl = this.mountEl.querySelector(".toolbar-menu")!
-    this.triggerEl.addEventListener("click", (e) => {
-      e.stopPropagation()
-      this.toggle()
-    })
     this.panelEl.addEventListener("keydown", this.boundPanelKeyDown)
     this.mountEl.addEventListener("click", this.onItemClick)
+    this.mountEl.addEventListener("click", this.onSubmenuClick)
     this.render()
   }
 
@@ -323,7 +346,37 @@ export class Menu {
   private onOutsideClick = (e: MouseEvent) => {
     if (!this._isOpen) return
     const target = e.target as HTMLElement
+    // External triggers (e.g. the FAB) own their click behavior — let the
+    // trigger's own handler toggle the menu instead of racing it via capture.
+    if (this.triggerEl && (target === this.triggerEl || this.triggerEl.contains(target))) return
     if (!this.mountEl.contains(target)) this.close()
+  }
+
+  // Flip the panel so it stays on screen: right-align when `left: 0` would
+  // push it past the right edge, and open upward when the natural `top: 100%`
+  // would push it past the bottom. Measured while visually hidden, so there's
+  // no reposition flash; results are just class toggles. Custom-anchored
+  // panels (panelClass, e.g. the FAB popup) own their horizontal alignment but
+  // still get the vertical flip (their CSS just wins when it also sets a side).
+  private positionPanel() {
+    const panel = this.panelEl
+    panel.classList.remove("toolbar-menu--right", "toolbar-menu--up")
+    const prevDisplay = panel.style.display
+    panel.style.display = "block"
+    panel.style.visibility = "hidden"
+    const mount = this.mountEl.getBoundingClientRect()
+    const panelWidth = panel.offsetWidth
+    const panelHeight = panel.offsetHeight
+    panel.style.visibility = ""
+    panel.style.display = prevDisplay
+    const vw = document.documentElement.clientWidth
+    const vh = document.documentElement.clientHeight
+    if (!this.panelClass && mount.left + panelWidth > vw - 8) {
+      panel.classList.add("toolbar-menu--right")
+    }
+    if (mount.bottom + 12 + panelHeight > vh) {
+      panel.classList.add("toolbar-menu--up")
+    }
   }
 
   private onItemClick = (e: Event) => {
@@ -334,5 +387,20 @@ export class Menu {
     if (!item) return
     item.onClick?.()
     this.close()
+  }
+
+  // Tap-to-open for submenus — the CSS only opens them on :hover, which touch
+  // devices never fire. Toggling inline display overrides the hover rule; other
+  // open submenus in the same panel collapse first.
+  private onSubmenuClick = (e: Event) => {
+    const item = (e.target as HTMLElement).closest(".menu-item-submenu") as HTMLElement | null
+    if (!item || !this.panelEl.contains(item)) return
+    const sub = item.querySelector<HTMLElement>(".menu-submenu")
+    if (!sub) return
+    item.parentElement?.querySelectorAll<HTMLElement>(".menu-item-submenu .menu-submenu").forEach((s) => {
+      if (s !== sub) s.style.display = ""
+    })
+    sub.style.display = sub.style.display === "block" ? "" : "block"
+    e.stopPropagation()
   }
 }

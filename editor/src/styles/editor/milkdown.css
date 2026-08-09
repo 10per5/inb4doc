@@ -10,7 +10,7 @@
 @import "../content/link.css";
 @import "../ui/icon.css";
 @import "../content/list.css";
-@import "../ui/toolbar.css";
+@import "../ui/body-toolbar.css";
 @import "../alerts/alert.css";
 @import "../processor/shortcode.css";
 @import "../content/hugo-ref.css";

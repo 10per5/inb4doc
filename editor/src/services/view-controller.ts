@@ -18,10 +18,11 @@ import { treeStore } from "@/stores/tree-store";
 import { getSuggestions } from "@/utils/tree";
 import { getRecents } from "@/utils/recent-files";
 import { appEvents, AppEvent } from "@/stores/app-events";
+import { hasFunc, AppFunc } from "$/build/build-mode";
 import type { EditorController } from "@/controllers/editor-controller";
 import * as focusHandler from "@/services/focus-handler";
 
-export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty"
+export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty" | "navigation" | "more" | "meta"
 
 type ViewHandlers = { activate: () => void; deactivate: () => void; focus?: () => void }
 
@@ -44,6 +45,12 @@ export class ViewController {
       }),
       appEvents.on(AppEvent.TreeChanged, () => {
         if (this.current === "disk-usage") this.showDiskUsage();
+      }),
+      appEvents.on(AppEvent.Navigate, () => {
+        // Mobile: selecting a file in the navigation fullview lands in the editor.
+        if (hasFunc(AppFunc.MobileDock) && this.current === "navigation") {
+          this.switchTo("editor");
+        }
       }),
     );
   }
@@ -84,6 +91,9 @@ export class ViewController {
     this.setupDiskUsageView();
     this.setupNoFileView();
     this.setupDirIndexEmptyView();
+    if (hasFunc(AppFunc.MobileDock)) {
+      this.setupMobileViews();
+    }
 
     focusHandler.setDefaultFocus(() => this.focusCurrent());
   }
@@ -172,6 +182,53 @@ export class ViewController {
         dirIndexEmptyEl.style.display = "none";
       },
     });
+  }
+
+  private setupMobileViews(): void {
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
+
+    // `navigation` — fullview that reuses the sidebar as its content. The
+    // sidebar instance inside it is self-sourcing (subscribes to SidebarReload
+    // etc.), so it needs no data wiring here.
+    const navigationEl = document.createElement("div");
+    navigationEl.dataset.controller = "navigation";
+    navigationEl.className = "fullview-view navigation-view";
+    navigationEl.style.display = "none";
+    editorArea.appendChild(navigationEl);
+
+    // `more` — bottom sheet with secondary actions.
+    const moreEl = document.createElement("div");
+    moreEl.dataset.controller = "more";
+    moreEl.className = "fullview-view more-view";
+    moreEl.style.display = "none";
+    editorArea.appendChild(moreEl);
+
+    // `meta` — the meta panel as a fullview. A second meta-panel instance
+    // (the desktop aside is omitted from gui-mobile builds) renders inside the
+    // editor area and shares the same outlet/event wiring.
+    const metaEl = document.createElement("div");
+    metaEl.dataset.controller = "meta-panel";
+    metaEl.dataset.metaPanelEditorOutlet = "#editor-area";
+    metaEl.className = "fullview-view meta-view";
+    metaEl.style.display = "none";
+    editorArea.appendChild(metaEl);
+
+    const fullview = (el: HTMLElement): ViewHandlers => ({
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        el.style.display = "";
+      },
+      deactivate: () => {
+        el.style.display = "none";
+      },
+    });
+
+    this.views.set("navigation", fullview(navigationEl));
+    this.views.set("more", fullview(moreEl));
+    this.views.set("meta", fullview(metaEl));
   }
 
   private showDiskUsage(): void {
