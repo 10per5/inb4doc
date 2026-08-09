@@ -20,12 +20,13 @@ export interface MenuItem {
   checked?: boolean
   active?: boolean
   disabled?: boolean
+  danger?: boolean
   onClick?: () => void
   items?: MenuItem[]
   onUpdate?: () => Partial<Pick<MenuItem, "icon" | "label" | "sublabel" | "checked" | "active" | "disabled">>
 }
 
-export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "sublabel" | "active" | "disabled" | "checked"> {
+export interface MenuRenderData extends Pick<MenuItem, "id" | "icon" | "label" | "sublabel" | "active" | "disabled" | "checked" | "danger"> {
   childrenHtml?: string
   icons?: { check: string; arrowRight?: string }
 }
@@ -140,6 +141,13 @@ export class Menu {
   }
 
   get isOpen() { return this._isOpen }
+
+  // Re-point the trigger element. Needed when the triggering element is
+  // re-created (e.g. the sidebar re-renders while its overflow menu is open)
+  // so outside-click still ignores the current button and toggles work.
+  setTriggerEl(el: HTMLElement): void {
+    this.triggerEl = el
+  }
 
   toggle() { this._isOpen ? this.close() : this.open() }
 

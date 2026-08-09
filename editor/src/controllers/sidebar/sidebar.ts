@@ -6,7 +6,7 @@ import { buildEditorUrl } from "@/utils/url";
 import { pagesStore } from "@/stores/page-store";
 import { PendingOpType, type PendingOp, type TreeIndex, type ChildInfo } from "@/utils/tree";
 import { SidebarAction, sidebarActions } from "@/config/enums";
-import { setContextMenuActions } from "@/controllers/context-menu-controller";
+import { Menu, MenuType, type MenuItem } from "@/components/ui/menu";
 import { ProviderType } from "@/providers/index";
 import {
   isRootPath,
@@ -445,10 +445,18 @@ export function applyResults(opts: ApplyResultsOpts): void {
   }
 }
 
+// Sidebar "..." overflow menu, built on the shared Menu so it inherits the
+// horizontal/vertical overflow flip, keyboard nav, focus-first, and outside-click
+// handling. A module-scoped singleton anchor + Menu are reused across opens; the
+// items are rebuilt per show from the current row's actions. (The old
+// context-menu-controller was a parallel, feature-lighter duplicate — removed.)
+let overflowAnchor: HTMLElement | null = null;
+let overflowMenu: Menu | null = null;
+let overflowItems: MenuItem[] = [];
+let overflowLastAnchor: HTMLElement | null = null;
+
 export function closeMenu(): void {
-  document.querySelectorAll(".ctx-menu").forEach((el) => el.remove());
-  document.querySelectorAll(".ctx-backdrop").forEach((el) => el.remove());
-  document.querySelectorAll('[data-controller="context-menu"]').forEach((el) => el.remove());
+  overflowMenu?.close();
 }
 
 export function showMenu(
@@ -457,17 +465,41 @@ export function showMenu(
   actions: SidebarActions,
   isFolder?: boolean,
 ): void {
-  closeMenu();
+  if (!overflowMenu) {
+    overflowAnchor = document.createElement("div");
+    overflowAnchor.className = "menu-anchor-fixed";
+    document.body.appendChild(overflowAnchor);
+    overflowMenu = new Menu({
+      mountEl: overflowAnchor,
+      triggerEl: anchor,
+      label: "Actions",
+      items: () => overflowItems,
+    });
+  } else {
+    // Keep outside-click ignoring the current button across re-renders.
+    overflowMenu.setTriggerEl(anchor);
+  }
+
+  // Re-clicking the same "..." toggles the menu closed instead of reopening.
+  if (overflowMenu.isOpen && overflowLastAnchor === anchor) {
+    overflowMenu.close();
+    overflowLastAnchor = null;
+    return;
+  }
+  overflowLastAnchor = anchor;
 
   const rect = anchor.getBoundingClientRect();
-  const el = document.createElement("div");
-  el.dataset.controller = "context-menu";
-  el.dataset.pagePath = pagePath;
-  el.dataset.menuTop = `${rect.bottom + 4}px`;
-  el.dataset.menuLeft = `${rect.left}px`;
-  if (isFolder) el.dataset.isFolder = "";
-  setContextMenuActions(el, actions);
-  document.body.appendChild(el);
+  overflowAnchor!.style.left = `${rect.left}px`;
+  overflowAnchor!.style.top = `${rect.bottom}px`;
+
+  overflowItems = [
+    { type: MenuType.Item, label: "New…", onClick: () => actions.onNewItem(pagePath, isFolder) },
+    { type: MenuType.Item, label: "Rename", onClick: () => actions.onRename(pagePath) },
+    { type: MenuType.Item, label: "Select", onClick: () => actions.onSelect(pagePath, isFolder) },
+    { type: MenuType.Item, label: "Delete", danger: true, onClick: () => actions.onDelete([pagePath]) },
+  ];
+
+  overflowMenu.openAndFocusFirst();
 }
 
 export function computeLiveUrl(providerType?: ProviderType, current?: string): string {

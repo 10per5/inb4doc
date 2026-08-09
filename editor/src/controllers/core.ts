@@ -4,7 +4,6 @@ import { hasFunc, AppFunc } from "$/build/build-mode"
 import ShellController from "./shell_controller"
 import TopbarController from "./topbar-controller"
 import SidebarController from "./sidebar/sidebar-controller"
-import ContextMenuController from "./context-menu-controller"
 import { PressTwiceController } from "./press-twice-controller"
 import NoFileController from "./no-file-controller"
 import DirIndexEmptyController from "./dir-index-empty-controller"
@@ -31,7 +30,6 @@ const coreRegistrations: ControllerRegistration[] = [
   { name: "topbar", controller: TopbarController },
   { name: "sidebar", controller: SidebarController },
   { name: "press-twice", controller: PressTwiceController },
-  { name: "context-menu", controller: ContextMenuController },
   { name: "no-file", controller: NoFileController },
   { name: "dir-index-empty", controller: DirIndexEmptyController },
   { name: "disk-usage", controller: DiskUsageController },

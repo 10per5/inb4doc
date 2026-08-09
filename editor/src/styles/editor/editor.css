@@ -42,40 +42,6 @@
   background-color: transparent;
 }
 
-/* ── Context Menu ──────────────────────────────────────────────────── */
-
-.ctx-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-}
-
-.ctx-menu {
-  position: fixed;
-  z-index: 1000;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 4px;
-  min-width: 140px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.ctx-menu .ctx-action {
-  padding: 0.4rem 0.8rem;
-  cursor: pointer;
-  border-radius: 3px;
-  font-size: 0.85rem;
-}
-
-.ctx-menu .ctx-action:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.ctx-menu .action-delete {
-  color: var(--color-error);
-}
-
 /* ── Mention Menu ──────────────────────────────────────────────────── */
 
 .milkdown-mention {

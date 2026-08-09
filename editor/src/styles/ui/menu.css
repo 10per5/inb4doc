@@ -2,6 +2,16 @@
   position: relative;
 }
 
+/* Body-level mount for a Menu anchored to arbitrary viewport coordinates
+   (e.g. the sidebar overflow, which opens over any row in the tree). The
+   panel itself is absolute within this zero-size fixed point. */
+.menu-anchor-fixed {
+  position: fixed;
+  width: 0;
+  height: 0;
+  z-index: 200;
+}
+
 .toolbar-menu-trigger {
   cursor: pointer;
   user-select: none;
@@ -81,6 +91,10 @@
 .toolbar-menu .menu-item:hover,
 .toolbar-menu .menu-item:focus {
   background: var(--color-bg-tertiary);
+}
+
+.toolbar-menu .menu-item--danger {
+  color: var(--color-error);
 }
 
 .toolbar-menu .menu-item .menu-item-icon {
