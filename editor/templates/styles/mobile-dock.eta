@@ -389,6 +389,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.edit-toolbar-btn[hidden] {
+  display: none;
+}
+
+.edit-toolbar-btn.is-disabled,
+.edit-toolbar-btn:disabled {
+  color: var(--color-text-disabled, var(--color-border));
+  cursor: default;
+  opacity: 0.45;
+}
+
+.edit-toolbar-btn:not(:disabled):active {
+  background: var(--color-accent-soft);
+}
+
 .edit-toolbar-btn .edit-toolbar-icon {
   display: flex;
   align-items: center;

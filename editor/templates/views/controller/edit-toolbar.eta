@@ -6,6 +6,15 @@
     <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-7" data-action="edit-toolbar#exec" title="Increase indent" aria-label="Increase indent">
       <span class="edit-toolbar-icon"><%~ it.icons.navArrowRight %></span>
     </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-11" data-action="edit-toolbar#exec" title="Bullet list" aria-label="Bullet list">
+      <span class="edit-toolbar-icon"><%~ it.icons.list %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-13" data-action="edit-toolbar#exec" title="Ordered list" aria-label="Ordered list">
+      <span class="edit-toolbar-icon"><%~ it.icons.numberedListLeft %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-12" data-action="edit-toolbar#exec" title="Checkbox" aria-label="Checkbox">
+      <span class="edit-toolbar-icon"><%~ it.icons.checkSquare %></span>
+    </button>
     <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-9" data-action="edit-toolbar#exec" title="Mark task done" aria-label="Mark task done">
       <span class="edit-toolbar-icon"><%~ it.icons.checkSquare %></span>
     </button>
