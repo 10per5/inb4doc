@@ -20,7 +20,7 @@
 }
 
 .mobile-layout .book-layout {
-  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
 }
 
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
@@ -79,9 +79,11 @@
   flex-basis: auto;
 }
 
-/* Keep the scrollable content clear of the fixed dock (strip + nav) */
+/* Keep the scrollable content clear of the fixed dock (bar + its own safe-area
+ * padding). 56px = the .dock bar; #dock already adds safe-area below the bar,
+ * so clearing it means matching the bar height plus the same env() term. */
 .book-layout {
-  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
 }
 <% } %>
 
