@@ -51,9 +51,11 @@ export default class DockController extends Controller {
     event.stopPropagation()
     const item = ((event.currentTarget as HTMLElement).dataset.dockItem ?? "editor") as DockItem
     if (item === "editor") {
-      // Already on the editor view → the FAB is the insert-block "+" popup
-      // trigger. Otherwise it's the tab that returns to the editor.
-      if (this.currentView === "editor") {
+      // FAB is the insert-block "+" popup trigger when on the editor tab
+      // (editor, no-file, dir-index-empty). On other fullviews (navigation,
+      // more, meta), it acts as the return-to-editor tab.
+      const isEditorTab = viewToDockItem(this.currentView) === "editor"
+      if (isEditorTab) {
         if (this.insertMenu?.isOpen) {
           this.insertMenu.close()
         } else {
@@ -61,10 +63,7 @@ export default class DockController extends Controller {
         }
         return
       }
-      const view: ViewType = (this.currentView === "no-file" || this.currentView === "dir-index-empty")
-        ? this.currentView
-        : "editor"
-      appEvents.emit(AppEvent.ViewChanged, { view })
+      appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
       return
     }
     appEvents.emit(AppEvent.ViewChanged, { view: item })

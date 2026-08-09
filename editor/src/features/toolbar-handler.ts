@@ -379,7 +379,11 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
   })
 
   const unsubInsert = appEvents.on(AppEvent.InsertBlockCommand, async ({ command, level }) => {
-    const editor = getEditor()
+    let editor = getEditor()
+    if (!editor) {
+      appEvents.emit(AppEvent.CreateFirstPage)
+      editor = getEditor()
+    }
     if (!editor) return
 
     const { editorContext } = await import("@/services/editor-context")
