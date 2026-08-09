@@ -47,6 +47,13 @@
   display: block;
 }
 
+/* Right-edge alignment — toggled by Menu.positionPanel() when the panel
+   would overflow the viewport at its natural `left: 0` position. */
+.toolbar-menu--right {
+  left: auto;
+  right: 0;
+}
+
 .toolbar-menu .menu-item {
   display: flex;
   align-items: center;

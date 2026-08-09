@@ -154,6 +154,7 @@ export class Menu {
     this.items = this.resolveItems()
     this.render()
     this.refresh()
+    this.positionPanel()
     this.panelEl.classList.add("open")
     this.triggerEl.classList.add("is-open")
     this._isOpen = true
@@ -341,6 +342,29 @@ export class Menu {
     // trigger's own handler toggle the menu instead of racing it via capture.
     if (this.triggerEl && (target === this.triggerEl || this.triggerEl.contains(target))) return
     if (!this.mountEl.contains(target)) this.close()
+  }
+
+  // Align the panel to the mount's right edge when opening it at `left: 0`
+  // would push it past the viewport (mobile overflow triggers sit near the
+  // right edge). Measured while visually hidden, so there's no reposition
+  // flash; the alignment is just a class toggle. Custom-anchored panels
+  // (panelClass, e.g. the centered FAB popup) own their alignment and are
+  // skipped.
+  private positionPanel() {
+    if (this.panelClass) return
+    const panel = this.panelEl
+    panel.classList.remove("toolbar-menu--right")
+    const prevDisplay = panel.style.display
+    panel.style.display = "block"
+    panel.style.visibility = "hidden"
+    const mountLeft = this.mountEl.getBoundingClientRect().left
+    const panelWidth = panel.offsetWidth
+    panel.style.visibility = ""
+    panel.style.display = prevDisplay
+    const vw = document.documentElement.clientWidth
+    if (mountLeft + panelWidth > vw - 8) {
+      panel.classList.add("toolbar-menu--right")
+    }
   }
 
   private onItemClick = (e: Event) => {
