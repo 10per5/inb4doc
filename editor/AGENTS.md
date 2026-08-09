@@ -110,6 +110,12 @@ There is no full-screen loading overlay. `shell.eta` renders skeleton placeholde
 - **Stimulus attributes in templates**: Use `<%= it.ENUM_PREFIX %><%= it.Enum.Value %>` for `data-action` values. Use `data-controller="name"` for Stimulus bindings. Use `data-name-target="target"` for targets.
 - **Partials are compiled at build time** — the Eta compiler never ships to the browser. Compiled templates (`.eta.ts`) are used for runtime rendering (e.g., `mobile.eta`).
 - **Icons**: Pass SVG icon strings via the template context (`it.icons.boldIcon`), not imported directly in templates.
+- **Eta tags used in this codebase** — exactly three, so pick deliberately:
+  - `<% code %>` — scriptlet (control flow). Used for `if`/`for` conditionals, nothing else.
+  - `<%= it.x %>` — **escaped** output (compiles to `__eta.e(it.x)`). Use for all text, labels, and attribute values.
+  - `<%~ it.x %>` — **raw** output (no escaping). Use ONLY for prebuilt markup you control: icon SVGs, `childrenHtml`, `include('partial', it)`.
+  - The compiled function tells you if you picked wrong: `<%=` shows up as `__eta.e(...)` (escaped), `<%~` as a plain `res+=...`.
+  - Gotcha: `<%= it.childrenHtml %>` in `submenu.eta` once escaped the nested item markup, so the "No recent projects" empty state rendered as literal HTML tags in the DOM instead of elements.
 
 ### Int-Based Enum Pattern
 
