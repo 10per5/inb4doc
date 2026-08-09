@@ -6,7 +6,25 @@ import type { ViewType } from "@/services/view-controller";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { ToolbarCommand, SlashCommand } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
-import { mediaImage, floppyDisk, folder, folderOpen, clockRotateRight, list, checkSquare, minus, navArrowRight, navArrowLeft, text, numberedListLeft, quote, codeBrackets, mathBook, table, videoCamera } from "@/eta/icons";
+import {
+  mediaImage,
+  floppyDisk,
+  folder,
+  folderOpen,
+  clockRotateRight,
+  list,
+  checkSquare,
+  minus,
+  navArrowRight,
+  navArrowLeft,
+  text,
+  numberedListLeft,
+  quote,
+  codeBrackets,
+  mathBook,
+  table,
+  videoCamera,
+} from "@/eta/icons";
 
 export const menuRegistry = createRegistry();
 
@@ -93,31 +111,57 @@ menuRegistry.register("file", (): MenuItem[] => {
 // re-import. Register once per document (a globalThis flag survives module
 // re-execution) and have every module instance read the shared view state.
 interface MenuViewState {
-  current: string
+  current: string;
 }
-const viewState =
-  ((globalThis as unknown as { __inb4docMenuViewState?: MenuViewState })
-    .__inb4docMenuViewState ??= { current: "editor" })
+const viewState = ((
+  globalThis as unknown as { __inb4docMenuViewState?: MenuViewState }
+).__inb4docMenuViewState ??= { current: "editor" });
 
-if (!(globalThis as unknown as { __inb4docMenuViewTracked?: boolean }).__inb4docMenuViewTracked) {
-  ;(globalThis as unknown as { __inb4docMenuViewTracked?: boolean }).__inb4docMenuViewTracked = true
+if (
+  !(globalThis as unknown as { __inb4docMenuViewTracked?: boolean })
+    .__inb4docMenuViewTracked
+) {
+  (
+    globalThis as unknown as { __inb4docMenuViewTracked?: boolean }
+  ).__inb4docMenuViewTracked = true;
   appEvents.on(AppEvent.ViewChanged, ({ view }) => {
-    viewState.current = view
-  })
+    viewState.current = view;
+  });
 }
 
 // Formatting "…" menu: mounted in the mobile topbar as an overflow trigger and
 // on the dock FAB as a popup. Flat list — reuses the shared
 // Menu/menuRegistry/eta infra, no bespoke submenu system.
 menuRegistry.register("format-more", (): MenuItem[] => [
-  { type: MenuType.Item, id: "bullet", icon: list, label: "Bullet list", onClick: () => emitToolbarCommand(ToolbarCommand.BulletList) },
-  { type: MenuType.Item, id: "ordered", icon: numberedListLeft, label: "Ordered list", onClick: () => emitToolbarCommand(ToolbarCommand.OrderedList) },
-  { type: MenuType.Item, id: "task", icon: checkSquare, label: "Checkbox", onClick: () => emitToolbarCommand(ToolbarCommand.TaskList) },
+  {
+    type: MenuType.Item,
+    id: "bullet",
+    icon: list,
+    label: "Bullet list",
+    onClick: () => emitToolbarCommand(ToolbarCommand.BulletList),
+  },
+  {
+    type: MenuType.Item,
+    id: "ordered",
+    icon: numberedListLeft,
+    label: "Ordered list",
+    onClick: () => emitToolbarCommand(ToolbarCommand.OrderedList),
+  },
+  {
+    type: MenuType.Item,
+    id: "task",
+    icon: checkSquare,
+    label: "Checkbox",
+    onClick: () => emitToolbarCommand(ToolbarCommand.TaskList),
+  },
   { type: MenuType.Separator },
-  { type: MenuType.Item, id: "indent", icon: navArrowRight, label: "Increase indent", onClick: () => emitToolbarCommand(ToolbarCommand.Indent) },
-  { type: MenuType.Item, id: "unindent", icon: navArrowLeft, label: "Decrease indent", onClick: () => emitToolbarCommand(ToolbarCommand.Unindent) },
-  { type: MenuType.Separator },
-  { type: MenuType.Item, id: "hr", icon: minus, label: "Horizontal rule", onClick: () => emitToolbarCommand(ToolbarCommand.Hr) },
+  {
+    type: MenuType.Item,
+    id: "hr",
+    icon: minus,
+    label: "Horizontal rule",
+    onClick: () => emitToolbarCommand(ToolbarCommand.Hr),
+  },
 ]);
 
 // Shared "insert block" menu: the mobile FAB "+" popup and the desktop
@@ -130,9 +174,27 @@ menuRegistry.register("add-block", (): MenuItem[] => [
     icon: text,
     label: "Headings",
     items: [
-      { type: MenuType.Item, id: "h1", icon: text, label: "Heading 1", onClick: () => emitInsertBlockCommand(SlashCommand.Heading, 1) },
-      { type: MenuType.Item, id: "h2", icon: text, label: "Heading 2", onClick: () => emitInsertBlockCommand(SlashCommand.Heading, 2) },
-      { type: MenuType.Item, id: "h3", icon: text, label: "Heading 3", onClick: () => emitInsertBlockCommand(SlashCommand.Heading, 3) },
+      {
+        type: MenuType.Item,
+        id: "h1",
+        icon: text,
+        label: "Heading 1",
+        onClick: () => emitInsertBlockCommand(SlashCommand.Heading, 1),
+      },
+      {
+        type: MenuType.Item,
+        id: "h2",
+        icon: text,
+        label: "Heading 2",
+        onClick: () => emitInsertBlockCommand(SlashCommand.Heading, 2),
+      },
+      {
+        type: MenuType.Item,
+        id: "h3",
+        icon: text,
+        label: "Heading 3",
+        onClick: () => emitInsertBlockCommand(SlashCommand.Heading, 3),
+      },
     ],
   },
   {
@@ -141,21 +203,63 @@ menuRegistry.register("add-block", (): MenuItem[] => [
     icon: list,
     label: "List",
     items: [
-      { type: MenuType.Item, id: "bullet", icon: list, label: "Bullet list", onClick: () => emitInsertBlockCommand(SlashCommand.BulletList) },
-      { type: MenuType.Item, id: "ordered", icon: numberedListLeft, label: "Ordered list", onClick: () => emitInsertBlockCommand(SlashCommand.OrderedList) },
-      { type: MenuType.Item, id: "checkbox", icon: checkSquare, label: "Checkbox", onClick: () => emitInsertBlockCommand(SlashCommand.TodoList) },
+      {
+        type: MenuType.Item,
+        id: "bullet",
+        icon: list,
+        label: "Bullet list",
+        onClick: () => emitInsertBlockCommand(SlashCommand.BulletList),
+      },
+      {
+        type: MenuType.Item,
+        id: "ordered",
+        icon: numberedListLeft,
+        label: "Ordered list",
+        onClick: () => emitInsertBlockCommand(SlashCommand.OrderedList),
+      },
+      {
+        type: MenuType.Item,
+        id: "checkbox",
+        icon: checkSquare,
+        label: "Checkbox",
+        onClick: () => emitInsertBlockCommand(SlashCommand.TodoList),
+      },
     ],
   },
-  { type: MenuType.Item, id: "blockquote", icon: quote, label: "Blockquote", onClick: () => emitInsertBlockCommand(SlashCommand.Blockquote) },
-  { type: MenuType.Item, id: "divider", icon: minus, label: "Divider", onClick: () => emitInsertBlockCommand(SlashCommand.ThematicBreak) },
+  {
+    type: MenuType.Item,
+    id: "blockquote",
+    icon: quote,
+    label: "Blockquote",
+    onClick: () => emitInsertBlockCommand(SlashCommand.Blockquote),
+  },
+  {
+    type: MenuType.Item,
+    id: "divider",
+    icon: minus,
+    label: "Divider",
+    onClick: () => emitInsertBlockCommand(SlashCommand.ThematicBreak),
+  },
   {
     type: MenuType.Submenu,
     id: "code",
     icon: codeBrackets,
     label: "Code",
     items: [
-      { type: MenuType.Item, id: "code-block", icon: codeBrackets, label: "Code block", onClick: () => emitInsertBlockCommand(SlashCommand.CodeBlock) },
-      { type: MenuType.Item, id: "math-block", icon: mathBook, label: "Math block", onClick: () => emitInsertBlockCommand(SlashCommand.MathBlock) },
+      {
+        type: MenuType.Item,
+        id: "code-block",
+        icon: codeBrackets,
+        label: "Code block",
+        onClick: () => emitInsertBlockCommand(SlashCommand.CodeBlock),
+      },
+      {
+        type: MenuType.Item,
+        id: "math-block",
+        icon: mathBook,
+        label: "Math block",
+        onClick: () => emitInsertBlockCommand(SlashCommand.MathBlock),
+      },
     ],
   },
   {
@@ -164,9 +268,27 @@ menuRegistry.register("add-block", (): MenuItem[] => [
     icon: table,
     label: "Widgets",
     items: [
-      { type: MenuType.Item, id: "table", icon: table, label: "Table", onClick: () => emitInsertBlockCommand(SlashCommand.Table) },
-      { type: MenuType.Item, id: "image", icon: mediaImage, label: "Image", onClick: () => emitInsertBlockCommand(SlashCommand.Image) },
-      { type: MenuType.Item, id: "video", icon: videoCamera, label: "Video", onClick: () => emitInsertBlockCommand(SlashCommand.Video) },
+      {
+        type: MenuType.Item,
+        id: "table",
+        icon: table,
+        label: "Table",
+        onClick: () => emitInsertBlockCommand(SlashCommand.Table),
+      },
+      {
+        type: MenuType.Item,
+        id: "image",
+        icon: mediaImage,
+        label: "Image",
+        onClick: () => emitInsertBlockCommand(SlashCommand.Image),
+      },
+      {
+        type: MenuType.Item,
+        id: "video",
+        icon: videoCamera,
+        label: "Video",
+        onClick: () => emitInsertBlockCommand(SlashCommand.Video),
+      },
     ],
   },
 ]);
