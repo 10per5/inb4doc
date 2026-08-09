@@ -28,26 +28,26 @@
     max-width: calc(100vw - 2rem);
     font-size: var(--font-size-small);
   }
-  
+
   .slash-item {
-    padding: 8px 10px;  /* Larger touch targets */
+    padding: 8px 10px; /* Larger touch targets */
   }
 
   /* Block handles for touch */
   .milkdown-block-handle {
     gap: 4px;
   }
-  
+
   .milkdown-block-handle button {
-    width: 44px;  /* WCAG minimum touch target */
+    width: 44px; /* WCAG minimum touch target */
     height: 44px;
   }
-  
+
   .milkdown-block-handle button svg {
     width: 24px;
     height: 24px;
   }
-  
+
   .milkdown-block-handle.touch-active {
     opacity: 1;
     pointer-events: auto;
@@ -57,15 +57,15 @@
   .milkdown-link-preview {
     max-width: calc(100vw - 2rem);
   }
-  
+
   .milkdown-link-preview .link-preview .link-display {
     max-width: 180px;
   }
-  
+
   .milkdown-link-edit {
     max-width: calc(100vw - 2rem);
   }
-  
+
   .milkdown-link-edit .link-edit .input-area {
     width: 150px;
   }
@@ -80,12 +80,6 @@
   /* Editor typography on mobile */
   #milkdown-editor .ProseMirror {
     font-size: var(--font-size-base);
-  }
-
-  /* Editor area */
-  #editor-area {
-    max-width: 100%;
-    padding: 0 0.5rem;
   }
 
   /* Toolbar on mobile — single-row to avoid 73px height */
@@ -108,12 +102,6 @@
 /* ── Tablet Optimizations (768px - 1199px) ────────────────────────── */
 
 @media (min-width: 768px) {
-  /* Editor area */
-  #editor-area {
-    max-width: 800px;
-    padding: 0;
-  }
-
   /* Toolbar */
   .app-toolbar {
     height: 28px;
@@ -139,12 +127,7 @@
   .sidebar-provider-bar {
     display: none !important;
   }
-  
-  #editor-area {
-    max-width: 100%;
-    width: 100%;
-  }
-  
+
   #milkdown-editor .ProseMirror {
     padding: 0;
   }
