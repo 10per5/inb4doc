@@ -48,6 +48,7 @@ export default class DockController extends Controller {
   }
 
   activate(event: Event): void {
+    event.stopPropagation()
     const item = ((event.currentTarget as HTMLElement).dataset.dockItem ?? "editor") as DockItem
     if (item === "editor") {
       // Already on the editor view → the FAB is the insert-block "+" popup
@@ -70,10 +71,17 @@ export default class DockController extends Controller {
   }
 
   private get fabItem(): HTMLElement {
-    return this.itemTargets.find((el) => el.dataset.dockItem === "editor")!
+    return (
+      this.element.querySelector<HTMLElement>('[data-dock-item="editor"]') ??
+      this.itemTargets.find((el) => el.dataset.dockItem === "editor")!
+    )
   }
 
   private setActiveItem(item: DockItem): void {
+    const fab = this.fabItem
+    if (fab && this.insertMenu) {
+      this.insertMenu.setTriggerEl(fab)
+    }
     for (const el of this.itemTargets) {
       const active = el.dataset.dockItem === item
       el.classList.toggle("is-active", active)
