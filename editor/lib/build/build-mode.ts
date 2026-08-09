@@ -116,7 +116,7 @@ export function hasFunc(func: AppFunc): boolean {
   const mode = getCurrentMode();
   // Web-local responsive-web (Part F): the dock layout is UA/viewport-gated,
   // not enabled by default — desktop stays desktop, mobile gets the dock.
-  if (func === AppFunc.MobileDock && mode === BuildMode.WebLocal) {
+  if (func === AppFunc.MobileDock) {
     return isMobileViewport();
   }
   return !!(SUPPORTED_MODES[func] & mode);
