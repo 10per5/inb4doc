@@ -17,15 +17,20 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d)
     if (node.type.name !== "list_item") continue
+    // The item's index within its parent list (depth d-1). sinkListItem fails
+    // when the item is the first child of the list (startIndex == 0), so only
+    // items at index > 0 can be indented further.
+    const canSink = $from.index(d - 1) > 0
     const checked = node.attrs.checked
     if (typeof checked === "boolean") {
-      return { isListItem: true, listType: "task", checked }
+      return { isListItem: true, listType: "task", checked, canSink }
     }
     const parentName = $from.node(d - 1).type.name
     return {
       isListItem: true,
       listType: parentName === "ordered_list" ? "ordered" : "bullet",
       checked: null,
+      canSink,
     }
   }
   return EMPTY_BLOCK_CONTEXT

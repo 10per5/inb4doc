@@ -18,4 +18,5 @@ export enum ToolbarCommand {
   UnmarkTask,
   BulletList,
   TaskList,
+  OrderedList,
 }

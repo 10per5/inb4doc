@@ -73,6 +73,10 @@ class CommandService {
     return this._cm!.wrapInBulletListCommand
   }
 
+  get wrapInOrderedListCommand(): $Command<unknown> {
+    return this._cm!.wrapInOrderedListCommand
+  }
+
   get toggleStrikethroughCommand(): $Command<unknown> {
     return this._gfm!.toggleStrikethroughCommand
   }

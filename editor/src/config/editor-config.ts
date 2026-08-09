@@ -127,6 +127,13 @@ export async function createEditor(
 
       ctx.update(remarkStringifyOptionsCtx, (prev) => ({
         ...prev,
+        // Keep list markers consistent: bullets as `*` (not `-`), numbers as
+        // `1.` (not `1)`). These are mdast-util-to-markdown options; Milkdown
+        // emits the marker for the `listItem` node via the stringifier.
+        // (bulletOther is intentionally left at its default — it must differ
+        // from `bullet` so nested same-type lists can be disambiguated.)
+        bullet: "*" as const,
+        bulletOrdered: "." as const,
         handlers: {
           ...prev.handlers,
           text: (node: any, _: any, state: any, info: any) => {

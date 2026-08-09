@@ -11,7 +11,6 @@ export default class EditToolbarController extends Controller {
   declare readonly listGroupTarget: HTMLElement
 
   private unsubs: (() => void)[] = []
-  private currentCmd = new Map<string, boolean>()
   private isListContext = false
   private viewIsEditor = true
 
@@ -48,25 +47,46 @@ export default class EditToolbarController extends Controller {
     isListItem: boolean
     listType: "bullet" | "ordered" | "task" | null
     checked: boolean | null
+    canSink: boolean
   }): void {
     this.listGroupTarget.hidden = !context.isListItem
-    this.setCmd("tc-9", context.isListItem && context.listType === "task" && context.checked === false)
-    this.setCmd("tc-10", context.isListItem && context.listType === "task" && context.checked === true)
-    this.setCmd("tc-7", context.isListItem)
-    this.setCmd("tc-8", context.isListItem)
+    const inList = context.isListItem
+    // Indent controls: always shown for a list item; increase indent is
+    // disabled when the item can't sink (first child of its parent list).
+    this.setVisible("tc-8", inList)
+    this.setVisible("tc-7", inList)
+    this.setDisabled("tc-7", inList && !context.canSink)
+    // List-kind conversions: hide the button matching the current kind.
+    this.setVisible("tc-11", inList && context.listType !== "bullet")
+    this.setVisible("tc-13", inList && context.listType !== "ordered")
+    this.setVisible("tc-12", inList && context.listType !== "task")
+    // Task on/off: show the action matching the current checked state.
+    this.setVisible("tc-9", inList && context.listType === "task" && context.checked === false)
+    this.setVisible("tc-10", inList && context.listType === "task" && context.checked === true)
   }
 
   private updateVisibility(): void {
     ;(this.element as HTMLElement).hidden = !(this.viewIsEditor && this.isListContext)
   }
 
-  private setCmd(cmd: string, active: boolean): void {
-    if (this.currentCmd.get(cmd) === active) return
-    this.currentCmd.set(cmd, active)
+  private setVisible(cmd: string, visible: boolean): void {
     for (const el of this.btnTargets) {
       if (el.dataset.cmd !== cmd) continue
-      el.classList.toggle("is-active", active)
-      el.setAttribute("aria-pressed", active ? "true" : "false")
+      el.hidden = !visible
+    }
+  }
+
+  private setDisabled(cmd: string, disabled: boolean): void {
+    for (const el of this.btnTargets) {
+      if (el.dataset.cmd !== cmd) continue
+      el.classList.toggle("is-disabled", disabled)
+      if (disabled) {
+        el.setAttribute("disabled", "")
+        el.setAttribute("aria-disabled", "true")
+      } else {
+        el.removeAttribute("disabled")
+        el.removeAttribute("aria-disabled")
+      }
     }
   }
 }

@@ -2,7 +2,7 @@ import { keymap } from "@milkdown/kit/prose/keymap"
 import { undo, redo } from "@milkdown/kit/prose/history"
 import { TextSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
-import { wrapInList } from "prosemirror-schema-list"
+import { wrapInList, sinkListItem } from "prosemirror-schema-list"
 import { appEvents, AppEvent } from "@/stores/app-events"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
@@ -115,6 +115,27 @@ export function createKeymap() {
     "Mod-z": (state, dispatch) => undo(state, dispatch),
     "Mod-Z": (state, dispatch) => redo(state, dispatch),
     "Mod-y": (state, dispatch) => redo(state, dispatch),
+    // Stock PM sinkListItem returns false when the item is the FIRST child of
+    // its parent list (startIndex == 0), so Tab indents when the item can sink
+    // and otherwise inserts 4 non-breaking spaces. The edit-toolbar increase
+    // button mirrors this: disabled when the item can't sink. This keymap runs
+    // before Milkdown's listItemKeymap, so Tab is taken.
+    "Tab": (state, dispatch) => {
+      let itemDepth = -1
+      for (let d = state.selection.$from.depth; d > 0; d--) {
+        if (state.selection.$from.node(d).type.name === "list_item") {
+          itemDepth = d
+          break
+        }
+      }
+      const canSink =
+        itemDepth !== -1 && state.selection.$from.index(itemDepth - 1) > 0
+      if (canSink) {
+        return sinkListItem(state.schema.nodes.list_item)(state, dispatch)
+      }
+      if (dispatch) dispatch(state.tr.insertText("\u00A0\u00A0\u00A0\u00A0"))
+      return true
+    },
     "Mod-ArrowUp": (state, dispatch) => moveBlock(state, dispatch, -1),
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
     "Backspace": (state, dispatch) => headingToParagraph(state, dispatch),
