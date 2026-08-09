@@ -367,7 +367,7 @@ export default class extends Controller {
     const isSingleCurrent =
       count === 1 && singleDirtyPath && singleDirtyPath === currentPath;
 
-    if (isSingleCurrent) {
+    if (isSingleCurrent && hasFunc(AppFunc.MobileDock)) {
       // Current file only → compact eye + discard, no pending text.
       el.prepend(createChangesBtn());
       const btn = pressTwiceButton({
