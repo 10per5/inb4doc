@@ -45,7 +45,7 @@ initFarmCompat(thinShell && ANDROID_MOUNT ? `${ANDROID_MOUNT}assets/` : "assets/
 // but Stimulus registered the controller set at boot from that decision.
 // Crossing the mobile/desktop breakpoint reloads so the dock layout (or the
 // desktop chrome) wires up; the reload guard prevents loops on UA-only matches.
-if (currentBuildMode() === BuildMode.WebLocal) {
+if (currentBuildMode() === BuildMode.WebLocal || currentBuildMode() === BuildMode.WebRemote) {
   let last = isMobileViewport();
   window.matchMedia("(max-width: 767px)").addEventListener("change", (e) => {
     if (e.matches !== last) {

@@ -55,12 +55,17 @@ function closeAllMenus(except?: Menu) {
   }
 }
 
-function renderItems(items: MenuItem[]): string {
+let autoIdCounter = 0
+
+function renderItems(items: MenuItem[], prefix = "menu-item"): string {
   return items.map((item) => {
+    if (!item.id && item.type !== MenuType.Separator) {
+      item.id = `${prefix}-${++autoIdCounter}`
+    }
     if (item.type === MenuType.Separator) return renderSeparator(item)
     if (item.type === MenuType.Check) return renderCheck({ ...item, icons: { check } })
     if (item.type === MenuType.Submenu) {
-      return renderSubmenu({ ...item, childrenHtml: renderItems(item.items ?? []), icons: { check, arrowRight } })
+      return renderSubmenu({ ...item, childrenHtml: renderItems(item.items ?? [], item.id), icons: { check, arrowRight } })
     }
     return renderMenuItem(item)
   }).join("")
