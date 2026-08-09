@@ -19,6 +19,7 @@ export default class DockController extends Controller {
   private insertMenu: Menu | null = null
 
   connect(): void {
+    console.log("[FAB] dock-controller connect")
     // Render only into the nav slot — #dock also hosts the edit-toolbar strip,
     // so it must not be clobbered with innerHTML.
     this.navTarget.innerHTML = renderDock({ icons: icons as Record<string, string> })
@@ -48,6 +49,7 @@ export default class DockController extends Controller {
   }
 
   activate(event: Event): void {
+    console.log("[FAB] activate fired", event.currentTarget, this.currentView)
     event.stopPropagation()
     const item = ((event.currentTarget as HTMLElement).dataset.dockItem ?? "editor") as DockItem
     if (item === "editor") {
@@ -55,17 +57,22 @@ export default class DockController extends Controller {
       // (editor, no-file, dir-index-empty). On other fullviews (navigation,
       // more, meta), it acts as the return-to-editor tab.
       const isEditorTab = viewToDockItem(this.currentView) === "editor"
+      console.log("[FAB] item=editor isEditorTab=", isEditorTab, "insertOpen=", this.insertMenu?.isOpen)
       if (isEditorTab) {
         if (this.insertMenu?.isOpen) {
+          console.log("[FAB] closing insert menu")
           this.insertMenu.close()
         } else {
+          console.log("[FAB] opening insert menu")
           this.insertMenu?.openAndFocusFirst()
         }
         return
       }
+      console.log("[FAB] switching to editor view (was not editor)")
       appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
       return
     }
+    console.log("[FAB] switching view to", item)
     appEvents.emit(AppEvent.ViewChanged, { view: item })
   }
 
