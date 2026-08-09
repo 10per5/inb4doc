@@ -344,26 +344,30 @@ export class Menu {
     if (!this.mountEl.contains(target)) this.close()
   }
 
-  // Align the panel to the mount's right edge when opening it at `left: 0`
-  // would push it past the viewport (mobile overflow triggers sit near the
-  // right edge). Measured while visually hidden, so there's no reposition
-  // flash; the alignment is just a class toggle. Custom-anchored panels
-  // (panelClass, e.g. the centered FAB popup) own their alignment and are
-  // skipped.
+  // Flip the panel so it stays on screen: right-align when `left: 0` would
+  // push it past the right edge, and open upward when the natural `top: 100%`
+  // would push it past the bottom. Measured while visually hidden, so there's
+  // no reposition flash; results are just class toggles. Custom-anchored
+  // panels (panelClass, e.g. the FAB popup) own their horizontal alignment but
+  // still get the vertical flip (their CSS just wins when it also sets a side).
   private positionPanel() {
-    if (this.panelClass) return
     const panel = this.panelEl
-    panel.classList.remove("toolbar-menu--right")
+    panel.classList.remove("toolbar-menu--right", "toolbar-menu--up")
     const prevDisplay = panel.style.display
     panel.style.display = "block"
     panel.style.visibility = "hidden"
-    const mountLeft = this.mountEl.getBoundingClientRect().left
+    const mount = this.mountEl.getBoundingClientRect()
     const panelWidth = panel.offsetWidth
+    const panelHeight = panel.offsetHeight
     panel.style.visibility = ""
     panel.style.display = prevDisplay
     const vw = document.documentElement.clientWidth
-    if (mountLeft + panelWidth > vw - 8) {
+    const vh = document.documentElement.clientHeight
+    if (!this.panelClass && mount.left + panelWidth > vw - 8) {
       panel.classList.add("toolbar-menu--right")
+    }
+    if (mount.bottom + 12 + panelHeight > vh) {
+      panel.classList.add("toolbar-menu--up")
     }
   }
 

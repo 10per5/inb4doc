@@ -329,7 +329,7 @@ function replaceListRange(
 }
 
 export function initToolbarHandler(getEditor: () => Editor | null) {
-  return appEvents.on(AppEvent.ToolbarCommandExec, async ({ command, level }) => {
+  const unsubToolbar = appEvents.on(AppEvent.ToolbarCommandExec, async ({ command, level }) => {
     const editor = getEditor()
     if (!editor) return
 
@@ -377,4 +377,23 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
       }
     })
   })
+
+  const unsubInsert = appEvents.on(AppEvent.InsertBlockCommand, async ({ command, level }) => {
+    const editor = getEditor()
+    if (!editor) return
+
+    const { editorContext } = await import("@/services/editor-context")
+    const { commandService } = await import("@/services/command-service")
+    await Promise.all([editorContext.load(), commandService.load()])
+
+    const { executeInsertCommand } = await import("@/features/insert-command")
+    editor.action((ctx) => {
+      executeInsertCommand(ctx, command, level, { appendBelow: true })
+    })
+  })
+
+  return () => {
+    unsubToolbar()
+    unsubInsert()
+  }
 }

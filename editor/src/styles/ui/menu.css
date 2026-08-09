@@ -54,6 +54,15 @@
   right: 0;
 }
 
+/* Opens upward — toggled by Menu.positionPanel() when the panel would
+   overflow the viewport at its natural `top: 100%` position. Combines with
+   --right for corner-anchored menus; leaves left/right alone so it stacks
+   with custom panel classes. */
+.toolbar-menu--up {
+  top: auto;
+  bottom: calc(100% + 12px);
+}
+
 .toolbar-menu .menu-item {
   display: flex;
   align-items: center;
@@ -67,7 +76,10 @@
   position: relative;
 }
 
-.toolbar-menu .menu-item:hover {
+/* Hover and focus share the same highlight so opening a menu onto its first
+   item (focus-first, mobile/"+" popups) reads the same as hovering it. */
+.toolbar-menu .menu-item:hover,
+.toolbar-menu .menu-item:focus {
   background: var(--color-bg-tertiary);
 }
 

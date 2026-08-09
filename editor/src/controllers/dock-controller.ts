@@ -16,23 +16,23 @@ export default class DockController extends Controller {
 
   private currentView: ViewType = "editor"
   private unsubs: (() => void)[] = []
-  private editMenu: Menu | null = null
+  private insertMenu: Menu | null = null
 
   connect(): void {
     // Render only into the nav slot — #dock also hosts the edit-toolbar strip,
     // so it must not be clobbered with innerHTML.
     this.navTarget.innerHTML = renderDock({ icons: icons as Record<string, string> })
-    this.editMenu = new Menu({
+    this.insertMenu = new Menu({
       mountEl: this.fabMenuTarget,
       triggerEl: this.fabItem,
-      label: "Edit",
-      items: () => menuRegistry.get("format-more")!,
-      panelClass: "toolbar-menu--up",
+      label: "Add",
+      items: () => menuRegistry.get("add-block")!,
+      panelClass: "dock-fab-menu",
     })
     this.unsubs.push(
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.currentView = view
-        this.editMenu?.close()
+        this.insertMenu?.close()
         dockStore.setActive(viewToDockItem(view))
       }),
       dockStore.subscribe((item) => this.setActiveItem(item)),
@@ -43,17 +43,21 @@ export default class DockController extends Controller {
   disconnect(): void {
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
-    this.editMenu?.destroy()
-    this.editMenu = null
+    this.insertMenu?.destroy()
+    this.insertMenu = null
   }
 
   activate(event: Event): void {
     const item = ((event.currentTarget as HTMLElement).dataset.dockItem ?? "editor") as DockItem
     if (item === "editor") {
-      // Already on the editor view → the FAB is a popup trigger for the
-      // formatting menu. Otherwise it's the tab that returns to the editor.
+      // Already on the editor view → the FAB is the insert-block "+" popup
+      // trigger. Otherwise it's the tab that returns to the editor.
       if (this.currentView === "editor") {
-        this.editMenu?.toggle()
+        if (this.insertMenu?.isOpen) {
+          this.insertMenu.close()
+        } else {
+          this.insertMenu?.openAndFocusFirst()
+        }
         return
       }
       const view: ViewType = (this.currentView === "no-file" || this.currentView === "dir-index-empty")
@@ -75,6 +79,22 @@ export default class DockController extends Controller {
       el.classList.toggle("is-active", active)
       el.setAttribute("aria-selected", active ? "true" : "false")
     }
+    this.setFabState(item === "editor")
+  }
+
+  // Editor view → "+" (insert menu trigger); any other view → pencil + "Editor"
+  // label (return-to-editor tab). Toggled via data-dock-state on the FAB.
+  private setFabState(editorView: boolean): void {
+    const fab = this.fabItem
+    fab.dataset.dockState = editorView ? "add" : "editor"
+    fab.setAttribute("aria-label", editorView ? "Add block" : "Editor")
+    fab.setAttribute("title", editorView ? "Add block" : "Editor")
+    const plus = fab.querySelector(".dock-icon--plus") as HTMLElement | null
+    const pencil = fab.querySelector(".dock-icon--pencil") as HTMLElement | null
+    const label = fab.querySelector(".dock-label") as HTMLElement | null
+    if (plus) plus.hidden = !editorView
+    if (pencil) pencil.hidden = editorView
+    if (label) label.hidden = editorView
   }
 }
 

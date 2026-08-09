@@ -110,23 +110,34 @@
   position: relative;
 }
 
-/* Anchor for the FAB popup menu: a 0×0 point above the center of the dock
- * (the FAB sits centered, raised 12px). The shared .toolbar-menu panel is
- * mounted here and opened upward via .toolbar-menu--up. */
+/* Anchor for the FAB popup menu: a 0-height strip above the dock. The shared
+ * .toolbar-menu panel is mounted here; this class pins it above the dock and
+ * right-aligns it toward the FAB button. Full-width so right:12px tracks it. */
 .dock-fab-menu-anchor {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 56px;
-  width: 0;
   height: 0;
-  transform: translateX(-50%);
   z-index: 300;
 }
 
-.toolbar-menu--up {
+/* The FAB popup always opens upward (the dock is pinned to the bottom, so
+ * there's never room below) and right-aligns toward the FAB button. The
+ * generic up/down flip lives in .toolbar-menu--up (menu.css) and stacks with
+ * this class. */
+.dock-fab-menu {
   top: auto;
   bottom: calc(100% + 12px);
-  transform: translateX(-50%);
+  left: auto;
+  right: 12px;
+}
+
+/* The FAB popup's grouped expanders open leftward — with the panel
+ * right-aligned they stay fully on screen on narrow phones. */
+.dock-fab-menu .menu-item-submenu .menu-submenu {
+  left: auto;
+  right: 100%;
 }
 
 .dock-item {
@@ -187,6 +198,23 @@
 .dock-item--fab.is-active {
   color: var(--color-active-text);
   background-color: var(--color-btn-bg);
+}
+
+/* FAB states (data-dock-state on the FAB): editor view → "+" insert trigger;
+   other views → pencil + "Editor" label (return-to-editor tab). The [hidden]
+   attribute toggles which icon/label shows. */
+.dock-item--fab .dock-icon--pencil {
+  height: 20px;
+}
+
+.dock-item--fab .dock-icon--pencil svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dock-item--fab .dock-label {
+  font-size: 10px;
+  line-height: 1;
 }
 
 /* Fullview views occupy the editor area above the dock */
