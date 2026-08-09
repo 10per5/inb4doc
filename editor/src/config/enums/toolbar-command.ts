@@ -12,4 +12,10 @@ export enum ToolbarCommand {
   Hr,
   Link,
   Heading,
+  Indent,
+  Unindent,
+  MarkTask,
+  UnmarkTask,
+  BulletList,
+  TaskList,
 }

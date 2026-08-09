@@ -65,17 +65,25 @@ function patchIncrementalWrite(compiler: any): void {
 const CTRL_SUFFIX_RE = /[-_]controller$/;
 const EXT_TS = ".ts";
 const DIALOG_SUBDIR = "dialog";
-const CTRL_TEMPLATE_DIR = "eta/views/controller";
-const DIALOG_TEMPLATE_DIR = "eta/views/dialog";
 // Controllers never registered in app.ts (e.g. the abstract base class) get no
 // chunk-map entry, no prune target, and no swap rule.
 const EXCLUDED_CONTROLLER_IDS = new Set(["base-dialog"]);
+
+// Import-scan pairing: a controller pairs with the compiled template(s) it
+// actually imports at runtime (`import renderTopbar from
+// "@/eta/views/controller/topbar"`). The import IS the pairing — no filename
+// convention. Multiple templates per controller are supported. Variant
+// templates composed via Eta include() (e.g. navigation-sidebar included by
+// navigation.eta) are inlined at eta-compile time, so they never need pairing.
+const TEMPLATE_IMPORT_RE = /from\s+["']@\/eta\/views\/(controller|dialog)\/([\w-]+)["']/g;
 
 interface ControllerReg {
   id: string;
   rel: string;
   isDialog: boolean;
-  templateRel: string | null;
+  // Compiled template rels (relative to src/, e.g. `eta/views/controller/topbar`)
+  // this controller imports at runtime — the explicit pairing.
+  templates: string[];
 }
 
 // ── Chunk-graph manifest (hot vs cold reload decision) ──
@@ -249,9 +257,10 @@ function computeChunkManifest(
 // Each Stimulus controller becomes its own chunk. A controller paired with a
 // compiled template (src/eta/views/controller/<id>.ts for non-dialogs,
 // src/eta/views/dialog/<id>.ts for dialogs) is bundled together with that
-// template. Dialog controllers additionally pull their facade helper
-// (src/controllers/dialog/<id>.ts) into the same chunk so controller + helper +
-// template reload as one unit.
+// template — the pairing is the controller's own template import, scanned from
+// source (see TEMPLATE_IMPORT_RE). Dialog controllers additionally pull their
+// facade helper (src/controllers/dialog/<id>.ts) into the same chunk so
+// controller + helper + template reload as one unit.
 function discoverControllers(
   controllersDir: string,
   srcDir: string
@@ -274,8 +283,8 @@ function discoverControllers(
         .join("/")
         .replace(EXT_TS, "");
       const isDialog = rel.startsWith(`controllers/${DIALOG_SUBDIR}/`);
-      const templateRel = pairedTemplate(id, srcDir, isDialog);
-      result.push({ id, rel, isDialog, templateRel });
+      const templates = scanTemplateImports(full, srcDir);
+      result.push({ id, rel, isDialog, templates });
     }
   }
 
@@ -283,13 +292,15 @@ function discoverControllers(
   return result;
 }
 
-function pairedTemplate(
-  id: string,
-  srcDir: string,
-  isDialog: boolean
-): string | null {
-  const rel = `${isDialog ? DIALOG_TEMPLATE_DIR : CTRL_TEMPLATE_DIR}/${id}`;
-  return existsSync(resolve(srcDir, `${rel}.ts`)) ? rel : null;
+function scanTemplateImports(controllerFile: string, srcDir: string): string[] {
+  const source = readFileSync(controllerFile, "utf-8");
+  const templates: string[] = [];
+  for (const match of source.matchAll(TEMPLATE_IMPORT_RE)) {
+    const rel = `eta/views/${match[1]}/${match[2]}`;
+    if (!existsSync(resolve(srcDir, `${rel}.ts`))) continue;
+    if (!templates.includes(rel)) templates.push(rel);
+  }
+  return templates;
 }
 
 function controllerRules(
@@ -308,15 +319,15 @@ function controllerRules(
       const test = c.isDialog
         ? [
             `.*src/controllers/dialog/${c.id}(?:-controller)?\\.ts`,
-            `.*src/eta/views/dialog/${c.id}\\.ts`,
+            ...c.templates.map((t) => `.*${t}\\.ts`),
           ]
         : folder
           ? [
               `.*src/${folder}/.*`,
-              ...(c.templateRel ? [`.*${c.templateRel}\\.ts`] : []),
+              ...c.templates.map((t) => `.*${t}\\.ts`),
             ]
-          : c.templateRel
-            ? [`.*${c.rel}\\.ts`, `.*${c.templateRel}\\.ts`]
+          : c.templates.length
+            ? [`.*${c.rel}\\.ts`, ...c.templates.map((t) => `.*${t}\\.ts`)]
             : [`.*${c.rel}\\.ts`];
       return { name: c.id, test };
     });

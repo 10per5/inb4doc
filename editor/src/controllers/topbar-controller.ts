@@ -27,6 +27,7 @@ export default class extends Controller {
   connect() {
     this.element.innerHTML = renderTopbar({
       mobileCss: hasFunc(AppFunc.MobileCss),
+      mobileDock: hasFunc(AppFunc.MobileDock),
       toolbarActions,
       ToolbarAction,
       TOOLBAR_CMD_PREFIX,
@@ -34,6 +35,15 @@ export default class extends Controller {
       icons: icons as Record<string, string>,
     });
     this.createMenus();
+    // Mobile: the topbar is editor-chrome — hide it on every other view
+    // (navigation/more/meta/disk-usage/empty states render their own headers).
+    if (hasFunc(AppFunc.MobileDock)) {
+      this.unsubs.push(
+        appEvents.on(AppEvent.ViewChanged, ({ view }) => {
+          ;(this.element as HTMLElement).hidden = view !== "editor";
+        }),
+      );
+    }
     if (hasFunc(AppFunc.ToolbarQuickNav)) {
       this.boundKeyDown = this.onKeyDown.bind(this);
       this.boundKeyUp = this.onKeyUp.bind(this);
@@ -75,13 +85,16 @@ export default class extends Controller {
       const name = mount.dataset.menuName!;
       const mnemonic = hasFunc(AppFunc.ToolbarQuickNav) ? mount.dataset.menuMnemonic?.toLowerCase() : undefined;
       if (!menuRegistry.get(name)) continue;
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
+      // The mobile overflow menu is a bare "…" trigger, not a labeled section.
+      const isMore = name === "format-more";
+      const label = isMore ? "…" : name.charAt(0).toUpperCase() + name.slice(1);
+      const title = isMore ? "More" : label;
       // Pass the resolver (not the resolved array) so dynamic items — e.g. the
       // Recent Projects list — are re-read on every menu open.
       const menu = new Menu({
         mountEl: mount,
         label,
-        title: label,
+        title,
         items: () => menuRegistry.get(name)!,
         mnemonic,
       });

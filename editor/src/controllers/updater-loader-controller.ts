@@ -23,7 +23,7 @@ export default class extends Controller {
   private probeTimer: ReturnType<typeof setTimeout> | null = null;
 
   connect(): void {
-    if (!hasFunc(AppFunc.ThinShell)) return;
+    if (hasFunc(AppFunc.FullBundle)) return;
     this.element.innerHTML = renderUpdaterLoader({} as Record<string, unknown>);
     this.rootTarget.hidden = true;
 

@@ -1,0 +1,16 @@
+<div class="edit-toolbar">
+  <div class="edit-toolbar-group" data-edit-toolbar-target="listGroup" hidden>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-8" data-action="edit-toolbar#exec" title="Decrease indent" aria-label="Decrease indent">
+      <span class="edit-toolbar-icon"><%~ it.icons.navArrowLeft %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-7" data-action="edit-toolbar#exec" title="Increase indent" aria-label="Increase indent">
+      <span class="edit-toolbar-icon"><%~ it.icons.navArrowRight %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-9" data-action="edit-toolbar#exec" title="Mark task done" aria-label="Mark task done">
+      <span class="edit-toolbar-icon"><%~ it.icons.checkSquare %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-10" data-action="edit-toolbar#exec" title="Mark task undone" aria-label="Mark task undone">
+      <span class="edit-toolbar-icon"><%~ it.icons.square %></span>
+    </button>
+  </div>
+</div>

@@ -42,6 +42,7 @@ import {
   imageBlockConfig,
 } from "@milkdown/kit/component/image-block";
 import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
+import { createBlockContextPlugin } from "@/plugins/block-context";
 import {
   copy,
   editPencil,
@@ -218,6 +219,7 @@ export async function createEditor(
           createImageEditPlugin(),
           createKeymap(),
           createCodeBlockMovePlugin(),
+          createBlockContextPlugin(),
         );
       });
     })

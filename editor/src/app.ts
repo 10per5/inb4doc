@@ -10,20 +10,20 @@ import { initNativeBridge } from "@/eta/bridge";
 import { setSessionStarted } from "@/controllers/shell_controller";
 import { initFarmCompat } from "$/farmfe-compat";
 import { logger } from "@/utils/logger";
-import { hasFunc, AppFunc } from "$/build/build-mode";
+import { hasFunc, AppFunc, currentBuildMode, isMobileViewport, BuildMode } from "$/build/build-mode";
 
 // Farm's chunk loader bakes a publicPath at build time; override it before any
 // dynamic import. The default RELATIVE "assets/" resolves against the document
-// URL, which is correct under http(s) root/subpath (web-remote), the desktop
-// app:// scheme, and FULL_BUNDLE mobile builds (where every chunk ships in the
-// APK under android_asset). The thin mobile shell is the one exception: the
-// page loads from the bundled file:///android_asset/editor/ shell, but WebView
-// does NOT call shouldInterceptRequest for file:///android_asset/ URLs
-// (documented), and the thin APK ships no lazy chunks — so a relative base
-// would resolve every lazy pot under android_asset and 404. Point the loader
-// at the writable data dir via the custom app://editor/ scheme instead: it has
-// no native WebView handler, so every request deterministically reaches
-// shouldInterceptRequest, which serves the updater-downloaded chunk.
+// URL, which is correct under http(s) root/subpath (web-remote, web-local), the
+// desktop app:// scheme (gui-desktop is a FullBundle build, so every chunk ships
+// in the install). The thin mobile shell is the one exception: the page loads
+// from the bundled file:///android_asset/editor/ shell, but WebView does NOT
+// call shouldInterceptRequest for file:///android_asset/ URLs (documented), and
+// the thin APK ships no lazy chunks — so a relative base would resolve every
+// lazy pot under android_asset and 404. Point the loader at the writable data
+// dir via the custom app://editor/ scheme instead: it has no native WebView
+// handler, so every request deterministically reaches shouldInterceptRequest,
+// which serves the updater-downloaded chunk.
 const ANDROID_MOUNT = (() => {
   try {
     const nb = (window as any).NativeBridge
@@ -36,10 +36,24 @@ const ANDROID_MOUNT = (() => {
 
 // The mount is the JsStaticFs ROOT; the updater stores chunks under its
 // assets/ subdir (pathForUrl keeps "assets/<name>"), so the thin loader base is
-// the mount + assets/. Everywhere else (web, desktop, FULL_BUNDLE mobile) falls
-// back to the relative base, which resolves under the bundled APK.
-const thinShell = hasFunc(AppFunc.ThinShell);
+// the mount + assets/. Everywhere else (web, desktop FullBundle) falls back to
+// the relative base, which resolves under the bundled install.
+const thinShell = !hasFunc(AppFunc.FullBundle);
 initFarmCompat(thinShell && ANDROID_MOUNT ? `${ANDROID_MOUNT}assets/` : "assets/")
+
+// Web-local responsive-web (Part F): hasFunc(MobileDock) is UA/viewport-gated,
+// but Stimulus registered the controller set at boot from that decision.
+// Crossing the mobile/desktop breakpoint reloads so the dock layout (or the
+// desktop chrome) wires up; the reload guard prevents loops on UA-only matches.
+if (currentBuildMode() === BuildMode.WebLocal) {
+  let last = isMobileViewport();
+  window.matchMedia("(max-width: 767px)").addEventListener("change", (e) => {
+    if (e.matches !== last) {
+      last = e.matches;
+      location.reload();
+    }
+  });
+}
 
 const app = new Application();
 
@@ -51,10 +65,10 @@ const app = new Application();
 // build mode (templates/partials/register.eta → src/eta/register.ts): non-thin
 // builds get the registerControllers used below, thin shells get a no-op.
 //
-// Thin shells (ThinShell — GuiDesktop) register core synchronously, start, then
-// register the lazy controllers so node_imports leaves the shipped boot set and
-// the first-run updater downloads it. Web keeps the equivalent behavior through
-// a dynamic registerControllers before start. Stimulus connects lazily-
+// Thin shells (non-FullBundle — GuiMobile) register core synchronously, start,
+// then register the lazy controllers so node_imports leaves the shipped boot
+// set and the first-run updater downloads it. Web keeps the equivalent behavior
+// through a dynamic registerControllers before start. Stimulus connects lazily-
 // registered controllers for elements already in the DOM (the scope observer
 // records data-controller scopes at start regardless of registration), so the
 // editor outlet wires up once the lazy chunk arrives.

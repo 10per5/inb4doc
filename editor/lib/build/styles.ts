@@ -5,6 +5,7 @@ import { Eta } from "eta"
 export interface StyleFlags {
   BUILD_MODE: string
   mobileCss: boolean
+  mobileDock: boolean
 }
 
 export function compileStyles(eta: Eta, templatesSrc: string, outDir: string, flags: StyleFlags): void {

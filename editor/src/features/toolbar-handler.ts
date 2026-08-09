@@ -7,8 +7,24 @@
  */
 
 import type { Editor } from "@milkdown/kit/core"
+import type { EditorView } from "@milkdown/kit/prose/view"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { ToolbarCommand } from "@/config/enums"
+
+function setTaskChecked(view: EditorView, checked: boolean): void {
+  const { $from } = view.state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d)
+    if (node.type.name !== "list_item") continue
+    view.dispatch(
+      view.state.tr.setNodeMarkup($from.before(d), undefined, {
+        ...node.attrs,
+        checked,
+      }),
+    )
+    return
+  }
+}
 
 export function initToolbarHandler(getEditor: () => Editor | null) {
   return appEvents.on(AppEvent.ToolbarCommandExec, async ({ command, level }) => {
@@ -42,6 +58,20 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
           commands.call(commandService.insertHrCommand.key); break
         case ToolbarCommand.Heading:
           commands.call(commandService.wrapInHeadingCommand.key, level); break
+        case ToolbarCommand.Indent:
+          commands.call(commandService.sinkListItemCommand.key); break
+        case ToolbarCommand.Unindent:
+          commands.call(commandService.liftListItemCommand.key); break
+        case ToolbarCommand.BulletList:
+          commands.call(commandService.wrapInBulletListCommand.key); break
+        case ToolbarCommand.TaskList:
+          commands.call(commandService.wrapInBulletListCommand.key)
+          setTaskChecked(view, false)
+          break
+        case ToolbarCommand.MarkTask:
+          setTaskChecked(view, true); break
+        case ToolbarCommand.UnmarkTask:
+          setTaskChecked(view, false); break
       }
     })
   })

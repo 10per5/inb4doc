@@ -21,8 +21,9 @@ export const staticSiteGeneration: boolean = hasFunc(AppFunc.StaticSiteGeneratio
 export const appVersion: string =
   document.querySelector('meta[name="app-version"]')?.getAttribute("content") ?? "";
 
-// The remote base the fetch updater transports pull from (thin-shell GuiDesktop).
-// Set at build time via UPDATE_BASE; empty means no fetch updater.
+// The remote base the fetch updater transports pull from (non-FullBundle
+// builds — GuiMobile). Set at build time via UPDATE_BASE; empty means no fetch
+// updater.
 export const updateBase: string =
   document.querySelector('meta[name="update-base"]')?.getAttribute("content") ?? "";
 

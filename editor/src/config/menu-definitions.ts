@@ -4,10 +4,15 @@ import { MenuType } from "@/components/ui/menu";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { ViewType } from "@/services/view-controller";
 import { hasFunc, AppFunc } from "$/build/build-mode";
+import { ToolbarCommand } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
-import { mediaImage, floppyDisk, folder, folderOpen, clockRotateRight } from "@/eta/icons";
+import { mediaImage, floppyDisk, folder, folderOpen, clockRotateRight, list, checkSquare, minus, navArrowRight, navArrowLeft } from "@/eta/icons";
 
 export const menuRegistry = createRegistry();
+
+function emitToolbarCommand(command: ToolbarCommand): void {
+  appEvents.emit(AppEvent.ToolbarCommandExec, { command });
+}
 
 function recentProjectItems(): MenuItem[] {
   const recents = recentProjectsStore.list();
@@ -96,6 +101,19 @@ if (!(globalThis as unknown as { __inb4docMenuViewTracked?: boolean }).__inb4doc
     viewState.current = view
   })
 }
+
+// Formatting "…" menu: mounted in the mobile topbar as an overflow trigger and
+// on the dock FAB as a popup. Flat list — reuses the shared
+// Menu/menuRegistry/eta infra, no bespoke submenu system.
+menuRegistry.register("format-more", (): MenuItem[] => [
+  { type: MenuType.Item, id: "bullet", icon: list, label: "Bullet list", onClick: () => emitToolbarCommand(ToolbarCommand.BulletList) },
+  { type: MenuType.Item, id: "task", icon: checkSquare, label: "Checkbox", onClick: () => emitToolbarCommand(ToolbarCommand.TaskList) },
+  { type: MenuType.Separator },
+  { type: MenuType.Item, id: "indent", icon: navArrowRight, label: "Increase indent", onClick: () => emitToolbarCommand(ToolbarCommand.Indent) },
+  { type: MenuType.Item, id: "unindent", icon: navArrowLeft, label: "Decrease indent", onClick: () => emitToolbarCommand(ToolbarCommand.Unindent) },
+  { type: MenuType.Separator },
+  { type: MenuType.Item, id: "hr", icon: minus, label: "Horizontal rule", onClick: () => emitToolbarCommand(ToolbarCommand.Hr) },
+]);
 
 menuRegistry.register("view", (): MenuItem[] => [
   {

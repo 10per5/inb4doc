@@ -261,11 +261,11 @@ export async function applyRemoteUpdate(
   const precached = new Set(stored.filter((u): u is string => u !== null))
   // First run (thin shells only): the data dir holds no downloaded index yet,
   // so the whole editor is coming down in one pull. The full-screen loader
-  // (updater-loader-controller, gated on AppFunc.ThinShell) owns the screen for
+  // (updater-loader-controller, gated on non-FullBundle) owns the screen for
   // that pull, so don't also raise the update toast — its progress/ready events
   // still drive the loader. `important[0]` is the site root ("/" → index.html).
   const indexUrl = remoteUrl(manifest.important[0] ?? "/")
-  const firstRun = hasFunc(AppFunc.ThinShell) && !precached.has(indexUrl)
+  const firstRun = !hasFunc(AppFunc.FullBundle) && !precached.has(indexUrl)
   if (!firstRun && urls.some((u) => !precached.has(u))) {
     appEvents.emit(AppEvent.UpdateAvailable)
   }

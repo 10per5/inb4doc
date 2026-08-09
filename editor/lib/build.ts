@@ -44,15 +44,15 @@ const SELF_BASE = (process.env.EDITOR_SELF_BASE || "").replace(/\/+$/, "")
 const ASSET_BASE = SELF_BASE ? `${SELF_BASE}/` : ""
 const modeStr = process.env.BUILD_MODE || "web-local"
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
-// FULL_BUNDLE=1 ships the complete local bundle: force the thin-shell flag off
-// (and empty UPDATE_BASE below) so the APK carries every chunk and never fetches
-// remotely. Build-time only — the runtime side keys off data-full-bundle in the
-// emitted html (see build-mode.ts hasFunc).
-const fullBundle = process.env.FULL_BUNDLE === "1"
-const hasFlag = (func: AppFunc): boolean => {
-  if (fullBundle && func === AppFunc.ThinShell) return false
-  return !!(SUPPORTED_MODES[func] & modeNum)
-}
+// FullBundle ships the complete local bundle: a thin shell is simply the
+// absence of FullBundle (GuiMobile only), so full builds write the full
+// public/ instead of the thin boot set, and UPDATE_BASE empties so the build
+// carries every chunk and never fetches remotely. Default-on for web-local
+// (`bun dev` — a full self-contained bundle that updates from itself),
+// web-remote (the SW serves the whole public/) and gui-desktop (read-only
+// install payload); gui-mobile stays thin-shell + remote update.
+const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
+const fullBundle = hasFlag(AppFunc.FullBundle)
 
 // The remote deployment of public/ that fetch transports pull the live editor
 // from (Part C.1). Defaults to the GitHub Pages live URL, mode-aware so a
@@ -64,7 +64,7 @@ const MODE_UPDATE_SUBDIR: Partial<Record<BuildMode, string>> = {
   [BuildMode.GuiDesktop]: "/desktop",
   [BuildMode.GuiMobile]: "/mobile",
 }
-// An explicit UPDATE_BASE always wins (per-mode CI override). FULL_BUNDLE
+// An explicit UPDATE_BASE always wins (per-mode CI override). FullBundle
 // overrides both: an empty base disables the fetch updater entirely.
 const UPDATE_BASE = (
   fullBundle ? "" : process.env.UPDATE_BASE || `${LIVE_BASE}${MODE_UPDATE_SUBDIR[modeNum] ?? ""}`
@@ -97,8 +97,13 @@ const context = {
   icons: icons as Record<string, string>,
   mobileCss: hasFlag(AppFunc.MobileCss),
   toolbarQuickNav: hasFlag(AppFunc.ToolbarQuickNav),
-  thinShell: hasFlag(AppFunc.ThinShell),
-  fullBundle,
+  thinShell: !fullBundle,
+  mobileDock: hasFlag(AppFunc.MobileDock),
+  // The dock layout replaces the desktop chrome (sidebar + meta aside) only on
+  // gui-mobile. Web-local ships the dock markup too, but keeps sidebar/meta so
+  // the desktop viewport (mobileDock off at runtime) shows the full chrome.
+  dockReplacesChrome: modeNum === BuildMode.GuiMobile,
+  webAdaptive: modeNum === BuildMode.WebLocal,
 }
 
 const html = renderShell(eta, templatesSrc, context as Record<string, unknown>)
@@ -107,13 +112,16 @@ writeFileSync(join(publicDir, "index.html"), html)
 const styleFlags = {
   BUILD_MODE: modeStr,
   mobileCss: hasFlag(AppFunc.MobileCss),
+  mobileDock: hasFlag(AppFunc.MobileDock),
+  dockReplacesChrome: modeNum === BuildMode.GuiMobile,
+  webAdaptive: modeNum === BuildMode.WebLocal,
 }
 compileStyles(eta, templatesSrc, join(root, "src", "eta", "styles"), styleFlags)
 
 const templateCount = compileAll(templatesSrc, join(root, "src", "eta"), {
   desktopBridge: hasFlag(AppFunc.DesktopBridge),
   mobileBridge: hasFlag(AppFunc.MobileBridge),
-  thinShell: hasFlag(AppFunc.ThinShell),
+  thinShell: !fullBundle,
 })
 if (templateCount > 0) console.log(`[build] Compiled ${templateCount} runtime template(s)`)
 
@@ -221,13 +229,14 @@ if (!renderTemplates) {
     })
     writeFileSync(join(publicDir, "sw.js"), swJs)
 
-    // Thin-shell install set: the read-only GuiDesktop ship. Must run after
+    // Thin-shell install set (a non-FullBundle build — GuiMobile): the core
+    // boot set only, fetched editor is downloaded on first run. Must run after
     // generateSWFiles() so manifest.json/sw-assets.js carry this build's data.
-    // FULL_BUNDLE builds ship the complete public/ instead (all chunks served
-    // locally from the APK, no updater).
-    if (hasFlag(AppFunc.ThinShell)) {
+    // FullBundle builds ship the complete public/ instead (all chunks served
+    // locally, no updater).
+    if (!fullBundle) {
       writeThinShell(publicDir, join(root, "dist"))
-    } else if (fullBundle) {
+    } else {
       writeFullBundle(publicDir, join(root, "dist"))
     }
   }

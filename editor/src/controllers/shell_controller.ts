@@ -146,7 +146,8 @@ export default class extends Controller {
         this.view.switchTo(view)
       }),
       appEvents.on(AppEvent.SourceModeToggled, () => {
-        this.editor.toggleSourceMode()
+        const source = this.editor.toggleSourceMode()
+        appEvents.emit(AppEvent.SourceModeChanged, { source })
       }),
       appEvents.on(AppEvent.SourceApplyRequested, ({ path, content }) => {
         this.cache.flushCurrentFile(path, content)

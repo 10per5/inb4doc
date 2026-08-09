@@ -18,13 +18,12 @@ const ETA_OUT = join(root, "src", "eta")
 // non-thin register entry).
 const modeStr = process.env.BUILD_MODE || "web-local"
 const modeNum = NAME_TO_BUILD_MODE[modeStr] ?? BuildMode.WebLocal
-// Same FULL_BUNDLE override as build.ts: force ThinShell off so .eta recompiles
-// agree with the spawned build (dev spawns build.ts --watch with process.env).
-const fullBundle = process.env.FULL_BUNDLE === "1"
-const hasFlag = (func: AppFunc): boolean => {
-  if (fullBundle && func === AppFunc.ThinShell) return false
-  return !!(SUPPORTED_MODES[func] & modeNum)
-}
+// Same flag logic as build.ts: a thin shell is simply the absence of FullBundle
+// (GuiMobile only), so .eta recompiles agree with the spawned build (dev spawns
+// build.ts --watch with process.env). FullBundle defaults on for web-local
+// (`bun dev`), web-remote and gui-desktop.
+const hasFlag = (func: AppFunc): boolean => !!(SUPPORTED_MODES[func] & modeNum)
+const fullBundle = hasFlag(AppFunc.FullBundle)
 
 // ── Leftover-process guard ───────────────────────────────────────────
 // A stale `build.ts --watch` / `serve.ts` / `dev.ts` left over from a previous
@@ -183,7 +182,7 @@ watch(TEMPLATES_DIR, { recursive: true }, (_event, filename) => {
     compileAll(TEMPLATES_DIR, ETA_OUT, {
       desktopBridge: hasFlag(AppFunc.DesktopBridge),
       mobileBridge: hasFlag(AppFunc.MobileBridge),
-      thinShell: hasFlag(AppFunc.ThinShell),
+      thinShell: !fullBundle,
     })
   }, 200)
 })
