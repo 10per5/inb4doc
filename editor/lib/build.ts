@@ -103,7 +103,7 @@ const context = {
   // gui-mobile. Web-local ships the dock markup too, but keeps sidebar/meta so
   // the desktop viewport (mobileDock off at runtime) shows the full chrome.
   dockReplacesChrome: modeNum === BuildMode.GuiMobile,
-  webAdaptive: modeNum === BuildMode.WebLocal,
+  webAdaptive: modeNum === BuildMode.WebLocal || modeNum === BuildMode.WebRemote,
 }
 
 const html = renderShell(eta, templatesSrc, context as Record<string, unknown>)
@@ -114,7 +114,7 @@ const styleFlags = {
   mobileCss: hasFlag(AppFunc.MobileCss),
   mobileDock: hasFlag(AppFunc.MobileDock),
   dockReplacesChrome: modeNum === BuildMode.GuiMobile,
-  webAdaptive: modeNum === BuildMode.WebLocal,
+  webAdaptive: modeNum === BuildMode.WebLocal || modeNum === BuildMode.WebRemote,
 }
 compileStyles(eta, templatesSrc, join(root, "src", "eta", "styles"), styleFlags)
 
