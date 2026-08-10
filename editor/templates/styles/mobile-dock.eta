@@ -103,6 +103,23 @@
   background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border);
   padding-bottom: env(safe-area-inset-bottom, 0);
+  --kb-offset: 0px;
+}
+
+/* On-screen keyboard (mobile): when the visual viewport shrinks, DockController
+ * sets --kb-offset on #dock and toggles .kb-open. Lift only the editing chrome
+ * (edit toolbar + FAB + its popup anchor) above the keyboard — the rest of the
+ * dock stays pinned to the bottom. */
+#dock.kb-open #edit-toolbar {
+  transform: translateY(calc(-1 * var(--kb-offset)));
+}
+
+#dock.kb-open .dock-item--fab {
+  transform: translateY(calc(-12px - var(--kb-offset)));
+}
+
+#dock.kb-open .dock-fab-menu-anchor {
+  bottom: calc(56px + var(--kb-offset));
 }
 
 .dock {

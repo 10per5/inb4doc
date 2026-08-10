@@ -5,6 +5,7 @@ import * as icons from "@/eta/icons"
 import renderDock from "@/eta/views/controller/dock"
 import { Menu } from "@/components/ui/menu"
 import { menuRegistry } from "@/config/menu-definitions"
+import { trackKeyboardOffset } from "@/utils/mobile"
 import type { ViewType } from "@/services/view-controller"
 
 export default class DockController extends Controller {
@@ -16,6 +17,7 @@ export default class DockController extends Controller {
 
   private currentView: ViewType = "editor"
   private unsubs: (() => void)[] = []
+  private stopKeyboardTrack: (() => void) | null = null
   private insertMenu: Menu | null = null
 
   connect(): void {
@@ -37,10 +39,19 @@ export default class DockController extends Controller {
       }),
       dockStore.subscribe((item) => this.setActiveItem(item)),
     )
+    // Lift the FAB and edit-toolbar above the on-screen keyboard when it opens.
+    this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
+      const el = this.element as HTMLElement
+      const kb = offset > 0
+      el.classList.toggle("kb-open", kb)
+      el.style.setProperty("--kb-offset", `${offset}px`)
+    })
     this.setActiveItem(dockStore.getActive())
   }
 
   disconnect(): void {
+    this.stopKeyboardTrack?.()
+    this.stopKeyboardTrack = null
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
     this.insertMenu?.destroy()
