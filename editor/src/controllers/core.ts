@@ -1,5 +1,6 @@
 import { Application, type Controller } from "@hotwired/stimulus"
 import { hasFunc, AppFunc } from "$/build/build-mode"
+import { isMobileDock } from "@/utils/mobile"
 
 import ShellController from "./shell_controller"
 import TopbarController from "./topbar-controller"
@@ -34,6 +35,9 @@ const coreRegistrations: ControllerRegistration[] = [
   { name: "dir-index-empty", controller: DirIndexEmptyController },
   { name: "disk-usage", controller: DiskUsageController },
   { name: "meta-panel", controller: MetaPanelController },
+  // The navigation fullview (reused sidebar) is a screen on every platform:
+  // mobile via the dock, tablet/desktop via View → Screens → Navigation.
+  { name: "navigation", controller: NavigationController },
   { name: "update", controller: UpdateController },
 ]
 
@@ -49,11 +53,10 @@ export function registerCoreControllers(app: Application): void {
     app.register("updater-loader", UpdaterLoaderController)
   }
   // Mobile bottom dock + its fullviews. The dock mount (shell.eta) and the
-  // fullview elements (view-controller) only exist when MobileDock is active,
-  // so the eager boot set stays desktop-free on web builds.
-  if (hasFunc(AppFunc.MobileDock)) {
+  // fullview elements (view-controller) only exist when the dock layout is
+  // active, so the eager boot set stays desktop-free on web builds.
+  if (isMobileDock()) {
     app.register("dock", DockController)
-    app.register("navigation", NavigationController)
     app.register("more", MoreController)
     app.register("edit-toolbar", EditToolbarController)
   }

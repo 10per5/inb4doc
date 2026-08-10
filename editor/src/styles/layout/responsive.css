@@ -9,16 +9,6 @@
  *   Desktop: ≥ 1200px
  */
 
-/* ── Panel Visibility Classes ──────────────────────────────────────── */
-
-.panel-hidden {
-  display: none !important;
-}
-
-.panel-visible {
-  display: flex !important;
-}
-
 /* ── Mobile Optimizations (< 768px) ────────────────────────────────── */
 
 @media (max-width: 767px) {

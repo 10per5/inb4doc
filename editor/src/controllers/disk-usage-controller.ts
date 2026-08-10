@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import * as icons from "@/eta/icons"
-import { hasFunc, AppFunc } from "$/build/build-mode"
+import { isMobileDock } from "@/utils/mobile"
 import { formatBytes } from "@/utils/format"
 import type { TreeIndex } from "@/utils/tree"
 import { appEvents, AppEvent } from "@/stores/app-events"
@@ -40,7 +40,7 @@ export default class DiskUsageController extends Controller {
   load(data: DiskUsageData): void {
     this.diskUsageData = data;
     this.currentMode = "dir";
-    const mobile = hasFunc(AppFunc.MobileDock);
+    const mobile = isMobileDock();
     this.element.innerHTML = renderDiskUsage({
       icons: icons as Record<string, string>,
       renderScreen,
@@ -52,7 +52,7 @@ export default class DiskUsageController extends Controller {
 
   close(): void {
     appEvents.emit(AppEvent.ViewChanged, {
-      view: hasFunc(AppFunc.MobileDock) ? "more" : "editor",
+      view: isMobileDock() ? "more" : "editor",
     });
   }
 

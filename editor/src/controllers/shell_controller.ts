@@ -14,6 +14,7 @@ import { UIService } from "@/stores/ui-store";
 import type { EditorController } from "@/controllers/editor-controller";
 import { FileSyncService } from "@/services/file-sync-service";
 import { ViewController } from "@/services/view-controller";
+import { LayoutService } from "@/services/layout-service";
 import { NavigationService } from "@/services/navigation-service";
 import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
@@ -33,7 +34,7 @@ import { changesScreenStore } from "@/stores/changes-screen-store";
 import { PendingOpType } from "@/entities/PendingOps";
 import { updateEditorTint } from "@/services/file-status-tint";
 import { storageService } from "@/services/storage";
-import { hasFunc, AppFunc } from "$/build/build-mode";
+import { isMobileDock } from "@/utils/mobile";
 
 let sessionStarted = 0;
 
@@ -82,6 +83,9 @@ export default class extends Controller {
     this.cache = new FileSyncService(this.editor as any)
     this.view = new ViewController(this.editor as any, sessionStarted)
     this.nav = new NavigationService(this.editor as any, this.cache)
+    // Apply the boot layout preset (focused by default) so the View-menu panel
+    // toggles are in effect from first paint.
+    LayoutService.getInstance()
 
     this.editor.setCurrentPath(this.initialPath)
     this.cache.setCurrentPath(this.initialPath)
@@ -94,7 +98,7 @@ export default class extends Controller {
       appEvents.on(AppEvent.FlushComplete, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.ModulesSwapped, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.PrefsOpened, async () => {
-        if (hasFunc(AppFunc.MobileDock)) {
+        if (isMobileDock()) {
           this.view.switchTo("prefs")
           return
         }
@@ -105,7 +109,7 @@ export default class extends Controller {
         this.toolbarStore!.setStickyPreference(sticky)
       }),
       appEvents.on(AppEvent.ImageManagerOpened, async () => {
-        if (hasFunc(AppFunc.MobileDock)) {
+        if (isMobileDock()) {
           this.view.switchTo("images")
           return
         }
@@ -113,7 +117,7 @@ export default class extends Controller {
         openImageManagerDialog()
       }),
       appEvents.on(AppEvent.DirtyClicked, async () => {
-        if (hasFunc(AppFunc.MobileDock)) {
+        if (isMobileDock()) {
           const data = await this.cache.buildChangesData();
           if (!data) return;
           changesScreenStore.set(data);
@@ -128,7 +132,6 @@ export default class extends Controller {
       }),
       appEvents.on(AppEvent.LoadRequested, () => this.handleLoadZip()),
       appEvents.on(AppEvent.SidebarToggle, () => this.uiService.toggleSidebar()),
-      appEvents.on(AppEvent.MetaPanelToggle, () => this.uiService.toggleMetaPanel()),
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
       appEvents.on(AppEvent.OpenProjectRequested, () => this.nav.openProject()),
       appEvents.on(AppEvent.RecentProjectRequested, ({ path }) => this.nav.openProject(path)),

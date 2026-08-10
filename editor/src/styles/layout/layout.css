@@ -2,8 +2,8 @@
  * The structural layout (grid, sidebar/toolbar/aside sizing, #editor-area)
  * lives in lib/style/layout.css — a build-time asset inlined into <head>
  * by lib/build.ts so skeletons fill their slots before app.css arrives.
- * This file keeps only runtime-only behaviors: mobile drawers, tablet
- * panel overlay, Milkdown content sizing, and print styles.
+ * This file keeps only runtime-only behaviors: mobile drawers, Milkdown
+ * content sizing, and print styles.
  */
 
 /* Mobile: sidebar as slide-in drawer */
@@ -63,41 +63,6 @@
   height: 50px;
   position: relative;
   line-height: 1.6;
-}
-
-/* ── Meta Panel (Right Sidebar) ────────────────────────────────────── */
-
-/* Hide meta panel on tablet and below by default */
-@media (max-width: 1199px) {
-  .book-aside {
-    display: none;
-  }
-
-  .book-aside.panel-visible {
-    display: flex;
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: 280px;
-    z-index: 100;
-    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .book-aside-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 99;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-
-  .book-aside-backdrop.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 /* ── Print Styles ──────────────────────────────────────────────────── */

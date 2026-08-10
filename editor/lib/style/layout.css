@@ -153,7 +153,9 @@ body {
   width: 100%;
   position: sticky;
   top: 0;
-  z-index: 10;
+  /* Above the fullview screens (.fullview-view, z-index 60) so the open View /
+     File dropdowns are never covered by a center screen like the meta panel. */
+  z-index: 70;
   align-self: flex-start;
 }
 
@@ -170,4 +172,26 @@ body {
   overflow-y: auto;
   display: var(--aside-visibility);
   flex-direction: column;
+}
+
+/* ── Runtime panel visibility (View-dropdown layout toggles) ────────
+ * The View menu drives body classes; these overrides let the in-flow
+ * columns be toggled off at tablet/desktop widths while leaving the
+ * mobile drawer path (max-width:767px) untouched. */
+@media (min-width: 768px) {
+  body.layout-nav-off .book-menu {
+    display: none;
+  }
+}
+
+@media (min-width: 1200px) {
+  body.layout-meta-off .book-aside {
+    display: none;
+  }
+}
+
+/* Focused mode: neither panel on → the editor spans the content column
+ * (no 800px cap). Specificity beats the media-query #editor-area rule. */
+body.layout-focus #editor-area {
+  max-width: 100%;
 }

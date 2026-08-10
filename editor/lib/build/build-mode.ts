@@ -63,10 +63,11 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   // SAF (Storage Access Framework) content provider over the Android bridge.
   [AppFunc.SafProvider]: BuildMode.GuiMobile,
   // Mobile bottom dock + context-aware editing toolbar. Native mobile host is
-  // the primary target. WebLocal ships the dock markup/CSS for the local
-  // dev/test mode, but the runtime hasFunc() gate turns it on only for a mobile
-  // viewport/UA (see hasFunc) — desktop stays desktop by default. WebRemote
-  // (the live site) and GuiDesktop stay desktop.
+  // the primary target. WebLocal/WebRemote ship the dock markup/CSS for phone
+  // testing, but the runtime isMobileDock() check engages it only on a mobile
+  // viewport — desktop stays desktop by default. GuiDesktop stays desktop.
+  // Build-time hasFlag(MobileDock) still covers the web modes so the markup
+  // ships; runtime consumers call isMobileDock() explicitly.
   [AppFunc.MobileDock]:
     BuildMode.GuiMobile | BuildMode.WebLocal | BuildMode.WebRemote,
   // Build-time-only packaging flag: ship the complete local bundle (no thin
@@ -96,30 +97,9 @@ export function currentBuildMode(): BuildMode {
   return getCurrentMode();
 }
 
-const MOBILE_VIEWPORT_MQ = "(max-width: 767px)";
-
-// Web-local is the local dev/test mode, not a mobile target: the dock layout
-// engages only on a mobile viewport OR a mobile UA (phone in landscape), so
-// desktop browsers keep the desktop chrome by default. Must mirror the inline
-// pre-paint script in shell.eta (mobile-layout/desktop-layout classes).
-export function isMobileViewport(): boolean {
-  if (typeof window === "undefined" || typeof navigator === "undefined")
-    return false;
-  if (window.matchMedia(MOBILE_VIEWPORT_MQ).matches) return true;
-  return /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(
-    navigator.userAgent
-  );
-}
-
 // A thin shell is simply the absence of FullBundle (GuiMobile only).
 export function hasFunc(func: AppFunc): boolean {
-  const mode = getCurrentMode();
-  // Web-local responsive-web (Part F): the dock layout is UA/viewport-gated,
-  // not enabled by default — desktop stays desktop, mobile gets the dock.
-  if (func === AppFunc.MobileDock) {
-    return isMobileViewport();
-  }
-  return !!(SUPPORTED_MODES[func] & mode);
+  return !!(SUPPORTED_MODES[func] & getCurrentMode());
 }
 
 // Updater transport selection (Part C). The updater core
