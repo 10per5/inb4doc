@@ -133,6 +133,8 @@ bun lib/dev.ts       # Dev server: Farm watch build + static serve + eta recompi
 bun --bun tsc --noEmit # TypeScript check
 ```
 
+**Never run `bun lib/dev.ts` and `bun lib/build.ts` concurrently in the same repo.** The developer runs `bun dev` concurrently most of the time, so stale-chunk symptoms are usually caused by that, not by the build itself. Both write `public/assets/sw-assets.js` and `public/assets/manifest.json`, and the dev watch server regenerates them from its own (incremental, stale-accumulating) chunk graph — a production build run alongside a dev server gets clobbered with stale chunk entries. The symptom is old chunk filenames (e.g. a deleted controller's `changes-dialog-*.js`) lingering in the manifest's `AFFECTED_BY` / `COLD_ON_CHANGE` maps (the runtime `chunkMap` stays clean, so lazy loading still works). If a `manifest.json` / `sw-assets.js` check turns up stale names, first stop the dev server, then delete `node_modules/.farm` (Farm's persistent cache is the other source of stale resources) and rebuild once. Don't chase the stale map entries as a code bug — verify the runtime `chunkMap` and the actual chunk files instead.
+
 ### Build Mode and AppFunc
 
 - `BuildMode` is the deployment target: `web-remote`, `web-local`, `gui-desktop`, `gui-mobile`.

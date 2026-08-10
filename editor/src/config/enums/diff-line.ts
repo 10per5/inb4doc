@@ -1,5 +1,5 @@
 /**
- * Diff line types used in external-change-dialog.ts and changes-dialog.ts
+ * Diff line types used in external-change-dialog.ts and changes-controller.ts
  * for rendering line-by-line comparisons.
  */
 export enum DiffLineType {

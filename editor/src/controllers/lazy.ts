@@ -8,12 +8,13 @@ import { CreateDialogController } from "./dialog/create-dialog-controller"
 import { LinkDialogController } from "./dialog/link-dialog-controller"
 import { VideoDialogController } from "./dialog/video-dialog-controller"
 import { HugoRefDialogController } from "./dialog/hugoref-dialog-controller"
-import { PrefsDialogController } from "./dialog/prefs-dialog-controller"
 import { ImportZipDialogController } from "./dialog/import-zip-dialog-controller"
-import { ImageManagerDialogController } from "./dialog/image-manager-dialog-controller"
-import { ChangesDialogController } from "./dialog/changes-dialog-controller"
 import { ExternalChangeDialogController } from "./dialog/external-change-dialog-controller"
 import { ProviderDialogController } from "./dialog/provider-dialog-controller"
+
+import PrefsController from "./prefs-controller"
+import ImageManagerController from "./image-manager-controller"
+import ChangesController from "./changes-controller"
 
 import type { ControllerRegistration } from "./core"
 
@@ -32,10 +33,10 @@ const lazyRegistrations: ControllerRegistration[] = [
   { name: "link-dialog", controller: LinkDialogController },
   { name: "video-dialog", controller: VideoDialogController },
   { name: "hugoref-dialog", controller: HugoRefDialogController },
-  { name: "prefs-dialog", controller: PrefsDialogController },
+  { name: "prefs", controller: PrefsController },
   { name: "import-zip-dialog", controller: ImportZipDialogController },
-  { name: "image-manager-dialog", controller: ImageManagerDialogController },
-  { name: "changes-dialog", controller: ChangesDialogController },
+  { name: "image-manager", controller: ImageManagerController },
+  { name: "changes", controller: ChangesController },
   { name: "external-change-dialog", controller: ExternalChangeDialogController },
   { name: "provider-dialog", controller: ProviderDialogController },
 ]

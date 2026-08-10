@@ -29,6 +29,7 @@ import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
+import { changesScreenStore } from "@/stores/changes-screen-store";
 import { PendingOpType } from "@/entities/PendingOps";
 import { updateEditorTint } from "@/services/file-status-tint";
 import { storageService } from "@/services/storage";
@@ -97,7 +98,7 @@ export default class extends Controller {
           this.view.switchTo("prefs")
           return
         }
-        const { openPrefsDialog } = await import("@/controllers/dialog/prefs-dialog")
+        const { openPrefsDialog } = await import("@/controllers/prefs-controller")
         openPrefsDialog()
       }),
       appEvents.on(AppEvent.StickyPreferenceChanged, ({ sticky }) => {
@@ -108,10 +109,19 @@ export default class extends Controller {
           this.view.switchTo("images")
           return
         }
-        const { openImageManagerDialog } = await import("@/controllers/dialog/image-manager-dialog")
+        const { openImageManagerDialog } = await import("@/controllers/image-manager-controller")
         openImageManagerDialog()
       }),
-      appEvents.on(AppEvent.DirtyClicked, () => this.cache.handleDirtyClick()),
+      appEvents.on(AppEvent.DirtyClicked, async () => {
+        if (hasFunc(AppFunc.MobileDock)) {
+          const data = await this.cache.buildChangesData();
+          if (!data) return;
+          changesScreenStore.set(data);
+          this.view.switchTo("changes");
+          return;
+        }
+        this.cache.handleDirtyClick();
+      }),
       appEvents.on(AppEvent.SingleDiscardRequested, ({ path }) => this.cache.discardFileChanges(path)),
       appEvents.on(AppEvent.SaveRequested, () => {
         exportToZip().then(() => this.nav.loadSidebar())

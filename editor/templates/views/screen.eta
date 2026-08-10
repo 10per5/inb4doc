@@ -1,6 +1,6 @@
 <div class="screen<%= it.className ? " " + it.className : "" %>">
   <header class="screen-header">
-    <h1 class="screen-title"><%= it.title %></h1>
+    <h1 class="screen-title"<%~ it.titleTarget ?? "" %>><%= it.title %></h1>
     <button type="button" class="screen-close" data-action="<%= it.closeAction %>" aria-label="<%= it.closeLabel %>">
       <% if (it.closeIcon === "back") { %><%~ it.icons.arrowLeft %><% } else { %><%~ it.icons.xmark %><% } %>
     </button>

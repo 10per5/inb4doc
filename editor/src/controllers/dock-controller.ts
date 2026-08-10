@@ -114,6 +114,7 @@ function viewToDockItem(view: ViewType): DockItem {
     case "disk-usage":
     case "prefs":
     case "images":
+    case "changes":
       return "more"
     default:
       return "editor"

@@ -2,6 +2,6 @@
   <div class="inb4doc-window-header"><%= it.title %><% if (it.dir) { %> <span style="font-weight:400;font-size:0.9rem;color:var(--color-text-tertiary)">— <%= it.dir %></span><% } %></div>
   <div class="inb4doc-window-body"><%~ it.rows %></div>
   <div class="inb4doc-window-actions">
-    <button class="inb4doc-btn" data-action="click->image-manager-dialog#close">Close</button>
+    <button class="inb4doc-btn" data-action="click->image-manager#close">Close</button>
   </div>
 </div>

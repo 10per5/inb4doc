@@ -1,6 +1,6 @@
 <%~ it.renderScreen({
   title: "Preferences",
-  closeAction: "click->prefs-screen#close",
+  closeAction: "click->prefs#close",
   closeLabel: "Back to more",
   closeIcon: "back",
   icons: it.icons,

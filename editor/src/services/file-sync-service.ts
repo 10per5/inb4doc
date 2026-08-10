@@ -5,7 +5,10 @@ import {
 } from "@/entities/Frontmatter";
 import {
   type ChangesDialogItem,
-} from "@/controllers/dialog/changes-dialog";
+  type ChangesDialogActions,
+} from "@/controllers/changes-controller";
+import { colors } from "@/config/theme";
+import { formatBytes } from "@/utils/format";
 import { pagesStore } from "@/stores/page-store";
 import {
   PendingOps,
@@ -32,6 +35,18 @@ import type { EditorController } from "@/controllers/editor-controller";
 export interface SearchMatch {
   path: string;
   snippets: string[];
+}
+
+function enrichChangesItems(items: ChangesDialogItem[]): ChangesDialogItem[] {
+  return items.map((c) => {
+    if (c.size === undefined) return { ...c };
+    const size = c.size;
+    return {
+      ...c,
+      sizeStr: formatBytes(size),
+      sizeColor: size > 0 ? colors.green : size < 0 ? colors.danger : colors.teal,
+    };
+  });
 }
 
 export class FileSyncService {
@@ -716,9 +731,59 @@ export class FileSyncService {
 
   // ── Changes dialog ──
 
-  async handleDirtyClick(): Promise<void> {
-    if (this.pendingOps.count === 0) return;
+  async buildChangesData(): Promise<{ items: ChangesDialogItem[]; currentPath: string; actions: ChangesDialogActions } | null> {
+    if (this.pendingOps.count === 0) return null;
 
+    const provider = getProvider();
+    const items = await this.buildChangesItems();
+    if (items.length === 0) return null;
+
+    return {
+      items,
+      currentPath: this.currentPath,
+      actions: {
+        onApprove: (path) => {
+          this.approveOp(path).catch(() => {});
+        },
+        onReject: (path) => {
+          this.rejectOp(path).catch(() => {});
+        },
+        onLoadOriginal: async (path) => {
+          const page = repo.getOrCreate(path);
+          if (page.bodyState.baseline !== undefined) {
+            if (page.originalFrontmatter) {
+              return (
+                "---\n" +
+                page.originalFrontmatter.serialize() +
+                "\n---\n\n" +
+                page.bodyState.baseline
+              );
+            }
+            return page.bodyState.baseline;
+          }
+          return (await provider?.readFile(path)) || "";
+        },
+        onFlushAll: () => this.flushDirtyFiles(),
+        onDiscardAll: async () => {
+          this.clearPendingOps();
+          await imageService.removeAllForDir(imageService.getCurrentDocDir());
+          this.recomputeDirty();
+          appEvents.emit(AppEvent.SidebarReload);
+          showNotification("All changes discarded", { type: "warning" });
+          await this.reloadCurrentFromDisk(this.currentPath);
+        },
+      },
+    };
+  }
+
+  async handleDirtyClick(): Promise<void> {
+    const data = await this.buildChangesData();
+    if (!data) return;
+    const { openChangesDialog } = await import("@/controllers/changes-controller");
+    openChangesDialog(data.items, data.currentPath, data.actions, () => {});
+  }
+
+  private async buildChangesItems(): Promise<ChangesDialogItem[]> {
     const provider = getProvider();
     const items: ChangesDialogItem[] = [];
 
@@ -841,46 +906,7 @@ export class FileSyncService {
       }
     }
 
-    if (items.length === 0) return;
-
-    const { openChangesDialog } = await import("@/controllers/dialog/changes-dialog");
-    openChangesDialog(
-      items,
-      this.currentPath,
-      {
-        onApprove: (path) => {
-          this.approveOp(path).catch(() => {});
-        },
-        onReject: (path) => {
-          this.rejectOp(path).catch(() => {});
-        },
-        onLoadOriginal: async (path) => {
-          const page = repo.getOrCreate(path);
-          if (page.bodyState.baseline !== undefined) {
-            if (page.originalFrontmatter) {
-              return (
-                "---\n" +
-                page.originalFrontmatter.serialize() +
-                "\n---\n\n" +
-                page.bodyState.baseline
-              );
-            }
-            return page.bodyState.baseline;
-          }
-          return (await provider?.readFile(path)) || "";
-        },
-        onFlushAll: () => this.flushDirtyFiles(),
-        onDiscardAll: async () => {
-          this.clearPendingOps();
-          await imageService.removeAllForDir(imageService.getCurrentDocDir());
-          this.recomputeDirty();
-          appEvents.emit(AppEvent.SidebarReload);
-          showNotification("All changes discarded", { type: "warning" });
-          await this.reloadCurrentFromDisk(this.currentPath);
-        },
-      },
-      () => {}
-    );
+    return enrichChangesItems(items);
   }
 }
 

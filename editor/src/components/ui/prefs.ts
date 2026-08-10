@@ -3,9 +3,9 @@ import { prefsStore } from "@/stores/preferences-store"
 import { appEvents, AppEvent } from "@/stores/app-events"
 
 /**
- * Shared preferences handlers — used by both the desktop dialog
- * (prefs-dialog-controller) and the mobile prefs screen
- * (prefs-screen-controller). Each controller wires these to its own
+ * Shared preferences handlers — used by both the desktop dialog and the
+ * mobile prefs screen (one controller per feature: PrefsController renders
+ * either from the payload presence). The controller wires these to its own
  * Stimulus change actions.
  */
 export function onPrefsStickyChanged(sticky: boolean): void {

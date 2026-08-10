@@ -227,20 +227,6 @@ menuRegistry.register("add-block", (): MenuItem[] => [
     ],
   },
   {
-    type: MenuType.Item,
-    id: "blockquote",
-    icon: quote,
-    label: "Blockquote",
-    onClick: () => emitInsertBlockCommand(SlashCommand.Blockquote),
-  },
-  {
-    type: MenuType.Item,
-    id: "divider",
-    icon: minus,
-    label: "Divider",
-    onClick: () => emitInsertBlockCommand(SlashCommand.ThematicBreak),
-  },
-  {
     type: MenuType.Submenu,
     id: "code",
     icon: codeBrackets,
@@ -290,6 +276,20 @@ menuRegistry.register("add-block", (): MenuItem[] => [
         onClick: () => emitInsertBlockCommand(SlashCommand.Video),
       },
     ],
+  },
+  {
+    type: MenuType.Item,
+    id: "blockquote",
+    icon: quote,
+    label: "Blockquote",
+    onClick: () => emitInsertBlockCommand(SlashCommand.Blockquote),
+  },
+  {
+    type: MenuType.Item,
+    id: "divider",
+    icon: minus,
+    label: "Divider",
+    onClick: () => emitInsertBlockCommand(SlashCommand.ThematicBreak),
   },
 ]);
 

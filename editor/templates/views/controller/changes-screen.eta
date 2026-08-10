@@ -1,0 +1,18 @@
+<%~ it.renderScreen({
+  title: it.title,
+  titleTarget: ' data-changes-target="header"',
+  closeAction: "click->changes#close",
+  closeLabel: "Back to more",
+  closeIcon: "back",
+  icons: it.icons,
+  body: `${it.rows}
+  <div class="inb4doc-changes-actions">
+    <button class="inb4doc-btn inb4doc-btn-primary" data-action="click->changes#saveAll">Save all</button>
+    <button class="inb4doc-btn inb4doc-btn-danger" data-controller="press-twice"
+      data-action="click->press-twice#click press-twice:confirm->changes#discardAll"
+      data-press-twice-idle-text-value="Discard all"
+      data-press-twice-pending-text-value="Press again"
+      data-press-twice-timeout-value="3000"
+    >Discard all</button>
+  </div>`
+}) %>
