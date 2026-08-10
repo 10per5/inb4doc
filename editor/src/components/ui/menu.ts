@@ -161,18 +161,14 @@ export class Menu {
   }
 
   open() {
-    console.log("[Menu] open start", this.panelEl ? "panel exists" : "NO PANEL", this.triggerEl ? "trigger exists" : "NO TRIGGER")
     closeAllMenus(this)
     // Re-resolve dynamic items (e.g. the Recent Projects list) so the menu is
     // fresh on every open, then apply onUpdate patches for stateful items.
     this.items = this.resolveItems()
     this.render()
-    console.log("[Menu] render done, panel innerHTML length:", this.panelEl?.innerHTML?.length, "items:", this.items?.length)
     this.refresh()
     this.positionPanel()
-    console.log("[Menu] positionPanel done, panel classes:", this.panelEl?.className, "display:", this.panelEl?.style?.display)
     this.panelEl.classList.add("open")
-    console.log("[Menu] added open class, panel open?", this.panelEl?.classList?.contains("open"))
     this.triggerEl.classList.add("is-open")
     this._isOpen = true
     openMenus.add(this)
