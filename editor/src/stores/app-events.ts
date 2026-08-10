@@ -54,6 +54,7 @@ export enum AppEvent {
   SidebarToggle = "sidebar-toggle",
   MetaPanelToggle = "meta-panel-toggle",
   PrefsOpened = "prefs-opened",
+  StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
   CreateFirstPage = "create-first-page",
   CreateDraftRequested = "create-draft-requested",
@@ -125,6 +126,7 @@ export interface AppEventPayloads {
   [AppEvent.SidebarToggle]:         void
   [AppEvent.MetaPanelToggle]:       void
   [AppEvent.PrefsOpened]:           void
+  [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void
   [AppEvent.CreateFirstPage]:       void
   [AppEvent.CreateDraftRequested]: { path: string; content: string }

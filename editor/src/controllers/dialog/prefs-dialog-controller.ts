@@ -1,12 +1,8 @@
 import type { ImageStorageMode } from "@/services/storage"
-import { prefsStore } from "@/stores/preferences-store"
 import { BaseDialogController } from "./base-dialog-controller"
+import { onPrefsStickyChanged, onPrefsDarkChanged, onPrefsImageModeChanged } from "@/components/ui/prefs"
 import renderPrefsDialog from "@/eta/views/dialog/prefs-dialog"
-
-export const PrefsDialogEvent = {
-  StickyChange:    "prefs-dialog:sticky-change",
-  ImageModeChange: "prefs-dialog:image-mode-change",
-} as const
+import renderPrefsFields from "@/eta/views/prefs-fields"
 
 export class PrefsDialogController extends BaseDialogController {
   static values = { payload: Object }
@@ -18,30 +14,25 @@ export class PrefsDialogController extends BaseDialogController {
   }
 
   connect() {
-    this.element.innerHTML = renderPrefsDialog(this.payloadValue)
+    this.element.innerHTML = renderPrefsDialog({
+      ...this.payloadValue,
+      form: renderPrefsFields({
+        ...this.payloadValue,
+        controller: "prefs-dialog",
+      }),
+    })
   }
 
   stickyChanged(e: Event) {
-    const v = (e.target as HTMLInputElement).checked
-    prefsStore.setStickyToolbar(v)
-    this.dispatch("sticky-change", { detail: v, bubbles: true })
+    onPrefsStickyChanged((e.target as HTMLInputElement).checked)
   }
 
   darkChanged(e: Event) {
-    const v = (e.target as HTMLInputElement).checked
-    prefsStore.setDarkMode(v)
-    if (v) {
-      document.documentElement.setAttribute("data-theme", "dark")
-    } else {
-      document.documentElement.removeAttribute("data-theme")
-    }
+    onPrefsDarkChanged((e.target as HTMLInputElement).checked)
   }
 
   imageModeChanged(e: Event) {
     const radio = e.target as HTMLInputElement
-    if (radio.checked) {
-      prefsStore.setImageStorageMode(radio.value as ImageStorageMode)
-      this.dispatch("image-mode-change", { detail: radio.value, bubbles: true })
-    }
+    if (radio.checked) onPrefsImageModeChanged(radio.value as ImageStorageMode)
   }
 }

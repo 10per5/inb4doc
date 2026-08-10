@@ -1,0 +1,10 @@
+<div class="screen<%= it.className ? " " + it.className : "" %>">
+  <header class="screen-header">
+    <h1 class="screen-title"><%= it.title %></h1>
+    <button type="button" class="screen-close" data-action="<%= it.closeAction %>" aria-label="<%= it.closeLabel %>">
+      <% if (it.closeIcon === "back") { %><%~ it.icons.arrowLeft %><% } else { %><%~ it.icons.xmark %><% } %>
+    </button>
+  </header>
+  <div class="screen-body"><%~ it.body %></div>
+  <footer class="screen-footer"<%= it.bottom ? "" : " hidden" %>><%~ it.bottom ?? "" %></footer>
+</div>

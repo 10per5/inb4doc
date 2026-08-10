@@ -1,0 +1,67 @@
+/* ── Screen layout (shared fullview chrome) ────────────────────────────
+ * The screen shell used by mobile subscreens (Disk Stats, Meta, Preferences,
+ * Image Manager, More). Works both inside an absolutely-positioned
+ * .fullview-view and inside a block-level container (desktop disk usage).
+ * Header/body/footer slot styles replace the old .fullview-* classes. */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: 48px;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.screen-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.screen-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.screen-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.screen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.screen-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.screen-footer[hidden] {
+  display: none;
+}
+
+/* Desktop: the meta panel lives in the aside (no close button needed). */
+.book-aside .screen-header {
+  display: none;
+}

@@ -1,9 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { github } from "@/eta/icons"
+import * as icons from "@/eta/icons"
+import { hasFunc, AppFunc } from "$/build/build-mode"
 import { pagesStore } from "@/stores/page-store"
 import { getCurrentPath } from "@/utils/url"
 import { MetaPanelUI } from "./meta-panel"
+import { renderScreen } from "@/eta/views/screen"
 import renderMetaPanel from "@/eta/views/controller/meta-panel"
 import type { EditorController } from "@/controllers/editor-controller"
 
@@ -71,11 +73,24 @@ export default class extends Controller {
   }
 
   load(): void {
-    this.element.innerHTML = renderMetaPanel({ github })
+    const mobile = hasFunc(AppFunc.MobileDock)
+    this.element.innerHTML = renderMetaPanel({
+      icons: icons as Record<string, string>,
+      github: icons.github,
+      renderScreen,
+      backIcon: mobile ? "back" : "xmark",
+      backLabel: mobile ? "Back to more" : "Close meta panel",
+    })
     this.ui = new MetaPanelUI(this.element as HTMLElement, () => this.notify())
     const data = pagesStore.get(getCurrentPath())?.getFrontmatter()
     this.ui.update(data ?? { title: "" })
     this.renderOutline()
+  }
+
+  close(): void {
+    appEvents.emit(AppEvent.ViewChanged, {
+      view: hasFunc(AppFunc.MobileDock) ? "more" : "editor",
+    })
   }
 
   addField() {
@@ -110,6 +125,7 @@ export default class extends Controller {
   }
 
   private renderOutline(): void {
+    if (!this.element.querySelector(".meta-outline-section")) return
     const outline = this.editor()?.getOutline() ?? []
     this.outlineSectionTarget.hidden = outline.length === 0
     this.outlineTarget.innerHTML = outline

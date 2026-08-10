@@ -97,6 +97,26 @@
   .toolbar-spacer {
     flex-basis: auto;
   }
+
+  /* Disk usage — stack chart over legend, shrink pie to fit narrow screens */
+  .disk-usage-content {
+    padding: 0.75rem 1rem;
+  }
+
+  .disk-usage-chart-area {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .disk-usage-legend {
+    width: 100%;
+    flex: none;
+  }
+
+  .disk-usage-pie {
+    width: 180px;
+    height: 180px;
+  }
 }
 
 /* ── Tablet Optimizations (768px - 1199px) ────────────────────────── */

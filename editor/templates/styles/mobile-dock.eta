@@ -219,7 +219,8 @@
   line-height: 1;
 }
 
-/* Fullview views occupy the editor area above the dock */
+/* Fullview views occupy the editor area above the dock. The inner header/
+ * body/footer slots live in src/styles/ui/screen.css (.screen-*). */
 .fullview-view {
   position: absolute;
   inset: 0;
@@ -228,53 +229,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.fullview-inner {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.fullview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  height: 48px;
-  padding: 0 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.fullview-title {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.fullview-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: none;
-  border: none;
-  border-radius: 8px;
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
-.fullview-close svg {
-  width: 20px;
-  height: 20px;
-}
-
-.fullview-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 /* Sidebar content reused as the navigation fullview */
@@ -336,28 +290,6 @@
 .more-item .more-chevron svg {
   width: 16px;
   height: 16px;
-}
-
-/* More sheet: slides up from the bottom, above the editor area */
-.more-view {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: auto;
-  height: 62%;
-  min-height: 320px;
-  z-index: 70;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-}
-
-/* Meta panel fullview: match the desktop aside column width */
-.meta-view {
-  padding: 1rem;
-  overflow-y: auto;
 }
 
 /* Edit toolbar: context-aware strip between the editor and the dock */

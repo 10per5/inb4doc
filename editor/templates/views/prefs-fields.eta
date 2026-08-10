@@ -1,0 +1,23 @@
+<div class="inb4doc-prefs-fields">
+  <label>
+    <input type="checkbox" id="inb4doc-sticky-checkbox" <%= it.stickyToolbar ? "checked" : "" %> data-action="change-><%= it.controller %>#stickyChanged">
+    Pin toolbar to top
+  </label>
+  <label>
+    <input type="checkbox" id="inb4doc-dark-checkbox" <%= it.darkMode ? "checked" : "" %> data-action="change-><%= it.controller %>#darkChanged">
+    Dark mode
+  </label>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Image storage</div>
+    <div class="radio-group">
+      <label>
+        <input type="radio" name="image-mode" value="file" <%= it.imageStorageMode === "file" ? "checked" : "" %> data-action="change-><%= it.controller %>#imageModeChanged">
+        Save to <code>image/</code> folder
+      </label>
+      <label>
+        <input type="radio" name="image-mode" value="base64" <%= it.imageStorageMode === "base64" ? "checked" : "" %> data-action="change-><%= it.controller %>#imageModeChanged">
+        Embed as base64 in document
+      </label>
+    </div>
+  </div>
+</div>

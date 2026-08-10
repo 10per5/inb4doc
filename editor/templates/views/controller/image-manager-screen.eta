@@ -1,0 +1,8 @@
+<%~ it.renderScreen({
+  title: "Image Manager",
+  closeAction: "click->image-manager-screen#close",
+  closeLabel: "Back to more",
+  closeIcon: "back",
+  icons: it.icons,
+  body: it.rows
+}) %>

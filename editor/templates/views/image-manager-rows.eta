@@ -1,0 +1,33 @@
+<% if (it.loadError) { %>
+  <div class="img-message img-message--error"><%= it.loadError %></div>
+<% } else if (it.allEntries.length === 0) { %>
+  <div class="img-message">No images in this directory</div>
+<% } else { %>
+  <% it.allEntries.forEach(function(entry) { %>
+    <div class="img-row">
+      <div class="img-thumb">
+        <img src="<%= entry.url %>" alt="<%= entry.name %>">
+      </div>
+      <div class="img-info">
+        <div class="img-name"><%= entry.name %><% if (entry.pending) { %> <span class="img-pending">(pending)</span><% } %></div>
+        <div class="img-used">
+          <% if (entry.usedIn.length > 0) { %>
+            Used in:
+            <ul>
+              <% entry.usedIn.forEach(function(ref) { %>
+                <li><%= ref %></li>
+              <% }) %>
+            </ul>
+          <% } else { %>
+            Not referenced in any file
+          <% } %>
+        </div>
+      </div>
+      <div class="img-actions">
+        <button type="button" class="img-review" data-url="<%= entry.url %>">Review</button>
+        <button type="button" class="img-delete danger" data-name="<%= entry.name %>">Delete</button>
+        <button type="button" class="img-copy" data-storage="<%= entry.storageUrl %>">Copy</button>
+      </div>
+    </div>
+  <% }) %>
+<% } %>

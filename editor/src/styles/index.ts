@@ -20,6 +20,7 @@ import "./panels/meta.css"
 /* ── App UI ─────────────────────────────────────────────────────── */
 import "./app/toolbar.css"
 import "./app/dialogs.css"
+import "./ui/screen.css"
 import "./app/toast.css"
 import "./app/notification.css"
 

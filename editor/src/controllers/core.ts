@@ -15,6 +15,8 @@ import DockController from "./dock-controller"
 import NavigationController from "./navigation-controller"
 import MoreController from "./more-controller"
 import EditToolbarController from "./edit-toolbar-controller"
+import PrefsScreenController from "./prefs-screen-controller"
+import ImageManagerScreenController from "./image-manager-screen-controller"
 
 export interface ControllerRegistration {
   name: string
@@ -56,5 +58,7 @@ export function registerCoreControllers(app: Application): void {
     app.register("navigation", NavigationController)
     app.register("more", MoreController)
     app.register("edit-toolbar", EditToolbarController)
+    app.register("prefs-screen", PrefsScreenController)
+    app.register("image-manager-screen", ImageManagerScreenController)
   }
 }

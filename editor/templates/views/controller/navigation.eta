@@ -1,11 +1,7 @@
-<div class="fullview-inner">
-  <header class="fullview-header">
-    <h1 class="fullview-title">Files</h1>
-    <button type="button" class="fullview-close" data-action="navigation#close" aria-label="Close files">
-      <%~ it.icons.xmark %>
-    </button>
-  </header>
-  <div class="fullview-body">
-    <div class="fullview-sidebar" data-controller="sidebar" data-action="keydown->sidebar#onKeydown"></div>
-  </div>
-</div>
+<%~ it.renderScreen({
+  title: "Files",
+  closeAction: "navigation#close",
+  closeLabel: "Close files",
+  icons: it.icons,
+  body: '<div class="fullview-sidebar" data-controller="sidebar" data-action="keydown->sidebar#onKeydown"></div>'
+}) %>

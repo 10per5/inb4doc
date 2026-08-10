@@ -1,26 +1,34 @@
-<div class="meta-panel-wrapper">
-  <div class="meta-panel">
-    <div class="meta-outline-section" data-meta-panel-target="outlineSection" hidden>
-      <div class="meta-panel-header">Outline</div>
-      <div class="meta-outline" data-meta-panel-target="outline" data-action="click->meta-panel#onOutlineClick"></div>
+<%~ it.renderScreen({
+  title: "Meta panel",
+  closeAction: "click->meta-panel#close",
+  closeLabel: it.backLabel ?? "Close meta panel",
+  closeIcon: it.backIcon ?? "xmark",
+  icons: it.icons,
+  body: `
+  <div class="meta-panel-wrapper">
+    <div class="meta-panel">
+      <div class="meta-outline-section" data-meta-panel-target="outlineSection" hidden>
+        <div class="meta-panel-header">Outline</div>
+        <div class="meta-outline" data-meta-panel-target="outline" data-action="click->meta-panel#onOutlineClick"></div>
+      </div>
+      <div class="meta-panel-header">Page Metadata</div>
+      <div class="meta-field">
+        <label>Title</label>
+        <input type="text" class="meta-title" data-action="input->meta-panel#inputChanged" />
+      </div>
+      <div class="meta-field">
+        <label>Weight</label>
+        <input type="number" class="meta-weight" data-action="input->meta-panel#inputChanged" />
+      </div>
+      <div class="meta-extra-header">Extra Fields</div>
+      <div class="meta-extra"></div>
+      <button class="meta-extra-add" data-action="click->meta-panel#addField">+ Add Field</button>
     </div>
-    <div class="meta-panel-header">Page Metadata</div>
-    <div class="meta-field">
-      <label>Title</label>
-      <input type="text" class="meta-title" data-action="input->meta-panel#inputChanged" />
+    <div class="meta-panel-footer">
+      <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
+        ${it.github}
+        <span>View on GitHub</span>
+      </a>
     </div>
-    <div class="meta-field">
-      <label>Weight</label>
-      <input type="number" class="meta-weight" data-action="input->meta-panel#inputChanged" />
-    </div>
-    <div class="meta-extra-header">Extra Fields</div>
-    <div class="meta-extra"></div>
-    <button class="meta-extra-add" data-action="click->meta-panel#addField">+ Add Field</button>
-  </div>
-  <div class="meta-panel-footer">
-    <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
-      <%~ it.github %>
-      <span>View on GitHub</span>
-    </a>
-  </div>
-</div>
+  </div>`
+}) %>

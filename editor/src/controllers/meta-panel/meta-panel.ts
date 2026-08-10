@@ -1,4 +1,4 @@
-import { x } from "@/eta/icons"
+import { xmark } from "@/eta/icons"
 import type { MetaPanelData } from "@/entities/Frontmatter"
 
 /**
@@ -52,7 +52,7 @@ export class MetaPanelUI {
     row.innerHTML = `
       <input class="meta-extra-key" value="${key}" placeholder="key" />
       <input class="meta-extra-val" value="${value}" placeholder="value" />
-      <button class="meta-extra-remove">${x}</button>
+      <button class="meta-extra-remove">${xmark}</button>
     `
     row.querySelector(".meta-extra-remove")!.addEventListener("click", () => {
       row.remove()

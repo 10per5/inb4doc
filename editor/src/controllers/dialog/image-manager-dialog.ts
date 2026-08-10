@@ -1,20 +1,15 @@
-import { imageService } from "@/services/image-service"
 import { openDialog } from "@/services/dialog-service"
+import { loadImageManagerData } from "@/components/ui/image-manager"
+import renderImageManagerRows from "@/eta/views/image-manager-rows"
 
 export async function openImageManagerDialog(): Promise<void> {
-  const dir = imageService.getCurrentDocDir()
+  const data = await loadImageManagerData()
 
-  let entries: Awaited<ReturnType<typeof imageService.listImages>> = []
-  let loadError: string | null = null
-  try {
-    entries = await imageService.listImages(true)
-  } catch (e: any) {
-    loadError = e.message
-  }
-
-  const allEntries = imageService.getAllImages()
-
-  const title = "Image Manager"
-
-  openDialog("image-manager-dialog", { title, dir, loadError, allEntries })
+  openDialog("image-manager-dialog", {
+    title: "Image Manager",
+    dir: data.dir,
+    loadError: data.loadError,
+    allEntries: data.allEntries,
+    rows: renderImageManagerRows(data as unknown as Record<string, unknown>),
+  })
 }

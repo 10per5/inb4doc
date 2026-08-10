@@ -11,6 +11,7 @@ import type { NoFileViewData } from "@/controllers/no-file-controller";
 import type DirIndexEmptyController from "@/controllers/dir-index-empty-controller";
 import type DiskUsageController from "@/controllers/disk-usage-controller";
 import type { DiskUsageData } from "@/controllers/disk-usage-controller";
+import type ImageManagerScreenController from "@/controllers/image-manager-screen-controller";
 import { registerEditorView } from "@/services/editor-view";
 import { pagesStore } from "@/stores/page-store";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
@@ -22,7 +23,7 @@ import { hasFunc, AppFunc } from "$/build/build-mode";
 import type { EditorController } from "@/controllers/editor-controller";
 import * as focusHandler from "@/services/focus-handler";
 
-export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty" | "navigation" | "more" | "meta"
+export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty" | "navigation" | "more" | "meta" | "prefs" | "images"
 
 type ViewHandlers = { activate: () => void; deactivate: () => void; focus?: () => void }
 
@@ -198,10 +199,10 @@ export class ViewController {
     navigationEl.style.display = "none";
     editorArea.appendChild(navigationEl);
 
-    // `more` — bottom sheet with secondary actions.
+    // `more` — fullview screen with secondary actions.
     const moreEl = document.createElement("div");
     moreEl.dataset.controller = "more";
-    moreEl.className = "fullview-view more-view";
+    moreEl.className = "fullview-view";
     moreEl.style.display = "none";
     editorArea.appendChild(moreEl);
 
@@ -211,9 +212,24 @@ export class ViewController {
     const metaEl = document.createElement("div");
     metaEl.dataset.controller = "meta-panel";
     metaEl.dataset.metaPanelEditorOutlet = "#editor-area";
-    metaEl.className = "fullview-view meta-view";
+    metaEl.className = "fullview-view";
     metaEl.style.display = "none";
     editorArea.appendChild(metaEl);
+
+    // `prefs` — preferences as a fullview screen (desktop keeps the dialog).
+    const prefsEl = document.createElement("div");
+    prefsEl.dataset.controller = "prefs-screen";
+    prefsEl.className = "fullview-view";
+    prefsEl.style.display = "none";
+    editorArea.appendChild(prefsEl);
+
+    // `images` — image manager as a fullview screen (desktop keeps the dialog).
+    // Data loads on activation (like disk-usage), after the provider is ready.
+    const imagesEl = document.createElement("div");
+    imagesEl.dataset.controller = "image-manager-screen";
+    imagesEl.className = "fullview-view";
+    imagesEl.style.display = "none";
+    editorArea.appendChild(imagesEl);
 
     const fullview = (el: HTMLElement): ViewHandlers => ({
       activate: () => {
@@ -229,6 +245,22 @@ export class ViewController {
     this.views.set("navigation", fullview(navigationEl));
     this.views.set("more", fullview(moreEl));
     this.views.set("meta", fullview(metaEl));
+    this.views.set("prefs", fullview(prefsEl));
+    this.views.set("images", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        imagesEl.style.display = "";
+        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
+          imagesEl,
+          "image-manager-screen",
+        ) as ImageManagerScreenController | null;
+        void ctrl?.load();
+      },
+      deactivate: () => {
+        imagesEl.style.display = "none";
+      },
+    });
   }
 
   private showDiskUsage(): void {

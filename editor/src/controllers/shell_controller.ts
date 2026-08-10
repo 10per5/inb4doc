@@ -32,6 +32,7 @@ import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
 import { updateEditorTint } from "@/services/file-status-tint";
 import { storageService } from "@/services/storage";
+import { hasFunc, AppFunc } from "$/build/build-mode";
 
 let sessionStarted = 0;
 
@@ -92,10 +93,23 @@ export default class extends Controller {
       appEvents.on(AppEvent.FlushComplete, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.ModulesSwapped, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.PrefsOpened, async () => {
+        if (hasFunc(AppFunc.MobileDock)) {
+          this.view.switchTo("prefs")
+          return
+        }
         const { openPrefsDialog } = await import("@/controllers/dialog/prefs-dialog")
-        openPrefsDialog({
-          onStickyToolbarChange: (sticky) => this.toolbarStore!.setStickyPreference(sticky),
-        })
+        openPrefsDialog()
+      }),
+      appEvents.on(AppEvent.StickyPreferenceChanged, ({ sticky }) => {
+        this.toolbarStore!.setStickyPreference(sticky)
+      }),
+      appEvents.on(AppEvent.ImageManagerOpened, async () => {
+        if (hasFunc(AppFunc.MobileDock)) {
+          this.view.switchTo("images")
+          return
+        }
+        const { openImageManagerDialog } = await import("@/controllers/dialog/image-manager-dialog")
+        openImageManagerDialog()
       }),
       appEvents.on(AppEvent.DirtyClicked, () => this.cache.handleDirtyClick()),
       appEvents.on(AppEvent.SingleDiscardRequested, ({ path }) => this.cache.discardFileChanges(path)),
@@ -103,10 +117,6 @@ export default class extends Controller {
         exportToZip().then(() => this.nav.loadSidebar())
       }),
       appEvents.on(AppEvent.LoadRequested, () => this.handleLoadZip()),
-      appEvents.on(AppEvent.ImageManagerOpened, async () => {
-        const { openImageManagerDialog } = await import("@/controllers/dialog/image-manager-dialog")
-        openImageManagerDialog()
-      }),
       appEvents.on(AppEvent.SidebarToggle, () => this.uiService.toggleSidebar()),
       appEvents.on(AppEvent.MetaPanelToggle, () => this.uiService.toggleMetaPanel()),
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
