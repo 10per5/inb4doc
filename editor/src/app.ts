@@ -10,7 +10,8 @@ import { initNativeBridge } from "@/eta/bridge";
 import { setSessionStarted } from "@/controllers/shell_controller";
 import { initFarmCompat } from "$/farmfe-compat";
 import { logger } from "@/utils/logger";
-import { hasFunc, AppFunc, currentBuildMode, isMobileViewport, BuildMode } from "$/build/build-mode";
+import { hasFunc, AppFunc, currentBuildMode, BuildMode } from "$/build/build-mode";
+import { isMobileViewport } from "@/utils/mobile";
 
 // Farm's chunk loader bakes a publicPath at build time; override it before any
 // dynamic import. The default RELATIVE "assets/" resolves against the document
@@ -41,10 +42,11 @@ const ANDROID_MOUNT = (() => {
 const thinShell = !hasFunc(AppFunc.FullBundle);
 initFarmCompat(thinShell && ANDROID_MOUNT ? `${ANDROID_MOUNT}assets/` : "assets/")
 
-// Web-local responsive-web (Part F): hasFunc(MobileDock) is UA/viewport-gated,
-// but Stimulus registered the controller set at boot from that decision.
-// Crossing the mobile/desktop breakpoint reloads so the dock layout (or the
-// desktop chrome) wires up; the reload guard prevents loops on UA-only matches.
+// Web-local responsive-web (Part F): isMobileDock() (dock only on a mobile
+// viewport for web modes) decides the chrome, and Stimulus registered the
+// controller set from that at boot. Crossing the mobile/desktop breakpoint
+// reloads so the dock layout (or the desktop chrome) wires up; the reload guard
+// prevents loops on UA-only matches.
 if (currentBuildMode() === BuildMode.WebLocal || currentBuildMode() === BuildMode.WebRemote) {
   let last = isMobileViewport();
   window.matchMedia("(max-width: 767px)").addEventListener("change", (e) => {

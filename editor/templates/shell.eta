@@ -7,10 +7,10 @@
 <% if (it.webAdaptive) { %>
     <script>
       // Web-local responsive-web: pick mobile/desktop chrome before first paint.
-      // Must mirror isMobileViewport() in lib/build/build-mode.ts.
+      // Decided by viewport WIDTH only — an iPad in landscape (>=768px) gets the
+      // desktop toolbar. Must mirror isMobileViewport() in lib/build/build-mode.ts.
       (function () {
-        var mobile = window.matchMedia("(max-width: 767px)").matches ||
-          /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+        var mobile = window.matchMedia("(max-width: 767px)").matches;
         document.documentElement.classList.add(mobile ? "mobile-layout" : "desktop-layout");
       })();
     </script>

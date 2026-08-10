@@ -7,6 +7,7 @@
  */
 
 import type { ViewType } from "@/services/view-controller"
+import type { LayoutChangedPayload } from "@/services/layout-service"
 import type { MetaPanelData } from "@/entities/Frontmatter"
 import type { ProviderType } from "@/providers/index"
 import type { ToolbarCommand, SlashCommand } from "@/config/enums"
@@ -52,8 +53,9 @@ export enum AppEvent {
 
   // UI toggles
   SidebarToggle = "sidebar-toggle",
-  MetaPanelToggle = "meta-panel-toggle",
+  LayoutChanged = "layout-changed",
   PrefsOpened = "prefs-opened",
+  StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
   CreateFirstPage = "create-first-page",
   CreateDraftRequested = "create-draft-requested",
@@ -123,8 +125,9 @@ export interface AppEventPayloads {
   [AppEvent.RecentProjectRequested]: { path: string }
 
   [AppEvent.SidebarToggle]:         void
-  [AppEvent.MetaPanelToggle]:       void
+  [AppEvent.LayoutChanged]:         LayoutChangedPayload
   [AppEvent.PrefsOpened]:           void
+  [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void
   [AppEvent.CreateFirstPage]:       void
   [AppEvent.CreateDraftRequested]: { path: string; content: string }

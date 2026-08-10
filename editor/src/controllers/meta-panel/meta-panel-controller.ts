@@ -1,9 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { github } from "@/eta/icons"
+import * as icons from "@/eta/icons"
+import { isMobileDock } from "@/utils/mobile"
+import { LayoutService } from "@/services/layout-service"
 import { pagesStore } from "@/stores/page-store"
 import { getCurrentPath } from "@/utils/url"
 import { MetaPanelUI } from "./meta-panel"
+import { renderScreen } from "@/eta/views/screen"
 import renderMetaPanel from "@/eta/views/controller/meta-panel"
 import type { EditorController } from "@/controllers/editor-controller"
 
@@ -71,11 +74,28 @@ export default class extends Controller {
   }
 
   load(): void {
-    this.element.innerHTML = renderMetaPanel({ github })
+    const mobile = isMobileDock()
+    this.element.innerHTML = renderMetaPanel({
+      icons: icons as Record<string, string>,
+      github: icons.github,
+      renderScreen,
+      backIcon: mobile ? "back" : "xmark",
+      backLabel: mobile ? "Back to more" : "Close meta panel",
+    })
     this.ui = new MetaPanelUI(this.element as HTMLElement, () => this.notify())
     const data = pagesStore.get(getCurrentPath())?.getFrontmatter()
     this.ui.update(data ?? { title: "" })
     this.renderOutline()
+  }
+
+  close(): void {
+    if (isMobileDock()) {
+      appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    } else {
+      // Desktop: closes the aside column; tablet (meta screen): toggles the
+      // panel off, which returns the center view to the editor.
+      LayoutService.getInstance().setMeta(false)
+    }
   }
 
   addField() {
@@ -94,11 +114,25 @@ export default class extends Controller {
     const pos = Number(item.dataset.pos)
     const level = Number(item.dataset.level)
     const text = decodeURIComponent(item.dataset.text ?? "")
-    this.editor()?.scrollToHeading(
-      text,
-      level,
-      Number.isNaN(pos) ? undefined : pos
-    )
+    const scroll = () =>
+      this.editor()?.scrollToHeading(
+        text,
+        level,
+        Number.isNaN(pos) ? undefined : pos
+      )
+    // Full-screen meta panel (tablet center screen / mobile "more" screen): the
+    // editor is hidden beneath it. Leave the screen first, then scroll once the
+    // editor is visible again.
+    if (this.element.classList.contains("fullview-view")) {
+      if (isMobileDock()) {
+        appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
+      } else {
+        LayoutService.getInstance().setMeta(false)
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => scroll()))
+      return
+    }
+    scroll()
   }
 
   private scheduleOutlineUpdate(): void {
@@ -110,6 +144,7 @@ export default class extends Controller {
   }
 
   private renderOutline(): void {
+    if (!this.element.querySelector(".meta-outline-section")) return
     const outline = this.editor()?.getOutline() ?? []
     this.outlineSectionTarget.hidden = outline.length === 0
     this.outlineTarget.innerHTML = outline

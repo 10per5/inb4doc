@@ -1,12 +1,16 @@
-<div class="disk-usage-wrapper">
-  <div class="disk-usage-header">
-    <span>Disk Usage</span>
-    <button class="disk-usage-close" data-action="click->disk-usage#close"><%~ it.x %></button>
-  </div>
-  <div class="disk-usage-mode-toggle">
-    <button class="disk-usage-mode-btn active" data-mode="dir" data-action="click->disk-usage#toggleMode">By Directory</button>
-    <button class="disk-usage-mode-btn" data-mode="size" data-action="click->disk-usage#toggleMode">By Size</button>
-  </div>
-  <div class="disk-usage-chart-area" data-disk-usage-target="chartArea"></div>
-  <div class="disk-usage-stats" data-disk-usage-target="statsArea"></div>
-</div>
+<%~ it.renderScreen({
+  title: "Disk Stats",
+  closeAction: "click->disk-usage#close",
+  closeLabel: it.backLabel ?? "Close disk stats",
+  closeIcon: it.backIcon ?? "xmark",
+  icons: it.icons,
+  body: `
+  <div class="disk-usage-content">
+    <div class="disk-usage-mode-toggle">
+      <button class="disk-usage-mode-btn active" data-mode="dir" data-action="click->disk-usage#toggleMode">By Directory</button>
+      <button class="disk-usage-mode-btn" data-mode="size" data-action="click->disk-usage#toggleMode">By Size</button>
+    </div>
+    <div class="disk-usage-chart-area" data-disk-usage-target="chartArea"></div>
+    <div class="disk-usage-stats" data-disk-usage-target="statsArea"></div>
+  </div>`
+}) %>

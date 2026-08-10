@@ -10,6 +10,7 @@ import { pressTwiceButton } from "@/components/ui/press-twice-button";
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
 import { hasFunc, AppFunc } from "$/build/build-mode";
+import { isMobileDock } from "@/utils/mobile";
 import * as focusHandler from "@/services/focus-handler";
 
 export default class extends Controller {
@@ -27,7 +28,7 @@ export default class extends Controller {
   connect() {
     this.element.innerHTML = renderTopbar({
       mobileCss: hasFunc(AppFunc.MobileCss),
-      mobileDock: hasFunc(AppFunc.MobileDock),
+      mobileDock: isMobileDock(),
       toolbarActions,
       ToolbarAction,
       TOOLBAR_CMD_PREFIX,
@@ -37,7 +38,7 @@ export default class extends Controller {
     this.createMenus();
     // Mobile: the topbar is editor-chrome — hide it on every other view
     // (navigation/more/meta/disk-usage/empty states render their own headers).
-    if (hasFunc(AppFunc.MobileDock)) {
+    if (isMobileDock()) {
       this.unsubs.push(
         appEvents.on(AppEvent.ViewChanged, ({ view }) => {
           ;(this.element as HTMLElement).hidden = view !== "editor";
@@ -300,10 +301,6 @@ export default class extends Controller {
     appEvents.emit(AppEvent.SidebarToggle);
   }
 
-  toggleMetaPanel() {
-    appEvents.emit(AppEvent.MetaPanelToggle);
-  }
-
   flushAll() {
     appEvents.emit(AppEvent.FlushAll);
   }
@@ -367,7 +364,7 @@ export default class extends Controller {
     const isSingleCurrent =
       count === 1 && singleDirtyPath && singleDirtyPath === currentPath;
 
-    if (isSingleCurrent && hasFunc(AppFunc.MobileDock)) {
+    if (isSingleCurrent && isMobileDock()) {
       // Current file only → compact eye + discard, no pending text.
       el.prepend(createChangesBtn());
       const btn = pressTwiceButton({

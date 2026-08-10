@@ -379,7 +379,7 @@
   font-size: 1rem;
   color: var(--color-text-primary);
 }
-.inb4doc-prefs-box label {
+.inb4doc-prefs-fields label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -388,13 +388,13 @@
   color: var(--color-text-primary);
   cursor: pointer;
 }
-.inb4doc-prefs-box input[type="checkbox"] {
+.inb4doc-prefs-fields input[type="checkbox"] {
   margin: 0;
 }
-.inb4doc-prefs-box .prefs-section {
+.inb4doc-prefs-fields .prefs-section {
   margin-top: 1rem;
 }
-.inb4doc-prefs-box .prefs-section-title {
+.inb4doc-prefs-fields .prefs-section-title {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -402,23 +402,27 @@
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
-.inb4doc-prefs-box .radio-group {
+.inb4doc-prefs-fields .radio-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-.inb4doc-prefs-box .radio-group label {
+.inb4doc-prefs-fields .radio-group label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
   color: var(--color-text-primary);
 }
-.inb4doc-prefs-box .radio-group code {
+.inb4doc-prefs-fields .radio-group code {
   background: var(--color-bg-secondary);
   padding: 0.1rem 0.3rem;
   border-radius: 3px;
   font-size: 0.8rem;
+}
+/* Mobile prefs screen: the fields render without the dialog box chrome. */
+.screen-body .inb4doc-prefs-fields {
+  padding: 1.25rem 1.5rem;
 }
 .inb4doc-prefs-actions {
   display: flex;
@@ -550,6 +554,21 @@
 }
 
 /* ── Image Manager Dialog ──────────────────────────────────────────── */
+
+.img-message {
+  padding: 1rem;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+.img-message--error {
+  color: var(--color-error);
+}
+
+.img-pending {
+  color: var(--color-warning);
+  font-size: 0.7rem;
+}
 
 .img-row {
   display: flex;

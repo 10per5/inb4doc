@@ -3,6 +3,7 @@ import type { MenuItem } from "@/components/ui/menu";
 import { MenuType } from "@/components/ui/menu";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import type { ViewType } from "@/services/view-controller";
+import { LayoutService } from "@/services/layout-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { ToolbarCommand, SlashCommand } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
@@ -227,20 +228,6 @@ menuRegistry.register("add-block", (): MenuItem[] => [
     ],
   },
   {
-    type: MenuType.Item,
-    id: "blockquote",
-    icon: quote,
-    label: "Blockquote",
-    onClick: () => emitInsertBlockCommand(SlashCommand.Blockquote),
-  },
-  {
-    type: MenuType.Item,
-    id: "divider",
-    icon: minus,
-    label: "Divider",
-    onClick: () => emitInsertBlockCommand(SlashCommand.ThematicBreak),
-  },
-  {
     type: MenuType.Submenu,
     id: "code",
     icon: codeBrackets,
@@ -291,30 +278,65 @@ menuRegistry.register("add-block", (): MenuItem[] => [
       },
     ],
   },
+  {
+    type: MenuType.Item,
+    id: "blockquote",
+    icon: quote,
+    label: "Blockquote",
+    onClick: () => emitInsertBlockCommand(SlashCommand.Blockquote),
+  },
+  {
+    type: MenuType.Item,
+    id: "divider",
+    icon: minus,
+    label: "Divider",
+    onClick: () => emitInsertBlockCommand(SlashCommand.ThematicBreak),
+  },
 ]);
 
-menuRegistry.register("view", (): MenuItem[] => [
-  {
+menuRegistry.register("view", (): MenuItem[] => {
+  const layout = LayoutService.getInstance();
+  const screen = (view: ViewType, label: string): MenuItem => ({
     type: MenuType.Check,
-    id: "editor",
-    label: "Editor",
-    checked: true,
-    onUpdate: () => ({
-      checked: viewState.current === "editor",
-      active: viewState.current === "editor",
-    }),
-    onClick: () =>
-      appEvents.emit(AppEvent.ViewChanged, { view: "editor" as ViewType }),
-  },
-  {
-    type: MenuType.Check,
-    id: "disk-usage",
-    label: "Disk Usage",
-    onUpdate: () => ({
-      checked: viewState.current === "disk-usage",
-      active: viewState.current === "disk-usage",
-    }),
-    onClick: () =>
-      appEvents.emit(AppEvent.ViewChanged, { view: "disk-usage" as ViewType }),
-  },
-]);
+    id: view,
+    label,
+    checked: viewState.current === view,
+    active: viewState.current === view,
+    onClick: () => appEvents.emit(AppEvent.ViewChanged, { view }),
+  });
+  return [
+    {
+      type: MenuType.Submenu,
+      id: "view-screens",
+      label: "Screens",
+      items: [
+        screen("editor", "Editor"),
+        screen("disk-usage", "Disk Usage"),
+        screen("navigation", "Navigation"),
+      ],
+    },
+    {
+      type: MenuType.Submenu,
+      id: "view-panels",
+      label: "Panels",
+      items: [
+        {
+          type: MenuType.Check,
+          id: "navtree",
+          label: "Navtree",
+          checked: layout.isNavOn(),
+          active: layout.isNavOn(),
+          onClick: () => layout.toggleNav(),
+        },
+        {
+          type: MenuType.Check,
+          id: "meta-panel",
+          label: "Meta panel",
+          checked: layout.isMetaOn(),
+          active: layout.isMetaOn(),
+          onClick: () => layout.toggleMeta(),
+        },
+      ],
+    },
+  ];
+});

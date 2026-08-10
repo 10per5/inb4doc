@@ -7,7 +7,7 @@ import { slashFactory, SlashProvider } from "@milkdown/kit/plugin/slash";
 import { paragraphSchema } from "@milkdown/kit/preset/commonmark";
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
-import { hasFunc, AppFunc } from "$/build/build-mode";
+import { isMobileDock } from "@/utils/mobile";
 import { executeInsertCommand } from "@/features/insert-command";
 import { menuAPI, type MenuAPI } from "@/features/menu-api";
 import {
@@ -651,10 +651,10 @@ class SlashView {
 }
 
 export function configureBlockEdit(ctx: Ctx) {
-  // Mobile (AppFunc.MobileDock — gui-mobile always, web-local on a mobile
-  // viewport/UA) has no hover affordance: the block handle is disabled and the
-  // FAB "+" is the insert entry point. Desktop keeps the hover block handle.
-  if (!hasFunc(AppFunc.MobileDock)) {
+  // The dock layout (gui-mobile always, web builds on a mobile viewport) has no
+  // hover affordance: the block handle is disabled and the FAB "+" is the insert
+  // entry point. Desktop keeps the hover block handle.
+  if (!isMobileDock()) {
     ctx.set(block.key, {
       view: () => new BlockHandleView(ctx),
     });
@@ -662,7 +662,7 @@ export function configureBlockEdit(ctx: Ctx) {
   ctx.update(blockConfig.key, (prev) => ({
     ...prev,
     filterNodes: (pos) => {
-      if (hasFunc(AppFunc.MobileDock)) return false;
+      if (isMobileDock()) return false;
       for (let d = pos.depth; d > 0; d--) {
         const node = pos.node(d);
         const typeName = proseNodeTypeByName.get(node.type.name);

@@ -11,6 +11,9 @@ import type { NoFileViewData } from "@/controllers/no-file-controller";
 import type DirIndexEmptyController from "@/controllers/dir-index-empty-controller";
 import type DiskUsageController from "@/controllers/disk-usage-controller";
 import type { DiskUsageData } from "@/controllers/disk-usage-controller";
+import type ImageManagerController from "@/controllers/image-manager-controller";
+import type ChangesController from "@/controllers/changes-controller";
+import type MoreController from "@/controllers/more-controller";
 import { registerEditorView } from "@/services/editor-view";
 import { pagesStore } from "@/stores/page-store";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
@@ -18,11 +21,12 @@ import { treeStore } from "@/stores/tree-store";
 import { getSuggestions } from "@/utils/tree";
 import { getRecents } from "@/utils/recent-files";
 import { appEvents, AppEvent } from "@/stores/app-events";
-import { hasFunc, AppFunc } from "$/build/build-mode";
+import { isMobileDock } from "@/utils/mobile";
+import { LayoutService } from "@/services/layout-service";
 import type { EditorController } from "@/controllers/editor-controller";
 import * as focusHandler from "@/services/focus-handler";
 
-export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty" | "navigation" | "more" | "meta"
+export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty" | "navigation" | "more" | "meta" | "prefs" | "images" | "changes"
 
 type ViewHandlers = { activate: () => void; deactivate: () => void; focus?: () => void }
 
@@ -47,9 +51,26 @@ export class ViewController {
         if (this.current === "disk-usage") this.showDiskUsage();
       }),
       appEvents.on(AppEvent.Navigate, () => {
-        // Mobile: selecting a file in the navigation fullview lands in the editor.
-        if (hasFunc(AppFunc.MobileDock) && this.current === "navigation") {
+        // Selecting a file while a full-screen view (navigation / meta) is the
+        // center view lands back in the editor.
+        if (this.current === "navigation" || this.current === "meta") {
           this.switchTo("editor");
+        }
+      }),
+      appEvents.on(AppEvent.LayoutChanged, ({ width, meta }) => {
+        if (isMobileDock()) return;
+        if (width === "desktop") {
+          // Meta is a column on desktop — never a center screen.
+          if (this.current === "meta") this.switchTo("editor");
+          return;
+        }
+        if (width === "tablet") {
+          // Meta as the center screen; toggling it off returns to the editor.
+          if (meta) {
+            if (this.current !== "meta") this.switchTo("meta");
+          } else if (this.current === "meta") {
+            this.switchTo("editor");
+          }
         }
       }),
     );
@@ -57,6 +78,14 @@ export class ViewController {
 
   switchTo(type: ViewType): void {
     if (type === this.current) return
+    if (type === "meta") this.ensureMetaScreenView()
+    if (type === "navigation") {
+      this.ensureNavigationScreenView()
+      // The navigation screen is the nav tree as the center view — collapse the
+      // left nav panel so the tree isn't shown twice. setNav(false) no-ops when
+      // it's already off (mobile drawer is independent of this state).
+      LayoutService.getInstance().setNav(false)
+    }
     this.views.get(this.current)?.deactivate()
     this.current = type
     this.views.get(type)?.activate()
@@ -91,7 +120,7 @@ export class ViewController {
     this.setupDiskUsageView();
     this.setupNoFileView();
     this.setupDirIndexEmptyView();
-    if (hasFunc(AppFunc.MobileDock)) {
+    if (isMobileDock()) {
       this.setupMobileViews();
     }
 
@@ -198,22 +227,37 @@ export class ViewController {
     navigationEl.style.display = "none";
     editorArea.appendChild(navigationEl);
 
-    // `more` — bottom sheet with secondary actions.
+    // `more` — fullview screen with secondary actions. Re-renders on each
+    // activation so the Pending Changes row reflects the current count.
     const moreEl = document.createElement("div");
     moreEl.dataset.controller = "more";
-    moreEl.className = "fullview-view more-view";
+    moreEl.className = "fullview-view";
     moreEl.style.display = "none";
     editorArea.appendChild(moreEl);
 
-    // `meta` — the meta panel as a fullview. A second meta-panel instance
-    // (the desktop aside is omitted from gui-mobile builds) renders inside the
-    // editor area and shares the same outlet/event wiring.
-    const metaEl = document.createElement("div");
-    metaEl.dataset.controller = "meta-panel";
-    metaEl.dataset.metaPanelEditorOutlet = "#editor-area";
-    metaEl.className = "fullview-view meta-view";
-    metaEl.style.display = "none";
-    editorArea.appendChild(metaEl);
+    // `prefs` — preferences as a fullview screen (desktop keeps the dialog).
+    const prefsEl = document.createElement("div");
+    prefsEl.dataset.controller = "prefs";
+    prefsEl.className = "fullview-view";
+    prefsEl.style.display = "none";
+    editorArea.appendChild(prefsEl);
+
+    // `images` — image manager as a fullview screen (desktop keeps the dialog).
+    // Data loads on activation (like disk-usage), after the provider is ready.
+    const imagesEl = document.createElement("div");
+    imagesEl.dataset.controller = "image-manager";
+    imagesEl.className = "fullview-view";
+    imagesEl.style.display = "none";
+    editorArea.appendChild(imagesEl);
+
+    // `changes` — pending changes as a fullview screen (desktop keeps the
+    // dialog). The shell builds the item list + action closures into
+    // changes-screen-store before switching here; load() renders from it.
+    const changesEl = document.createElement("div");
+    changesEl.dataset.controller = "changes";
+    changesEl.className = "fullview-view";
+    changesEl.style.display = "none";
+    editorArea.appendChild(changesEl);
 
     const fullview = (el: HTMLElement): ViewHandlers => ({
       activate: () => {
@@ -227,8 +271,110 @@ export class ViewController {
     });
 
     this.views.set("navigation", fullview(navigationEl));
-    this.views.set("more", fullview(moreEl));
-    this.views.set("meta", fullview(metaEl));
+    this.views.set("more", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        moreEl.style.display = "";
+        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
+          moreEl,
+          "more",
+        ) as MoreController | null;
+        ctrl?.load();
+      },
+      deactivate: () => {
+        moreEl.style.display = "none";
+      },
+    });
+    this.views.set("prefs", fullview(prefsEl));
+    this.views.set("images", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        imagesEl.style.display = "";
+        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
+          imagesEl,
+          "image-manager",
+        ) as ImageManagerController | null;
+        void ctrl?.load();
+      },
+      deactivate: () => {
+        imagesEl.style.display = "none";
+      },
+    });
+    this.views.set("changes", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        changesEl.style.display = "";
+        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
+          changesEl,
+          "changes",
+        ) as ChangesController | null;
+        ctrl?.load();
+      },
+      deactivate: () => {
+        changesEl.style.display = "none";
+      },
+    });
+  }
+
+  /**
+   * The meta panel as a center screen. Created lazily: needed on mobile (the
+   * "more" screen) and on tablet (the View-menu Meta toggle, where the aside
+   * column is hidden below 1200px). Desktop never uses it — meta there is the
+   * aside column. A second meta-panel instance renders inside the editor area
+   * and shares the same outlet/event wiring as the aside.
+   */
+  private ensureMetaScreenView(): void {
+    if (this.views.has("meta")) return;
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
+    const metaEl = document.createElement("div");
+    metaEl.dataset.controller = "meta-panel";
+    metaEl.dataset.metaPanelEditorOutlet = "#editor-area";
+    metaEl.className = "fullview-view";
+    metaEl.style.display = "none";
+    editorArea.appendChild(metaEl);
+    this.views.set("meta", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        metaEl.style.display = "";
+      },
+      deactivate: () => {
+        metaEl.style.display = "none";
+      },
+    });
+  }
+
+  /**
+   * The navigation fullview as a center screen — the full navbar view. Created
+   * lazily so it is reachable on tablet/desktop (mobile registers it eagerly in
+   * setupMobileViews). The sidebar instance inside is self-sourcing, so no data
+   * wiring is needed here.
+   */
+  private ensureNavigationScreenView(): void {
+    if (this.views.has("navigation")) return;
+    const editorArea = this.editor.element as HTMLElement;
+    const milkdownEl = this.editor.milkdownTarget;
+    const sourceEl = this.editor.sourceTarget;
+    const navigationEl = document.createElement("div");
+    navigationEl.dataset.controller = "navigation";
+    navigationEl.className = "fullview-view navigation-view";
+    navigationEl.style.display = "none";
+    editorArea.appendChild(navigationEl);
+    this.views.set("navigation", {
+      activate: () => {
+        milkdownEl.style.display = "none";
+        sourceEl.style.display = "none";
+        navigationEl.style.display = "";
+      },
+      deactivate: () => {
+        navigationEl.style.display = "none";
+      },
+    });
   }
 
   private showDiskUsage(): void {

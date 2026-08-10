@@ -14,7 +14,6 @@ let globalUIService: UIService | null = null;
 
 export class UIService {
   private sidebarOpen: boolean = false;
-  private metaPanelOpen: boolean = false;
   private mediaQuery: MediaQueryList;
   private config: UIServiceConfig;
   private mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
@@ -97,42 +96,11 @@ export class UIService {
   }
 
   /**
-   * Get meta panel open state
-   */
-  isMetaPanelOpen(): boolean {
-    return this.metaPanelOpen;
-  }
-
-  /**
-   * Set meta panel open state
-   */
-  setMetaPanelOpen(open: boolean): void {
-    this.metaPanelOpen = open;
-    const asideEl = document.querySelector(".book-aside");
-    const backdrop = document.querySelector(".book-aside-backdrop");
-    if (open) {
-      asideEl?.classList.add("panel-visible");
-      backdrop?.classList.add("visible");
-    } else {
-      asideEl?.classList.remove("panel-visible");
-      backdrop?.classList.remove("visible");
-    }
-  }
-
-  /**
    * Toggle sidebar (with optional explicit state)
    */
   toggleSidebar(open?: boolean): void {
     const shouldOpen = open ?? !this.isSidebarOpen();
     this.setSidebarOpen(shouldOpen);
-  }
-
-  /**
-   * Toggle meta panel (with optional explicit state)
-   */
-  toggleMetaPanel(open?: boolean): void {
-    const shouldOpen = open ?? !this.isMetaPanelOpen();
-    this.setMetaPanelOpen(shouldOpen);
   }
 
   /**
@@ -145,14 +113,6 @@ export class UIService {
       sidebarBackdrop.className = "book-menu-backdrop";
       sidebarBackdrop.addEventListener("click", () => this.toggleSidebar(false));
       document.body.appendChild(sidebarBackdrop);
-    }
-
-    // Create aside backdrop if it doesn't exist
-    if (!document.querySelector(".book-aside-backdrop")) {
-      const asideBackdrop = document.createElement("div");
-      asideBackdrop.className = "book-aside-backdrop";
-      asideBackdrop.addEventListener("click", () => this.toggleMetaPanel(false));
-      document.body.appendChild(asideBackdrop);
     }
   }
 
@@ -171,7 +131,6 @@ export class UIService {
     // Close sidebars when switching to desktop
     if (this.mediaQuery.matches) {
       this.setSidebarOpen(false);
-      this.setMetaPanelOpen(false);
     }
     this.config.onMediaChange?.();
   }

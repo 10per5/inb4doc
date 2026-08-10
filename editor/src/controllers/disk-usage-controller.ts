@@ -1,8 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
+import * as icons from "@/eta/icons"
+import { isMobileDock } from "@/utils/mobile"
 import { formatBytes } from "@/utils/format"
 import type { TreeIndex } from "@/utils/tree"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { x } from "@/eta/icons"
+import { renderScreen } from "@/eta/views/screen"
 import renderDiskUsage from "@/eta/views/controller/disk-usage"
 
 const PIE_COLORS = [
@@ -38,12 +40,20 @@ export default class DiskUsageController extends Controller {
   load(data: DiskUsageData): void {
     this.diskUsageData = data;
     this.currentMode = "dir";
-    this.element.innerHTML = renderDiskUsage({ x });
+    const mobile = isMobileDock();
+    this.element.innerHTML = renderDiskUsage({
+      icons: icons as Record<string, string>,
+      renderScreen,
+      backIcon: mobile ? "back" : "xmark",
+      backLabel: mobile ? "Back to more" : "Close disk stats",
+    });
     this.renderChart();
   }
 
   close(): void {
-    appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
+    appEvents.emit(AppEvent.ViewChanged, {
+      view: isMobileDock() ? "more" : "editor",
+    });
   }
 
   toggleMode(event: Event): void {

@@ -49,10 +49,6 @@
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Link %>" title="Insert Link"><%~ it.icons.link %></button>
     <span class="toolbar-sep"></span>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.SourceMode] %>" title="Source Mode"><%~ it.icons.codeBrackets %></button>
-    <% if (it.mobileCss) { %>
-      <span class="toolbar-sep toolbar-mobile-only"></span>
-      <button class="btn btn-icon toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleMetaPanel] %>" title="Meta Panel"><%~ it.icons.viewColumns2 %></button>
-    <% } %>
   </div>
   <% } %>
   <div class="toolbar-spacer"></div>
