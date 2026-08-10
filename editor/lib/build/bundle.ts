@@ -336,6 +336,12 @@ function controllerRules(
 const SRC_DOMAIN_RULES: Array<{ name: string; test: string[] }> = [
   // NOTE: listed after the per-controller rules so a controller's paired
   // template (src/eta/views/controller/<id>.ts) is claimed by its controller.
+  // conditions.css (generated into src/eta/styles/) is app stylesheet CSS, not
+  // a template module: claiming it into the styles chunk keeps base rules and
+  // their build-conditional overrides in one emitted css in import order, so
+  // same-specificity overrides (e.g. .dock-fab-menu over .toolbar-menu) resolve
+  // correctly instead of fighting across eta-*.css and styles-*.css links.
+  { name: "styles", test: [".*src/eta/styles/.*"] },
   { name: "eta", test: [".*src/eta/.*"] },
   { name: "components", test: [".*src/components/.*"] },
   { name: "config", test: [".*src/config/.*"] },
