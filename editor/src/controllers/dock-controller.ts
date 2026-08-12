@@ -34,6 +34,7 @@ export default class DockController extends Controller {
       triggerEl: this.fabItem,
       label: "Add",
       items: () => menuRegistry.get("add-block")!,
+      panelClass: "dock-fab-menu",
     })
     this.unsubs.push(
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
@@ -43,13 +44,18 @@ export default class DockController extends Controller {
       }),
       dockStore.subscribe((item) => this.setActiveItem(item)),
     )
-    // Relocate the FAB above the on-screen keyboard when it opens.
+    // Relocate the FAB above the on-screen keyboard when it opens. If the
+    // insert menu is open, re-anchor it too: open keyboard → follow the
+    // selection block; closed → back to the dock strip.
     this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
       const el = this.element as HTMLElement
       const kb = offset > 0
       this.kbOpen = kb
       el.classList.toggle("kb-open", kb)
       el.style.setProperty("--kb-offset", `${offset}px`)
+      if (this.insertMenu?.isOpen) {
+        this.anchorFabMenu().then(() => this.insertMenu?.reposition())
+      }
     })
     this.setActiveItem(dockStore.getActive())
   }

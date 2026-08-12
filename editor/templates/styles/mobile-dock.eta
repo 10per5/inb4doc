@@ -148,15 +148,23 @@
   width: 0;
 }
 
-/* The generic toolbar-menu--right class flushes the panel to the anchor's
- * right edge; in dock mode keep the old 12px inset toward the FAB button. */
-.dock-fab-menu-anchor:not(.is-block-anchored) .toolbar-menu--right {
+/* The FAB popup in dock mode (keyboard closed): opens upward from the dock and
+ * right-aligns toward the FAB button. The panel carries .dock-fab-menu from the
+ * Menu's panelClass; while block-anchored (.is-block-anchored) this rule stops
+ * applying so the shared toolbar-menu--up / --right flip classes position it at
+ * the selection instead. */
+.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu {
+  top: auto;
+  bottom: calc(100% + 12px);
+  left: auto;
   right: 12px;
 }
 
 /* The FAB popup's grouped expanders open leftward — with the panel
- * right-aligned they stay fully on screen on narrow phones. */
-.dock-fab-menu-anchor .toolbar-menu--right .menu-item-submenu .menu-submenu {
+ * right-aligned they stay fully on screen on narrow phones. Dock mode always;
+ * block mode only when the shared flip right-aligned the panel. */
+.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu .menu-item-submenu .menu-submenu,
+.dock-fab-menu-anchor.is-block-anchored .dock-fab-menu.toolbar-menu--right .menu-item-submenu .menu-submenu {
   left: auto;
   right: 100%;
 }

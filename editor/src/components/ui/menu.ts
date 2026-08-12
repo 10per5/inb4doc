@@ -170,6 +170,13 @@ export class Menu {
     this.preferAbove = preferAbove
   }
 
+  // Re-run the flip for an already-open panel (e.g. the dock menu when the
+  // on-screen keyboard opens/closes and the anchor must move back and forth
+  // between the selected block and the dock strip).
+  reposition() {
+    this.positionPanel()
+  }
+
   toggle() { this._isOpen ? this.close() : this.open() }
 
   focus() {
@@ -378,12 +385,15 @@ export class Menu {
   // natural `top: 100%` would push it past the bottom. Anchors at an explicit
   // rect when set (block-anchored menus) or at the mount element otherwise.
   // Measurement happens while visually hidden (see applyPanelFlip) so there's
-  // no reposition flash; results are just class toggles.
+  // no reposition flash; results are class toggles plus a clamped inline left.
+  // Panels with a panelClass own their horizontal alignment in their dock
+  // position, so the horizontal flip only runs for them while block-anchored.
   private positionPanel() {
     const anchor = this.anchorRect ?? this.mountEl.getBoundingClientRect()
     applyPanelFlip(this.panelEl, {
       anchor,
       preferAbove: this.preferAbove,
+      flipX: this.anchorRect !== null || !this.panelClass,
     })
   }
 
