@@ -130,7 +130,7 @@ body {
   padding-bottom: 6em;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1800px) {
   #editor-area {
     max-width: 800px;
     padding: 0;
