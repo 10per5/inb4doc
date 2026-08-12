@@ -3,16 +3,23 @@ import { appEvents, AppEvent } from "@/stores/app-events"
 import { ToolbarCommand } from "@/config/enums"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
+import { trackKeyboardOffset } from "@/utils/mobile"
+import { applyPanelFlip } from "@/utils/popover"
+import type { EditorController } from "@/controllers/editor-controller"
 
 export default class EditToolbarController extends Controller {
   static targets = ["btn", "listGroup"]
+  static outlets = ["editor"]
 
   declare readonly btnTargets: HTMLElement[]
   declare readonly listGroupTarget: HTMLElement
+  declare readonly editorOutletElement: Element
+  declare readonly hasEditorOutlet: boolean
 
   private unsubs: (() => void)[] = []
   private isListContext = false
   private viewIsEditor = true
+  private stopKeyboardTrack: (() => void) | null = null
 
   connect(): void {
     this.element.innerHTML = renderEditToolbar({ icons: icons as Record<string, string> })
@@ -21,15 +28,25 @@ export default class EditToolbarController extends Controller {
         this.isListContext = context.isListItem
         this.renderListOps(context)
         this.updateVisibility()
+        this.positionPopover()
       }),
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.viewIsEditor = view === "editor"
         this.updateVisibility()
+        this.positionPopover()
       }),
     )
+    // Opening/closing the on-screen keyboard (and visual-viewport scrolling)
+    // moves the block the popover is anchored to, so re-anchor on those too.
+    this.stopKeyboardTrack = trackKeyboardOffset(() => {
+      this.positionPopover()
+    })
+    this.updateVisibility()
   }
 
   disconnect(): void {
+    this.stopKeyboardTrack?.()
+    this.stopKeyboardTrack = null
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
   }
@@ -41,6 +58,39 @@ export default class EditToolbarController extends Controller {
     appEvents.emit(AppEvent.ToolbarCommandExec, {
       command: Number(cmd.replace("tc-", "")) as ToolbarCommand,
     })
+  }
+
+  // The panel is a popover anchored at the current selection's block. #edit-
+  // toolbar is a 0×0 fixed anchor whose left/top are set to the block coords;
+  // applyPanelFlip then opens the .edit-toolbar panel above the block when it
+  // fits (preferAbove), flipping below otherwise.
+  private positionPopover(): void {
+    const anchor = this.element as HTMLElement
+    const panel = this.element.querySelector<HTMLElement>(".edit-toolbar")
+    if (!panel || anchor.hidden) return
+    const milk = this.editor()?.getEditor()
+    if (!milk) return
+    void import("@/services/editor-context").then(({ getView }) => {
+      if (anchor.hidden) return
+      const view = getView(milk)
+      const coords = view.coordsAtPos(view.state.selection.from)
+      if (!coords) return
+      anchor.style.left = `${coords.left}px`
+      anchor.style.top = `${coords.top}px`
+      applyPanelFlip(panel, { anchor: coords, preferAbove: true })
+    })
+  }
+
+  // editorOutlet is a blessed Stimulus getter that THROWS when the outlet
+  // element lacks a connected "editor" controller — which is the case on thin
+  // shells before the lazy editor chunk registers. Route every access through
+  // this so positionPopover() never throws on that window.
+  private editor(): EditorController | null {
+    if (!this.hasEditorOutlet) return null
+    return this.application.getControllerForElementAndIdentifier(
+      this.editorOutletElement,
+      "editor",
+    ) as EditorController | null
   }
 
   private renderListOps(context: {

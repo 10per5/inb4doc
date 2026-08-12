@@ -107,19 +107,17 @@
 }
 
 /* On-screen keyboard (mobile): when the visual viewport shrinks, DockController
- * sets --kb-offset on #dock and toggles .kb-open. Lift only the editing chrome
- * (edit toolbar + FAB + its popup anchor) above the keyboard — the rest of the
- * dock stays pinned to the bottom. */
-#dock.kb-open #edit-toolbar {
-  transform: translateY(calc(-1 * var(--kb-offset)));
-}
-
+ * sets --kb-offset on #dock and toggles .kb-open. The FAB relocates to the
+ * bottom-right corner, above the keyboard. position:fixed pulls it out of the
+ * dock flex row (Files/More then split the bar, which is keyboard-covered
+ * anyway). The edit-toolbar is a block-anchored popover (see below), so it
+ * needs no lift here. */
 #dock.kb-open .dock-item--fab {
-  transform: translateY(calc(-12px - var(--kb-offset)));
-}
-
-#dock.kb-open .dock-fab-menu-anchor {
-  bottom: calc(56px + var(--kb-offset));
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--kb-offset) + env(safe-area-inset-bottom, 0) + 12px);
+  transform: none;
+  margin: 0;
 }
 
 .dock {
@@ -129,9 +127,11 @@
   position: relative;
 }
 
-/* Anchor for the FAB popup menu: a 0-height strip above the dock. The shared
- * .toolbar-menu panel is mounted here; this class pins it above the dock and
- * right-aligns it toward the FAB button. Full-width so right:12px tracks it. */
+/* Anchor for the FAB popup menu. Default: a 0-height strip above the dock; the
+ * shared .toolbar-menu panel is mounted here and pinned above the dock via the
+ * shared up/right flip classes. When the keyboard is open the dock controller
+ * adds .is-block-anchored and sets left/top to the selection block's coords,
+ * turning the anchor into a 0×0 fixed point so the menu opens at the block. */
 .dock-fab-menu-anchor {
   position: absolute;
   left: 0;
@@ -141,20 +141,22 @@
   z-index: 300;
 }
 
-/* The FAB popup always opens upward (the dock is pinned to the bottom, so
- * there's never room below) and right-aligns toward the FAB button. The
- * generic up/down flip lives in .toolbar-menu--up (menu.css) and stacks with
- * this class. */
-.dock-fab-menu {
-  top: auto;
-  bottom: calc(100% + 12px);
-  left: auto;
+.dock-fab-menu-anchor.is-block-anchored {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  width: 0;
+}
+
+/* The generic toolbar-menu--right class flushes the panel to the anchor's
+ * right edge; in dock mode keep the old 12px inset toward the FAB button. */
+.dock-fab-menu-anchor:not(.is-block-anchored) .toolbar-menu--right {
   right: 12px;
 }
 
 /* The FAB popup's grouped expanders open leftward — with the panel
  * right-aligned they stay fully on screen on narrow phones. */
-.dock-fab-menu .menu-item-submenu .menu-submenu {
+.dock-fab-menu-anchor .toolbar-menu--right .menu-item-submenu .menu-submenu {
   left: auto;
   right: 100%;
 }
@@ -321,11 +323,16 @@
   text-align: center;
 }
 
-/* Edit toolbar: context-aware strip between the editor and the dock */
+/* Edit toolbar: list-context controls as a block-anchored popover (no bottom
+ * strip). #edit-toolbar is a 0×0 fixed anchor whose left/top are set to the
+ * selection block by EditToolbarController; the .edit-toolbar panel is
+ * absolutely positioned inside it and reuses the shared toolbar-menu--up /
+ * --right flip classes from menu.css. */
 #edit-toolbar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
+  position: fixed;
+  width: 0;
+  height: 0;
+  z-index: 300;
 }
 
 #edit-toolbar[hidden] {
@@ -333,6 +340,11 @@
 }
 
 .edit-toolbar {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -341,6 +353,10 @@
   padding: 0.375rem 0.5rem;
   overflow-x: auto;
   scrollbar-width: none;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .edit-toolbar::-webkit-scrollbar {

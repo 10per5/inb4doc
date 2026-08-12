@@ -7,29 +7,33 @@ import { Menu } from "@/components/ui/menu"
 import { menuRegistry } from "@/config/menu-definitions"
 import { trackKeyboardOffset } from "@/utils/mobile"
 import type { ViewType } from "@/services/view-controller"
+import type { EditorController } from "@/controllers/editor-controller"
 
 export default class DockController extends Controller {
   static targets = ["item", "nav", "fabMenu"]
+  static outlets = ["editor"]
 
   declare readonly itemTargets: HTMLElement[]
   declare readonly navTarget: HTMLElement
   declare readonly fabMenuTarget: HTMLElement
+  declare readonly editorOutletElement: Element
+  declare readonly hasEditorOutlet: boolean
 
   private currentView: ViewType = "editor"
   private unsubs: (() => void)[] = []
   private stopKeyboardTrack: (() => void) | null = null
   private insertMenu: Menu | null = null
+  private kbOpen = false
 
   connect(): void {
-    // Render only into the nav slot — #dock also hosts the edit-toolbar strip,
-    // so it must not be clobbered with innerHTML.
+    // Render only into the nav slot — #dock also hosts the edit-toolbar
+    // popover anchor, so it must not be clobbered with innerHTML.
     this.navTarget.innerHTML = renderDock({ icons: icons as Record<string, string> })
     this.insertMenu = new Menu({
       mountEl: this.fabMenuTarget,
       triggerEl: this.fabItem,
       label: "Add",
       items: () => menuRegistry.get("add-block")!,
-      panelClass: "dock-fab-menu",
     })
     this.unsubs.push(
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
@@ -39,10 +43,11 @@ export default class DockController extends Controller {
       }),
       dockStore.subscribe((item) => this.setActiveItem(item)),
     )
-    // Lift the FAB and edit-toolbar above the on-screen keyboard when it opens.
+    // Relocate the FAB above the on-screen keyboard when it opens.
     this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
       const el = this.element as HTMLElement
       const kb = offset > 0
+      this.kbOpen = kb
       el.classList.toggle("kb-open", kb)
       el.style.setProperty("--kb-offset", `${offset}px`)
     })
@@ -70,7 +75,7 @@ export default class DockController extends Controller {
         if (this.insertMenu?.isOpen) {
           this.insertMenu.close()
         } else {
-          this.insertMenu?.openAndFocusFirst()
+          this.anchorFabMenu().then(() => this.insertMenu?.openAndFocusFirst())
         }
         return
       }
@@ -78,6 +83,42 @@ export default class DockController extends Controller {
       return
     }
     appEvents.emit(AppEvent.ViewChanged, { view: item })
+  }
+
+  // Keyboard open → anchor the insert popup at the selected block (above-first
+  // flip). Keyboard closed → reset to the mount element (the dock strip), which
+  // keeps today's open-upward, right-aligned behavior.
+  private async anchorFabMenu(): Promise<void> {
+    const anchor = this.fabMenuTarget
+    if (!this.kbOpen) {
+      anchor.classList.remove("is-block-anchored")
+      anchor.style.left = ""
+      anchor.style.top = ""
+      this.insertMenu?.setAnchorRect(null)
+      return
+    }
+    const milk = this.editor()?.getEditor()
+    if (!milk) return
+    const { getView } = await import("@/services/editor-context")
+    const view = getView(milk)
+    const coords = view.coordsAtPos(view.state.selection.from)
+    if (!coords) return
+    anchor.classList.add("is-block-anchored")
+    anchor.style.left = `${coords.left}px`
+    anchor.style.top = `${coords.top}px`
+    this.insertMenu?.setAnchorRect(coords, true)
+  }
+
+  // editorOutlet is a blessed Stimulus getter that THROWS when the outlet
+  // element lacks a connected "editor" controller — which is the case on thin
+  // shells before the lazy editor chunk registers. Route every access through
+  // this so activate() never throws on that window.
+  private editor(): EditorController | null {
+    if (!this.hasEditorOutlet) return null
+    return this.application.getControllerForElementAndIdentifier(
+      this.editorOutletElement,
+      "editor",
+    ) as EditorController | null
   }
 
   private get fabItem(): HTMLElement {
