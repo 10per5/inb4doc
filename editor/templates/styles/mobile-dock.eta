@@ -123,6 +123,14 @@
   display: none !important;
 }
 
+/* On-screen keyboard: the browser pans the visual viewport (--vv-offset, the
+ * visualViewport.offsetTop TopbarController tracks) to keep the caret above the
+ * keys. `position: fixed` is layout-viewport-anchored, so the pan drags the bar
+ * off-screen — translateY cancels it and pins the bar to the visible top. */
+.book-layout .app-toolbar.kb-open {
+  transform: translateY(var(--vv-offset, 0px));
+}
+
 #dock {
   position: fixed;
   left: 0;

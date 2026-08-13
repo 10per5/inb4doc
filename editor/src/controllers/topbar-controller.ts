@@ -10,7 +10,7 @@ import { pressTwiceButton } from "@/components/ui/press-twice-button";
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
 import { hasFunc, AppFunc } from "$/build/build-mode";
-import { isMobileDock } from "@/utils/mobile";
+import { isMobileDock, trackViewportPan } from "@/utils/mobile";
 import * as focusHandler from "@/services/focus-handler";
 
 export default class extends Controller {
@@ -42,6 +42,17 @@ export default class extends Controller {
       this.unsubs.push(
         appEvents.on(AppEvent.ViewChanged, ({ view }) => {
           ;(this.element as HTMLElement).hidden = view !== "editor";
+        }),
+      );
+      // On-screen keyboard: the browser pans the visual viewport (offsetTop)
+      // to keep the caret above the keys, which drags the layout-anchored
+      // fixed topbar off-screen. Cancel the pan with translateY (see
+      // .app-toolbar.kb-open in mobile-dock.eta).
+      this.unsubs.push(
+        trackViewportPan((offsetTop) => {
+          const el = this.element as HTMLElement;
+          el.classList.toggle("kb-open", offsetTop > 0);
+          el.style.setProperty("--vv-offset", `${offsetTop}px`);
         }),
       );
     }
