@@ -62,6 +62,6 @@
 }
 
 /* Desktop: the meta panel lives in the aside (no close button needed). */
-.book-aside .screen-header {
+.book-rightpanel .screen-header {
   display: none;
 }

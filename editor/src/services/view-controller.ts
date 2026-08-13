@@ -57,21 +57,12 @@ export class ViewController {
           this.switchTo("editor");
         }
       }),
-      appEvents.on(AppEvent.LayoutChanged, ({ width, meta }) => {
+      appEvents.on(AppEvent.LayoutChanged, () => {
         if (isMobileDock()) return;
-        if (width === "desktop") {
-          // Meta is a column on desktop — never a center screen.
-          if (this.current === "meta") this.switchTo("editor");
-          return;
-        }
-        if (width === "tablet") {
-          // Meta as the center screen; toggling it off returns to the editor.
-          if (meta) {
-            if (this.current !== "meta") this.switchTo("meta");
-          } else if (this.current === "meta") {
-            this.switchTo("editor");
-          }
-        }
+        // The meta panel is only a center-screen fullview on mobile (reached
+        // via the "more" screen). On tablet it is a left-bar panel and on
+        // desktop the aside column — so drop any leftover center meta view.
+        if (this.current === "meta") this.switchTo("editor");
       }),
     );
   }
@@ -82,9 +73,9 @@ export class ViewController {
     if (type === "navigation") {
       this.ensureNavigationScreenView()
       // The navigation screen is the nav tree as the center view — collapse the
-      // left nav panel so the tree isn't shown twice. setNav(false) no-ops when
-      // it's already off (mobile drawer is independent of this state).
-      LayoutService.getInstance().setNav(false)
+      // left nav panel so the tree isn't shown twice. setLeftPanel(false)
+      // no-ops when it's already off (mobile drawer is independent of this state).
+      LayoutService.getInstance().setLeftPanel(false)
     }
     this.views.get(this.current)?.deactivate()
     this.current = type

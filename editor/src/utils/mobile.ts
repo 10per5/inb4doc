@@ -44,27 +44,3 @@ export function trackKeyboardOffset(onChange: (offset: number) => void): () => v
     window.removeEventListener("resize", measure);
   };
 }
-
-// Track the visual-viewport pan the browser applies when the on-screen keyboard
-// opens (visualViewport.offsetTop): the page is scrolled to keep the caret above
-// the keys. `position: fixed` elements are anchored to the layout viewport, so
-// the pan drags them off the visible area — translateY(offsetTop) cancels it.
-// Fires immediately with the current offset, then on every visual viewport
-// resize/scroll and window resize. Returns an unsubscribe.
-export function trackViewportPan(onChange: (offsetTop: number) => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const vv = window.visualViewport;
-  const measure = (): void => {
-    if (!vv) return;
-    onChange(vv.offsetTop);
-  };
-  vv?.addEventListener("resize", measure);
-  vv?.addEventListener("scroll", measure);
-  window.addEventListener("resize", measure);
-  measure();
-  return () => {
-    vv?.removeEventListener("resize", measure);
-    vv?.removeEventListener("scroll", measure);
-    window.removeEventListener("resize", measure);
-  };
-}

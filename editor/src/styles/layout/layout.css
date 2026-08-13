@@ -8,7 +8,7 @@
 
 /* Mobile: sidebar as slide-in drawer */
 @media (max-width: 767px) {
-  .book-menu {
+  .book-leftpanel {
     position: fixed;
     top: 0;
     left: 0;
@@ -20,11 +20,11 @@
     transition: transform 0.3s ease;
   }
 
-  .book-menu.sidebar-open {
+  .book-leftpanel.sidebar-open {
     transform: translateX(0);
   }
 
-  .book-menu-backdrop {
+  .book-leftpanel-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
@@ -34,7 +34,7 @@
     transition: opacity 0.3s ease;
   }
 
-  .book-menu-backdrop.visible {
+  .book-leftpanel-backdrop.visible {
     opacity: 1;
     pointer-events: auto;
   }
@@ -69,8 +69,8 @@
 
 @media print {
   .app-toolbar,
-  .book-menu,
-  .book-aside,
+  .book-leftpanel,
+  .book-rightpanel,
   .milkdown-block-handle,
   .sidebar-provider-bar {
     display: none !important;

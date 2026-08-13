@@ -14,8 +14,8 @@
   padding-bottom: 0;
 }
 
-.mobile-layout .book-menu,
-.mobile-layout .book-aside {
+.mobile-layout .book-leftpanel,
+.mobile-layout .book-rightpanel {
   display: none;
 }
 
@@ -123,14 +123,6 @@
   display: none !important;
 }
 
-/* On-screen keyboard: the browser pans the visual viewport (--vv-offset, the
- * visualViewport.offsetTop TopbarController tracks) to keep the caret above the
- * keys. `position: fixed` is layout-viewport-anchored, so the pan drags the bar
- * off-screen — translateY cancels it and pins the bar to the visible top. */
-.book-layout .app-toolbar.kb-open {
-  transform: translateY(var(--vv-offset, 0px));
-}
-
 #dock {
   position: fixed;
   left: 0;
@@ -155,6 +147,17 @@
   bottom: calc(var(--kb-offset) + env(safe-area-inset-bottom, 0) + 12px);
   transform: none;
   margin: 0;
+}
+
+/* MobileShrink layout (keyboard open): the on-screen keyboard pans the visual
+ * viewport to keep the caret visible, which can carry the fixed topbar/dock out
+ * of view. LayoutService resolves the width to MobileShrink while the keyboard
+ * is open and publishes the overlay height as --kb-offset on :root; shrinking
+ * the scroll container to the remaining visual viewport keeps the fixed bars in
+ * the visible area — the editor content scrolls above the keys instead. */
+body.layout-mobile-shrink #app,
+body.layout-mobile-shrink .book-layout {
+  height: calc(100vh - var(--kb-offset, 0px));
 }
 
 .dock {

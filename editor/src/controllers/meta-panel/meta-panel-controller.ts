@@ -92,9 +92,9 @@ export default class extends Controller {
     if (isMobileDock()) {
       appEvents.emit(AppEvent.ViewChanged, { view: "more" })
     } else {
-      // Desktop: closes the aside column; tablet (meta screen): toggles the
-      // panel off, which returns the center view to the editor.
-      LayoutService.getInstance().setMeta(false)
+      // Desktop: closes the aside column; tablet: toggles the left-bar panel
+      // off, restoring the nav tree.
+      LayoutService.getInstance().setRightPanel(false)
     }
   }
 
@@ -120,14 +120,15 @@ export default class extends Controller {
         level,
         Number.isNaN(pos) ? undefined : pos
       )
-    // Full-screen meta panel (tablet center screen / mobile "more" screen): the
-    // editor is hidden beneath it. Leave the screen first, then scroll once the
-    // editor is visible again.
-    if (this.element.classList.contains("fullview-view")) {
+    // Full-screen meta panel (mobile "more" screen): the editor is hidden
+    // beneath it. Leave the screen first, then scroll once the editor is
+    // visible again. On desktop (aside column) and tablet (left-bar panel) the
+    // editor stays visible, so scroll directly.
+    if (LayoutService.getInstance().isCenterScreen("meta")) {
       if (isMobileDock()) {
         appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
       } else {
-        LayoutService.getInstance().setMeta(false)
+        LayoutService.getInstance().setRightPanel(false)
       }
       requestAnimationFrame(() => requestAnimationFrame(() => scroll()))
       return
