@@ -22,4 +22,21 @@
       <span class="edit-toolbar-icon"><%~ it.icons.square %></span>
     </button>
   </div>
+  <div class="edit-toolbar-group" data-edit-toolbar-target="tableGroup" hidden>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-14" data-action="edit-toolbar#exec" title="Add row" aria-label="Add row">
+      <span class="edit-toolbar-icon"><%~ it.icons.tableRows %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-15" data-action="edit-toolbar#exec" title="Add column" aria-label="Add column">
+      <span class="edit-toolbar-icon"><%~ it.icons.table2Columns %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-16" data-action="edit-toolbar#exec" title="Remove row" aria-label="Remove row">
+      <span class="edit-toolbar-icon"><%~ it.icons.minus %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-17" data-action="edit-toolbar#exec" title="Delete column" aria-label="Delete column">
+      <span class="edit-toolbar-icon"><%~ it.icons.xmarkSquare %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-18" data-action="edit-toolbar#exec" title="Remove table" aria-label="Remove table">
+      <span class="edit-toolbar-icon"><%~ it.icons.trash %></span>
+    </button>
+  </div>
 </div>

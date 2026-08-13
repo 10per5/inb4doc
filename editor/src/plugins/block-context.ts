@@ -1,21 +1,27 @@
 import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import {
+  ActiveBlockType,
   EMPTY_BLOCK_CONTEXT,
   type ActiveBlockContext,
 } from "@/config/enums/block-context"
 
 /**
  * Resolve the block the current selection sits in. Walks up from the deepest
- * resolved position to find a `list_item` node, then classifies it:
- * - `task` when the item carries a boolean `checked` attr (GFM task list)
- * - `ordered` / `bullet` from the parent list node
- * Everything else (paragraphs, headings, code blocks, …) is "not a list item".
+ * resolved position:
+ * - a `table` ancestor classifies the selection as `Table` (deepest match
+ *   wins, so a table nested inside a list item reports as table context)
+ * - a `list_item` node is classified as `TaskList` / `OrderedList` /
+ *   `BulletList` from its `checked` attr and parent list node
+ * Everything else (paragraphs, headings, code blocks, …) is `None`.
  */
 export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
   const { $from } = state.selection
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d)
+    if (node.type.name === "table") {
+      return { type: ActiveBlockType.Table, checked: null, canSink: false }
+    }
     if (node.type.name !== "list_item") continue
     // The item's index within its parent list (depth d-1). sinkListItem fails
     // when the item is the first child of the list (startIndex == 0), so only
@@ -23,12 +29,14 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
     const canSink = $from.index(d - 1) > 0
     const checked = node.attrs.checked
     if (typeof checked === "boolean") {
-      return { isListItem: true, listType: "task", checked, canSink }
+      return { type: ActiveBlockType.TaskList, checked, canSink }
     }
     const parentName = $from.node(d - 1).type.name
     return {
-      isListItem: true,
-      listType: parentName === "ordered_list" ? "ordered" : "bullet",
+      type:
+        parentName === "ordered_list"
+          ? ActiveBlockType.OrderedList
+          : ActiveBlockType.BulletList,
       checked: null,
       canSink,
     }

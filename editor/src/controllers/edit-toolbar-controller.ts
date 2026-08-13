@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { ToolbarCommand } from "@/config/enums"
+import { ActiveBlockType, type ActiveBlockContext } from "@/config/enums/block-context"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
 import { trackKeyboardOffset } from "@/utils/mobile"
@@ -8,16 +9,17 @@ import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/pop
 import type { EditorController } from "@/controllers/editor-controller"
 
 export default class EditToolbarController extends Controller {
-  static targets = ["btn", "listGroup"]
+  static targets = ["btn", "listGroup", "tableGroup"]
   static outlets = ["editor"]
 
   declare readonly btnTargets: HTMLElement[]
   declare readonly listGroupTarget: HTMLElement
+  declare readonly tableGroupTarget: HTMLElement
   declare readonly editorOutletElement: Element
   declare readonly hasEditorOutlet: boolean
 
   private unsubs: (() => void)[] = []
-  private isListContext = false
+  private currentType: ActiveBlockType = ActiveBlockType.None
   private viewIsEditor = true
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
@@ -26,8 +28,8 @@ export default class EditToolbarController extends Controller {
     this.element.innerHTML = renderEditToolbar({ icons: icons as Record<string, string> })
     this.unsubs.push(
       appEvents.on(AppEvent.BlockContextChanged, ({ context }) => {
-        this.isListContext = context.isListItem
-        this.renderListOps(context)
+        this.currentType = context.type
+        this.renderToolbarOps(context)
         this.updateVisibility()
         this.positionPopover()
       }),
@@ -85,7 +87,7 @@ export default class EditToolbarController extends Controller {
       if (!cursor) return
       const block = getBlockRectAt(view, from) ?? cursor
       this.setInViewport(this.isBlockInView(block))
-      if (!this.inViewport || !this.viewIsEditor || !this.isListContext) return
+      if (!this.inViewport || !this.viewIsEditor || this.currentType === ActiveBlockType.None) return
       applyPanelFlip(panel, {
         anchor: block,
         anchorCursor: cursor,
@@ -129,30 +131,38 @@ export default class EditToolbarController extends Controller {
     ) as EditorController | null
   }
 
-  private renderListOps(context: {
-    isListItem: boolean
-    listType: "bullet" | "ordered" | "task" | null
-    checked: boolean | null
-    canSink: boolean
-  }): void {
-    this.listGroupTarget.hidden = !context.isListItem
-    const inList = context.isListItem
+  private renderToolbarOps(context: ActiveBlockContext): void {
+    const inList =
+      context.type === ActiveBlockType.BulletList ||
+      context.type === ActiveBlockType.OrderedList ||
+      context.type === ActiveBlockType.TaskList
+    const inTable = context.type === ActiveBlockType.Table
+    this.listGroupTarget.hidden = !inList
+    this.tableGroupTarget.hidden = !inTable
     // Indent controls: always shown for a list item; increase indent is
     // disabled when the item can't sink (first child of its parent list).
     this.setVisible("tc-8", inList)
     this.setVisible("tc-7", inList)
     this.setDisabled("tc-7", inList && !context.canSink)
     // List-kind conversions: hide the button matching the current kind.
-    this.setVisible("tc-11", inList && context.listType !== "bullet")
-    this.setVisible("tc-13", inList && context.listType !== "ordered")
-    this.setVisible("tc-12", inList && context.listType !== "task")
+    this.setVisible("tc-11", inList && context.type !== ActiveBlockType.BulletList)
+    this.setVisible("tc-13", inList && context.type !== ActiveBlockType.OrderedList)
+    this.setVisible("tc-12", inList && context.type !== ActiveBlockType.TaskList)
     // Task on/off: show the action matching the current checked state.
-    this.setVisible("tc-9", inList && context.listType === "task" && context.checked === false)
-    this.setVisible("tc-10", inList && context.listType === "task" && context.checked === true)
+    this.setVisible("tc-9", context.type === ActiveBlockType.TaskList && context.checked === false)
+    this.setVisible("tc-10", context.type === ActiveBlockType.TaskList && context.checked === true)
+    // All five table actions apply to whichever cell is focused.
+    for (const cmd of ["tc-14", "tc-15", "tc-16", "tc-17", "tc-18"]) {
+      this.setVisible(cmd, inTable)
+    }
   }
 
   private updateVisibility(): void {
-    ;(this.element as HTMLElement).hidden = !(this.viewIsEditor && this.isListContext && this.inViewport)
+    ;(this.element as HTMLElement).hidden = !(
+      this.viewIsEditor &&
+      this.currentType !== ActiveBlockType.None &&
+      this.inViewport
+    )
   }
 
   private setVisible(cmd: string, visible: boolean): void {

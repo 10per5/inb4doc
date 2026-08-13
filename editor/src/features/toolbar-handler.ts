@@ -335,6 +335,7 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
 
     const { editorContext } = await import("@/services/editor-context")
     const { commandService } = await import("@/services/command-service")
+    const { isInTable, selectedRect } = await import("@milkdown/kit/prose/tables")
     await Promise.all([editorContext.load(), commandService.load()])
 
     if (command === ToolbarCommand.Link) {
@@ -374,6 +375,28 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
           setTaskChecked(view, true); break
         case ToolbarCommand.UnmarkTask:
           setTaskChecked(view, false); break
+        case ToolbarCommand.AddRow:
+          commands.call(commandService.addRowAfterCommand.key); break
+        case ToolbarCommand.AddCol:
+          commands.call(commandService.addColAfterCommand.key); break
+        case ToolbarCommand.RemoveRow:
+          if (isInTable(view.state)) {
+            const { top } = selectedRect(view.state)
+            commands.call(commandService.selectRowCommand.key, { index: top })
+            commands.call(commandService.deleteSelectedCellsCommand.key)
+          }
+          break
+        case ToolbarCommand.DeleteCol:
+          if (isInTable(view.state)) {
+            const { left } = selectedRect(view.state)
+            commands.call(commandService.selectColCommand.key, { index: left })
+            commands.call(commandService.deleteSelectedCellsCommand.key)
+          }
+          break
+        case ToolbarCommand.RemoveTable:
+          commands.call(commandService.selectTableCommand.key)
+          commands.call(commandService.deleteSelectedCellsCommand.key)
+          break
       }
     })
   })

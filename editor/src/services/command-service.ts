@@ -80,6 +80,30 @@ class CommandService {
   get toggleStrikethroughCommand(): $Command<unknown> {
     return this._gfm!.toggleStrikethroughCommand
   }
+
+  get addRowAfterCommand(): $Command<unknown> {
+    return this._gfm!.addRowAfterCommand
+  }
+
+  get addColAfterCommand(): $Command<unknown> {
+    return this._gfm!.addColAfterCommand
+  }
+
+  get selectRowCommand(): $Command<{ index: number; pos?: number }> {
+    return this._gfm!.selectRowCommand
+  }
+
+  get selectColCommand(): $Command<{ index: number; pos?: number }> {
+    return this._gfm!.selectColCommand
+  }
+
+  get selectTableCommand(): $Command<unknown> {
+    return this._gfm!.selectTableCommand
+  }
+
+  get deleteSelectedCellsCommand(): $Command<unknown> {
+    return this._gfm!.deleteSelectedCellsCommand
+  }
 }
 
 export const commandService = new CommandService()

@@ -19,4 +19,9 @@ export enum ToolbarCommand {
   BulletList,
   TaskList,
   OrderedList,
+  AddRow,
+  AddCol,
+  RemoveRow,
+  DeleteCol,
+  RemoveTable,
 }

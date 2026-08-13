@@ -112,6 +112,9 @@ There is no full-screen loading overlay. `shell.eta` renders skeleton placeholde
 - **Stimulus attributes in templates**: Use `<%= it.ENUM_PREFIX %><%= it.Enum.Value %>` for `data-action` values. Use `data-controller="name"` for Stimulus bindings. Use `data-name-target="target"` for targets.
 - **Partials are compiled at build time** — the Eta compiler never ships to the browser. Compiled templates (`.eta.ts`) are used for runtime rendering (e.g., `mobile.eta`).
 - **Icons**: Pass SVG icon strings via the template context (`it.icons.boldIcon`), not imported directly in templates.
+- **Looking up icons**: `src/eta/icons.ts` is auto-generated from the iconoir set (`lib/build/iconoir.ts`) and exports every icon as `export const <camelCaseName> = "<svg …>"`. To find available names by concept, grep the declarations, not the bodies:
+  `grep -oE "^export const [a-zA-Z0-9_]+" src/eta/icons.ts | sed "s/export const //" | grep -iE "table|plus|trash"`.
+  Then verify the exact exported name exists before using it in a template (an icon used under a wrong name is `undefined` and renders as nothing). Icons render through `<%~ it.icons.<name> %>` (raw output); never `<%=`.
 - **Eta tags used in this codebase** — exactly three, so pick deliberately:
   - `<% code %>` — scriptlet (control flow). Used for `if`/`for` conditionals, nothing else.
   - `<%= it.x %>` — **escaped** output (compiles to `__eta.e(it.x)`). Use for all text, labels, and attribute values.
