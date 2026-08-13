@@ -7,7 +7,9 @@ import type { TextState } from "@/config/enums/text-state"
  * True when the mark is active over the *whole* selection:
  * - collapsed cursor → the marks in effect at that position (`storedMarks`
  *   after a toggle, falling back to the marks around the cursor);
- * - spanned selection → every text node in the range must carry the mark.
+ * - spanned selection → every text node in the range must carry the mark; a
+ *   range with no text nodes (e.g. a leaf block such as an HR) reports
+ *   inactive, since nothing in it can carry a mark.
  * `rangeHasMark` is deliberately avoided — it reports "any sub-range has the
  * mark", which would light up the button for a selection that is only
  * partially formatted. Text nodes are uniformly marked, so checking each text
@@ -19,12 +21,14 @@ function markActive(state: EditorState, type: MarkType): boolean {
     return !!type.isInSet(state.storedMarks || state.selection.$from.marks())
   }
   let active = true
+  let hasText = false
   state.doc.nodesBetween(from, to, (node) => {
     if (!active || !node.isText) return
+    hasText = true
     if (node.marks.length === 0 || !type.isInSet(node.marks)) active = false
     return active
   })
-  return active
+  return active && hasText
 }
 
 export function getTextState(state: EditorState): TextState {
