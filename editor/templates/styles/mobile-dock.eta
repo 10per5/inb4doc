@@ -94,6 +94,14 @@
   display: none !important;
 }
 
+/* On-screen keyboard: the browser pans the visual viewport (--vv-offset, the
+ * visualViewport.offsetTop TopbarController tracks) to keep the caret above
+ * the keys, which pushes the sticky topbar off-screen. translateY cancels the
+ * pan so the bar stays pinned at the visible top while the keyboard is open. */
+.book-layout .app-toolbar.kb-open {
+  transform: translateY(var(--vv-offset, 0px));
+}
+
 #dock {
   position: fixed;
   left: 0;

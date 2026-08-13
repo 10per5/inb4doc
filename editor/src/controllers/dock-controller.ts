@@ -48,7 +48,7 @@ export default class DockController extends Controller {
     // Relocate the FAB above the on-screen keyboard when it opens. If the
     // insert menu is open, re-anchor it too: open keyboard → follow the
     // selection block; closed → back to the dock strip.
-    this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
+    this.stopKeyboardTrack = trackKeyboardOffset(({ offset }) => {
       const el = this.element as HTMLElement
       const kb = offset > 0
       this.kbOpen = kb
