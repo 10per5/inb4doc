@@ -20,13 +20,29 @@
 }
 
 .mobile-layout .book-layout {
+  /* Clear the fixed dock (bar + its own safe-area padding). 56px = the .dock
+   * bar; #dock already adds safe-area below the bar, so clearing it means
+   * matching the bar height plus the same env() term. */
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
 }
 
+/* The fixed topbar overlays the top 48px of the scrollport, so keep the
+ * editor content clear of it — but only while the bar is visible (editor
+ * view). Fullviews hide it and render their own header at the very top. */
+.mobile-layout .book-layout:has(.app-toolbar:not([hidden])) {
+  padding-top: 48px;
+}
+
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
+ * Fixed (not sticky) so it stays at the top of the visible area even when the
+ * on-screen keyboard pans the visual viewport to keep the caret visible.
  * Scoped under .book-layout to beat the flag-blind 28px overrides in
  * src/styles/app/toolbar.css and src/styles/layout/responsive.css. */
 .mobile-layout .book-layout .app-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 48px;
   min-height: 48px;
   padding: 0 0.75rem;
@@ -52,9 +68,15 @@
 }
 <% } else { %>
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
+ * Fixed (not sticky) so it stays at the top of the visible area even when the
+ * on-screen keyboard pans the visual viewport to keep the caret visible.
  * Scoped under .book-layout to beat the flag-blind 28px overrides in
  * src/styles/app/toolbar.css and src/styles/layout/responsive.css. */
 .book-layout .app-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 48px;
   min-height: 48px;
   padding: 0 0.75rem;
@@ -80,10 +102,17 @@
 }
 
 /* Keep the scrollable content clear of the fixed dock (bar + its own safe-area
- * padding). 56px = the .dock bar; #dock already adds safe-area below the bar,
+ * padding): 56px = the .dock bar; #dock already adds safe-area below the bar,
  * so clearing it means matching the bar height plus the same env() term. */
 .book-layout {
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
+}
+
+/* The fixed topbar overlays the top 48px of the scrollport, so keep the
+ * editor content clear of it — but only while the bar is visible (editor
+ * view). Fullviews hide it and render their own header at the very top. */
+.book-layout:has(.app-toolbar:not([hidden])) {
+  padding-top: 48px;
 }
 <% } %>
 
@@ -92,14 +121,6 @@
 #app-toolbar[hidden],
 .app-toolbar[hidden] {
   display: none !important;
-}
-
-/* On-screen keyboard: the browser pans the visual viewport (--vv-offset, the
- * visualViewport.offsetTop TopbarController tracks) to keep the caret above
- * the keys, which pushes the sticky topbar off-screen. translateY cancels the
- * pan so the bar stays pinned at the visible top while the keyboard is open. */
-.book-layout .app-toolbar.kb-open {
-  transform: translateY(var(--vv-offset, 0px));
 }
 
 #dock {

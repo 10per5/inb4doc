@@ -10,7 +10,7 @@ import { pressTwiceButton } from "@/components/ui/press-twice-button";
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
 import { hasFunc, AppFunc } from "$/build/build-mode";
-import { isMobileDock, trackKeyboardOffset } from "@/utils/mobile";
+import { isMobileDock } from "@/utils/mobile";
 import * as focusHandler from "@/services/focus-handler";
 
 export default class extends Controller {
@@ -20,7 +20,6 @@ export default class extends Controller {
   declare readonly flushBtnTarget: HTMLButtonElement;
 
   private unsubs: (() => void)[] = [];
-  private stopKeyboardTrack: (() => void) | null = null;
   private menus: Menu[] = [];
   private menusByMnemonic = new Map<string, Menu>();
   private boundKeyDown = (e: KeyboardEvent) => {};
@@ -45,15 +44,6 @@ export default class extends Controller {
           ;(this.element as HTMLElement).hidden = view !== "editor";
         }),
       );
-      // On-screen keyboard: the browser pans the visual viewport (offsetTop)
-      // to keep the caret above the keys, which pushes the sticky topbar
-      // off-screen. Track it so the bar can cancel the pan and stay pinned at
-      // the visible top (see .app-toolbar.kb-open in mobile-dock.eta).
-      this.stopKeyboardTrack = trackKeyboardOffset(({ offset, offsetTop }) => {
-        const el = this.element as HTMLElement;
-        el.classList.toggle("kb-open", offset > 0);
-        el.style.setProperty("--vv-offset", `${offsetTop}px`);
-      });
     }
     if (hasFunc(AppFunc.ToolbarQuickNav)) {
       this.boundKeyDown = this.onKeyDown.bind(this);
@@ -80,8 +70,6 @@ export default class extends Controller {
     this.menus = [];
     this.menusByMnemonic.clear();
     focusHandler.clear();
-    this.stopKeyboardTrack?.();
-    this.stopKeyboardTrack = null;
     if (this.boundKeyDown) document.removeEventListener("keydown", this.boundKeyDown, true);
     if (this.boundKeyUp) document.removeEventListener("keyup", this.boundKeyUp, true);
     this.unsubs.forEach((u) => u());

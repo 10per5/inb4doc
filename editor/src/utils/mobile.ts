@@ -23,33 +23,16 @@ export function isMobileDock(): boolean {
   return currentBuildMode() === BuildMode.GuiMobile || isMobileViewport();
 }
 
-// Visual-viewport metrics captured when the on-screen keyboard changes.
-export interface KeyboardOffset {
-  // Space between the keyboard's top edge and the layout viewport bottom. 0
-  // when no keyboard is shown (or it fits entirely within the viewport).
-  offset: number;
-  // The visual viewport's top edge in layout-viewport coordinates — the pan
-  // the browser applies to keep the focused field visible above the keyboard.
-  offsetTop: number;
-  // The visual viewport's current height (the area not covered by the keyboard
-  // / browser chrome).
-  height: number;
-}
-
 // Track the on-screen keyboard: opening it shrinks the visual viewport, and the
 // space between its bottom edge and the layout viewport bottom is the keyboard's
-// overlay height. Fires immediately with the current metrics, then on every
+// overlay height. Fires immediately with the current offset, then on every
 // visual viewport resize/scroll and window resize. Returns an unsubscribe.
-export function trackKeyboardOffset(onChange: (k: KeyboardOffset) => void): () => void {
+export function trackKeyboardOffset(onChange: (offset: number) => void): () => void {
   if (typeof window === "undefined") return () => {};
   const vv = window.visualViewport;
   const measure = (): void => {
     if (!vv) return;
-    onChange({
-      offset: Math.max(0, window.innerHeight - (vv.offsetTop + vv.height)),
-      offsetTop: vv.offsetTop,
-      height: vv.height,
-    });
+    onChange(Math.max(0, window.innerHeight - (vv.offsetTop + vv.height)));
   };
   vv?.addEventListener("resize", measure);
   vv?.addEventListener("scroll", measure);
