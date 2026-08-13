@@ -1,5 +1,5 @@
 import { colors } from "@/config/theme";
-import { x, warningCircle, infoCircle, checkCircle } from "@/eta/icons";
+import { xmark, warningCircle, infoCircle, checkCircle } from "@/eta/icons";
 
 export type NotificationType = "danger" | "info" | "warning" | "success";
 
@@ -20,7 +20,7 @@ const NOTIFICATION_BG: Record<NotificationType, string> = {
 };
 
 const NOTIFICATION_ICONS: Record<NotificationType, string> = {
-  danger: x,
+  danger: xmark,
   warning: warningCircle,
   info: infoCircle,
   success: checkCircle,
@@ -60,7 +60,7 @@ export function showNotification(msg: string, opts?: NotificationOptions): void 
 
   const closeEl = document.createElement("button");
   closeEl.className = "prdc-notif-close";
-  closeEl.innerHTML = x;
+  closeEl.innerHTML = xmark;
   closeEl.addEventListener("click", (e) => {
     e.stopPropagation();
     el.remove();

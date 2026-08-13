@@ -1,16 +1,26 @@
-export type ListBlockKind = "bullet" | "ordered" | "task"
+/**
+ * The kinds of block the quick/edit toolbar has a button mapping for.
+ * `None` = no toolbar context (plain paragraph, heading, …).
+ */
+export enum ActiveBlockType {
+  None = 0,
+  BulletList = 1,
+  OrderedList = 2,
+  TaskList = 3,
+  Table = 4,
+  Blockquote = 5,
+}
 
 export interface ActiveBlockContext {
-  isListItem: boolean
-  listType: ListBlockKind | null
+  type: ActiveBlockType
+  /** Task list only: the item's checked state (null outside task lists). */
   checked: boolean | null
-  /** True when the item is not the first child of its parent list, so it can sink deeper. */
+  /** List items only: true when not the first child of its parent list, so it can sink deeper. */
   canSink: boolean
 }
 
 export const EMPTY_BLOCK_CONTEXT: ActiveBlockContext = {
-  isListItem: false,
-  listType: null,
+  type: ActiveBlockType.None,
   checked: null,
   canSink: false,
 }

@@ -22,3 +22,25 @@ export function isMobileDock(): boolean {
   if (!hasFunc(AppFunc.MobileDock)) return false;
   return currentBuildMode() === BuildMode.GuiMobile || isMobileViewport();
 }
+
+// Track the on-screen keyboard: opening it shrinks the visual viewport, and the
+// space between its bottom edge and the layout viewport bottom is the keyboard's
+// overlay height. Fires immediately with the current offset, then on every
+// visual viewport resize/scroll and window resize. Returns an unsubscribe.
+export function trackKeyboardOffset(onChange: (offset: number) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const vv = window.visualViewport;
+  const measure = (): void => {
+    if (!vv) return;
+    onChange(Math.max(0, window.innerHeight - (vv.offsetTop + vv.height)));
+  };
+  vv?.addEventListener("resize", measure);
+  vv?.addEventListener("scroll", measure);
+  window.addEventListener("resize", measure);
+  measure();
+  return () => {
+    vv?.removeEventListener("resize", measure);
+    vv?.removeEventListener("scroll", measure);
+    window.removeEventListener("resize", measure);
+  };
+}

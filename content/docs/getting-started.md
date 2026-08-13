@@ -5,8 +5,6 @@ weight: 1
 
 # Getting Started
 
-![1.00](/docs/image/image-0he7dh.png)
-
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/engine/install/) — primary build method

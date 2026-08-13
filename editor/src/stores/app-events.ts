@@ -12,6 +12,7 @@ import type { MetaPanelData } from "@/entities/Frontmatter"
 import type { ProviderType } from "@/providers/index"
 import type { ToolbarCommand, SlashCommand } from "@/config/enums"
 import type { ActiveBlockContext } from "@/config/enums/block-context"
+import type { TextState } from "@/config/enums/text-state"
 import type { FileEntry } from "@/config/storage-keys"
 
 
@@ -75,6 +76,8 @@ export enum AppEvent {
   ToolbarCommandExec = "toolbar-command-exec",
   InsertBlockCommand = "insert-block-command",
   BlockContextChanged = "block-context-changed",
+  TextStateChanged = "text-state-changed",
+  HistoryChanged = "history-changed",
   ScrollToText = "scroll-to-text",
   LinkDialogRequested = "link-dialog-requested",
 
@@ -143,6 +146,8 @@ export interface AppEventPayloads {
   [AppEvent.SourceModeChanged]:     { source: boolean }
   [AppEvent.SourceApplyRequested]:  { path: string; content: string }
   [AppEvent.BlockContextChanged]:   { context: ActiveBlockContext }
+  [AppEvent.TextStateChanged]:      TextState
+  [AppEvent.HistoryChanged]:         { canUndo: boolean; canRedo: boolean }
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
   [AppEvent.InsertBlockCommand]:    { command: SlashCommand; level?: number }
   [AppEvent.ScrollToText]:          { query: string; matchIndex: number; snippetText?: string }

@@ -84,8 +84,8 @@ export class UIService {
    */
   setSidebarOpen(open: boolean): void {
     this.sidebarOpen = open;
-    const sidebarEl = document.querySelector(".book-menu");
-    const backdrop = document.querySelector(".book-menu-backdrop");
+    const sidebarEl = document.querySelector(".book-leftpanel");
+    const backdrop = document.querySelector(".book-leftpanel-backdrop");
     if (open) {
       sidebarEl?.classList.add("sidebar-open");
       backdrop?.classList.add("visible");
@@ -108,9 +108,9 @@ export class UIService {
    */
   private setupDOM(): void {
     // Create sidebar backdrop if it doesn't exist
-    if (!document.querySelector(".book-menu-backdrop")) {
+    if (!document.querySelector(".book-leftpanel-backdrop")) {
       const sidebarBackdrop = document.createElement("div");
-      sidebarBackdrop.className = "book-menu-backdrop";
+      sidebarBackdrop.className = "book-leftpanel-backdrop";
       sidebarBackdrop.addEventListener("click", () => this.toggleSidebar(false));
       document.body.appendChild(sidebarBackdrop);
     }

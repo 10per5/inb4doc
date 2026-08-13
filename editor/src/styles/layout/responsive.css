@@ -131,8 +131,8 @@
 
 @media print {
   .app-toolbar,
-  .book-menu,
-  .book-aside,
+  .book-leftpanel,
+  .book-rightpanel,
   .milkdown-block-handle,
   .sidebar-provider-bar {
     display: none !important;

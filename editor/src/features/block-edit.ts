@@ -115,7 +115,7 @@ class BlockHandleView {
             ? proseRect.left + Math.round(2 * rem)
             : domRect.left;
         } else if (w >= 800) {
-          const menuEl = document.querySelector(".book-menu");
+          const menuEl = document.querySelector(".book-leftpanel");
           const menuRect = menuEl?.getBoundingClientRect();
           left = menuRect
             ? menuRect.right + Math.round(4.25 * rem)

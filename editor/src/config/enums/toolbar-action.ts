@@ -12,6 +12,9 @@ export enum ToolbarAction {
   OpenPrefs,
   MenuItem,
   SourceMode,
+  ToggleListDropdown,
+  ExecList,
+  ToggleOverflowDropdown,
 }
 
 /**
@@ -28,4 +31,7 @@ export const toolbarActions: Record<ToolbarAction, string> = {
   [ToolbarAction.OpenPrefs]: "openPrefs",
   [ToolbarAction.MenuItem]: "menuItem",
   [ToolbarAction.SourceMode]: "sourceMode",
+  [ToolbarAction.ToggleListDropdown]: "toggleListDropdown",
+  [ToolbarAction.ExecList]: "execList",
+  [ToolbarAction.ToggleOverflowDropdown]: "toggleOverflowDropdown",
 };

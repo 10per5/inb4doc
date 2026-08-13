@@ -15,6 +15,12 @@
   font-size: 0.9rem;
 }
 
+.toolbar-heading-btn.active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border);
+  color: var(--color-accent);
+}
+
 .toolbar-heading-dropdown {
   display: none;
   position: absolute;
@@ -49,6 +55,12 @@
   background: var(--color-bg-tertiary);
 }
 
+.toolbar-heading-dropdown button.active {
+  background: var(--color-bg-tertiary);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 .toolbar-heading-dropdown button[data-h="1"] {
   font-size: 1.1rem;
   font-weight: 700;
@@ -64,7 +76,182 @@
   font-weight: 500;
 }
 
+.toolbar-list-wrap {
+  position: relative;
+}
+
+.toolbar-list-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.toolbar-list-btn .list-label {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-list-btn.active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border);
+  color: var(--color-accent);
+}
+
+.toolbar-list-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 170px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.toolbar-list-dropdown.open {
+  display: block;
+}
+
+.toolbar-list-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.toolbar-list-dropdown button:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.toolbar-list-dropdown button.active {
+  background: var(--color-bg-tertiary);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.toolbar-list-dropdown button.is-disabled,
+.toolbar-list-dropdown button:disabled {
+  color: var(--color-text-disabled, var(--color-border));
+  cursor: default;
+  opacity: 0.45;
+}
+
+.toolbar-list-dropdown button.is-disabled:hover,
+.toolbar-list-dropdown button:disabled:hover {
+  background: none;
+}
+
+.toolbar-list-dropdown button.toolbar-dropdown-hr,
+.toolbar-list-dropdown button.toolbar-list-clear {
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.toolbar-list-dropdown button[hidden] {
+  display: none;
+}
+
+
 .toolbar-section-center button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* ── Procedural overflow ─────────────────────────────────────────────
+ * The "…" trigger + dropdown collect formatting buttons that no longer
+ * fit at narrow / zoomed-in viewport widths. The trigger is reserved
+ * space in the topbar even while hidden so its appearance never shifts
+ * the layout; it only becomes visible once something actually overflows. */
+
+.app-toolbar.toolbar-desktop .toolbar-section {
+  flex-shrink: 0;
+}
+
+.toolbar-overflow-wrap {
+  position: relative;
+}
+
+.toolbar-overflow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+}
+
+.toolbar-overflow-btn[hidden] {
+  display: none;
+}
+
+.toolbar-overflow-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 200;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 150px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.toolbar-overflow-dropdown.open {
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar-overflow-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 3px;
+  height: auto;
+}
+
+.toolbar-overflow-dropdown button:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.toolbar-overflow-dropdown button.active {
+  background: var(--color-bg-tertiary);
+  color: var(--color-accent);
+}
+
+.toolbar-overflow-dropdown button.is-disabled,
+.toolbar-overflow-dropdown button:disabled {
+  color: var(--color-text-disabled, var(--color-border));
+  cursor: default;
+  opacity: 0.45;
+}
+
+.toolbar-overflow-dropdown button.is-disabled:hover,
+.toolbar-overflow-dropdown button:disabled:hover {
+  background: none;
+}
+
+.toolbar-overflow-dropdown button svg {
   width: 18px;
   height: 18px;
   display: block;

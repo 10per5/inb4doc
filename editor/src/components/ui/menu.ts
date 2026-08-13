@@ -3,6 +3,7 @@ import renderSeparator from "@/eta/menu/separator"
 import renderCheck from "@/eta/menu/check"
 import renderSubmenu from "@/eta/menu/submenu"
 import { check, arrowRight, navArrowDown } from "@/eta/icons"
+import { applyPanelFlip, type FlipAnchorRect } from "@/utils/popover"
 
 export enum MenuType {
   Item,
@@ -39,6 +40,8 @@ export interface MenuOptions {
   items: MenuItem[] | (() => MenuItem[])
   mnemonic?: string
   panelClass?: string
+  anchorRect?: FlipAnchorRect
+  preferAbove?: boolean
 }
 
 export interface MenuRegistry {
@@ -133,6 +136,8 @@ export class Menu {
   private boundPanelKeyDown: (e: KeyboardEvent) => void
   private mnemonic?: string
   private panelClass?: string
+  private anchorRect: FlipAnchorRect | null = null
+  private preferAbove = false
 
   constructor(opts: MenuOptions) {
     this.mountEl = opts.mountEl
@@ -140,6 +145,8 @@ export class Menu {
     this.items = this.resolveItems()
     this.mnemonic = opts.mnemonic
     this.panelClass = opts.panelClass
+    this.anchorRect = opts.anchorRect ?? null
+    this.preferAbove = opts.preferAbove ?? false
     this.boundOutsideClick = this.onOutsideClick.bind(this)
     this.boundPanelKeyDown = this.onPanelKeyDown.bind(this)
     this.build(opts.label, opts.title, opts.triggerEl)
@@ -152,6 +159,22 @@ export class Menu {
   // so outside-click still ignores the current button and toggles work.
   setTriggerEl(el: HTMLElement): void {
     this.triggerEl = el
+  }
+
+  // Re-anchor the panel at an arbitrary viewport point (e.g. the selected
+  // block) before opening. Pass null to fall back to the mount element's
+  // position. preferAbove flips the vertical direction (block anchors want
+  // above-first; dock/button menus keep below-first).
+  setAnchorRect(rect: FlipAnchorRect | null, preferAbove = false): void {
+    this.anchorRect = rect
+    this.preferAbove = preferAbove
+  }
+
+  // Re-run the flip for an already-open panel (e.g. the dock menu when the
+  // on-screen keyboard opens/closes and the anchor must move back and forth
+  // between the selected block and the dock strip).
+  reposition() {
+    this.positionPanel()
   }
 
   toggle() { this._isOpen ? this.close() : this.open() }
@@ -357,31 +380,24 @@ export class Menu {
     if (!this.mountEl.contains(target)) this.close()
   }
 
-  // Flip the panel so it stays on screen: right-align when `left: 0` would
-  // push it past the right edge, and open upward when the natural `top: 100%`
-  // would push it past the bottom. Measured while visually hidden, so there's
-  // no reposition flash; results are just class toggles. Custom-anchored
-  // panels (panelClass, e.g. the FAB popup) own their horizontal alignment but
-  // still get the vertical flip (their CSS just wins when it also sets a side).
+  // Flip the panel so it stays on screen: right-align when the natural
+  // `left: 0` would push it past the right edge, and open upward when the
+  // natural `top: 100%` would push it past the bottom. Anchors at an explicit
+  // rect when set (block-anchored menus) or at the mount element otherwise.
+  // Measurement happens while visually hidden (see applyPanelFlip) so there's
+  // no reposition flash; results are class toggles plus a clamped inline left.
+  // Panels with a panelClass own their horizontal alignment in their dock
+  // position, so the horizontal flip only runs for them while block-anchored.
+  // Block-anchored panels also let applyPanelFlip move the 0×0 anchor element
+  // itself, so "below" opens at the anchor rect's bottom (not its top).
   private positionPanel() {
-    const panel = this.panelEl
-    panel.classList.remove("toolbar-menu--right", "toolbar-menu--up")
-    const prevDisplay = panel.style.display
-    panel.style.display = "block"
-    panel.style.visibility = "hidden"
-    const mount = this.mountEl.getBoundingClientRect()
-    const panelWidth = panel.offsetWidth
-    const panelHeight = panel.offsetHeight
-    panel.style.visibility = ""
-    panel.style.display = prevDisplay
-    const vw = document.documentElement.clientWidth
-    const vh = document.documentElement.clientHeight
-    if (!this.panelClass && mount.left + panelWidth > vw - 8) {
-      panel.classList.add("toolbar-menu--right")
-    }
-    if (mount.bottom + 12 + panelHeight > vh) {
-      panel.classList.add("toolbar-menu--up")
-    }
+    const anchor = this.anchorRect ?? this.mountEl.getBoundingClientRect()
+    applyPanelFlip(this.panelEl, {
+      anchor,
+      preferAbove: this.preferAbove,
+      flipX: this.anchorRect !== null || !this.panelClass,
+      positionAnchor: this.anchorRect !== null,
+    })
   }
 
   private onItemClick = (e: Event) => {

@@ -65,7 +65,7 @@ body {
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 
-.book-menu {
+.book-leftpanel {
   width: var(--sidebar-width);
   border-right: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
@@ -85,7 +85,7 @@ body {
   flex-direction: column;
 }
 
-.book-menu .sidebar-wrapper {
+.book-leftpanel .sidebar-wrapper {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -130,7 +130,7 @@ body {
   padding-bottom: 6em;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1800px) {
   #editor-area {
     max-width: 800px;
     padding: 0;
@@ -161,7 +161,7 @@ body {
 
 /* ── Meta panel (right sidebar) ──────────────────────────────────── */
 
-.book-aside {
+.book-rightpanel {
   width: var(--aside-width);
   border-left: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
@@ -179,19 +179,44 @@ body {
  * columns be toggled off at tablet/desktop widths while leaving the
  * mobile drawer path (max-width:767px) untouched. */
 @media (min-width: 768px) {
-  body.layout-nav-off .book-menu {
+  body.layout-leftpanel-off .book-leftpanel {
     display: none;
   }
 }
 
 @media (min-width: 1200px) {
-  body.layout-meta-off .book-aside {
+  body.layout-rightpanel-off .book-rightpanel {
     display: none;
+  }
+}
+
+/* Tablet: the Meta panel takes over the left column (in place of the nav
+ * tree) instead of becoming a center-screen fullview. It reuses the same
+ * #meta-panel-mount instance as the desktop aside, pulled to the left with
+ * order — the width keeps the nav column's 260px so the editor slot doesn't
+ * reflow between toggles. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  body:not(.layout-rightpanel-off) .book-leftpanel {
+    display: none;
+  }
+
+  body:not(.layout-rightpanel-off) .book-rightpanel {
+    display: flex;
+    width: 260px;
+    border-left: none;
+    border-right: 1px solid var(--color-border);
+    order: -1;
+  }
+
+  /* The desktop aside hides its header (persistent column); on tablet the
+   * panel is transient, so keep the header's close affordance. */
+  body:not(.layout-rightpanel-off) .book-rightpanel .screen-header {
+    display: flex;
   }
 }
 
 /* Focused mode: neither panel on → the editor spans the content column
  * (no 800px cap). Specificity beats the media-query #editor-area rule. */
-body.layout-focus #editor-area {
+body.layout-focused #editor-area {
   max-width: 100%;
 }

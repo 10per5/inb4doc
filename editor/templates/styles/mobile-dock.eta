@@ -14,19 +14,73 @@
   padding-bottom: 0;
 }
 
-.mobile-layout .book-menu,
-.mobile-layout .book-aside {
+  /* Tablet (768–1199px): show the quick bar only — the dock nav row
+   * (Files/FAB/More) stays hidden and the strip becomes a plain fixed bottom
+   * bar. #edit-toolbar is a block child of fixed #dock (shell.eta), so showing
+   * #dock while hiding its .dock nav row leaves just the strip at the bottom
+   * edge, above #dock's own safe-area padding. */
+  @media (min-width: 768px) and (max-width: 1199px) {
+    .desktop-layout #dock {
+      display: block;
+    }
+
+    .desktop-layout #dock .dock {
+      display: none;
+    }
+
+    .desktop-layout #edit-toolbar {
+      display: block;
+    }
+
+    /* With the nav tree on (LayoutPreset.LeftPanel) the strip must live in the
+     * center editor column, not overlay the 260px nav column. body classes come
+     * from LayoutService.apply(): LeftPanel == layout-rightpanel-off set and
+     * layout-leftpanel-off unset (nav on, meta off). Any other preset keeps the
+     * full-width strip. Follow mode positions inline, so it overrides this. */
+    .desktop-layout body:not(.layout-leftpanel-off).layout-rightpanel-off #dock {
+      left: var(--sidebar-width);
+    }
+
+  /* Tighten the base 104px clearance (56px hidden nav row + 47px strip) to
+   * just the strip, since the nav row is gone. The :has chain out-specifies
+   * the plain .book-layout rule, so it must carry the same :has selectors. */
+  .desktop-layout
+    .book-layout:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    ) {
+    padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+  }
+}
+
+.mobile-layout .book-leftpanel,
+.mobile-layout .book-rightpanel {
   display: none;
 }
 
 .mobile-layout .book-layout {
+  /* Clear the fixed dock (bar + its own safe-area padding). 56px = the .dock
+   * bar; #dock already adds safe-area below the bar, so clearing it means
+   * matching the bar height plus the same env() term. */
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
 }
 
+/* The fixed topbar overlays the top 48px of the scrollport, so keep the
+ * editor content clear of it — but only while the bar is visible (editor
+ * view). Fullviews hide it and render their own header at the very top. */
+.mobile-layout .book-layout:has(.app-toolbar:not([hidden])) {
+  padding-top: 48px;
+}
+
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
+ * Fixed (not sticky) so it stays at the top of the visible area even when the
+ * on-screen keyboard pans the visual viewport to keep the caret visible.
  * Scoped under .book-layout to beat the flag-blind 28px overrides in
  * src/styles/app/toolbar.css and src/styles/layout/responsive.css. */
 .mobile-layout .book-layout .app-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 48px;
   min-height: 48px;
   padding: 0 0.75rem;
@@ -50,11 +104,25 @@
 .mobile-layout .book-layout .toolbar-spacer {
   flex-basis: auto;
 }
+
+/* The mobile list dropdown sits near the right edge of the slim topbar, so
+ * right-align it — the base left:0 anchor would push the 170px panel off the
+ * viewport on narrow phones. */
+.mobile-layout .book-layout .app-toolbar .toolbar-list-dropdown {
+  left: auto;
+  right: 0;
+}
 <% } else { %>
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
+ * Fixed (not sticky) so it stays at the top of the visible area even when the
+ * on-screen keyboard pans the visual viewport to keep the caret visible.
  * Scoped under .book-layout to beat the flag-blind 28px overrides in
  * src/styles/app/toolbar.css and src/styles/layout/responsive.css. */
 .book-layout .app-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 48px;
   min-height: 48px;
   padding: 0 0.75rem;
@@ -79,11 +147,35 @@
   flex-basis: auto;
 }
 
+/* The mobile list dropdown sits near the right edge of the slim topbar, so
+ * right-align it — the base left:0 anchor would push the 170px panel off the
+ * viewport on narrow phones. */
+.book-layout .app-toolbar .toolbar-list-dropdown {
+  left: auto;
+  right: 0;
+}
+
 /* Keep the scrollable content clear of the fixed dock (bar + its own safe-area
- * padding). 56px = the .dock bar; #dock already adds safe-area below the bar,
+ * padding): 56px = the .dock bar; #dock already adds safe-area below the bar,
  * so clearing it means matching the bar height plus the same env() term. */
 .book-layout {
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
+}
+
+/* When the edit-toolbar strip is visible it stacks above the dock bar (~47px:
+ * 34px buttons + 12px padding + 1px border), so clear that too. The :has
+ * variant carries an id selector and beats both .book-layout rules above. In
+ * follow mode (keyboard open) the bar floats at the cursor instead, so no
+ * extra clearance. */
+.book-layout:has(#edit-toolbar:not([hidden])):not(:has(#edit-toolbar.is-follow-mode)) {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0));
+}
+
+/* The fixed topbar overlays the top 48px of the scrollport, so keep the
+ * editor content clear of it — but only while the bar is visible (editor
+ * view). Fullviews hide it and render their own header at the very top. */
+.book-layout:has(.app-toolbar:not([hidden])) {
+  padding-top: 48px;
 }
 <% } %>
 
@@ -103,6 +195,31 @@
   background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border);
   padding-bottom: env(safe-area-inset-bottom, 0);
+  --kb-offset: 0px;
+}
+
+/* On-screen keyboard (mobile): when the visual viewport shrinks, DockController
+ * sets --kb-offset on #dock and toggles .kb-open. The FAB relocates to the
+ * bottom-right corner, above the keyboard. position:fixed pulls it out of the
+ * dock flex row (Files/More then split the bar, which is keyboard-covered
+ * anyway). The edit-toolbar switches to follow mode (see below). */
+#dock.kb-open .dock-item--fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--kb-offset) + env(safe-area-inset-bottom, 0) + 12px);
+  transform: none;
+  margin: 0;
+}
+
+/* MobileShrink layout (keyboard open): the on-screen keyboard pans the visual
+ * viewport to keep the caret visible, which can carry the fixed topbar/dock out
+ * of view. LayoutService resolves the width to MobileShrink while the keyboard
+ * is open and publishes the overlay height as --kb-offset on :root; shrinking
+ * the scroll container to the remaining visual viewport keeps the fixed bars in
+ * the visible area — the editor content scrolls above the keys instead. */
+body.layout-mobile-shrink #app,
+body.layout-mobile-shrink .book-layout {
+  height: calc(100vh - var(--kb-offset, 0px));
 }
 
 .dock {
@@ -112,9 +229,11 @@
   position: relative;
 }
 
-/* Anchor for the FAB popup menu: a 0-height strip above the dock. The shared
- * .toolbar-menu panel is mounted here; this class pins it above the dock and
- * right-aligns it toward the FAB button. Full-width so right:12px tracks it. */
+/* Anchor for the FAB popup menu. Default: a 0-height strip above the dock; the
+ * shared .toolbar-menu panel is mounted here and pinned above the dock via the
+ * shared up/right flip classes. When the keyboard is open the dock controller
+ * adds .is-block-anchored and sets left/top to the selection block's coords,
+ * turning the anchor into a 0×0 fixed point so the menu opens at the block. */
 .dock-fab-menu-anchor {
   position: absolute;
   left: 0;
@@ -124,11 +243,19 @@
   z-index: 300;
 }
 
-/* The FAB popup always opens upward (the dock is pinned to the bottom, so
- * there's never room below) and right-aligns toward the FAB button. The
- * generic up/down flip lives in .toolbar-menu--up (menu.css) and stacks with
- * this class. */
-.dock-fab-menu {
+.dock-fab-menu-anchor.is-block-anchored {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  width: 0;
+}
+
+/* The FAB popup in dock mode (keyboard closed): opens upward from the dock and
+ * right-aligns toward the FAB button. The panel carries .dock-fab-menu from the
+ * Menu's panelClass; while block-anchored (.is-block-anchored) this rule stops
+ * applying so the shared toolbar-menu--up / --right flip classes position it at
+ * the selection instead. */
+.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu {
   top: auto;
   bottom: calc(100% + 12px);
   left: auto;
@@ -136,8 +263,10 @@
 }
 
 /* The FAB popup's grouped expanders open leftward — with the panel
- * right-aligned they stay fully on screen on narrow phones. */
-.dock-fab-menu .menu-item-submenu .menu-submenu {
+ * right-aligned they stay fully on screen on narrow phones. Dock mode always;
+ * block mode only when the shared flip right-aligned the panel. */
+.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu .menu-item-submenu .menu-submenu,
+.dock-fab-menu-anchor.is-block-anchored .dock-fab-menu.toolbar-menu--right .menu-item-submenu .menu-submenu {
   left: auto;
   right: 100%;
 }
@@ -304,7 +433,11 @@
   text-align: center;
 }
 
-/* Edit toolbar: context-aware strip between the editor and the dock */
+/* Edit toolbar: context-aware strip pinned between the editor and the dock.
+ * #edit-toolbar is a plain block child of the fixed #dock, so it stacks above
+ * the 56px .dock row. Undo/redo are always present (disabled when the open
+ * file has no history); the list/table groups appear contextually inside the
+ * strip. */
 #edit-toolbar {
   flex-shrink: 0;
   border-top: 1px solid var(--color-border);
@@ -324,6 +457,44 @@
   padding: 0.375rem 0.5rem;
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+/* Follow mode (keyboard open): the strip becomes a popover anchored at the
+ * caret's block. #edit-toolbar is a 0×0 fixed point whose left/top are set by
+ * EditToolbarController (applyPanelFlip's positionAnchor) to the block bounds;
+ * the .edit-toolbar panel is absolutely positioned inside it and reuses the
+ * shared toolbar-menu--up / --right flip classes from menu.css. The flip
+ * overrides below must match this rule's specificity and come after it, or the
+ * base `top:100%`/`left:0` would win the tie. */
+#edit-toolbar.is-follow-mode {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 300;
+}
+
+#edit-toolbar.is-follow-mode .edit-toolbar {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+#edit-toolbar.is-follow-mode .edit-toolbar.toolbar-menu--up {
+  top: auto;
+  bottom: calc(100% + 12px);
+}
+
+#edit-toolbar.is-follow-mode .edit-toolbar.toolbar-menu--right {
+  left: auto;
+  right: 0;
 }
 
 .edit-toolbar::-webkit-scrollbar {

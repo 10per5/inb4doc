@@ -65,10 +65,14 @@
 }
 
 /* Opens upward — toggled by Menu.positionPanel() when the panel would
-   overflow the viewport at its natural `top: 100%` position. Combines with
-   --right for corner-anchored menus; leaves left/right alone so it stacks
-   with custom panel classes. */
-.toolbar-menu--up {
+   overflow the viewport at its natural `top: 100%` position. The modifier is
+   scoped under its parent block classes (.toolbar-menu / .edit-toolbar) so it
+   always beats their `top: 100%` base rules by specificity: mobile-dock.eta's
+   `.edit-toolbar` rule is concatenated AFTER this file (src/styles/index.ts
+   imports conditions.css last), so an unscoped single-class modifier would
+   lose the cascade to it. Combines with --right for corner-anchored menus. */
+.toolbar-menu.toolbar-menu--up,
+.edit-toolbar.toolbar-menu--up {
   top: auto;
   bottom: calc(100% + 12px);
 }

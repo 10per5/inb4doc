@@ -30,6 +30,79 @@ function setTaskChecked(view: EditorView, checked: boolean): void {
   }
 }
 
+/**
+ * Toggle `checked` on the list item under the caret — the topbar dropdown's
+ * "Checked/Unchecked Task List" item. The quick bar's MarkTask/UnmarkTask set
+ * the state explicitly; this flips the CURRENT item only (the block-wide
+ * variant was dropped per the UI spec).
+ */
+function toggleTaskChecked(view: EditorView): void {
+  const { state, dispatch } = view
+  const { $from } = state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d)
+    if (node.type.name !== "list_item") continue
+    dispatch(
+      state.tr.setNodeMarkup($from.before(d), undefined, {
+        ...node.attrs,
+        checked: node.attrs.checked !== true,
+      }),
+    )
+    return
+  }
+}
+
+/**
+ * Unwrap the list items touched by the selection back into non-lists — the
+ * dropdown's "Clear List Item". Every covered item's content (its paragraph
+ * plus any nested blocks) replaces the item; the uncovered before/after items
+ * stay in their own same-kind lists. Selection-wide, mirroring
+ * `setListItemKind`'s coverage rules, so a multi-item selection clears every
+ * touched list.
+ */
+function clearListItems(view: EditorView): void {
+  const { state, dispatch } = view
+  const { $from, $to } = state.selection
+  const from = $from.pos
+  const to = $to.pos
+  const touched = collectTouchedLists(state, from, to)
+  if (touched.length === 0) return
+  const tr = state.tr
+  // Caret target in final-doc coordinates: first unwrapped paragraph of the
+  // lowest touched list. All later replaces sit above it, so it never shifts.
+  let caretPos: number | null = null
+  for (const t of [...touched].sort((a, b) => a.pos - b.pos)) {
+    const curPos = tr.mapping.map(t.pos)
+    const list = tr.doc.nodeAt(curPos)
+    if (!list || (list.type.name !== "bullet_list" && list.type.name !== "ordered_list")) continue
+
+    const before: Node[] = []
+    const mid: Node[] = []
+    const after: Node[] = []
+    list.forEach((child, _offset, index) => {
+      if (index < t.first) before.push(child)
+      else if (index > t.last) after.push(child)
+      else child.forEach((inner) => mid.push(inner))
+    })
+    if (mid.length === 0) continue
+
+    const beforeList =
+      before.length > 0 ? list.type.create({ ...list.attrs }, before) : null
+    const afterList =
+      after.length > 0 ? list.type.create({ ...list.attrs }, after) : null
+    const start = curPos
+    const end = curPos + list.nodeSize
+    tr.replaceWith(start, end, [beforeList, ...mid, afterList].filter((n): n is Node => n != null))
+    if (caretPos === null) {
+      caretPos = start + (beforeList?.nodeSize ?? 0) + 1
+    }
+  }
+  if (tr.docChanged) {
+    tr.setSelection(TextSelection.near(tr.doc.resolve(caretPos ?? from)))
+    dispatch(tr.scrollIntoView())
+  }
+}
+
 interface ListCommands {
   call: (key: string | CmdKey<unknown>, ...args: unknown[]) => boolean
 }
@@ -335,6 +408,8 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
 
     const { editorContext } = await import("@/services/editor-context")
     const { commandService } = await import("@/services/command-service")
+    const { isInTable, selectedRect } = await import("@milkdown/kit/prose/tables")
+    const { undo, redo } = await import("@milkdown/kit/prose/history")
     await Promise.all([editorContext.load(), commandService.load()])
 
     if (command === ToolbarCommand.Link) {
@@ -374,6 +449,38 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
           setTaskChecked(view, true); break
         case ToolbarCommand.UnmarkTask:
           setTaskChecked(view, false); break
+        case ToolbarCommand.Blockquote:
+          commands.call(commandService.wrapInBlockquoteCommand.key); break
+        case ToolbarCommand.ToggleTaskChecked:
+          toggleTaskChecked(view); break
+        case ToolbarCommand.ExitList:
+          clearListItems(view); break
+        case ToolbarCommand.AddRow:
+          commands.call(commandService.addRowAfterCommand.key); break
+        case ToolbarCommand.AddCol:
+          commands.call(commandService.addColAfterCommand.key); break
+        case ToolbarCommand.RemoveRow:
+          if (isInTable(view.state)) {
+            const { top } = selectedRect(view.state)
+            commands.call(commandService.selectRowCommand.key, { index: top })
+            commands.call(commandService.deleteSelectedCellsCommand.key)
+          }
+          break
+        case ToolbarCommand.DeleteCol:
+          if (isInTable(view.state)) {
+            const { left } = selectedRect(view.state)
+            commands.call(commandService.selectColCommand.key, { index: left })
+            commands.call(commandService.deleteSelectedCellsCommand.key)
+          }
+          break
+        case ToolbarCommand.RemoveTable:
+          commands.call(commandService.selectTableCommand.key)
+          commands.call(commandService.deleteSelectedCellsCommand.key)
+          break
+        case ToolbarCommand.Undo:
+          undo(view.state, view.dispatch); break
+        case ToolbarCommand.Redo:
+          redo(view.state, view.dispatch); break
       }
     })
   })

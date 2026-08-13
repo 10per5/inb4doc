@@ -5,18 +5,26 @@ import * as icons from "@/eta/icons"
 import renderDock from "@/eta/views/controller/dock"
 import { Menu } from "@/components/ui/menu"
 import { menuRegistry } from "@/config/menu-definitions"
+import { trackKeyboardOffset } from "@/utils/mobile"
+import { getBlockRectAt } from "@/utils/popover"
 import type { ViewType } from "@/services/view-controller"
+import type { EditorController } from "@/controllers/editor-controller"
 
 export default class DockController extends Controller {
   static targets = ["item", "nav", "fabMenu"]
+  static outlets = ["editor"]
 
   declare readonly itemTargets: HTMLElement[]
   declare readonly navTarget: HTMLElement
   declare readonly fabMenuTarget: HTMLElement
+  declare readonly editorOutletElement: Element
+  declare readonly hasEditorOutlet: boolean
 
   private currentView: ViewType = "editor"
   private unsubs: (() => void)[] = []
+  private stopKeyboardTrack: (() => void) | null = null
   private insertMenu: Menu | null = null
+  private kbOpen = false
 
   connect(): void {
     // Render only into the nav slot — #dock also hosts the edit-toolbar strip,
@@ -37,10 +45,25 @@ export default class DockController extends Controller {
       }),
       dockStore.subscribe((item) => this.setActiveItem(item)),
     )
+    // Relocate the FAB above the on-screen keyboard when it opens. If the
+    // insert menu is open, re-anchor it too: open keyboard → follow the
+    // selection block; closed → back to the dock strip.
+    this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
+      const el = this.element as HTMLElement
+      const kb = offset > 0
+      this.kbOpen = kb
+      el.classList.toggle("kb-open", kb)
+      el.style.setProperty("--kb-offset", `${offset}px`)
+      if (this.insertMenu?.isOpen) {
+        this.anchorFabMenu().then(() => this.insertMenu?.reposition())
+      }
+    })
     this.setActiveItem(dockStore.getActive())
   }
 
   disconnect(): void {
+    this.stopKeyboardTrack?.()
+    this.stopKeyboardTrack = null
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
     this.insertMenu?.destroy()
@@ -59,7 +82,7 @@ export default class DockController extends Controller {
         if (this.insertMenu?.isOpen) {
           this.insertMenu.close()
         } else {
-          this.insertMenu?.openAndFocusFirst()
+          this.anchorFabMenu().then(() => this.insertMenu?.openAndFocusFirst())
         }
         return
       }
@@ -67,6 +90,46 @@ export default class DockController extends Controller {
       return
     }
     appEvents.emit(AppEvent.ViewChanged, { view: item })
+  }
+
+  // Keyboard open → anchor the insert popup at the selected block (above-first
+  // flip). Keyboard closed → reset to the mount element (the dock strip), which
+  // keeps today's open-upward, right-aligned behavior.
+  private async anchorFabMenu(): Promise<void> {
+    const anchor = this.fabMenuTarget
+    if (!this.kbOpen) {
+      anchor.classList.remove("is-block-anchored")
+      anchor.style.left = ""
+      anchor.style.top = ""
+      this.insertMenu?.setAnchorRect(null)
+      return
+    }
+    const milk = this.editor()?.getEditor()
+    if (!milk) return
+    const { getView } = await import("@/services/editor-context")
+    const view = getView(milk)
+    const { from } = view.state.selection
+    const block = getBlockRectAt(view, from) ?? view.coordsAtPos(from)
+    if (!block) return
+    anchor.classList.add("is-block-anchored")
+    // Intermediate position while the panel is still hidden — applyPanelFlip
+    // (via Menu.positionPanel) repositions the anchor to the block's top or
+    // bottom+margin once it measures the open panel.
+    anchor.style.left = `${block.left}px`
+    anchor.style.top = `${block.top}px`
+    this.insertMenu?.setAnchorRect(block, true)
+  }
+
+  // editorOutlet is a blessed Stimulus getter that THROWS when the outlet
+  // element lacks a connected "editor" controller — which is the case on thin
+  // shells before the lazy editor chunk registers. Route every access through
+  // this so activate() never throws on that window.
+  private editor(): EditorController | null {
+    if (!this.hasEditorOutlet) return null
+    return this.application.getControllerForElementAndIdentifier(
+      this.editorOutletElement,
+      "editor",
+    ) as EditorController | null
   }
 
   private get fabItem(): HTMLElement {

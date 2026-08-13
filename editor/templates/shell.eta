@@ -23,7 +23,7 @@
     <div id="app" data-controller="shell" data-shell-editor-outlet="#editor-area">
       <div class="book-layout">
 <% if (!it.dockReplacesChrome) { %>
-        <nav class="book-menu">
+        <nav class="book-leftpanel">
           <div id="sidebar-nav" data-controller="sidebar" data-shell-target="sidebar" data-action="keydown->sidebar#onKeydown">
             <%~ include('partials/skeleton-sidebar', it) %>
           </div>
@@ -40,14 +40,14 @@
           </div>
         </div>
         <% if (!it.dockReplacesChrome) { %>
-        <aside class="book-aside" id="meta-panel-mount" data-controller="meta-panel" data-meta-panel-editor-outlet="#editor-area">
+        <aside class="book-rightpanel" id="meta-panel-mount" data-controller="meta-panel" data-meta-panel-editor-outlet="#editor-area">
           <%~ include('partials/skeleton-meta', it) %>
         </aside>
         <% } %>
       </div>
 <% if (it.mobileDock) { %>
-      <div id="dock" data-controller="dock">
-        <div id="edit-toolbar" data-controller="edit-toolbar"></div>
+      <div id="dock" data-controller="dock" data-dock-editor-outlet="#editor-area">
+        <div id="edit-toolbar" data-controller="edit-toolbar" data-edit-toolbar-editor-outlet="#editor-area"></div>
         <div data-dock-target="nav"></div>
       </div>
 <% } %>
