@@ -11,12 +11,14 @@ import type { ViewType } from "@/services/view-controller"
 import type { EditorController } from "@/controllers/editor-controller"
 
 export default class DockController extends Controller {
-  static targets = ["item", "nav", "fabMenu"]
+  static targets = ["item", "nav", "fabMenu", "badge"]
   static outlets = ["editor"]
 
   declare readonly itemTargets: HTMLElement[]
   declare readonly navTarget: HTMLElement
   declare readonly fabMenuTarget: HTMLElement
+  declare readonly badgeTarget: HTMLElement
+  declare readonly hasBadgeTarget: boolean
   declare readonly editorOutletElement: Element
   declare readonly hasEditorOutlet: boolean
 
@@ -44,6 +46,11 @@ export default class DockController extends Controller {
         dockStore.setActive(viewToDockItem(view))
       }),
       dockStore.subscribe((item) => this.setActiveItem(item)),
+      appEvents.on(AppEvent.DirtyChanged, ({ count }) => {
+        if (!this.hasBadgeTarget) return
+        this.badgeTarget.textContent = String(count)
+        this.badgeTarget.hidden = count === 0
+      }),
     )
     // Relocate the FAB above the on-screen keyboard when it opens. If the
     // insert menu is open, re-anchor it too: open keyboard → follow the

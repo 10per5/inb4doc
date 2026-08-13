@@ -99,22 +99,6 @@
   background: #218838;
 }
 
-/* ── Diff Viewer (shared by changes + external-change) ─────────────── */
-
-.inb4doc-diff-container {
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-  max-height: 300px;
-  overflow-y: auto;
-}
-.inb4doc-diff-line {
-  padding: 2px 8px;
-  white-space: pre-wrap;
-  font-family: "SF Mono", Monaco, monospace;
-  font-size: 0.75rem;
-}
-
 /* ── Confirm / Prompt / Create Dialog (dialog.ts) ─────────────────── */
 
 .inb4doc-dialog-box {
@@ -545,12 +529,12 @@
   flex-shrink: 0;
 }
 .import-file-badge.new {
-  background: #d4edda;
-  color: #155724;
+  background: color-mix(in srgb, var(--color-success) 20%, transparent);
+  color: var(--color-success);
 }
 .import-file-badge.replace {
-  background: #fff3cd;
-  color: #856404;
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
+  color: var(--color-warning);
 }
 
 /* ── Image Manager Dialog ──────────────────────────────────────────── */
@@ -678,6 +662,9 @@
   gap: 0.5rem;
   font-size: 0.9rem;
   user-select: none;
+}
+.inb4doc-changes-path-current {
+  background: var(--color-bg-secondary);
 }
 .inb4doc-changes-preview {
   display: none;

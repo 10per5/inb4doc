@@ -130,7 +130,7 @@ export default class ChangesController extends BaseDialogController {
     if (data.notice) {
       const preview = this.previewTargets[idx]
       if (preview) {
-        preview.innerHTML = `<div style="padding:8px 10px;color:#856404;background:#fff8e1;font-size:0.85rem">${data.notice}</div>`
+        preview.innerHTML = `<div class="inb4doc-diff-notice">${data.notice}</div>`
       }
       return
     }

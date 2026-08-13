@@ -27,18 +27,20 @@ function escapeHtml(text: string): string {
 
 export function renderDiffHtml(lines: DiffLine[], maxLines = 100): string {
   if (lines.length === 0) {
-    return `<div style="padding:8px;color:#888;text-align:center;font-size:0.8rem">No differences</div>`
+    return `<div class="inb4doc-diff-empty">No differences</div>`
   }
   const limited = lines.slice(0, maxLines)
   let html = ""
   for (const line of limited) {
-    const bg = line.type === "added" ? "#d4edda" : line.type === "removed" ? "#f8d7da" : "#fafafa"
-    const color = line.type === "added" ? "#155724" : line.type === "removed" ? "#721c24" : "#555"
+    const cls =
+      line.type === "added" ? "inb4doc-diff-add" :
+      line.type === "removed" ? "inb4doc-diff-del" :
+      "inb4doc-diff-ctx"
     const prefix = line.type === "added" ? "+ " : line.type === "removed" ? "- " : "  "
-    html += `<div class="inb4doc-diff-line" style="background:${bg};color:${color}">${prefix}${escapeHtml(line.text)}</div>`
+    html += `<div class="inb4doc-diff-line ${cls}">${prefix}${escapeHtml(line.text)}</div>`
   }
   if (lines.length > maxLines) {
-    html += `<div style="padding:4px 8px;color:#888;font-style:italic;font-size:0.75rem">... and ${lines.length - maxLines} more lines</div>`
+    html += `<div class="inb4doc-diff-more">... and ${lines.length - maxLines} more lines</div>`
   }
   return html
 }

@@ -1,0 +1,65 @@
+/* ── Diff Viewer (components/ui/diff-viewer.ts, pending-diff.ts) ──────
+ *
+ * Shared by the changes dialog/screen, the external-change dialog, and the
+ * pending-changes preview. All colors are theme variables (color-mix for the
+ * translucent add/del/mod tints) so they track the light/dark toggle.
+ */
+
+.inb4doc-diff-container {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.inb4doc-diff-line {
+  padding: 2px 8px;
+  white-space: pre-wrap;
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 0.75rem;
+}
+.inb4doc-diff-line.inb4doc-diff-add {
+  background: color-mix(in srgb, var(--color-success) 20%, transparent);
+  color: var(--color-success);
+}
+.inb4doc-diff-line.inb4doc-diff-del {
+  background: color-mix(in srgb, var(--color-error) 20%, transparent);
+  color: var(--color-error);
+}
+.inb4doc-diff-line.inb4doc-diff-ctx {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+}
+.inb4doc-diff-line.inb4doc-diff-mod {
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
+  color: var(--color-warning);
+}
+.inb4doc-diff-empty {
+  padding: 8px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+.inb4doc-diff-header {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+.inb4doc-diff-spacer {
+  height: 4px;
+  background: var(--color-bg-primary);
+}
+.inb4doc-diff-more {
+  padding: 4px 8px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  font-size: 0.75rem;
+}
+.inb4doc-diff-notice {
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
