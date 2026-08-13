@@ -15,7 +15,18 @@
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Strike %>" title="Strikethrough"><%~ it.icons.strikethrough %></button>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Link %>" title="Insert Link"><%~ it.icons.link %></button>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.SourceMode] %>" title="Source Mode"><%~ it.icons.codeBrackets %></button>
-    <div class="toolbar-relative" data-menu-name="format-more" title="More"></div>
+    <span class="toolbar-list-wrap">
+      <button class="btn btn-icon toolbar-list-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleListDropdown] %>" title="List" aria-haspopup="true">
+        <span class="list-label"><%~ it.icons.list %></span>
+      </button>
+      <div class="toolbar-list-dropdown">
+        <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecList] %>" data-kind="bullet">Bullet list</button>
+        <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecList] %>" data-kind="ordered">Ordered list</button>
+        <button class="toolbar-list-task" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecList] %>" data-kind="task">Task list</button>
+        <button class="toolbar-list-clear" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.ExitList %>" hidden>Clear List Item</button>
+        <button class="toolbar-dropdown-hr" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Hr %>">Horizontal rule</button>
+      </div>
+    </span>
   <% } else { %>
     <% if (it.mobileCss && !it.mobileDock) { %>
       <button class="btn btn-icon btn-toggle-sidebar toolbar-mobile-only" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleSidebar] %>" title="Toggle Sidebar"><%~ it.icons.menuScale %></button>
@@ -24,6 +35,8 @@
     <div class="toolbar-relative" data-menu-name="file" data-menu-mnemonic="f"></div>
     <% if (!it.mobileDock) { %>
     <div class="toolbar-relative" data-menu-name="view" data-menu-mnemonic="v"></div>
+    <button class="btn btn-icon toolbar-history-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Undo %>" title="Undo" disabled><%~ it.icons.undo %></button>
+    <button class="btn btn-icon toolbar-history-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Redo %>" title="Redo" disabled><%~ it.icons.redo %></button>
     <% } %>
   <% } %>
   </div>
@@ -45,10 +58,27 @@
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Strike %>" title="Strikethrough"><%~ it.icons.strikethrough %></button>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Code %>" title="Inline Code"><%~ it.icons.code %></button>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Hr %>" title="Insert Horizontal Rule"><%~ it.icons.minus %></button>
+    <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Blockquote %>" title="Quote"><%~ it.icons.quote %></button>
+    <span class="toolbar-sep"></span>
+    <span class="toolbar-list-wrap">
+      <button class="btn btn-icon toolbar-list-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleListDropdown] %>" title="List" aria-haspopup="true">
+        <span class="list-label"><%~ it.icons.list %></span>
+      </button>
+      <div class="toolbar-list-dropdown">
+        <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecList] %>" data-kind="bullet">Bullet list</button>
+        <button data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecList] %>" data-kind="ordered">Ordered list</button>
+        <button class="toolbar-list-task" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ExecList] %>" data-kind="task">Task list</button>
+        <button class="toolbar-list-clear" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.ExitList %>" hidden>Clear List Item</button>
+      </div>
+    </span>
     <span class="toolbar-sep"></span>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.Exec] %>" data-cmd="<%= it.TOOLBAR_CMD_PREFIX %><%= it.ToolbarCommand.Link %>" title="Insert Link"><%~ it.icons.link %></button>
     <span class="toolbar-sep"></span>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.SourceMode] %>" title="Source Mode"><%~ it.icons.codeBrackets %></button>
+    <span class="toolbar-overflow-wrap" data-topbar-target="overflowWrap">
+      <button class="btn btn-icon toolbar-overflow-btn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.ToggleOverflowDropdown] %>" title="More formatting" data-topbar-target="overflowBtn" hidden><%~ it.icons.moreHoriz %></button>
+      <div class="toolbar-overflow-dropdown" data-topbar-target="overflowDropdown"></div>
+    </span>
   </div>
   <% } %>
   <div class="toolbar-spacer"></div>

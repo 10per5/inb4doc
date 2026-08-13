@@ -11,6 +11,8 @@ import {
  * resolved position:
  * - a `table` ancestor classifies the selection as `Table` (deepest match
  *   wins, so a table nested inside a list item reports as table context)
+ * - a `blockquote` ancestor classifies the selection as `Blockquote` (a list
+ *   nested inside a blockquote reports as list, since the item is deeper)
  * - a `list_item` node is classified as `TaskList` / `OrderedList` /
  *   `BulletList` from its `checked` attr and parent list node
  * Everything else (paragraphs, headings, code blocks, …) is `None`.
@@ -21,6 +23,9 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
     const node = $from.node(d)
     if (node.type.name === "table") {
       return { type: ActiveBlockType.Table, checked: null, canSink: false }
+    }
+    if (node.type.name === "blockquote") {
+      return { type: ActiveBlockType.Blockquote, checked: null, canSink: false }
     }
     if (node.type.name !== "list_item") continue
     // The item's index within its parent list (depth d-1). sinkListItem fails

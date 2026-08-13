@@ -4,7 +4,7 @@ import { ToolbarCommand } from "@/config/enums"
 import { ActiveBlockType, type ActiveBlockContext } from "@/config/enums/block-context"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
-import { trackKeyboardOffset } from "@/utils/mobile"
+import { trackKeyboardOffset, isMobileViewport } from "@/utils/mobile"
 import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/popover"
 import type { EditorController } from "@/controllers/editor-controller"
 
@@ -59,7 +59,7 @@ export default class EditToolbarController extends Controller {
     // keys, so the strip would be hidden behind them). Visual-viewport
     // pan/scroll re-anchors the popover to the caret's block.
     this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
-      this.followMode = offset > 0
+      this.followMode = offset > 0 && isMobileViewport()
       this.element.classList.toggle("is-follow-mode", this.followMode)
       this.updateVisibility()
       this.positionPopover()

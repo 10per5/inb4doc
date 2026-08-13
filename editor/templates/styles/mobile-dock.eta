@@ -14,6 +14,44 @@
   padding-bottom: 0;
 }
 
+  /* Tablet (768–1199px): show the quick bar only — the dock nav row
+   * (Files/FAB/More) stays hidden and the strip becomes a plain fixed bottom
+   * bar. #edit-toolbar is a block child of fixed #dock (shell.eta), so showing
+   * #dock while hiding its .dock nav row leaves just the strip at the bottom
+   * edge, above #dock's own safe-area padding. */
+  @media (min-width: 768px) and (max-width: 1199px) {
+    .desktop-layout #dock {
+      display: block;
+    }
+
+    .desktop-layout #dock .dock {
+      display: none;
+    }
+
+    .desktop-layout #edit-toolbar {
+      display: block;
+    }
+
+    /* With the nav tree on (LayoutPreset.LeftPanel) the strip must live in the
+     * center editor column, not overlay the 260px nav column. body classes come
+     * from LayoutService.apply(): LeftPanel == layout-rightpanel-off set and
+     * layout-leftpanel-off unset (nav on, meta off). Any other preset keeps the
+     * full-width strip. Follow mode positions inline, so it overrides this. */
+    .desktop-layout body:not(.layout-leftpanel-off).layout-rightpanel-off #dock {
+      left: var(--sidebar-width);
+    }
+
+  /* Tighten the base 104px clearance (56px hidden nav row + 47px strip) to
+   * just the strip, since the nav row is gone. The :has chain out-specifies
+   * the plain .book-layout rule, so it must carry the same :has selectors. */
+  .desktop-layout
+    .book-layout:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    ) {
+    padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+  }
+}
+
 .mobile-layout .book-leftpanel,
 .mobile-layout .book-rightpanel {
   display: none;
@@ -66,6 +104,14 @@
 .mobile-layout .book-layout .toolbar-spacer {
   flex-basis: auto;
 }
+
+/* The mobile list dropdown sits near the right edge of the slim topbar, so
+ * right-align it — the base left:0 anchor would push the 170px panel off the
+ * viewport on narrow phones. */
+.mobile-layout .book-layout .app-toolbar .toolbar-list-dropdown {
+  left: auto;
+  right: 0;
+}
 <% } else { %>
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
  * Fixed (not sticky) so it stays at the top of the visible area even when the
@@ -99,6 +145,14 @@
 
 .book-layout .toolbar-spacer {
   flex-basis: auto;
+}
+
+/* The mobile list dropdown sits near the right edge of the slim topbar, so
+ * right-align it — the base left:0 anchor would push the 170px panel off the
+ * viewport on narrow phones. */
+.book-layout .app-toolbar .toolbar-list-dropdown {
+  left: auto;
+  right: 0;
 }
 
 /* Keep the scrollable content clear of the fixed dock (bar + its own safe-area

@@ -5,7 +5,7 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import type { ViewType } from "@/services/view-controller";
 import { LayoutService } from "@/services/layout-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
-import { ToolbarCommand, SlashCommand } from "@/config/enums";
+import { SlashCommand } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
 import {
   mediaImage,
@@ -28,10 +28,6 @@ import {
 } from "@/eta/icons";
 
 export const menuRegistry = createRegistry();
-
-function emitToolbarCommand(command: ToolbarCommand): void {
-  appEvents.emit(AppEvent.ToolbarCommandExec, { command });
-}
 
 function emitInsertBlockCommand(command: SlashCommand, level?: number): void {
   appEvents.emit(AppEvent.InsertBlockCommand, { command, level });
@@ -129,41 +125,6 @@ if (
     viewState.current = view;
   });
 }
-
-// Formatting "…" menu: mounted in the mobile topbar as an overflow trigger and
-// on the dock FAB as a popup. Flat list — reuses the shared
-// Menu/menuRegistry/eta infra, no bespoke submenu system.
-menuRegistry.register("format-more", (): MenuItem[] => [
-  {
-    type: MenuType.Item,
-    id: "bullet",
-    icon: list,
-    label: "Bullet list",
-    onClick: () => emitToolbarCommand(ToolbarCommand.BulletList),
-  },
-  {
-    type: MenuType.Item,
-    id: "ordered",
-    icon: numberedListLeft,
-    label: "Ordered list",
-    onClick: () => emitToolbarCommand(ToolbarCommand.OrderedList),
-  },
-  {
-    type: MenuType.Item,
-    id: "task",
-    icon: checkSquare,
-    label: "Checkbox",
-    onClick: () => emitToolbarCommand(ToolbarCommand.TaskList),
-  },
-  { type: MenuType.Separator },
-  {
-    type: MenuType.Item,
-    id: "hr",
-    icon: minus,
-    label: "Horizontal rule",
-    onClick: () => emitToolbarCommand(ToolbarCommand.Hr),
-  },
-]);
 
 // Shared "insert block" menu: the mobile FAB "+" popup and the desktop
 // block-handle "+" open the same grouped menu. Commands emit InsertBlockCommand

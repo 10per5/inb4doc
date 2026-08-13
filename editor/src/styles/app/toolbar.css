@@ -33,6 +33,22 @@
   color: var(--color-accent);
 }
 
+.app-toolbar .btn-icon.is-disabled,
+.app-toolbar .btn-icon:disabled {
+  color: var(--color-text-disabled, var(--color-border));
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* Undo/redo live in the topbar on desktop (≥1200px) only. On tablet the
+ * quick bar (edit-toolbar) provides them, so the topbar must not duplicate
+ * them at 768–1199px. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .app-toolbar .toolbar-history-btn {
+    display: none;
+  }
+}
+
 /* ── Provider Badge ────────────────────────────────────────────────── */
 
 .app-toolbar .toolbar-provider {

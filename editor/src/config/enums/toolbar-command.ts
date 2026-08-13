@@ -26,4 +26,7 @@ export enum ToolbarCommand {
   RemoveTable,
   Undo,
   Redo,
+  Blockquote,
+  ToggleTaskChecked,
+  ExitList,
 }

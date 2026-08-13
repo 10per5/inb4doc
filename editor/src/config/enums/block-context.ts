@@ -8,6 +8,7 @@ export enum ActiveBlockType {
   OrderedList = 2,
   TaskList = 3,
   Table = 4,
+  Blockquote = 5,
 }
 
 export interface ActiveBlockContext {
