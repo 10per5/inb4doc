@@ -10,7 +10,6 @@
 import type { Ctx } from "@milkdown/kit/ctx";
 import { editorViewCtx, commandsCtx } from "@milkdown/kit/core";
 import { TextSelection } from "@milkdown/kit/prose/state";
-import type { Node } from "@milkdown/kit/prose/model";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import {
   paragraphSchema,
@@ -22,6 +21,7 @@ import {
 import { createTable } from "@milkdown/kit/preset/gfm";
 import { SlashCommand, ProseNodeType, proseNodeTypeByName } from "@/config/enums";
 import { defaultVideoAttrs } from "@/plugins/video";
+import { setListItemKind } from "@/utils/editor-mutator";
 
 export interface InsertCommandOptions {
   /**
@@ -70,6 +70,29 @@ export function executeInsertCommand(
     return;
   }
 
+  // List kinds run through the same in-place conversion the topbar / quickbar
+  // use (setListItemKind in utils/editor-mutator.ts), which retypes the covered
+  // items and keeps every sibling. The hand-rolled block surgery below used to
+  // intercept these first and replaced the WHOLE enclosing list with a single
+  // empty item / blockquote, dropping all other items.
+  const commands = ctx.get(commandsCtx);
+  const listService = { wrapInBulletListCommand, wrapInOrderedListCommand };
+  if (cmd === SlashCommand.BulletList) {
+    setListItemKind(view, commands, listService, "bullet");
+    view.focus();
+    return;
+  }
+  if (cmd === SlashCommand.OrderedList) {
+    setListItemKind(view, commands, listService, "ordered");
+    view.focus();
+    return;
+  }
+  if (cmd === SlashCommand.TodoList) {
+    setListItemKind(view, commands, listService, "task");
+    view.focus();
+    return;
+  }
+
   // Empty block nested in a list / blockquote / heading → convert that block
   // in place (same special cases the slash menu handles). Kept BEFORE the
   // ThematicBreak check so a divider picked inside an empty list item behaves
@@ -101,15 +124,9 @@ export function executeInsertCommand(
     return;
   }
 
-  const commands = ctx.get(commandsCtx);
   if (cmd === SlashCommand.Heading) commands.call(wrapInHeadingCommand.key, level);
-  else if (cmd === SlashCommand.BulletList)
-    commands.call(wrapInBulletListCommand.key);
-  else if (cmd === SlashCommand.OrderedList)
-    commands.call(wrapInOrderedListCommand.key);
   else if (cmd === SlashCommand.Blockquote)
     commands.call(wrapInBlockquoteCommand.key);
-  else if (cmd === SlashCommand.TodoList) convertToTodoList(view);
   else if (cmd === SlashCommand.CodeBlock) convertToCodeBlock(view);
   else if (cmd === SlashCommand.MathBlock) convertToMathBlock(view);
   else if (cmd === SlashCommand.Table) insertTable(ctx, view);
@@ -131,34 +148,10 @@ function replaceBlock(
   const { $from } = state.selection;
 
   if (cmd === SlashCommand.ThematicBreak) {
-    insertBelow(view, cmd, level);
+    insertBelow(view);
     return;
   }
 
-  if (parentType === ProseNodeType.BulletList && cmd === SlashCommand.OrderedList) {
-    const pos = $from.before(parentDepth);
-    const node = $from.node(parentDepth);
-    dispatch(
-      state.tr.replaceWith(
-        pos,
-        pos + node.nodeSize,
-        schema.nodes.ordered_list.create(null, node.content),
-      ),
-    );
-    return;
-  }
-  if (parentType === ProseNodeType.OrderedList && cmd === SlashCommand.BulletList) {
-    const pos = $from.before(parentDepth);
-    const node = $from.node(parentDepth);
-    dispatch(
-      state.tr.replaceWith(
-        pos,
-        pos + node.nodeSize,
-        schema.nodes.bullet_list.create(null, node.content),
-      ),
-    );
-    return;
-  }
   if (parentType === ProseNodeType.Blockquote && cmd === SlashCommand.Blockquote) return;
 
   if (cmd === SlashCommand.Heading) {
@@ -178,6 +171,10 @@ function replaceBlock(
     return;
   }
 
+  // Blockquote / code / math / table picked while the caret sits in an empty
+  // block inside a list or blockquote: replace the enclosing block with an
+  // empty blockquote (the pre-existing slash-menu behavior). List kinds never
+  // reach here — they are handled by setListItemKind above.
   const pos =
     isHeading || parentType
       ? $from.before(parentType ? parentDepth : $from.depth)
@@ -185,19 +182,10 @@ function replaceBlock(
   const block = parentType
     ? $from.node(parentType ? parentDepth : $from.depth)
     : $from.node($from.depth);
-  const para = schema.nodes.paragraph.create();
-  let newBlock: Node;
-  if (cmd === SlashCommand.BulletList)
-    newBlock = schema.nodes.bullet_list.create(
-      null,
-      schema.nodes.list_item.create(null, para),
-    );
-  else if (cmd === SlashCommand.OrderedList)
-    newBlock = schema.nodes.ordered_list.create(
-      null,
-      schema.nodes.list_item.create(null, para),
-    );
-  else newBlock = schema.nodes.blockquote.create(null, para);
+  const newBlock = schema.nodes.blockquote.create(
+    null,
+    schema.nodes.paragraph.create(),
+  );
   dispatch(state.tr.replaceWith(pos, pos + block.nodeSize, newBlock));
 }
 
@@ -206,40 +194,15 @@ function replaceBlock(
  * a divider is picked inside an empty list/blockquote/heading item). Kept
  * faithful to the original SlashView.insertBelow.
  */
-function insertBelow(view: EditorView, cmd: SlashCommand, level: number): void {
+function insertBelow(view: EditorView): void {
   const { state, dispatch } = view;
   const { schema } = state;
   const { $from } = state.selection;
   const afterPos = $from.after($from.depth);
-  if (cmd === SlashCommand.Heading) {
-    const heading = schema.nodes.heading.create({ level });
-    const tr = state.tr.insert(afterPos, heading);
-    dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 1)));
-    return;
-  }
-  if (cmd === SlashCommand.ThematicBreak) {
-    const hr = schema.nodes.hr.create();
-    const para = schema.nodes.paragraph.create();
-    const tr = state.tr.insert(afterPos, hr).insert(afterPos + 2, para);
-    dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
-    return;
-  }
+  const hr = schema.nodes.hr.create();
   const para = schema.nodes.paragraph.create();
-  let newBlock: Node;
-  if (cmd === SlashCommand.BulletList)
-    newBlock = schema.nodes.bullet_list.create(
-      null,
-      schema.nodes.list_item.create(null, para),
-    );
-  else if (cmd === SlashCommand.OrderedList)
-    newBlock = schema.nodes.ordered_list.create(
-      null,
-      schema.nodes.list_item.create(null, para),
-    );
-  else newBlock = schema.nodes.blockquote.create(null, para);
-  const tr = state.tr.insert(afterPos, newBlock);
-  const selPos = cmd === SlashCommand.Blockquote ? afterPos + 2 : afterPos + 3;
-  dispatch(tr.setSelection(TextSelection.create(tr.doc, selPos)));
+  const tr = state.tr.insert(afterPos, hr).insert(afterPos + 2, para);
+  dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
 }
 
 function insertDivider(view: EditorView): void {
@@ -254,23 +217,6 @@ function insertDivider(view: EditorView): void {
   const tr = state.tr.replaceWith(pos, pos + blockSize, [hr, para]);
   dispatch(
     tr.setSelection(TextSelection.create(tr.doc, pos + 2)).scrollIntoView(),
-  );
-}
-
-function convertToTodoList(view: EditorView): void {
-  const { state, dispatch } = view;
-  const { $from } = state.selection;
-  const para = state.schema.nodes.paragraph.create();
-  const listItem = state.schema.nodes.list_item.create(
-    { checked: false },
-    para,
-  );
-  const bulletList = state.schema.nodes.bullet_list.create(null, listItem);
-  const pos = $from.before($from.depth);
-  dispatch(
-    state.tr
-      .replaceWith(pos, pos + $from.node($from.depth).nodeSize, bulletList)
-      .scrollIntoView(),
   );
 }
 
