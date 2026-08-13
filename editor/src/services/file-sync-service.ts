@@ -219,12 +219,12 @@ export class FileSyncService {
     try {
       const ok = await page.flushOut(imageUrlMap);
       if (!ok) {
-        showNotification("Failed to save", { type: "danger" });
+        showNotification("Failed to save", { type: "danger", id: "save" });
         return;
       }
     } catch (error) {
       if (!surfaceBackendError(error)) {
-        showNotification("Failed to save", { type: "danger" });
+        showNotification("Failed to save", { type: "danger", id: "save" });
       }
       return;
     }
@@ -233,7 +233,7 @@ export class FileSyncService {
     pendingOpsStore.save(this.pendingOps.all);
     this.recomputeDirty();
     appEvents.emit(AppEvent.FlushComplete);
-    showNotification("File saved", { type: "success" });
+    showNotification("File saved", { type: "success", id: "save" });
   }
 
   async flushDirtyFiles(): Promise<void> {
@@ -324,9 +324,9 @@ export class FileSyncService {
     }
 
     if (hadFailure) {
-      showNotification("Some files failed to save", { type: "danger" });
+      showNotification("Some files failed to save", { type: "danger", id: "save" });
     } else {
-      showNotification("All files saved", { type: "success" });
+      showNotification("All files saved", { type: "success", id: "save" });
     }
 
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});

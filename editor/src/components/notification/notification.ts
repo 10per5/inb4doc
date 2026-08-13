@@ -39,6 +39,12 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
 
 let container: HTMLElement | null = null;
 
+// The active auto-dismiss animation per card. Stored on the element so renewal
+// (same id, e.g. repeated Ctrl+S saves) can cancel the pending dismiss, restart
+// the timer, and swipe-dismiss can always cancel the current fade regardless of
+// how many times the card was renewed.
+const renewalAnims = new WeakMap<HTMLElement, Animation>();
+
 function getContainer(): HTMLElement {
   if (!container) {
     container = document.getElementById("prdc-notifications") as HTMLElement;
@@ -51,9 +57,37 @@ function getContainer(): HTMLElement {
   return container;
 }
 
+// (Re)schedule a card's auto-dismiss. Cancels any pending fade first so a
+// renewed card starts a fresh countdown instead of continuing the old one.
+function scheduleDismiss(el: HTMLElement, duration: number): void {
+  const prev = renewalAnims.get(el);
+  if (prev) {
+    prev.cancel();
+    renewalAnims.delete(el);
+  }
+  if (duration <= 0) return;
+  const anim = el.animate(
+    [
+      { opacity: 1, transform: "translateY(0)" },
+      { opacity: 0, transform: "translateY(-8px)" },
+    ],
+    {
+      duration: 300,
+      fill: "forwards",
+      delay: duration - 300,
+      easing: "ease-out",
+    },
+  );
+  anim.onfinish = () => {
+    if (el.isConnected) el.remove();
+    renewalAnims.delete(el);
+  };
+  renewalAnims.set(el, anim);
+}
+
 // Slide a card out (offsetX = travel direction in px) then remove it.
-function dismissCard(el: HTMLElement, anim: Animation | null, offsetX: number): void {
-  anim?.cancel();
+function dismissCard(el: HTMLElement, offsetX: number): void {
+  renewalAnims.get(el)?.cancel();
   const out = el.animate(
     [{ transform: `translateX(${offsetX}px)`, opacity: 0 }],
     { duration: 180, easing: "ease-in", fill: "forwards" },
@@ -65,7 +99,7 @@ function dismissCard(el: HTMLElement, anim: Animation | null, offsetX: number): 
 // window/document bindings): cards are pointer-events:auto so the gesture is
 // captured directly. touch-action: pan-y (CSS) keeps vertical pans on the page
 // scrolling. A swipe starting on the ✕ close button is left to the button.
-function attachCardSwipe(el: HTMLElement, anim: Animation | null): void {
+function attachCardSwipe(el: HTMLElement): void {
   let startX = 0;
   let startY = 0;
   let dx = 0;
@@ -109,7 +143,7 @@ function attachCardSwipe(el: HTMLElement, anim: Animation | null): void {
     if (!engaged) return;
     e.preventDefault();
     if (Math.abs(dx) > 56) {
-      dismissCard(el, anim, dx > 0 ? 160 : -160);
+      dismissCard(el, dx > 0 ? 160 : -160);
     } else {
       el.style.transition = "transform 0.15s ease, opacity 0.15s ease";
       el.style.transform = "";
@@ -124,20 +158,70 @@ function attachCardSwipe(el: HTMLElement, anim: Animation | null): void {
   el.addEventListener("pointercancel", onUp);
 }
 
-export function showNotification(msg: string, opts?: NotificationOptions): void {
-  const mobile = isMobileDock();
-  const duration = opts?.duration ?? (mobile ? MOBILE_DURATION : DEFAULT_DURATION);
+// Update an existing card in place (same id): swap message/title/icon/tint,
+// restart the dismiss timer, and pulse a border/glow so repeated saves read as
+// "refreshed" rather than spamming a fresh card.
+function renewCard(
+  el: HTMLElement,
+  msg: string,
+  opts?: NotificationOptions,
+  mobile?: boolean,
+): void {
   const type = opts?.type ?? "danger";
   const title = opts?.title;
+  const isMobile = mobile ?? isMobileDock();
+
+  el.style.background = isMobile ? NOTIFICATION_BG_MOBILE[type] : NOTIFICATION_BG[type];
+
+  const iconEl = el.querySelector(".prdc-notif-icon") as HTMLElement | null;
+  if (iconEl) iconEl.innerHTML = NOTIFICATION_ICONS[type];
+
+  let titleEl = el.querySelector<HTMLElement>(".prdc-notif-title");
+  if (title) {
+    if (!titleEl) {
+      titleEl = document.createElement("div");
+      titleEl.className = "prdc-notif-title";
+      const bodyEl = el.querySelector(".prdc-notif-body");
+      if (bodyEl) bodyEl.prepend(titleEl);
+    }
+    titleEl.textContent = title;
+  } else if (titleEl) {
+    titleEl.remove();
+  }
+
+  const msgEl = el.querySelector(".prdc-notif-msg") as HTMLElement | null;
+  if (msgEl) msgEl.textContent = msg;
+
+  scheduleDismiss(
+    el,
+    opts?.duration ?? (isMobile ? MOBILE_DURATION : DEFAULT_DURATION),
+  );
+
+  // Re-trigger the glow pulse (remove class → reflow → re-add so repeated
+  // renewals each flash the ring).
+  el.classList.remove("prdc-notif-renew");
+  void el.offsetWidth;
+  el.classList.add("prdc-notif-renew");
+}
+
+export function showNotification(msg: string, opts?: NotificationOptions): void {
+  const mobile = isMobileDock();
+  const type = opts?.type ?? "danger";
   const id = opts?.id;
 
   const c = getContainer();
   c.classList.toggle("prdc-notifications--mobile", mobile);
 
   if (id) {
-    const existing = c.querySelector(`[data-nid="${id}"]`);
-    if (existing) existing.remove();
+    const existing = c.querySelector<HTMLElement>(`[data-nid="${id}"]`);
+    if (existing) {
+      renewCard(existing, msg, opts, mobile);
+      return;
+    }
   }
+
+  const duration = opts?.duration ?? (mobile ? MOBILE_DURATION : DEFAULT_DURATION);
+  const title = opts?.title;
 
   const el = document.createElement("div");
   el.className = "prdc-notification";
@@ -147,10 +231,10 @@ export function showNotification(msg: string, opts?: NotificationOptions): void 
   const closeEl = document.createElement("button");
   closeEl.className = "prdc-notif-close";
   closeEl.innerHTML = xmark;
-  let anim: Animation | null = null;
   closeEl.addEventListener("click", (e) => {
     e.stopPropagation();
-    anim?.cancel();
+    renewalAnims.get(el)?.cancel();
+    renewalAnims.delete(el);
     el.remove();
   });
   el.appendChild(closeEl);
@@ -176,21 +260,7 @@ export function showNotification(msg: string, opts?: NotificationOptions): void 
 
   c.appendChild(el);
 
-  if (duration > 0) {
-    anim = el.animate(
-      [
-        { opacity: 1, transform: "translateY(0)" },
-        { opacity: 0, transform: "translateY(-8px)" },
-      ],
-      {
-        duration: 300,
-        fill: "forwards",
-        delay: duration - 300,
-        easing: "ease-out",
-      },
-    );
-    anim.onfinish = () => { if (el.isConnected) el.remove() };
-  }
+  scheduleDismiss(el, duration);
 
-  if (mobile) attachCardSwipe(el, anim);
+  if (mobile) attachCardSwipe(el);
 }
