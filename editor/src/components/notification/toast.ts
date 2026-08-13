@@ -1,4 +1,8 @@
+import { isMobileDock } from "@/utils/mobile";
+
 const DEFAULT_DURATION = 4000;
+// Mobile transient toasts auto-dismiss faster so they never linger over typing.
+const MOBILE_DURATION = 2400;
 
 export type ToastType = "danger" | "warning" | "info";
 
@@ -13,21 +17,152 @@ const TOAST_BG: Record<ToastType, string> = {
   info: "#388bf2",
 };
 
+// Semi-transparent variants (8-digit hex, ~85% alpha) for the mobile toast.
+const TOAST_BG_MOBILE: Record<ToastType, string> = {
+  danger: "#e03e3ed9",
+  warning: "#d08731d9",
+  info: "#388bf2d9",
+};
+
+// The mobile transient toast is pointer-events:none (phantom touch), so a tap
+// on its body passes through to the editor underneath. Dismiss gestures are
+// captured with capture-phase window listeners while the toast is mounted and
+// torn down on dismiss/replace. This is a transient touch-gesture capture
+// scoped to the toast lifetime, not a global keyboard binding (keyboard.ts owns
+// those).
+const gestureCleanup = new WeakMap<HTMLElement, () => void>();
+
+function removeCurrentToast(): void {
+  const old = document.getElementById("prdc-toast");
+  if (!old) return;
+  gestureCleanup.get(old)?.();
+  gestureCleanup.delete(old);
+  old.remove();
+}
+
+// Slide the toast out (offsetX = travel direction in px) then remove it.
+function dismiss(toast: HTMLElement, offsetX: number): void {
+  if (!toast.isConnected) return;
+  gestureCleanup.get(toast)?.();
+  gestureCleanup.delete(toast);
+  toast.style.transition = "transform 0.18s ease, opacity 0.18s ease";
+  toast.style.transform = `translateX(calc(-50% + ${offsetX}px))`;
+  toast.style.opacity = "0";
+  setTimeout(() => {
+    if (toast.isConnected) toast.remove();
+  }, 200);
+}
+
+// Horizontal swipe anywhere on the toast body slides it out. Capture-phase
+// window listeners still see the pointer even though the toast is
+// pointer-events:none; a plain tap inside the band is left untouched so the
+// editor underneath still receives it (phantom touch) — only a confirmed
+// horizontal drag engages the gesture.
+function attachSwipeDismiss(toast: HTMLElement): void {
+  let active = false;
+  let engaged = false;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+
+  const onDown = (e: PointerEvent): void => {
+    if (!toast.isConnected) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const r = toast.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+    active = true;
+    engaged = false;
+    dx = 0;
+    startX = e.clientX;
+    startY = e.clientY;
+  };
+
+  const onMove = (e: PointerEvent): void => {
+    if (!active || !toast.isConnected) return;
+    const x = e.clientX - startX;
+    const y = e.clientY - startY;
+    if (!engaged) {
+      if (Math.abs(x) < 8 && Math.abs(y) < 8) return;
+      // Vertical drags stay free (scrolling); only horizontal ones dismiss.
+      if (Math.abs(y) > Math.abs(x)) {
+        active = false;
+        return;
+      }
+      engaged = true;
+      e.preventDefault();
+    }
+    dx = x;
+    toast.style.transform = `translateX(calc(-50% + ${x}px))`;
+    toast.style.opacity = String(Math.max(0.3, 1 - Math.abs(x) / 240));
+  };
+
+  const onUp = (e: PointerEvent): void => {
+    if (!active) return;
+    active = false;
+    if (!engaged) return;
+    e.preventDefault();
+    if (Math.abs(dx) > 56) {
+      dismiss(toast, dx > 0 ? 160 : -160);
+    } else {
+      toast.style.transition = "transform 0.15s ease, opacity 0.15s ease";
+      toast.style.transform = "translateX(-50%)";
+      toast.style.opacity = "";
+      setTimeout(() => {
+        toast.style.transition = "";
+      }, 160);
+    }
+  };
+
+  window.addEventListener("pointerdown", onDown, true);
+  window.addEventListener("pointermove", onMove, true);
+  window.addEventListener("pointerup", onUp, true);
+  window.addEventListener("pointercancel", onUp, true);
+
+  gestureCleanup.set(toast, () => {
+    window.removeEventListener("pointerdown", onDown, true);
+    window.removeEventListener("pointermove", onMove, true);
+    window.removeEventListener("pointerup", onUp, true);
+    window.removeEventListener("pointercancel", onUp, true);
+  });
+}
+
 export function showToast(msg: string, opts?: ToastOptions) {
-  const duration = opts?.duration ?? DEFAULT_DURATION;
+  const mobile = isMobileDock();
+  const duration = opts?.duration ?? (mobile ? MOBILE_DURATION : DEFAULT_DURATION);
   const type = opts?.type ?? "danger";
 
-  const old = document.getElementById("prdc-toast");
-  if (old) old.remove();
+  removeCurrentToast();
 
   const toast = document.createElement("div");
   toast.id = "prdc-toast";
-  toast.textContent = msg;
-  toast.style.background = TOAST_BG[type];
+  if (mobile) {
+    toast.className = "prdc-toast prdc-toast--mobile";
+    toast.style.background = TOAST_BG_MOBILE[type];
+
+    const msgEl = document.createElement("span");
+    msgEl.className = "prdc-toast-msg";
+    msgEl.textContent = msg;
+    toast.appendChild(msgEl);
+
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "prdc-toast-dismiss";
+    handle.setAttribute("aria-label", "Dismiss");
+    handle.textContent = "✕";
+    handle.addEventListener("click", () => dismiss(toast, 0));
+    toast.appendChild(handle);
+
+    attachSwipeDismiss(toast);
+  } else {
+    toast.style.background = TOAST_BG[type];
+    toast.textContent = msg;
+  }
   document.body.appendChild(toast);
 
   if (duration > 0) {
-    setTimeout(() => toast.remove(), duration);
+    setTimeout(() => {
+      if (toast.isConnected) dismiss(toast, 0);
+    }, duration);
   }
 }
 
@@ -61,12 +196,13 @@ export function showActionToast(
   onAction: () => void,
   opts?: { type?: ToastType }
 ): void {
-  const old = document.getElementById("prdc-toast");
-  if (old) old.remove();
+  removeCurrentToast();
 
   const toast = document.createElement("div");
   toast.id = "prdc-toast";
-  toast.className = "prdc-toast prdc-toast-action";
+  toast.className = isMobileDock()
+    ? "prdc-toast prdc-toast-action prdc-toast--mobile"
+    : "prdc-toast prdc-toast-action";
   toast.style.background = TOAST_BG[opts?.type ?? "danger"];
 
   const msgEl = document.createElement("span");
@@ -91,12 +227,13 @@ const PROGRESS_COLOR = "#388bf2";
 const INDETERMINATE_KEYFRAMES = `@keyframes prdc-toast-slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}`;
 
 export function showProgressToast(initialMsg: string): ProgressToastHandle {
-  const old = document.getElementById("prdc-toast");
-  if (old) old.remove();
+  removeCurrentToast();
 
   const el = document.createElement("div");
   el.id = "prdc-toast";
-  el.className = "prdc-toast prdc-toast-progress";
+  el.className = isMobileDock()
+    ? "prdc-toast prdc-toast-progress prdc-toast--mobile"
+    : "prdc-toast prdc-toast-progress";
 
   const msgEl = document.createElement("div");
   msgEl.textContent = initialMsg;

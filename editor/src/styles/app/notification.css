@@ -93,3 +93,43 @@
     transform: translateX(0);
   }
 }
+
+/* ── Mobile notification stack (notification.ts) ─────────────────────
+ *
+ * The stack reserves the top-center slot just below the slim 48px mobile
+ * topbar (class toggled by notification.ts via isMobileDock(), so desktop
+ * builds are unaffected). Cards stay interactive (✕ close + swipe-to-dismiss)
+ * while the container stays pointer-events:none, so taps between/outside cards
+ * pass through to the editor (phantom touch). Semi-transparent backgrounds are
+ * set inline in notification.ts.
+ */
+#prdc-notifications.prdc-notifications--mobile {
+  top: calc(48px + 0.5rem);
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
+/* Slide-down entry instead of the desktop right-slide (whose keyframes end at
+ * translateX(0) and would jump once the animation finishes). */
+#prdc-notifications.prdc-notifications--mobile .prdc-notification {
+  animation: prdc-notif-in-mobile 0.2s ease-out;
+  touch-action: pan-y;
+}
+
+@keyframes prdc-notif-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* No hover on touch: keep the ✕ dismiss visible and tappable. */
+#prdc-notifications.prdc-notifications--mobile .prdc-notif-close {
+  display: flex;
+}
