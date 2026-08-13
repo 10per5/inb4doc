@@ -332,12 +332,14 @@
 }
 
 /* Edit toolbar: list-context controls as a block-anchored popover (no bottom
- * strip). #edit-toolbar is a 0×0 fixed anchor whose left/top are set to the
- * selection block by EditToolbarController; the .edit-toolbar panel is
- * absolutely positioned inside it and reuses the shared toolbar-menu--up /
- * --right flip classes from menu.css. */
+ * strip). #edit-toolbar is a 0×0 fixed anchor whose left/top are set by
+ * EditToolbarController (via applyPanelFlip's positionAnchor) to the block
+ * bounds; the .edit-toolbar panel is absolutely positioned inside it and
+ * reuses the shared toolbar-menu--up / --right flip classes from menu.css. */
 #edit-toolbar {
   position: fixed;
+  left: 0;
+  top: 0;
   width: 0;
   height: 0;
   z-index: 300;

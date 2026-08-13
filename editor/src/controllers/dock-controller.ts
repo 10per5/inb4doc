@@ -6,6 +6,7 @@ import renderDock from "@/eta/views/controller/dock"
 import { Menu } from "@/components/ui/menu"
 import { menuRegistry } from "@/config/menu-definitions"
 import { trackKeyboardOffset } from "@/utils/mobile"
+import { getBlockRectAt } from "@/utils/popover"
 import type { ViewType } from "@/services/view-controller"
 import type { EditorController } from "@/controllers/editor-controller"
 
@@ -107,12 +108,16 @@ export default class DockController extends Controller {
     if (!milk) return
     const { getView } = await import("@/services/editor-context")
     const view = getView(milk)
-    const coords = view.coordsAtPos(view.state.selection.from)
-    if (!coords) return
+    const { from } = view.state.selection
+    const block = getBlockRectAt(view, from) ?? view.coordsAtPos(from)
+    if (!block) return
     anchor.classList.add("is-block-anchored")
-    anchor.style.left = `${coords.left}px`
-    anchor.style.top = `${coords.top}px`
-    this.insertMenu?.setAnchorRect(coords, true)
+    // Intermediate position while the panel is still hidden — applyPanelFlip
+    // (via Menu.positionPanel) repositions the anchor to the block's top or
+    // bottom+margin once it measures the open panel.
+    anchor.style.left = `${block.left}px`
+    anchor.style.top = `${block.top}px`
+    this.insertMenu?.setAnchorRect(block, true)
   }
 
   // editorOutlet is a blessed Stimulus getter that THROWS when the outlet

@@ -388,12 +388,15 @@ export class Menu {
   // no reposition flash; results are class toggles plus a clamped inline left.
   // Panels with a panelClass own their horizontal alignment in their dock
   // position, so the horizontal flip only runs for them while block-anchored.
+  // Block-anchored panels also let applyPanelFlip move the 0×0 anchor element
+  // itself, so "below" opens at the anchor rect's bottom (not its top).
   private positionPanel() {
     const anchor = this.anchorRect ?? this.mountEl.getBoundingClientRect()
     applyPanelFlip(this.panelEl, {
       anchor,
       preferAbove: this.preferAbove,
       flipX: this.anchorRect !== null || !this.panelClass,
+      positionAnchor: this.anchorRect !== null,
     })
   }
 

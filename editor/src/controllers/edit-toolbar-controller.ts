@@ -4,7 +4,7 @@ import { ToolbarCommand } from "@/config/enums"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
 import { trackKeyboardOffset } from "@/utils/mobile"
-import { applyPanelFlip } from "@/utils/popover"
+import { applyPanelFlip, getBlockRectAt } from "@/utils/popover"
 import type { EditorController } from "@/controllers/editor-controller"
 
 export default class EditToolbarController extends Controller {
@@ -60,10 +60,12 @@ export default class EditToolbarController extends Controller {
     })
   }
 
-  // The panel is a popover anchored at the current selection's block. #edit-
-  // toolbar is a 0×0 fixed anchor whose left/top are set to the block coords;
-  // applyPanelFlip then opens the .edit-toolbar panel above the block when it
-  // fits (preferAbove), flipping below otherwise.
+  // The panel is a popover anchored at the block holding the current selection,
+  // left-aligned to the block. #edit-toolbar is a 0×0 fixed anchor that
+  // applyPanelFlip moves (positionAnchor) so the .edit-toolbar panel opens
+  // BELOW the block when it fits — above only when the block sits too low —
+  // and, for blocks taller than the viewport, on the side away from the cursor
+  // (cursor near the bottom → above, near the top → below).
   private positionPopover(): void {
     const anchor = this.element as HTMLElement
     const panel = this.element.querySelector<HTMLElement>(".edit-toolbar")
@@ -73,11 +75,16 @@ export default class EditToolbarController extends Controller {
     void import("@/services/editor-context").then(({ getView }) => {
       if (anchor.hidden) return
       const view = getView(milk)
-      const coords = view.coordsAtPos(view.state.selection.from)
-      if (!coords) return
-      anchor.style.left = `${coords.left}px`
-      anchor.style.top = `${coords.top}px`
-      applyPanelFlip(panel, { anchor: coords, preferAbove: true })
+      const { from } = view.state.selection
+      const cursor = view.coordsAtPos(from)
+      if (!cursor) return
+      applyPanelFlip(panel, {
+        anchor: getBlockRectAt(view, from) ?? cursor,
+        anchorCursor: cursor,
+        preferAbove: false,
+        positionAnchor: true,
+        measureDisplay: "flex",
+      })
     })
   }
 
