@@ -765,12 +765,21 @@ export class FileSyncService {
         },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
+          // Only the current file needs an editor reload, and only when it
+          // actually had a pending op. Reloading a clean file (or reloading
+          // with stale editorStates/editorContents) makes updateEditorContent
+          // restore the cached doc and compare its re-serialization against
+          // the raw disk body — a non-canonical file then re-queues itself as
+          // a "formatted" pending Edit op. invalidateState forces the
+          // re-baseline path (lastSetContent.delete) so the reload is silent.
+          const currentHadOp = this.pendingOps.get(this.currentPath) !== undefined;
           this.clearPendingOps();
           await imageService.removeAllForDir(imageService.getCurrentDocDir());
+          if (currentHadOp) this.editor.invalidateState(this.currentPath);
           this.recomputeDirty();
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
-          await this.reloadCurrentFromDisk(this.currentPath);
+          if (currentHadOp) await this.reloadCurrentFromDisk(this.currentPath);
         },
       },
     };
