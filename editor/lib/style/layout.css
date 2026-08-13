@@ -14,8 +14,24 @@ body {
   height: 100%;
 }
 
+/* Viewport height unit: 100vh is the LARGE viewport, which on tablet/phone
+ * browsers exceeds the visible area whenever the address bar is shown, so a
+ * 100vh panel sticks out below the fold. 100dvh tracks the visible viewport;
+ * the fallback keeps older engines on plain vh. Desktop is unaffected (dvh ==
+ * vh there). Use var(--vp) for any element that must fill exactly the visible
+ * height (panels, the layout container). */
+:root {
+  --vp: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --vp: 100dvh;
+  }
+}
+
 #app {
-  height: 100vh;
+  height: var(--vp);
 }
 
 /* ── Layout variables (extracted from foundation/base.css) ───────── */
@@ -49,7 +65,7 @@ body {
 
 .book-layout {
   display: flex;
-  height: 100vh;
+  height: var(--vp);
   overflow-y: auto;
   background: var(--color-bg-primary);
 }
@@ -74,7 +90,7 @@ body {
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: var(--vp);
 }
 
 /* Skeleton host must fill the menu column before the sidebar view renders */
@@ -90,7 +106,7 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  height: 100vh;
+  height: var(--vp);
 }
 
 .sidebar-inner {
@@ -168,7 +184,7 @@ body {
   flex-shrink: 0;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: var(--vp);
   overflow-y: auto;
   display: var(--aside-visibility);
   flex-direction: column;
