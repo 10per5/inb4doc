@@ -10,7 +10,7 @@ import { Controller } from "@hotwired/stimulus";
 import type { Editor } from "@milkdown/kit/core";
 import { createEditor, type EditorHost } from "@/config/editor-config";
 import { editorContext, getMarkdown, getView } from "@/services/editor-context";
-import { initToolbarHandler } from "@/features/toolbar-handler";
+import { initEditorMutationService } from "@/services/editor-mutation-service";
 import { initLinkHandler } from "@/features/link-handler";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { pagesStore } from "@/stores/page-store";
@@ -412,7 +412,7 @@ export class EditorController extends Controller {
       this.element.insertAdjacentHTML("beforeend", renderSourceEditor({}));
     }
     this.unsubs.push(
-      initToolbarHandler(() => this.editor),
+      initEditorMutationService(() => this.editor),
       initLinkHandler(() => this.editor),
       appEvents.on(
         AppEvent.ScrollToText,

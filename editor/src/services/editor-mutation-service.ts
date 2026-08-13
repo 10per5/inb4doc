@@ -1,9 +1,17 @@
 /**
- * toolbar-handler — subscribes to ToolbarCommandExec events and dispatches
- * Milkdown commands. Receives an editor getter; imports services lazily.
+ * editor-mutation-service — routes document-mutation intents to the Milkdown
+ * editor.
  *
- * No static imports of editorContext or commandService — both are
- * dynamically imported inside the handler to keep the main bundle free.
+ * Every surface that mutates the open document funnels through one of two
+ * events: AppEvent.ToolbarCommandExec (topbar + quick bar) and
+ * AppEvent.InsertBlockCommand (slash menu, mobile FAB "+", block handle "+").
+ * This service subscribes to both and dispatches them via editor.action().
+ * The heavy list conversions live in utils/editor-mutator.ts so every caller
+ * shares the same coverage/split/merge rules.
+ *
+ * Receives an editor getter (the editor is owned by EditorController, is lazily
+ * created and can be null); imports services lazily to keep the main bundle
+ * free.
  */
 
 import type { Editor } from "@milkdown/kit/core"
@@ -11,7 +19,7 @@ import { appEvents, AppEvent } from "@/stores/app-events"
 import { ToolbarCommand } from "@/config/enums"
 import { clearListItems, setListItemKind, setTaskChecked, toggleTaskChecked } from "@/utils/editor-mutator"
 
-export function initToolbarHandler(getEditor: () => Editor | null) {
+export function initEditorMutationService(getEditor: () => Editor | null) {
   const unsubToolbar = appEvents.on(AppEvent.ToolbarCommandExec, async ({ command, level }) => {
     const editor = getEditor()
     if (!editor) return

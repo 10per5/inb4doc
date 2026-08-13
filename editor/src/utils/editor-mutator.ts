@@ -3,12 +3,12 @@
  *
  * The list retyping / task toggling / list-unwrap surgery that every entry
  * point shares: the topbar and the quick bar (edit toolbar) reach it through
- * AppEvent.ToolbarCommandExec (features/toolbar-handler.ts), while the slash
- * menu, the FAB "+" and the block handle "+" call `setListItemKind` directly
- * (features/insert-command.ts). Keeping the mutations here — instead of inside
- * toolbar-handler — means all callers convert lists with the exact same rules
- * (coverage, split, merge, caret restore) instead of hand-rolled replacements
- * that drop sibling items.
+ * AppEvent.ToolbarCommandExec (services/editor-mutation-service.ts), while the
+ * slash menu, the FAB "+" and the block handle "+" call `setListItemKind`
+ * directly (features/insert-command.ts). Keeping the mutations here — instead
+ * of inside the mutation service — means all callers convert lists with the
+ * exact same rules (coverage, split, merge, caret restore) instead of
+ * hand-rolled replacements that drop sibling items.
  */
 
 import type { CmdKey } from "@milkdown/core"
