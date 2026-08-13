@@ -46,6 +46,7 @@ import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createTextStatePlugin } from "@/plugins/text-state";
 import { createHistoryContextPlugin } from "@/plugins/history-context";
 import { createCaretScrollPlugin } from "@/plugins/caret-scroll";
+import { createPlainPastePlugin } from "@/plugins/plain-paste";
 import { isMobileDock } from "@/utils/mobile";
 import {
   copy,
@@ -218,6 +219,7 @@ export async function createEditor(
 
       ctx.update(prosePluginsCtx, (plugins) => {
         return plugins.concat(
+          createPlainPastePlugin(),
           createUrlPastePlugin(),
           createDirtyPlugin(ctx, {
             getLastSetContent: (path) => host.stateCache.getLastSet(path),
