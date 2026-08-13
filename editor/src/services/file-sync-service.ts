@@ -23,12 +23,12 @@ import { surfaceBackendError } from "@/utils/backend-error";
 import type { TreeIndex } from "@/utils/tree";
 import { extractSnippets } from "@/utils/content-search";
 import { imageService } from "@/services/image-service";
-import { storageService } from "@/services/storage";
+import { storageService } from "@/services/storage-service";
 import { STORE_FILES } from "@/config/storage-keys";
 import { pagesStore as repo } from "@/stores/page-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
-import { clearEditorTint, updateEditorTint } from "@/services/file-status-tint";
+import { clearEditorTint, updateEditorTint } from "@/utils/file-status-tint";
 
 import type { EditorController } from "@/controllers/editor-controller";
 

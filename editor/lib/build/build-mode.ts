@@ -107,9 +107,9 @@ export function hasFunc(func: AppFunc): boolean {
 // transport-agnostic — only the glue layers differ per deployment:
 //
 //   WebRemote / WebLocal → ServiceWorker: sw.js precaches via updaterTransfer
-//     (Cache Storage backend) and posts the manifest; the page's sw-registrar
+//     (Cache Storage backend) and posts the manifest; the page's sw-registrar-service
 //     applies via updaterDiff + ModuleRegistry.swap. Selected implicitly by the
-//     protocol check in sw-registrar (http/https only).
+//     protocol check in sw-registrar-service (http/https only).
 //
 //   GuiDesktop → fetch manifest from UPDATE_BASE + disk cache + NativeBridge
 //     reload (Part E). No ServiceWorker (app:// protocol).

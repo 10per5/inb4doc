@@ -15,14 +15,14 @@ A two-layer wiki: edit markdown in a live WYSIWYG editor. Connect multiple provi
 
 * [Getting Started](/docs/getting-started) — set up and make your first edit
 
-* [Architecture](/docs/architecture) — how the two modes work, tech stack
+- [Architecture](/docs/architecture) — how the two modes work, tech stack
 
-* [Build](/docs/build) — build process, artifacts, cross-machine install
+- [Build](/docs/build) — build process, artifacts, cross-machine install
 
-* [Editor](/docs/editor) — Milkdown, Hotwired, flush-based writes, bundle size
+- [Editor](/docs/editor) — Milkdown, Hotwired, flush-based writes, bundle size
 
-* [Endpoints](/docs/endpoints) — API reference, how to add new routes, future server decoupling
+- [Endpoints](/docs/endpoints) — API reference, how to add new routes, future server decoupling
 
-* [Static Site Generator](/docs/ssg) — Hugo + Book theme, build pipeline, credits
+- [Static Site Generator](/docs/ssg) — Hugo + Book theme, build pipeline, credits
 
-* [Roadmap](/docs/roadmap) — future direction, mounting, git, compile target
+- [Roadmap](/docs/roadmap) — future direction, mounting, git, compile target

@@ -1,4 +1,4 @@
-import type { ImageStorageMode } from "@/services/storage"
+import type { ImageStorageMode } from "@/services/storage-service"
 import { prefsStore } from "@/stores/preferences-store"
 import { appEvents, AppEvent } from "@/stores/app-events"
 

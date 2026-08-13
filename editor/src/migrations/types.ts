@@ -1,4 +1,4 @@
-import type { StorageService } from "@/services/storage"
+import type { StorageService } from "@/services/storage-service"
 import type { FileEntry } from "@/config/storage-keys"
 
 export interface Migration {

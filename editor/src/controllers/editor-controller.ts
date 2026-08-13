@@ -2,14 +2,14 @@
  * EditorController — Stimulus controller managing Milkdown editor lifecycle and state.
  *
  * Editor creation is delegated to config/editor-config.ts.
- * Conflict resolution is delegated to services/conflict-resolver.ts.
+ * Conflict resolution is delegated to features/conflict-resolver.ts.
  * This class owns: path context, editor state, content loading, source mode.
  */
 
 import { Controller } from "@hotwired/stimulus";
 import type { Editor } from "@milkdown/kit/core";
 import { createEditor, type EditorHost } from "@/config/editor-config";
-import { editorContext, getMarkdown, getView } from "@/services/editor-context";
+import { editorContext, getMarkdown, getView } from "@/services/editor-context-service";
 import { initEditorMutationService } from "@/services/editor-mutation-service";
 import { initLinkHandler } from "@/features/link-handler";
 import { appEvents, AppEvent } from "@/stores/app-events";
@@ -25,7 +25,7 @@ import {
   resolveConflict,
   executeConflictDecision,
   applyNoConflict,
-} from "@/services/conflict-resolver";
+} from "@/features/conflict-resolver";
 import {
   findTextMatch,
   findHeadingTarget,

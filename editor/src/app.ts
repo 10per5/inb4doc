@@ -2,8 +2,8 @@ import "./styles/index";
 
 import { Application } from "@hotwired/stimulus";
 import { registerCoreControllers } from "@/controllers/core";
-import { ModuleRegistry } from "@/services/module-registry";
-import { setRegistry } from "@/services/registry-provider";
+import { ModuleRegistry } from "@/services/module-registry-service";
+import { setRegistry } from "@/services/registry-provider-service";
 import { initializeProvider, setProviderReady } from "@/stores/provider-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { initNativeBridge } from "@/eta/bridge";
@@ -178,7 +178,7 @@ async function init() {
   initNativeBridge();
 
   if ("serviceWorker" in navigator && ["http:", "https:"].includes(location.protocol)) {
-    const { registerSW } = await import("./services/sw-registrar");
+    const { registerSW } = await import("./services/sw-registrar-service");
     registerSW(registry);
   }
 
@@ -188,7 +188,7 @@ async function init() {
   // lazy chunks exist nowhere on disk yet, and the updater is what downloads
   // them (then reloads). Starting it first means the one-time import failure
   // below can't strand the shell.
-  const { startUpdater } = await import("./services/updater");
+  const { startUpdater } = await import("./services/updater-service");
   startUpdater(registry);
 
   if (thinShell) {

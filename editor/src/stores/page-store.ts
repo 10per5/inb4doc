@@ -1,5 +1,5 @@
 import { Page, type PageData } from "@/entities/Page"
-import { storageService } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { STORE_FILES } from "@/config/storage-keys"
 import { activeProviderId } from "@/stores/provider-store"

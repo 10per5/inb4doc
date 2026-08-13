@@ -1,7 +1,7 @@
-import { createNewItem, deletePages, renamePage, movePage, setPageWeights } from "@/services/editor-actions";
+import { createNewItem, deletePages, renamePage, movePage, setPageWeights } from "@/features/editor-actions";
 import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
-import { storageService } from "@/services/storage";
+import { storageService } from "@/services/storage-service";
 import { getProvider, switchProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { showNotification } from "@/components/notification/notification";
 import { pagesStore } from "@/stores/page-store";
@@ -9,7 +9,7 @@ import { pushPath, replacePath } from "@/utils/url";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
-import { updateEditorTint, clearEditorTint } from "@/services/file-status-tint";
+import { updateEditorTint, clearEditorTint } from "@/utils/file-status-tint";
 import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";

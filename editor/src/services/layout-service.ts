@@ -1,7 +1,7 @@
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { UIService } from "@/stores/ui-store";
 import { LayoutPreset, LayoutWidth } from "@/config/enums";
-import type { ViewType } from "@/services/view-controller";
+import type { ViewType } from "@/services/view-service";
 import { trackKeyboardOffset } from "@/utils/mobile";
 
 export interface LayoutState {

@@ -105,7 +105,7 @@ export default class EditToolbarController extends Controller {
     }
     const milk = this.editor()?.getEditor()
     if (!milk) return
-    void import("@/services/editor-context").then(({ getView }) => {
+    void import("@/services/editor-context-service").then(({ getView }) => {
       if (!this.followMode) return
       const view = getView(milk)
       const { from } = view.state.selection

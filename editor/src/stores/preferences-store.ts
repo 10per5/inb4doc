@@ -1,6 +1,6 @@
 import { STORE_PREFS } from "@/config/storage-keys"
-import { storageService } from "@/services/storage"
-import type { WikiPrefs, ImageStorageMode } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
+import type { WikiPrefs, ImageStorageMode } from "@/services/storage-service"
 
 const DEFAULTS: WikiPrefs = {
   stickyToolbar: true,

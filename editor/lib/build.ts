@@ -134,7 +134,7 @@ if (!renderTemplates) {
   const BASE = SELF_BASE ? `${SELF_BASE}/` : "/"
   const SW_PREFIX = `${SELF_BASE}/assets`
 
-  // buildVersion feeds the SW_ACTIVATED version guard in sw-registrar.ts, which
+  // buildVersion feeds the SW_ACTIVATED version guard in sw-registrar-service.ts, which
   // drops activations older than the last applied one. The counter must stay
   // monotonic ACROSS dev-server restarts (it lives in a process-local variable
   // otherwise, so a fresh `bun dev` would start at 1 again and get ignored by

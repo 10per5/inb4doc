@@ -6,7 +6,7 @@
  * State changes flow back via events that components subscribe to.
  */
 
-import type { ViewType } from "@/services/view-controller"
+import type { ViewType } from "@/services/view-service"
 import type { LayoutChangedPayload } from "@/services/layout-service"
 import type { MetaPanelData } from "@/entities/Frontmatter"
 import type { ProviderType } from "@/providers/index"

@@ -4,7 +4,7 @@ import { buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 import { imageKey, IMAGE_PREFIX, STORE_FILES, type FileEntry } from "@/config/storage-keys"
-import { storageService } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
 import { imageStore } from "@/stores/image-store"
 
 

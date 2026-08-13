@@ -1,4 +1,4 @@
-import type { ViewController, ViewType } from "@/services/view-controller"
+import type { ViewService, ViewType } from "@/services/view-service"
 
 export interface EditorViewOptions {
   sourceMode: () => boolean
@@ -8,7 +8,7 @@ export interface EditorViewOptions {
 }
 
 export function registerEditorView(
-  registerFn: ViewController["register"],
+  registerFn: ViewService["register"],
   opts: EditorViewOptions,
 ) {
   registerFn("editor", {

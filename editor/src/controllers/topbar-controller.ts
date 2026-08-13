@@ -18,7 +18,7 @@ import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { isMobileDock } from "@/utils/mobile";
-import * as focusHandler from "@/services/focus-handler";
+import * as focusHandler from "@/services/focus-handler-service";
 
 export default class extends Controller {
   static targets = [

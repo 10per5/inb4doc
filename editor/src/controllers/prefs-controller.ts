@@ -1,7 +1,7 @@
 import * as icons from "@/eta/icons"
 import { BaseDialogController } from "./dialog/base-dialog-controller"
 import { prefsStore } from "@/stores/preferences-store"
-import type { ImageStorageMode } from "@/services/storage"
+import type { ImageStorageMode } from "@/services/storage-service"
 import { onPrefsStickyChanged, onPrefsDarkChanged, onPrefsImageModeChanged } from "@/components/ui/prefs"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { openDialog } from "@/services/dialog-service"

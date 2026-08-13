@@ -1,4 +1,4 @@
-import { storageService, type StorageService } from "@/services/storage"
+import { storageService, type StorageService } from "@/services/storage-service"
 import { appEvents, AppEvent } from "@/stores/app-events"
 
 export abstract class EntityStore<T> {

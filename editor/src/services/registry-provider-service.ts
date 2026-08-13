@@ -1,4 +1,4 @@
-import type { ModuleRegistry } from "./module-registry"
+import type { ModuleRegistry } from "./module-registry-service"
 
 let _registry: ModuleRegistry | null = null
 
