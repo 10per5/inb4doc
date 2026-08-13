@@ -187,7 +187,7 @@ export default class ChangesController extends BaseDialogController {
       if (this.hasPayloadValue) {
         this.dispatch("done", { bubbles: true })
       } else {
-        appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+        appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
       }
     }
   }
@@ -199,7 +199,7 @@ export default class ChangesController extends BaseDialogController {
       return
     }
     changesScreenStore.get()?.actions.onFlushAll()
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 
   discardAll() {
@@ -209,7 +209,7 @@ export default class ChangesController extends BaseDialogController {
       return
     }
     changesScreenStore.get()?.actions.onDiscardAll()
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 
   close() {
