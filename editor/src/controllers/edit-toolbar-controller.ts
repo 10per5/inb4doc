@@ -4,7 +4,7 @@ import { ToolbarCommand } from "@/config/enums"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
 import { trackKeyboardOffset } from "@/utils/mobile"
-import { applyPanelFlip, getBlockRectAt } from "@/utils/popover"
+import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/popover"
 import type { EditorController } from "@/controllers/editor-controller"
 
 export default class EditToolbarController extends Controller {
@@ -19,6 +19,7 @@ export default class EditToolbarController extends Controller {
   private unsubs: (() => void)[] = []
   private isListContext = false
   private viewIsEditor = true
+  private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
 
   connect(): void {
@@ -41,10 +42,15 @@ export default class EditToolbarController extends Controller {
     this.stopKeyboardTrack = trackKeyboardOffset(() => {
       this.positionPopover()
     })
+    // The popover anchors to the focused block; document scroll can carry the
+    // block out of the viewport. Capture-phase: scroll events from the inner
+    // .book-layout scroller don't bubble (same pattern as code-block-ui.ts).
+    window.addEventListener("scroll", this.onScroll, true)
     this.updateVisibility()
   }
 
   disconnect(): void {
+    window.removeEventListener("scroll", this.onScroll, true)
     this.stopKeyboardTrack?.()
     this.stopKeyboardTrack = null
     this.unsubs.forEach((unsub) => unsub())
@@ -65,27 +71,50 @@ export default class EditToolbarController extends Controller {
   // applyPanelFlip moves (positionAnchor) so the .edit-toolbar panel opens
   // BELOW the block when it fits — above only when the block sits too low —
   // and, for blocks taller than the viewport, on the side away from the cursor
-  // (cursor near the bottom → above, near the top → below).
+  // (cursor near the bottom → above, near the top → below). Once the anchored
+  // block scrolls fully out of the visible viewport the popover is hidden.
   private positionPopover(): void {
-    const anchor = this.element as HTMLElement
     const panel = this.element.querySelector<HTMLElement>(".edit-toolbar")
-    if (!panel || anchor.hidden) return
+    if (!panel) return
     const milk = this.editor()?.getEditor()
     if (!milk) return
     void import("@/services/editor-context").then(({ getView }) => {
-      if (anchor.hidden) return
       const view = getView(milk)
       const { from } = view.state.selection
       const cursor = view.coordsAtPos(from)
       if (!cursor) return
+      const block = getBlockRectAt(view, from) ?? cursor
+      this.setInViewport(this.isBlockInView(block))
+      if (!this.inViewport || !this.viewIsEditor || !this.isListContext) return
       applyPanelFlip(panel, {
-        anchor: getBlockRectAt(view, from) ?? cursor,
+        anchor: block,
         anchorCursor: cursor,
         preferAbove: false,
         positionAnchor: true,
         measureDisplay: "flex",
       })
     })
+  }
+
+  // Re-anchor the popover on every scroll; positionPopover also hides it once
+  // the anchored block scrolls out of the viewport.
+  private onScroll = (): void => {
+    this.positionPopover()
+  }
+
+  // The block rect is in layout-viewport coordinates; the visible area is the
+  // visual viewport (offsetTop + height — the keyboard pan shifts offsetTop).
+  private isBlockInView(block: FlipAnchorRect): boolean {
+    const vv = window.visualViewport
+    const top = vv ? vv.offsetTop : 0
+    const bottom = top + (vv ? vv.height : window.innerHeight)
+    return block.bottom > top && block.top < bottom
+  }
+
+  private setInViewport(inView: boolean): void {
+    if (this.inViewport === inView) return
+    this.inViewport = inView
+    this.updateVisibility()
   }
 
   // editorOutlet is a blessed Stimulus getter that THROWS when the outlet
@@ -123,7 +152,7 @@ export default class EditToolbarController extends Controller {
   }
 
   private updateVisibility(): void {
-    ;(this.element as HTMLElement).hidden = !(this.viewIsEditor && this.isListContext)
+    ;(this.element as HTMLElement).hidden = !(this.viewIsEditor && this.isListContext && this.inViewport)
   }
 
   private setVisible(cmd: string, visible: boolean): void {
