@@ -24,4 +24,6 @@ export enum ToolbarCommand {
   RemoveRow,
   DeleteCol,
   RemoveTable,
+  Undo,
+  Redo,
 }

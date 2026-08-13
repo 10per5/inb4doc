@@ -336,6 +336,7 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
     const { editorContext } = await import("@/services/editor-context")
     const { commandService } = await import("@/services/command-service")
     const { isInTable, selectedRect } = await import("@milkdown/kit/prose/tables")
+    const { undo, redo } = await import("@milkdown/kit/prose/history")
     await Promise.all([editorContext.load(), commandService.load()])
 
     if (command === ToolbarCommand.Link) {
@@ -397,6 +398,10 @@ export function initToolbarHandler(getEditor: () => Editor | null) {
           commands.call(commandService.selectTableCommand.key)
           commands.call(commandService.deleteSelectedCellsCommand.key)
           break
+        case ToolbarCommand.Undo:
+          undo(view.state, view.dispatch); break
+        case ToolbarCommand.Redo:
+          redo(view.state, view.dispatch); break
       }
     })
   })

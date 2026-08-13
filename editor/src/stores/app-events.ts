@@ -75,6 +75,7 @@ export enum AppEvent {
   ToolbarCommandExec = "toolbar-command-exec",
   InsertBlockCommand = "insert-block-command",
   BlockContextChanged = "block-context-changed",
+  HistoryChanged = "history-changed",
   ScrollToText = "scroll-to-text",
   LinkDialogRequested = "link-dialog-requested",
 
@@ -143,6 +144,7 @@ export interface AppEventPayloads {
   [AppEvent.SourceModeChanged]:     { source: boolean }
   [AppEvent.SourceApplyRequested]:  { path: string; content: string }
   [AppEvent.BlockContextChanged]:   { context: ActiveBlockContext }
+  [AppEvent.HistoryChanged]:         { canUndo: boolean; canRedo: boolean }
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
   [AppEvent.InsertBlockCommand]:    { command: SlashCommand; level?: number }
   [AppEvent.ScrollToText]:          { query: string; matchIndex: number; snippetText?: string }

@@ -1,4 +1,12 @@
 <div class="edit-toolbar">
+  <div class="edit-toolbar-group">
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-19" data-action="edit-toolbar#exec" title="Undo" aria-label="Undo" disabled>
+      <span class="edit-toolbar-icon"><%~ it.icons.undo %></span>
+    </button>
+    <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-20" data-action="edit-toolbar#exec" title="Redo" aria-label="Redo" disabled>
+      <span class="edit-toolbar-icon"><%~ it.icons.redo %></span>
+    </button>
+  </div>
   <div class="edit-toolbar-group" data-edit-toolbar-target="listGroup" hidden>
     <button type="button" class="edit-toolbar-btn" data-edit-toolbar-target="btn" data-cmd="tc-8" data-action="edit-toolbar#exec" title="Decrease indent" aria-label="Decrease indent">
       <span class="edit-toolbar-icon"><%~ it.icons.navArrowLeft %></span>

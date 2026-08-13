@@ -108,6 +108,15 @@
   padding-bottom: calc(56px + env(safe-area-inset-bottom, 0));
 }
 
+/* When the edit-toolbar strip is visible it stacks above the dock bar (~47px:
+ * 34px buttons + 12px padding + 1px border), so clear that too. The :has
+ * variant carries an id selector and beats both .book-layout rules above. In
+ * follow mode (keyboard open) the bar floats at the cursor instead, so no
+ * extra clearance. */
+.book-layout:has(#edit-toolbar:not([hidden])):not(:has(#edit-toolbar.is-follow-mode)) {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0));
+}
+
 /* The fixed topbar overlays the top 48px of the scrollport, so keep the
  * editor content clear of it — but only while the bar is visible (editor
  * view). Fullviews hide it and render their own header at the very top. */
@@ -139,8 +148,7 @@
  * sets --kb-offset on #dock and toggles .kb-open. The FAB relocates to the
  * bottom-right corner, above the keyboard. position:fixed pulls it out of the
  * dock flex row (Files/More then split the bar, which is keyboard-covered
- * anyway). The edit-toolbar is a block-anchored popover (see below), so it
- * needs no lift here. */
+ * anyway). The edit-toolbar switches to follow mode (see below). */
 #dock.kb-open .dock-item--fab {
   position: fixed;
   right: 16px;
@@ -371,18 +379,15 @@ body.layout-mobile-shrink .book-layout {
   text-align: center;
 }
 
-/* Edit toolbar: list-context controls as a block-anchored popover (no bottom
- * strip). #edit-toolbar is a 0×0 fixed anchor whose left/top are set by
- * EditToolbarController (via applyPanelFlip's positionAnchor) to the block
- * bounds; the .edit-toolbar panel is absolutely positioned inside it and
- * reuses the shared toolbar-menu--up / --right flip classes from menu.css. */
+/* Edit toolbar: context-aware strip pinned between the editor and the dock.
+ * #edit-toolbar is a plain block child of the fixed #dock, so it stacks above
+ * the 56px .dock row. Undo/redo are always present (disabled when the open
+ * file has no history); the list/table groups appear contextually inside the
+ * strip. */
 #edit-toolbar {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  z-index: 300;
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
 }
 
 #edit-toolbar[hidden] {
@@ -390,11 +395,6 @@ body.layout-mobile-shrink .book-layout {
 }
 
 .edit-toolbar {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  min-width: 180px;
-  max-width: calc(100vw - 16px);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -403,10 +403,44 @@ body.layout-mobile-shrink .book-layout {
   padding: 0.375rem 0.5rem;
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+/* Follow mode (keyboard open): the strip becomes a popover anchored at the
+ * caret's block. #edit-toolbar is a 0×0 fixed point whose left/top are set by
+ * EditToolbarController (applyPanelFlip's positionAnchor) to the block bounds;
+ * the .edit-toolbar panel is absolutely positioned inside it and reuses the
+ * shared toolbar-menu--up / --right flip classes from menu.css. The flip
+ * overrides below must match this rule's specificity and come after it, or the
+ * base `top:100%`/`left:0` would win the tie. */
+#edit-toolbar.is-follow-mode {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 300;
+}
+
+#edit-toolbar.is-follow-mode .edit-toolbar {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+#edit-toolbar.is-follow-mode .edit-toolbar.toolbar-menu--up {
+  top: auto;
+  bottom: calc(100% + 12px);
+}
+
+#edit-toolbar.is-follow-mode .edit-toolbar.toolbar-menu--right {
+  left: auto;
+  right: 0;
 }
 
 .edit-toolbar::-webkit-scrollbar {

@@ -27,8 +27,8 @@ export default class DockController extends Controller {
   private kbOpen = false
 
   connect(): void {
-    // Render only into the nav slot — #dock also hosts the edit-toolbar
-    // popover anchor, so it must not be clobbered with innerHTML.
+    // Render only into the nav slot — #dock also hosts the edit-toolbar strip,
+    // so it must not be clobbered with innerHTML.
     this.navTarget.innerHTML = renderDock({ icons: icons as Record<string, string> })
     this.insertMenu = new Menu({
       mountEl: this.fabMenuTarget,

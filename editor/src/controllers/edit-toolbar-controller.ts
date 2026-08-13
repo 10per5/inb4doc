@@ -8,6 +8,17 @@ import { trackKeyboardOffset } from "@/utils/mobile"
 import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/popover"
 import type { EditorController } from "@/controllers/editor-controller"
 
+/**
+ * Quick bar for the mobile dock. Two modes:
+ * - Default (keyboard closed): a strip pinned at the bottom of the dock.
+ * - Follow mode (keyboard open): a popover anchored at the block the caret is
+ *   in, so the actions stay next to where you type. The `.is-follow-mode`
+ *   class on #edit-toolbar switches the CSS; this controller positions the
+ *   0×0 fixed anchor via applyPanelFlip and hides the popover once the block
+ *   scrolls out of the viewport.
+ * Undo/redo are always shown in both modes (disabled when the open file has
+ * no history); the list/table groups appear contextually inside the bar.
+ */
 export default class EditToolbarController extends Controller {
   static targets = ["btn", "listGroup", "tableGroup"]
   static outlets = ["editor"]
@@ -21,6 +32,7 @@ export default class EditToolbarController extends Controller {
   private unsubs: (() => void)[] = []
   private currentType: ActiveBlockType = ActiveBlockType.None
   private viewIsEditor = true
+  private followMode = false
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
 
@@ -38,15 +50,24 @@ export default class EditToolbarController extends Controller {
         this.updateVisibility()
         this.positionPopover()
       }),
+      appEvents.on(AppEvent.HistoryChanged, ({ canUndo, canRedo }) => {
+        this.setDisabled("tc-19", !canUndo)
+        this.setDisabled("tc-20", !canRedo)
+      }),
     )
-    // Opening/closing the on-screen keyboard (and visual-viewport scrolling)
-    // moves the block the popover is anchored to, so re-anchor on those too.
-    this.stopKeyboardTrack = trackKeyboardOffset(() => {
+    // On-screen keyboard open → follow mode (the caret sits just above the
+    // keys, so the strip would be hidden behind them). Visual-viewport
+    // pan/scroll re-anchors the popover to the caret's block.
+    this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
+      this.followMode = offset > 0
+      this.element.classList.toggle("is-follow-mode", this.followMode)
+      this.updateVisibility()
       this.positionPopover()
     })
-    // The popover anchors to the focused block; document scroll can carry the
-    // block out of the viewport. Capture-phase: scroll events from the inner
-    // .book-layout scroller don't bubble (same pattern as code-block-ui.ts).
+    // The follow-mode popover anchors to the focused block; document scroll
+    // can carry the block out of the viewport. Capture-phase: scroll events
+    // from the inner .book-layout scroller don't bubble (same pattern as
+    // code-block-ui.ts).
     window.addEventListener("scroll", this.onScroll, true)
     this.updateVisibility()
   }
@@ -68,26 +89,31 @@ export default class EditToolbarController extends Controller {
     })
   }
 
-  // The panel is a popover anchored at the block holding the current selection,
-  // left-aligned to the block. #edit-toolbar is a 0×0 fixed anchor that
-  // applyPanelFlip moves (positionAnchor) so the .edit-toolbar panel opens
-  // BELOW the block when it fits — above only when the block sits too low —
-  // and, for blocks taller than the viewport, on the side away from the cursor
-  // (cursor near the bottom → above, near the top → below). Once the anchored
-  // block scrolls fully out of the visible viewport the popover is hidden.
+  // Default mode is a plain bottom strip — nothing to position. Follow mode
+  // opens the panel below the caret's block (above when the block sits too low,
+  // and at the cursor when the block is taller than the viewport). Once the
+  // anchored block scrolls fully out of view the popover hides.
   private positionPopover(): void {
     const panel = this.element.querySelector<HTMLElement>(".edit-toolbar")
     if (!panel) return
+    if (!this.followMode) {
+      // Back to the docked strip — clear any follow-mode anchor offsets.
+      ;(this.element as HTMLElement).style.left = ""
+      ;(this.element as HTMLElement).style.top = ""
+      this.setInViewport(true)
+      return
+    }
     const milk = this.editor()?.getEditor()
     if (!milk) return
     void import("@/services/editor-context").then(({ getView }) => {
+      if (!this.followMode) return
       const view = getView(milk)
       const { from } = view.state.selection
       const cursor = view.coordsAtPos(from)
       if (!cursor) return
       const block = getBlockRectAt(view, from) ?? cursor
       this.setInViewport(this.isBlockInView(block))
-      if (!this.inViewport || !this.viewIsEditor || this.currentType === ActiveBlockType.None) return
+      if (!this.inViewport || !this.viewIsEditor) return
       applyPanelFlip(panel, {
         anchor: block,
         anchorCursor: cursor,
@@ -158,10 +184,11 @@ export default class EditToolbarController extends Controller {
   }
 
   private updateVisibility(): void {
+    // Default mode: always visible in the editor view. Follow mode: only while
+    // the anchored block is still on screen.
     ;(this.element as HTMLElement).hidden = !(
       this.viewIsEditor &&
-      this.currentType !== ActiveBlockType.None &&
-      this.inViewport
+      (!this.followMode || this.inViewport)
     )
   }
 
