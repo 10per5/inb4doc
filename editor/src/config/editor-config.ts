@@ -44,6 +44,8 @@ import {
 import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
 import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createHistoryContextPlugin } from "@/plugins/history-context";
+import { createCaretScrollPlugin } from "@/plugins/caret-scroll";
+import { isMobileDock } from "@/utils/mobile";
 import {
   copy,
   editPencil,
@@ -229,6 +231,10 @@ export async function createEditor(
           createCodeBlockMovePlugin(),
           createBlockContextPlugin(),
           createHistoryContextPlugin(),
+          // Mobile-only: taps that leave the caret outside the visible band
+          // get scrolled back into view. Skipped entirely on desktop builds
+          // (and desktop-sized viewports in adaptive web builds).
+          ...(isMobileDock() ? [createCaretScrollPlugin()] : []),
         );
       });
     })
