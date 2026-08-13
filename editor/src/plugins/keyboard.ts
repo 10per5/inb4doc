@@ -140,13 +140,102 @@ function cutBlock(
   return true
 }
 
+// Milkdown registers the inline-code mark under `inlineCode` (the `code`
+// alias is absent from its schema), so resolve it defensively.
+function codeMark(state: any): any {
+  return state.schema.marks.inlineCode ?? state.schema.marks.code
+}
+
+// ProseMirror keeps the code mark "stored" at a mark boundary with no
+// character on the other side (block end/start), so typing there stays
+// code-styled. At a block end there is no position outside the mark — break
+// out = clear the stored marks and STAY (jumping would land on the next
+// block). Mid-block the caret is already outside, so navigation stays native.
+function exitInlineCode(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty) return false
+  const codeType = codeMark(state)
+  if (!codeType) return false
+  const from = $from.pos
+  const start = $from.start()
+  const end = $from.end()
+  if (from <= start) return false
+  if (!state.doc.rangeHasMark(from - 1, from, codeType)) return false
+  if (from < end) return false
+  if (dispatch) dispatch(state.tr.setStoredMarks([]))
+  return true
+}
+
+// Mirror for the start boundary: ArrowLeft on a block-start code span clears
+// the stored mark and stays.
+function enterInlineCodeFromLeft(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty) return false
+  const codeType = codeMark(state)
+  if (!codeType) return false
+  const from = $from.pos
+  const start = $from.start()
+  const end = $from.end()
+  if (from >= end) return false
+  if (!state.doc.rangeHasMark(from, from + 1, codeType)) return false
+  if (start < from) return false
+  if (dispatch) dispatch(state.tr.setStoredMarks([]))
+  return true
+}
+
+// Home/End to a block edge that touches inline code: move the caret there and
+// clear the stored mark so typing before/after the span is plain.
+function homeToBlockStart(state: any, dispatch: any): boolean {
+  const { $from, empty } = state.selection
+  if (!empty) return false
+  const codeType = codeMark(state)
+  if (!codeType) return false
+  const start = $from.start()
+  if ($from.pos === start) return false
+  if (!state.doc.rangeHasMark(start, start + 1, codeType)) return false
+  if (dispatch) {
+    dispatch(
+      state.tr
+        .setSelection(TextSelection.create(state.doc, start))
+        .setStoredMarks([])
+        .scrollIntoView(),
+    )
+  }
+  return true
+}
+
+function endToBlockEnd(state: any, dispatch: any): boolean {
+  const { $from, empty } = state.selection
+  if (!empty) return false
+  const codeType = codeMark(state)
+  if (!codeType) return false
+  const end = $from.end()
+  if ($from.pos === end) return false
+  if (!state.doc.rangeHasMark(end - 1, end, codeType)) return false
+  if (dispatch) {
+    dispatch(
+      state.tr
+        .setSelection(TextSelection.create(state.doc, end))
+        .setStoredMarks([])
+        .scrollIntoView(),
+    )
+  }
+  return true
+}
+
 export function createKeymap() {
   return keymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
     "Mod-B": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
     "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.em)(state, dispatch),
     "Mod-I": (state, dispatch) => toggleMark(state.schema.marks.em)(state, dispatch),
-    "Mod-`": (state, dispatch) => toggleMark(state.schema.marks.code)(state, dispatch),
+    "Mod-`": (state, dispatch) => toggleMark(codeMark(state))(state, dispatch),
     "Mod-Shift-s": (state, dispatch) => toggleMark(state.schema.marks.strikethrough)(state, dispatch),
     "Mod-Shift-x": (state, dispatch) => toggleMark(state.schema.marks.strikethrough)(state, dispatch),
     "Mod-Alt-1": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 1 })(state, dispatch),
@@ -187,6 +276,10 @@ export function createKeymap() {
     },
     "Mod-ArrowUp": (state, dispatch) => moveBlock(state, dispatch, -1),
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
+    "ArrowLeft": (state, dispatch) => enterInlineCodeFromLeft(state, dispatch),
+    "ArrowRight": (state, dispatch) => exitInlineCode(state, dispatch),
+    "Home": (state, dispatch) => homeToBlockStart(state, dispatch),
+    "End": (state, dispatch) => endToBlockEnd(state, dispatch),
     "Backspace": (state, dispatch) => headingToParagraph(state, dispatch),
     "Delete": (state, dispatch) => {
       if (deleteAtListItemStart(state, dispatch)) return true
