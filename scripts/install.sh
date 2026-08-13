@@ -211,7 +211,9 @@ resolve_payload() {
     fi
     local d
     for d in "$base"/*/; do
-        [ -d "$d" ] || continue
+        # Never descend into symlinked dirs: a symlink cycle (e.g. a dir
+        # pointing back to itself) would otherwise recurse forever.
+        [ -d "$d" ] && [ ! -L "$d" ] || continue
         if resolve_payload "${d%/}"; then
             return 0
         fi
@@ -290,15 +292,17 @@ uninstall() {
 }
 
 # `install` (coreutils) is preferred; fall back to cp+chmod in minimal envs.
+# `command` guards the name so a user- or script-defined `install` function can
+# never shadow the coreutils binary and turn put_file into infinite recursion.
 if command -v install >/dev/null 2>&1; then
-    put_file() { install -m "$1" "$2" "$3"; }
+    put_file() { command install -m "$1" "$2" "$3"; }
 else
     put_file() { cp "$2" "$3" && chmod "$1" "$3"; }
 fi
 
 # --- install ------------------------------------------------------------------
 
-install() {
+install_inb4doc() {
     obtain_payload "${SOURCE:-$(payload_url)}"
 
     local label="latest"
@@ -362,6 +366,6 @@ verify() {
 if [ "$UNINSTALL" = 1 ]; then
     uninstall
 else
-    install
+    install_inb4doc
     verify
 fi
