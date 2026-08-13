@@ -49,6 +49,20 @@ export class LayoutService {
     // hidden until the user opts in — otherwise the CSS defaults show them at
     // tablet/desktop widths.
     this.apply();
+    // Crossing the tablet/desktop (1200px) boundary via browser zoom or a
+    // window resize must behave like a first load of the new bracket, or the
+    // body panel classes stay stale (unlike the 768px cutover, which
+    // hard-reloads in app.ts). Tablet never keeps the desktop meta-aside
+    // choice: resetting to the bracket defaults keeps the nav tree + dock
+    // offset (mobile-dock.eta) while still letting the topbar meta toggle
+    // place the panel in the tablet left column.
+    const widthMq = window.matchMedia("(min-width: 1200px)");
+    widthMq.addEventListener("change", () => {
+      const defs = bootDefaults(this.currentWidth());
+      this.state.leftPanel = defs.leftPanel;
+      this.state.rightPanel = defs.rightPanel;
+      this.apply();
+    });
     // Watch the on-screen keyboard. Opening it on a mobile viewport flips the
     // width to MobileShrink (via apply) and publishes --kb-offset on :root so
     // the shrink CSS can size the layout to the visible area above the keys.
@@ -101,24 +115,30 @@ export class LayoutService {
 
   setLeftPanel(on: boolean): void {
     if (this.state.leftPanel === on) return;
+    if (on && this.currentWidth() === LayoutWidth.Tablet) {
+      // Tablet: nav tree and meta panel share the single left gutter, so the
+      // two panels are mutually exclusive there.
+      this.state.rightPanel = false;
+    }
     this.state.leftPanel = on;
     this.apply();
   }
 
   setRightPanel(on: boolean): void {
     if (this.state.rightPanel === on) return;
+    if (on && this.currentWidth() === LayoutWidth.Tablet) {
+      this.state.leftPanel = false;
+    }
     this.state.rightPanel = on;
     this.apply();
   }
 
   toggleLeftPanel(): void {
-    this.state.leftPanel = !this.state.leftPanel;
-    this.apply();
+    this.setLeftPanel(!this.state.leftPanel);
   }
 
   toggleRightPanel(): void {
-    this.state.rightPanel = !this.state.rightPanel;
-    this.apply();
+    this.setRightPanel(!this.state.rightPanel);
   }
 
   /** Viewport width, keyboard-aware: opening the on-screen keyboard on a mobile
