@@ -22,6 +22,17 @@
   gap: 2px;
 }
 
+/* ── Active Formatting Buttons (h/b/i/s) ─────────────────────────────
+ * Reflects the text state at the caret: bold/italic/strikethrough light
+ * up when the selection is inside that mark, and the heading button shows
+ * the current heading level. */
+
+.app-toolbar .btn-icon.active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border);
+  color: var(--color-accent);
+}
+
 /* ── Provider Badge ────────────────────────────────────────────────── */
 
 .app-toolbar .toolbar-provider {

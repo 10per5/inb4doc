@@ -13,5 +13,6 @@ export { ImageAction, IMG_ACTION_PREFIX } from "./image-action";
 
 // Types
 export { DiffLineType } from "./diff-line";
+export { EMPTY_TEXT_STATE, type TextState } from "./text-state";
 export { ProseNodeType, proseNodeTypeByName } from "./prose-node";
 export { LayoutPreset, LayoutWidth } from "./layout";

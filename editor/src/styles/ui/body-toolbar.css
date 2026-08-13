@@ -15,6 +15,12 @@
   font-size: 0.9rem;
 }
 
+.toolbar-heading-btn.active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border);
+  color: var(--color-accent);
+}
+
 .toolbar-heading-dropdown {
   display: none;
   position: absolute;
@@ -47,6 +53,12 @@
 
 .toolbar-heading-dropdown button:hover {
   background: var(--color-bg-tertiary);
+}
+
+.toolbar-heading-dropdown button.active {
+  background: var(--color-bg-tertiary);
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 .toolbar-heading-dropdown button[data-h="1"] {

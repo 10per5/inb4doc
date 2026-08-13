@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { ToolbarCommand, TOOLBAR_CMD_PREFIX } from "@/config/enums";
 import { ToolbarAction, toolbarActions } from "@/config/enums/toolbar-action";
+import { EMPTY_TEXT_STATE, type TextState } from "@/config/enums/text-state";
 import * as icons from "@/eta/icons";
 import renderTopbar from "@/eta/views/controller/topbar";
 import { formatBytes } from "@/utils/format";
@@ -58,6 +59,15 @@ export default class extends Controller {
           this.updateDirtyCounter(count, bytes, singleDirtyPath, currentPath);
         },
       ),
+      appEvents.on(AppEvent.TextStateChanged, (state) => {
+        this.updateTextState(state);
+      }),
+      appEvents.on(AppEvent.SourceModeToggled, () => {
+        this.updateTextState(EMPTY_TEXT_STATE);
+      }),
+      appEvents.on(AppEvent.ViewChanged, ({ view }) => {
+        if (view !== "editor") this.updateTextState(EMPTY_TEXT_STATE);
+      }),
     );
 
     this.element.addEventListener("menu-closed", this.onMenuClosed);
@@ -318,6 +328,44 @@ export default class extends Controller {
   }
 
   // ── Private ──
+
+  /**
+   * Reflect the formatting state at the editor caret: mark buttons (b/i/s + link)
+   * get `.active`, and the heading button shows the current level + highlights
+   * the matching dropdown entry.
+   */
+  private updateTextState(state: TextState): void {
+    this.setCommandActive(ToolbarCommand.Bold, state.bold);
+    this.setCommandActive(ToolbarCommand.Italic, state.italic);
+    this.setCommandActive(ToolbarCommand.Strike, state.strike);
+    this.setCommandActive(ToolbarCommand.Link, state.link);
+    this.updateHeadingState(state.heading);
+  }
+
+  private setCommandActive(command: ToolbarCommand, active: boolean): void {
+    const cmd = `${TOOLBAR_CMD_PREFIX}${command}`;
+    this.element
+      .querySelectorAll<HTMLElement>(`[data-cmd="${cmd}"]`)
+      .forEach((el) => {
+        el.classList.toggle("active", active);
+        el.setAttribute("aria-pressed", String(active));
+      });
+  }
+
+  private updateHeadingState(level: number): void {
+    const btn = this.element.querySelector<HTMLElement>(".toolbar-heading-btn");
+    const label = btn?.querySelector<HTMLElement>(".heading-label");
+    if (label) label.textContent = level > 0 ? `H${level}` : "H";
+    btn?.classList.toggle("active", level > 0);
+    this.element
+      .querySelectorAll<HTMLElement>(".toolbar-heading-dropdown button")
+      .forEach((el) => {
+        const isCurrent =
+          level > 0 && parseInt(el.dataset.level ?? "0", 10) === level;
+        el.classList.toggle("active", isCurrent);
+        el.setAttribute("aria-current", isCurrent ? "true" : "false");
+      });
+  }
 
   private onDocClick = (e: MouseEvent) => {
     const dropdown = this.element.querySelector(
