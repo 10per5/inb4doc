@@ -31,25 +31,33 @@ function setTaskChecked(view: EditorView, checked: boolean): void {
 }
 
 /**
- * Toggle `checked` on the list item under the caret — the topbar dropdown's
- * "Checked/Unchecked Task List" item. The quick bar's MarkTask/UnmarkTask set
- * the state explicitly; this flips the CURRENT item only (the block-wide
- * variant was dropped per the UI spec).
+ * Toggle `checked` on the list items under the selection — the topbar
+ * dropdown's "Checked/Unchecked Task List" item. The quick bar's
+ * MarkTask/UnmarkTask set the state explicitly; this flips the covered items
+ * only. A caret flips just its own item; a multi-item selection (drag or
+ * Shift+arrows) flips every covered task item. Uses the same coverage rule as
+ * the list-conversion code: an item counts when the selection touches its own
+ * paragraph, never merely a nested list inside it.
  */
 function toggleTaskChecked(view: EditorView): void {
   const { state, dispatch } = view
-  const { $from } = state.selection
-  for (let d = $from.depth; d > 0; d--) {
-    const node = $from.node(d)
-    if (node.type.name !== "list_item") continue
-    dispatch(
-      state.tr.setNodeMarkup($from.before(d), undefined, {
-        ...node.attrs,
-        checked: node.attrs.checked !== true,
-      }),
-    )
-    return
+  const { $from, $to } = state.selection
+  const touched = collectTouchedLists(state, $from.pos, $to.pos)
+  if (touched.length === 0) return
+  const tr = state.tr
+  let toggled = false
+  for (const t of touched) {
+    t.node.forEach((child, offset, index) => {
+      if (index < t.first || index > t.last) return
+      if (typeof child.attrs.checked !== "boolean") return
+      tr.setNodeMarkup(t.pos + 1 + offset, undefined, {
+        ...child.attrs,
+        checked: child.attrs.checked !== true,
+      })
+      toggled = true
+    })
   }
+  if (toggled) dispatch(tr.scrollIntoView())
 }
 
 /**

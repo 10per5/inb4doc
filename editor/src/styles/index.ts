@@ -21,6 +21,7 @@ import "./panels/meta.css"
 import "./app/toolbar.css"
 import "./app/dialogs.css"
 import "./ui/screen.css"
+import "./ui/diff.css"
 import "./app/toast.css"
 import "./app/notification.css"
 

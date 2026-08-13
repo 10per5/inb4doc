@@ -262,7 +262,7 @@ export default class extends Controller {
 
     const dirtyPaths = this.cache.getPendingOps().getDirtyPaths()
     if (!dirtyPaths.includes(path)) {
-      showNotification("No changes to save", { type: "info" })
+      showNotification("No changes to save", { type: "info", id: "save" })
       return
     }
     const content = this.editor.getCurrentContent()

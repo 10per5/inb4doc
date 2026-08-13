@@ -4,7 +4,7 @@
 <% it.items.forEach(function(data, idx) { %>
   <div class="inb4doc-changes-item" data-changes-target="changeItem">
     <div class="inb4doc-changes-header" data-action="click->changes#togglePreview" data-idx="<%= idx %>">
-      <div class="inb4doc-changes-path" style="background:<%= data.currentPath ? '#eef4f9' : '' %>">
+      <div class="inb4doc-changes-path<%= data.currentPath ? ' inb4doc-changes-path-current' : '' %>">
         <span style="flex:1"><%= data.label %></span>
         <% if (data.sizeStr) { %>
         <span style="color:<%= data.sizeColor %>;font-size:0.8rem"><%= data.sizeStr %></span>

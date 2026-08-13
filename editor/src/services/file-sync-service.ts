@@ -219,12 +219,12 @@ export class FileSyncService {
     try {
       const ok = await page.flushOut(imageUrlMap);
       if (!ok) {
-        showNotification("Failed to save", { type: "danger" });
+        showNotification("Failed to save", { type: "danger", id: "save" });
         return;
       }
     } catch (error) {
       if (!surfaceBackendError(error)) {
-        showNotification("Failed to save", { type: "danger" });
+        showNotification("Failed to save", { type: "danger", id: "save" });
       }
       return;
     }
@@ -233,7 +233,7 @@ export class FileSyncService {
     pendingOpsStore.save(this.pendingOps.all);
     this.recomputeDirty();
     appEvents.emit(AppEvent.FlushComplete);
-    showNotification("File saved", { type: "success" });
+    showNotification("File saved", { type: "success", id: "save" });
   }
 
   async flushDirtyFiles(): Promise<void> {
@@ -324,9 +324,9 @@ export class FileSyncService {
     }
 
     if (hadFailure) {
-      showNotification("Some files failed to save", { type: "danger" });
+      showNotification("Some files failed to save", { type: "danger", id: "save" });
     } else {
-      showNotification("All files saved", { type: "success" });
+      showNotification("All files saved", { type: "success", id: "save" });
     }
 
     this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
@@ -765,12 +765,21 @@ export class FileSyncService {
         },
         onFlushAll: () => this.flushDirtyFiles(),
         onDiscardAll: async () => {
+          // Only the current file needs an editor reload, and only when it
+          // actually had a pending op. Reloading a clean file (or reloading
+          // with stale editorStates/editorContents) makes updateEditorContent
+          // restore the cached doc and compare its re-serialization against
+          // the raw disk body — a non-canonical file then re-queues itself as
+          // a "formatted" pending Edit op. invalidateState forces the
+          // re-baseline path (lastSetContent.delete) so the reload is silent.
+          const currentHadOp = this.pendingOps.get(this.currentPath) !== undefined;
           this.clearPendingOps();
           await imageService.removeAllForDir(imageService.getCurrentDocDir());
+          if (currentHadOp) this.editor.invalidateState(this.currentPath);
           this.recomputeDirty();
           appEvents.emit(AppEvent.SidebarReload);
           showNotification("All changes discarded", { type: "warning" });
-          await this.reloadCurrentFromDisk(this.currentPath);
+          if (currentHadOp) await this.reloadCurrentFromDisk(this.currentPath);
         },
       },
     };

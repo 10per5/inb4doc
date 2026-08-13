@@ -115,11 +115,24 @@ class BlockHandleView {
             ? proseRect.left + Math.round(2 * rem)
             : domRect.left;
         } else if (w >= 800) {
-          const menuEl = document.querySelector(".book-leftpanel");
-          const menuRect = menuEl?.getBoundingClientRect();
-          left = menuRect
-            ? menuRect.right + Math.round(4.25 * rem)
-            : domRect.left;
+          // The left column can be the nav tree OR — at tablet width, when the
+          // meta panel is open — the meta panel pulled into the left gutter
+          // (lib/style/layout.css: .book-leftpanel display:none, .book-rightpanel
+          // order:-1). Anchor to whichever left panel is actually visible.
+          const navEl = document.querySelector(".book-leftpanel");
+          const navRect = navEl?.getBoundingClientRect();
+          let panelRight: number | null = null;
+          if (navRect && navRect.width > 0) {
+            panelRight = navRect.right;
+          } else if (w < 1200) {
+            const metaEl = document.querySelector(".book-rightpanel");
+            const metaRect = metaEl?.getBoundingClientRect();
+            if (metaRect && metaRect.width > 0) panelRight = metaRect.right;
+          }
+          left =
+            panelRight !== null
+              ? panelRight + Math.round(4.25 * rem)
+              : domRect.left;
         } else {
           left = domRect.right + Math.round(1.25 * rem);
           paddingTop -= 12.5;

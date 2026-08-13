@@ -5,7 +5,7 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import type { ViewType } from "@/services/view-controller";
 import { LayoutService } from "@/services/layout-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
-import { SlashCommand } from "@/config/enums";
+import { SlashCommand, LayoutWidth } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
 import {
   mediaImage,
@@ -273,7 +273,13 @@ menuRegistry.register("view", (): MenuItem[] => {
       items: [
         screen("editor", "Editor"),
         screen("disk-usage", "Disk Usage"),
-        screen("navigation", "Navigation"),
+        // Navigation is the nav tree as a center fullview; on tablet the tree
+        // is already the left sidebar, so the redundant screen entry is hidden.
+        // The sidebar-collapse path (ViewController.switchTo → setLeftPanel)
+        // stays central for future reuse.
+        ...(layout.getWidth() === LayoutWidth.Tablet
+          ? []
+          : [screen("navigation", "Navigation")]),
       ],
     },
     {

@@ -1,6 +1,6 @@
 import { keymap } from "@milkdown/kit/prose/keymap"
 import { undo, redo } from "@milkdown/kit/prose/history"
-import { TextSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state"
+import { TextSelection, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList, sinkListItem } from "prosemirror-schema-list"
 import { appEvents, AppEvent } from "@/stores/app-events"
@@ -92,6 +92,54 @@ function headingToParagraph(
   return setBlockType(state.schema.nodes.paragraph)(state, dispatch)
 }
 
+// Find the block a caret sits in, to cut it whole. Inside a list the "block" is
+// the list item (marker + content), matching the Shift+Home whole-item view;
+// elsewhere it is the top-level block (paragraph, heading, blockquote, ...).
+// Returns the document position of the block's start, or null when the caret is
+// directly in the doc (nothing meaningful to cut).
+function findBlockStart($from: any): number | null {
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === "list_item") {
+      return $from.before(d)
+    }
+  }
+  return $from.depth >= 1 ? $from.before(1) : null
+}
+
+// Ctrl+X with no selection → cut the whole current block (a bullet point cuts
+// the item, a paragraph cuts the paragraph). ProseMirror has no Mod-x binding —
+// the browser only cuts a real DOM selection — so this selects the block as a
+// NodeSelection and lets prosemirror-view's own cut handler (serialize
+// selection → clipboard, deleteSelection) do the rest with full markdown/html
+// fidelity. With a real selection the native path is left untouched.
+function cutBlock(
+  state: any,
+  dispatch: any,
+  view: { focus: () => void; nodeDOM: (pos: number) => Node | null } | undefined,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty) return false
+  const pos = findBlockStart($from)
+  if (pos === null || !dispatch || !view) return false
+
+  const tr = state.tr.setSelection(NodeSelection.create(state.doc, pos))
+  dispatch(tr)
+
+  view.focus()
+  const dom = view.nodeDOM(pos)
+  if (dom) {
+    const range = document.createRange()
+    range.selectNodeContents(dom)
+    const sel = window.getSelection()
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+  document.execCommand("cut")
+  return true
+}
+
 export function createKeymap() {
   return keymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
@@ -115,6 +163,7 @@ export function createKeymap() {
     "Mod-z": (state, dispatch) => undo(state, dispatch),
     "Mod-Z": (state, dispatch) => redo(state, dispatch),
     "Mod-y": (state, dispatch) => redo(state, dispatch),
+    "Mod-x": (state, dispatch, view) => cutBlock(state, dispatch, view),
     // Stock PM sinkListItem returns false when the item is the FIRST child of
     // its parent list (startIndex == 0), so Tab indents when the item can sink
     // and otherwise inserts 4 non-breaking spaces. The edit-toolbar increase

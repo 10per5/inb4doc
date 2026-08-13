@@ -9,7 +9,10 @@
     <span class="dock-label" hidden>Editor</span>
   </button>
   <button type="button" class="dock-item" role="tab" data-dock-target="item" data-dock-item="more" data-action="dock#activate">
-    <span class="dock-icon"><%~ it.icons.menuScale %></span>
+    <span class="dock-icon">
+      <%~ it.icons.menuScale %>
+      <span class="dock-badge" data-dock-target="badge" hidden>0</span>
+    </span>
     <span class="dock-label">More</span>
   </button>
   <div class="dock-fab-menu-anchor toolbar-relative" data-dock-target="fabMenu"></div>

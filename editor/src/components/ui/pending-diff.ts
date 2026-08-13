@@ -14,17 +14,19 @@ export function renderPendingDiff(original: string, current: string): string {
 
   let html = ""
   if (metaDiff.length > 0) {
-    html += `<div style="padding:4px 8px;background:#e8e8e8;color:#333;font-size:0.7rem;font-weight:600;border-bottom:1px solid #ddd">METADATA CHANGES</div>`
+    html += `<div class="inb4doc-diff-header">METADATA CHANGES</div>`
     for (const entry of metaDiff) {
-      const bg = entry.status === "added" ? "#d4edda" : entry.status === "removed" ? "#f8d7da" : "#fff3cd"
-      const color = entry.status === "added" ? "#155724" : entry.status === "removed" ? "#721c24" : "#856404"
+      const cls =
+        entry.status === "added" ? "inb4doc-diff-add" :
+        entry.status === "removed" ? "inb4doc-diff-del" :
+        "inb4doc-diff-mod"
       const prefix = entry.status === "added" ? "+ " : entry.status === "removed" ? "- " : "~ "
       const valStr = entry.status === "removed"
         ? String(entry.oldVal ?? "")
         : entry.status === "added"
           ? String(entry.newVal ?? "")
           : `${entry.oldVal ?? ""} → ${entry.newVal ?? ""}`
-      html += `<div style="background:${bg};color:${color};padding:2px 8px;white-space:pre-wrap">${prefix}${entry.key}: ${valStr}</div>`
+      html += `<div class="inb4doc-diff-line ${cls}">${prefix}${entry.key}: ${valStr}</div>`
     }
   }
 
@@ -37,10 +39,10 @@ export function renderPendingDiff(original: string, current: string): string {
   })
 
   if (contextDiff.length > 0) {
-    if (html) html += `<div style="height:4px;background:#fafafa"></div>`
-    html += `<div style="padding:4px 8px;background:#e8e8e8;color:#333;font-size:0.7rem;font-weight:600;border-bottom:1px solid #ddd">CONTENT CHANGES</div>`
+    if (html) html += `<div class="inb4doc-diff-spacer"></div>`
+    html += `<div class="inb4doc-diff-header">CONTENT CHANGES</div>`
     html += renderDiffHtml(contextDiff)
   }
 
-  return html || `<div style="padding:8px;color:#888;text-align:center">No changes</div>`
+  return html || `<div class="inb4doc-diff-empty">No changes</div>`
 }

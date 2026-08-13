@@ -61,3 +61,71 @@
     transform: translateX(0);
   }
 }
+
+/* ── Mobile toasts (toast.ts) ──────────────────────────────────────────
+ *
+ * Every toast variant reserves the top-center slot just below the slim 48px
+ * mobile topbar (class applied by toast.ts only when isMobileDock(), so
+ * desktop builds are unaffected). The transient showToast() additionally gets
+ * a semi-transparent background (alpha set inline in toast.ts), phantom touch
+ * (pointer-events:none — taps on the body pass through to the editor), faster
+ * auto-dismiss, a tap-to-dismiss handle on the right edge, and horizontal
+ * swipe-to-dismiss (gesture handled in toast.ts).
+ */
+
+/* Shared position: overrides the progress toast's bottom-right anchor. This
+ * rule is later in the file than #prdc-toast.prdc-toast-progress and wins the
+ * equal-specificity tie. */
+#prdc-toast.prdc-toast--mobile {
+  top: calc(48px + 0.5rem);
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
+/* The progress toast keeps its card layout but must drop the bottom-right
+ * slide-in: those keyframes end at translateX(0) and would jump to the
+ * centered translateX(-50%) once the animation finishes. It also drops the
+ * fixed 4rem height (that existed only to avoid the bottom-right top/bottom
+ * stretch bug; bottom is auto here so nothing can stretch) — otherwise a
+ * wrapped message clips the progress line below it. */
+#prdc-toast.prdc-toast--mobile.prdc-toast-progress {
+  animation: prdc-toast-in 0.2s ease-out;
+  height: auto;
+}
+
+/* Transient-only layout: flex row, phantom touch, right-edge dismiss handle.
+ * The action/progress toasts keep their own block layouts. */
+#prdc-toast.prdc-toast--mobile:not(.prdc-toast-action):not(.prdc-toast-progress) {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+  max-width: min(88vw, 420px);
+  pointer-events: none;
+}
+
+#prdc-toast.prdc-toast--mobile .prdc-toast-msg {
+  flex: 1;
+  text-align: center;
+  padding-right: 0.25rem;
+}
+
+#prdc-toast.prdc-toast--mobile .prdc-toast-dismiss {
+  pointer-events: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.24);
+  color: inherit;
+  font: 600 0.9rem/1 system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
