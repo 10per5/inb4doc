@@ -14,6 +14,30 @@ export function createInlineCodeInputPlugin() {
   return new Plugin({
     key: new PluginKey("inb4doc-inline-code-input"),
     props: {
+      // Tapping/clicking at a block edge that touches inline code would leave
+      // the code mark stored (typing stays code-styled). Landing at a code
+      // boundary clears it so the caret starts outside the span.
+      handleClick: (view, pos, event) => {
+        if (event.button > 0 || event.detail !== 1) return false
+        const { state } = view
+        const $pos = state.doc.resolve(pos)
+        if ($pos.parent.type.spec.code) return false
+        const codeType = codeMarkType(state)
+        if (!codeType) return false
+        const start = $pos.start()
+        const end = $pos.end()
+        const atBoundary =
+          (pos === start && state.doc.rangeHasMark(start, start + 1, codeType)) ||
+          (pos === end && state.doc.rangeHasMark(end - 1, end, codeType))
+        if (!atBoundary) return false
+        view.dispatch(
+          state.tr
+            .setSelection(TextSelection.create(state.doc, pos))
+            .setStoredMarks([])
+            .scrollIntoView(),
+        )
+        return true
+      },
       handleTextInput: (view, from, to, text) => {
         if (text !== "`" || from !== to) return false
         const { state } = view
