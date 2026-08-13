@@ -37,10 +37,11 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
 }
 
 /**
- * Emits `AppEvent.BlockContextChanged` when the active block changes (deduped
- * on the block signature, so typing inside the same block is silent). The
- * signature ignores selection position within the block — only the block kind
- * and task state matter to consumers.
+ * Emits `AppEvent.BlockContextChanged` when the active block changes — deduped
+ * on the block signature, so typing inside the same block is silent. The
+ * signature includes the block's start position, so moving the caret to a
+ * different block (even one with the same list context, e.g. paragraph →
+ * paragraph) still fires and lets consumers re-anchor.
  */
 export function createBlockContextPlugin() {
   let last = ""
@@ -48,12 +49,20 @@ export function createBlockContextPlugin() {
     key: new PluginKey("inb4doc-block-context"),
     view: () => ({
       update: (view) => {
-        const context = getActiveBlockContext(view.state)
-        const sig = JSON.stringify(context)
+        const state = view.state
+        const context = getActiveBlockContext(state)
+        const sig = `${activeBlockStart(state)}:${JSON.stringify(context)}`
         if (sig === last) return
         last = sig
         appEvents.emit(AppEvent.BlockContextChanged, { context })
       },
     }),
   })
+}
+
+function activeBlockStart(state: EditorState): number {
+  const { $from } = state.selection
+  let d = $from.depth
+  while (d > 0 && !$from.node(d).isBlock) d--
+  return d > 0 ? $from.before(d) : 0
 }

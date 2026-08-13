@@ -128,19 +128,32 @@ export function applyPanelFlip(panel: HTMLElement, opts: PanelFlipOptions): void
   }
 }
 
-// Bounding rect of the block node containing the document position — the
-// deepest block ancestor (paragraph, heading, code block, list item, …). Used
-// to anchor popovers at the block the user is editing instead of at the caret
-// line. The rect comes from the block's DOM element (view.nodeDOM at the
-// node's start position), so it tracks scroll/keyboard offsets.
+// Bounding rect of the block the caret sits in, used to anchor popovers at the
+// block being edited instead of at the caret line. The block element is found
+// by walking the DOM up from the caret (view.domAtPos) to the closest <p>, <li>,
+// <h1-6>, blockquote, <pre> or table cell — far more reliable than resolving
+// through view.nodeDOM, which can return the editor root or a container node at
+// block boundaries. Horizontal edges are pinned to the editor container
+// (.ProseMirror) so the popover aligns with the editor's content column; only
+// the vertical edges come from the block itself.
+const BLOCK_SELECTOR = "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td"
+
 export function getBlockRectAt(view: EditorView, pos: number): FlipAnchorRect | null {
-  const $pos = view.state.doc.resolve(pos)
-  let depth = $pos.depth
-  while (depth > 0 && !$pos.node(depth).isBlock) depth--
-  if (depth === 0) return null
-  const el = view.nodeDOM($pos.before(depth)) as HTMLElement | null
-  if (!el) return null
-  const rect = el.getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0) return null
-  return { left: rect.left, top: rect.top, bottom: rect.bottom, right: rect.right }
+  let el: HTMLElement | null = null
+  try {
+    const { node } = view.domAtPos(pos)
+    el = node instanceof HTMLElement ? node : node.parentElement
+  } catch {
+    el = null
+  }
+  while (el && el !== view.dom) {
+    if (el.matches(BLOCK_SELECTOR)) {
+      const block = el.getBoundingClientRect()
+      const editor = view.dom.getBoundingClientRect()
+      if (block.width === 0 && block.height === 0) return null
+      return { left: editor.left, top: block.top, bottom: block.bottom, right: editor.right }
+    }
+    el = el.parentElement
+  }
+  return null
 }
