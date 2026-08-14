@@ -56,6 +56,13 @@ export class MountProvider extends RemoteProvider {
     return url
   }
 
+  async renameImage(name: string, dir: string, newName: string): Promise<string> {
+    const env = await callBridge("renameImage", name, dir, newName)
+    const url = (env.data as { url?: string } | undefined)?.url
+    if (!url) throw backendError(500, "Rename returned no URL")
+    return url
+  }
+
   /** Point the native host at a new content root (runtime directory reselection). */
   async setRoot(path: string): Promise<void> {
     await setContentRoot(path)

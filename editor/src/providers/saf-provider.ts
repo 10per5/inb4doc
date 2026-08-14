@@ -94,6 +94,14 @@ export class SafProvider implements ContentProvider {
     await callBridge("deleteImage", name, dir)
   }
 
+  async renameImage(name: string, dir: string, newName: string): Promise<string> {
+    const env = await callBridge("renameImage", name, dir, newName)
+    const url = (env.data as { url?: string } | undefined)?.url
+    if (!url) throw backendError(500, "Rename returned no URL")
+    this.cacheImage(dir, newName, url)
+    return url
+  }
+
   private cacheImage(dir: string, name: string, uri?: string): void {
     if (!uri) return
     const key = `${dir ? dir + "/" : ""}image/${name}`

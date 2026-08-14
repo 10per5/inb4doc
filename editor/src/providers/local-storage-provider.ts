@@ -151,6 +151,23 @@ export class LocalStorageProvider implements ContentProvider {
     imageStore.deleteImage(name)
   }
 
+  async renameImage(name: string, _dir: string, newName: string): Promise<string> {
+    const data = imageStore.getImage(name)
+    if (!data) throw new Error("Image not found")
+    imageStore.setImage(newName, data)
+    imageStore.deleteImage(name)
+    const files = storageService.loadProviderFiles(this.providerId)
+    let changed = false
+    for (const [path, entry] of Object.entries(files)) {
+      if (entry.content?.includes(`inb4doc-image:${name}`)) {
+        entry.content = entry.content.split(`inb4doc-image:${name}`).join(`inb4doc-image:${newName}`)
+        changed = true
+      }
+    }
+    if (changed) storageService.saveProviderFiles(this.providerId, files)
+    return `inb4doc-image:${newName}`
+  }
+
   private removeOrphanedImages(): void {
     const names = storageService.listImageNames()
     for (const name of names) {

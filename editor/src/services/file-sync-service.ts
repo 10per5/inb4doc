@@ -22,7 +22,10 @@ import { showNotification } from "@/components/notification/notification";
 import { surfaceBackendError } from "@/utils/backend-error";
 import type { TreeIndex } from "@/utils/tree";
 import { extractSnippets } from "@/utils/content-search";
-import { imageService } from "@/services/image-service";
+import {
+  imageService,
+  type ImageCommitResult,
+} from "@/services/image-service";
 import { storageService } from "@/services/storage-service";
 import { STORE_FILES } from "@/config/storage-keys";
 import { pagesStore as repo } from "@/stores/page-store";
@@ -223,12 +226,14 @@ export class FileSyncService {
   // ── Flush ──
 
   async flushCurrentFile(path: string, content: string): Promise<void> {
-    const imageUrlMap = await imageService.commitAllPendingImages();
+    const imageResult = await imageService.commitAllPendingImages();
+    this.notifyImageFailures(imageResult);
     const page = repo.getOrCreate(path);
+    const baselineBody = page.bodyState.baseline;
     page.setBody(content);
 
     try {
-      const ok = await page.flushOut(imageUrlMap);
+      const ok = await page.flushOut(imageResult.urlMap);
       if (!ok) {
         showNotification("Failed to save", { type: "danger", id: "save" });
         return;
@@ -239,12 +244,22 @@ export class FileSyncService {
       }
       return;
     }
+    await imageService.confirmCommitted(imageResult.urlMap);
     treeStore.afterWrite(path, page.reconstructContent());
     this.pendingOps.cancelEdit(path);
     pendingOpsStore.save(this.pendingOps.all);
     this.recomputeDirty();
     appEvents.emit(AppEvent.FlushComplete);
     showNotification("File saved", { type: "success", id: "save" });
+
+    imageService
+      .cleanupOrphanedImages({
+        dir: imageService.getCurrentDocDir(),
+        docPath: path,
+        baselineBody,
+        newBody: content,
+      })
+      .catch(() => {});
   }
 
   async flushDirtyFiles(): Promise<void> {
@@ -254,7 +269,14 @@ export class FileSyncService {
     const currentMd = this.editor.getCurrentContent();
     const provider = getProvider();
 
-    const imageUrlMap = await imageService.commitAllPendingImages();
+    // Pre-edit body of the current document: the "before" snapshot used to
+    // decide which images it dropped this save. Captured before any flush
+    // mutates it (flushOut calls setBaseline).
+    const currentPageBaseline = repo.getOrCreate(this.currentPath).bodyState.baseline;
+
+    const imageResult = await imageService.commitAllPendingImages();
+    this.notifyImageFailures(imageResult);
+    const imageUrlMap = imageResult.urlMap;
 
     let hadFailure = false;
 
@@ -305,6 +327,14 @@ export class FileSyncService {
       await this.executePendingOps(flushedPaths);
     hadFailure = hadFailure || opFailed;
 
+    // Only drop the pending→real URL mapping when the whole flush succeeded.
+    // If any page failed to write, the records stay so the next save re-resolves
+    // the placeholders instead of leaving a dangling `pending-image:` reference
+    // in the saved file.
+    if (!hadFailure) {
+      await imageService.confirmCommitted(imageUrlMap);
+    }
+
     pendingOpsStore.save(this.pendingOps.all);
 
     this.recomputeDirty();
@@ -340,7 +370,19 @@ export class FileSyncService {
       showNotification("All files saved", { type: "success", id: "save" });
     }
 
-    this.cleanupOrphanedImages(dirtyPaths, provider).catch(() => {});
+    // Orphan cleanup only after a fully successful save, and only for images
+    // the current document actually dropped this flush. Unrelated images in
+    // the folder are never touched.
+    if (!hadFailure && dirtyPaths.includes(this.currentPath)) {
+      imageService
+        .cleanupOrphanedImages({
+          dir: imageService.getCurrentDocDir(),
+          docPath: this.currentPath,
+          baselineBody: currentPageBaseline,
+          newBody: currentMd,
+        })
+        .catch(() => {});
+    }
   }
 
   private async executeOp(
@@ -552,26 +594,14 @@ export class FileSyncService {
     return deletedPaths;
   }
 
-  private async cleanupOrphanedImages(
-    dirtyPaths: string[],
-    provider: any
-  ): Promise<void> {
-    const dirs = new Set(
-      dirtyPaths.map((p) =>
-        p.includes("/") ? p.substring(0, p.lastIndexOf("/")) : ""
-      )
-    );
-    for (const dir of dirs) {
-      if (!provider.listImages || !provider.deleteImage) continue;
-      try {
-        const images = await provider.listImages(dir, true);
-        for (const img of images) {
-          if (img.usedIn.length === 0) {
-            await provider.deleteImage(img.name, dir);
-          }
-        }
-      } catch {}
-    }
+  private notifyImageFailures(result: ImageCommitResult): void {
+    if (result.failed.length === 0) return;
+    const names = result.failed.map((f) => f.name).join(", ");
+    showNotification(names, {
+      type: "danger",
+      id: "image-upload",
+      title: "Image upload failed",
+    });
   }
 
   // ── Discard ──
@@ -616,7 +646,8 @@ export class FileSyncService {
 
   private async flushPendingEdit(path: string): Promise<boolean> {
     const provider = getProvider();
-    const imageUrlMap = await imageService.commitAllPendingImages();
+    const imageResult = await imageService.commitAllPendingImages();
+    this.notifyImageFailures(imageResult);
     const page = repo.getOrCreate(path);
     const editOp = this.pendingOps.findEdit(path);
 
@@ -647,8 +678,9 @@ export class FileSyncService {
     }
 
     page.setBody(bodyToWrite);
-    const ok = await page.flushOut(imageUrlMap);
+    const ok = await page.flushOut(imageResult.urlMap);
     if (ok) {
+      await imageService.confirmCommitted(imageResult.urlMap);
       treeStore.afterWrite(path, page.reconstructContent());
       this.pendingOps.cancelEdit(path);
     }

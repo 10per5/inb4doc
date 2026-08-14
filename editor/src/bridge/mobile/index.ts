@@ -63,6 +63,7 @@ export function initMobileBridge(): void {
     "uploadImage",
     "listImages",
     "deleteImage",
+    "renameImage",
     "resolveImage",
   ]) {
     forward(exposed, native, name)

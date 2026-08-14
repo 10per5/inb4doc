@@ -354,6 +354,21 @@ export class FileSystemProvider implements ContentProvider {
     } catch {}
   }
 
+  async renameImage(name: string, dir: string, newName: string): Promise<string> {
+    const imageDir = await this.ensureImageDir(dir)
+    const srcHandle = await imageDir.getFileHandle(name)
+    const file = await srcHandle.getFile()
+    const dstHandle = await imageDir.getFileHandle(newName, { create: true })
+    const writable = await dstHandle.createWritable()
+    await writable.write(file)
+    await writable.close()
+    await imageDir.removeEntry(name)
+    const relPath = `image/${newName}`
+    const blobUrl = URL.createObjectURL(file)
+    this.imageUrlCache.set(`${dir}/${relPath}`, blobUrl)
+    return `/${dir}/${relPath}`
+  }
+
   private async removeOrphanedImages(dir: string): Promise<void> {
     let imageDir: FileSystemDirectoryHandle
     try {

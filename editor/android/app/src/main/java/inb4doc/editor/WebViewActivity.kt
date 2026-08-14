@@ -694,6 +694,18 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun renameImage(name: String, dir: String, newName: String): String {
+            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            return try {
+                val url = safFs.renameImage(tree, name, dir, newName)
+                jsonData(JSONObject().apply { put("url", url) })
+            } catch (e: Exception) {
+                Log.w("inb4doc", "renameImage failed $name -> $newName", e)
+                jsonError(500, "Rename failed")
+            }
+        }
+
+        @JavascriptInterface
         fun deleteImage(name: String, dir: String): String {
             val tree = activeTree() ?: return jsonError(400, "No project directory")
             return try {

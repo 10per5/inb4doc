@@ -29,6 +29,8 @@ export interface ContentProvider {
   uploadImage?(file: File, dir: string): Promise<string>
   listImages?(dir: string, refs?: boolean): Promise<ImageEntry[]>
   deleteImage?(name: string, dir: string): Promise<void>
+  /** Rename a committed image file; returns the new content-relative URL. */
+  renameImage?(name: string, dir: string, newName: string): Promise<string>
   resolveImageUrl?(url: string): string | undefined
   /** Point the provider at a new content root (runtime directory reselection). */
   setRoot?(path: string): Promise<void>

@@ -28,6 +28,7 @@ import {
 import { defaultVideoAttrs } from "@/plugins/video";
 import { openVideoDialog, type VideoDialogResult } from "@/controllers/dialog/video-dialog";
 import { imageService } from "@/services/image-service";
+import { showToast } from "@/bridge";
 import {
   SlashCommand, SLASH_CMD_PREFIX,
   ImageAction, IMG_ACTION_PREFIX,
@@ -52,6 +53,35 @@ const SLASH_ITEMS: SlashItem[] = [
   { cmd: SlashCommand.Image, label: "Image", icon: mediaImage },
   { cmd: SlashCommand.Video, label: "Video", icon: videoCamera },
 ];
+
+/** The on-disk file name of a committed image reference, or null when the
+ *  reference is not a file (external URL, pending upload, base64/blob). */
+function imageFileName(src: string): string | null {
+  if (src.startsWith("inb4doc-image:")) {
+    const n = src.slice("inb4doc-image:".length);
+    return n || null;
+  }
+  if (
+    /\.(png|jpe?g|gif|svg|webp|bmp|ico)$/i.test(src) &&
+    !src.startsWith("http://") &&
+    !src.startsWith("https://") &&
+    !src.startsWith("data:") &&
+    !src.startsWith("blob:") &&
+    !src.startsWith("pending-image:")
+  ) {
+    const base = src.split("/").pop()!;
+    return base || null;
+  }
+  return null;
+}
+
+/** Doc dir owning an image URL, e.g. "/docs/editor/image/foo.png" →
+ *  "docs/editor". Empty when the image lives at the content root. */
+function imageDirFromSrc(src: string): string {
+  const s = src.replace(/^\//, "");
+  const idx = s.lastIndexOf("/image/");
+  return idx >= 0 ? s.slice(0, idx) : "";
+}
 
 class BlockHandleView {
   #content: HTMLElement;
@@ -222,7 +252,7 @@ class SlashView {
   #imageSlashStart: number = -1;
   #editState:
     | { type: "create" }
-    | { type: "edit"; pos: number; src: string }
+    | { type: "edit"; pos: number; src: string; attrs: Record<string, unknown> }
     | null = null;
   #imageMode = false;
 
@@ -270,8 +300,8 @@ class SlashView {
       }
     };
     view.dom.addEventListener("inb4doc:edit-image", ((e: CustomEvent) => {
-      const { pos, src } = e.detail;
-      this.openImageEditor(pos, src);
+      const { pos, src, attrs } = e.detail;
+      this.openImageEditor(pos, src, attrs ?? {});
     }) as EventListener);
 
     view.dom.addEventListener("inb4doc:edit-video", ((e: CustomEvent) => {
@@ -480,8 +510,8 @@ class SlashView {
     executeInsertCommand(this.milkdownCtx, cmd, level);
   }
 
-  private openImageEditor(pos: number, src: string) {
-    this.#editState = { type: "edit", pos, src };
+  private openImageEditor(pos: number, src: string, attrs: Record<string, unknown>) {
+    this.#editState = { type: "edit", pos, src, attrs };
     this.renderImagePicker();
     const { state, dispatch } = this.view;
     const tr = state.tr.setSelection(TextSelection.create(state.doc, pos));
@@ -515,13 +545,43 @@ class SlashView {
   private renderImagePicker() {
     const editState = this.#editState;
     const currentSrc = editState?.type === "edit" ? editState.src : "";
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    const a = editState?.type === "edit" ? editState.attrs : {};
+    const isBlock = "caption" in a || "ratio" in a;
+    const isInline = "alt" in a || "title" in a;
+    const fileName = editState?.type === "edit" ? imageFileName(editState.src) : null;
+    const altValue = typeof a.alt === "string" ? a.alt : "";
+    const captionValue =
+      typeof (isBlock ? a.caption : a.title) === "string"
+        ? (isBlock ? a.caption : a.title) as string
+        : "";
+    const extraFields = editState?.type === "edit"
+      ? `
+        ${isInline ? `
+          <div class="slash-field-row">
+            <label class="slash-field-label" for="inb4doc-slash-alt">Alt</label>
+            <input id="inb4doc-slash-alt" class="slash-alt-input" type="text" placeholder="Alt text\u2026" value="${esc(altValue)}">
+          </div>` : ""}
+        ${isBlock || isInline ? `
+          <div class="slash-field-row">
+            <label class="slash-field-label" for="inb4doc-slash-caption">Caption</label>
+            <input id="inb4doc-slash-caption" class="slash-caption-input" type="text" placeholder="Caption\u2026" value="${esc(captionValue)}">
+          </div>` : ""}
+        ${fileName ? `
+          <div class="slash-field-row">
+            <label class="slash-field-label" for="inb4doc-slash-filename">File</label>
+            <input id="inb4doc-slash-filename" class="slash-filename-input" type="text" value="${esc(fileName)}">
+          </div>` : ""}`
+      : "";
     const html = `
       <div class="slash-image-picker">
         <div class="slash-image-suggestions" data-area="suggestions">
           <div class="slash-image-empty">Loading\u2026</div>
         </div>
+        ${extraFields}
         <div class="slash-url-row">
-          <input class="slash-url-input" type="text" placeholder="Paste image URL\u2026" value="${currentSrc}">
+          <input class="slash-url-input" type="text" placeholder="Paste image URL\u2026" value="${esc(currentSrc)}">
           <button class="slash-url-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.UrlSubmit}">OK</button>
           <button class="slash-url-btn slash-cancel-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Cancel}">Cancel</button>
           ${editState?.type === "edit" ? `<button class="slash-url-btn slash-remove-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Remove}">Remove</button>` : ""}
@@ -604,18 +664,56 @@ class SlashView {
         .join("") || '<div class="slash-image-empty">No images yet</div>';
   }
 
-  private confirmImageUrl(url: string) {
+  private async confirmImageUrl(url: string) {
     const view = this.view;
     const { state, dispatch } = view;
 
     if (this.#editState?.type === "edit") {
       const pos = this.#editState.pos;
       const node = state.doc.nodeAt(pos);
-      if (node) {
-        dispatch(
-          state.tr.setNodeMarkup(pos, null, { ...node.attrs, src: url }),
-        );
+      const a = this.#editState.attrs;
+      if (!node) {
+        this.#editState = null;
+        this.provider.hide();
+        view.focus();
+        return;
       }
+      let finalUrl = url;
+      const altInput = this.content.querySelector(
+        ".slash-alt-input",
+      ) as HTMLInputElement | null;
+      const captionInput = this.content.querySelector(
+        ".slash-caption-input",
+      ) as HTMLInputElement | null;
+      const fileNameInput = this.content.querySelector(
+        ".slash-filename-input",
+      ) as HTMLInputElement | null;
+      const isInline = "alt" in a || "title" in a;
+
+      const newName = fileNameInput?.value.trim();
+      if (newName) {
+        const oldName = imageFileName(this.#editState.src);
+        if (oldName && newName !== oldName) {
+          try {
+            finalUrl = await imageService.renameImage(
+              oldName,
+              newName,
+              imageDirFromSrc(this.#editState.src),
+            );
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : "Rename failed", { type: "danger" });
+            return;
+          }
+        }
+      }
+
+      const nextAttrs: Record<string, unknown> = { ...a, src: finalUrl };
+      if (altInput && "alt" in a) nextAttrs.alt = altInput.value.trim();
+      if (captionInput) {
+        if (isInline) nextAttrs.title = captionInput.value.trim();
+        else nextAttrs.caption = captionInput.value.trim();
+      }
+      dispatch(state.tr.setNodeMarkup(pos, null, nextAttrs));
       this.#editState = null;
       this.provider.hide();
       view.focus();

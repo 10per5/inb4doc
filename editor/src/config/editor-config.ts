@@ -41,6 +41,9 @@ import {
   imageBlockComponent,
   imageBlockConfig,
 } from "@milkdown/kit/component/image-block";
+import { inlineImageConfig } from "@milkdown/kit/component/image-inline";
+import { imageResizeSchema, imageResizeView } from "@/plugins/image-resize";
+import { imageInlineResizeView } from "@/plugins/image-inline-resize";
 import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
 import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createTextStatePlugin } from "@/plugins/text-state";
@@ -89,6 +92,7 @@ import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
+import { createImageTableDropPlugin } from "@/plugins/image-table-drop";
 import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
 import { imageStore } from "@/stores/image-store";
@@ -103,6 +107,41 @@ export interface EditorHost {
     setLastSet(path: string, content: string): void
   }
   onMentionView(mv: MentionView | null): void
+}
+
+/**
+ * Resolves a stored image src to something the DOM can load. Pending/blob/
+ * data URLs pass through; registered pending images map to their blob URLs;
+ * everything else resolves against the current document directory so stored
+ * content-relative paths render regardless of the mount point.
+ */
+function proxyDomURLFor(host: EditorHost): (url: string) => string {
+  return (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
+    if (url.startsWith("inb4doc-image:")) {
+      const name = url.slice("inb4doc-image:".length);
+      return imageStore.getImage(name) || url;
+    }
+    if (url.startsWith("pending-image:")) {
+      const blobUrl = imageService.getBlobUrl(url.slice("pending-image:".length));
+      if (blobUrl) return blobUrl;
+    }
+    const provider = getProvider();
+    const resolved = provider.resolveImageUrl?.(url);
+    if (resolved) return resolved;
+    const dir = host.currentPathDir();
+    // Absolute URLs are already server paths: the content-asset route
+    // (HTTP) and the GUI scheme handler both serve them with a MIME
+    // guessed from the extension. Relative URLs resolve against the
+    // current document directory.
+    if (url.startsWith("/")) return url;
+    let relPath = url;
+    if (dir && relPath.startsWith(dir + "/")) {
+      relPath = relPath.slice(dir.length + 1);
+    }
+    return `/${dir}/${relPath}`;
+  };
 }
 
 export async function createEditor(
@@ -188,34 +227,18 @@ export async function createEditor(
         },
       }));
 
+      const proxyDomURL = proxyDomURLFor(host);
+
       ctx.update(imageBlockConfig.key, (prev) => ({
         ...prev,
         onUpload: (file: File) => imageService.uploadImage(file),
-        proxyDomURL: (url: string) => {
-          if (!url) return url;
-          if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
-          if (url.startsWith("/uploads/")) return url;
-          if (url.startsWith("inb4doc-image:")) {
-            const name = url.slice("inb4doc-image:".length);
-            return imageStore.getImage(name) || url;
-          }
-          if (url.startsWith("pending-image:")) {
-            const blobUrl = imageService.getBlobUrl(url.slice("pending-image:".length));
-            if (blobUrl) return blobUrl;
-          }
-          const provider = getProvider();
-          const resolved = provider.resolveImageUrl?.(url);
-          if (resolved) return resolved;
-          const dir = host.currentPathDir();
-          let relPath = url;
-          if (relPath.startsWith("/")) {
-            relPath = relPath.slice(1);
-            if (dir && relPath.startsWith(dir + "/")) {
-              relPath = relPath.slice(dir.length + 1);
-            }
-          }
-          return `/uploads/${dir}/${relPath}`;
-        },
+        proxyDomURL,
+      }));
+
+      ctx.update(inlineImageConfig.key, (prev) => ({
+        ...prev,
+        onUpload: (file: File) => imageService.uploadImage(file),
+        proxyDomURL,
       }));
 
       ctx.update(prosePluginsCtx, (plugins) => {
@@ -232,6 +255,7 @@ export async function createEditor(
           createImagePastePlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createLinkBoundaryPlugin(),
           createImageEditPlugin(),
+          createImageTableDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createKeymap(),
           createCodeBlockMovePlugin(),
           createBlockContextPlugin(),
@@ -260,6 +284,10 @@ export async function createEditor(
     .use(linkTooltipPlugin)
     .use(tableBlock)
     .use(imageBlockComponent)
+    .use(imageResizeSchema)
+    .use(imageResizeView)
+    .use(inlineImageConfig)
+    .use(imageInlineResizeView)
     .use(codeBlockUI)
     .use(videoRemarkPlugin)
     .use(videoSchema)

@@ -120,6 +120,39 @@
   gap: 6px;
   align-items: center;
 }
+.slash-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.slash-field-label {
+  color: var(--color-text-tertiary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.slash-field-row .slash-alt-input,
+.slash-field-row .slash-caption-input,
+.slash-field-row .slash-filename-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.slash-alt-input,
+.slash-caption-input,
+.slash-filename-input {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  outline: none;
+}
+.slash-alt-input:focus,
+.slash-caption-input:focus,
+.slash-filename-input:focus {
+  border-color: var(--color-accent);
+}
 .slash-url-input {
   flex: 1;
   padding: 6px 8px;

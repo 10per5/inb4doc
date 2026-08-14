@@ -315,6 +315,55 @@ class SafFs(private val resolver: ContentResolver) {
         return if (dir.isEmpty()) "image/$name" else "$dir/image/$name"
     }
 
+    /** Rename a committed image file. Copies bytes to a new document, deletes
+     *  the old one, and rewrites every `.md` reference to the old name. */
+    fun renameImage(tree: Uri, name: String, dir: String, newRawName: String): String {
+        val newName = sanitizeImageName(newRawName)
+        val relDir = if (dir.isEmpty()) "image" else "$dir/image"
+        if (name == newName) {
+            return if (dir.isEmpty()) "image/$newName" else "$dir/image/$newName"
+        }
+        val src = resolve(tree, "$relDir/$name")
+            ?: throw FileNotFoundException("Image not found")
+        if (resolve(tree, "$relDir/$newName") != null) {
+            throw IllegalStateException("Target already exists")
+        }
+        val bytes = resolver.openInputStream(
+            DocumentsContract.buildDocumentUriUsingTree(tree, src.id)
+        )?.use { it.readBytes() } ?: throw IllegalStateException("Read failed")
+
+        var parentId = rootDocId(tree)
+        for (d in dir.split('/').filter { it.isNotEmpty() && it != "." && it != ".." }) {
+            parentId = ensureDir(tree, parentId, d)
+        }
+        parentId = ensureDir(tree, parentId, "image")
+        val targetUri = DocumentsContract.createDocument(
+            resolver,
+            DocumentsContract.buildDocumentUriUsingTree(tree, parentId),
+            mimeFor(newName),
+            newName,
+        ) ?: throw IllegalStateException("createDocument failed for $newName")
+        try {
+            resolver.openOutputStream(targetUri, "wt")?.use { it.write(bytes) }
+                ?: throw IllegalStateException("openOutputStream failed")
+        } catch (e: IllegalArgumentException) {
+            resolver.openOutputStream(targetUri)?.use { it.write(bytes) }
+                ?: throw IllegalStateException("openOutputStream failed")
+        }
+        if (!delete(tree, src.id)) throw IllegalStateException("Delete failed")
+
+        val oldUrl = if (dir.isEmpty()) "/image/$name" else "/$dir/image/$name"
+        val newUrl = if (dir.isEmpty()) "/image/$newName" else "/$dir/image/$newName"
+        walkTree(tree) { rel, isDir, content ->
+            if (isDir || !rel.endsWith(".md") || content == null) return@walkTree
+            val replaced = content.replace(oldUrl, "\u0001")
+                .replace(name, newName)
+                .replace("\u0001", newUrl)
+            if (replaced != content) writeText(tree, rel, replaced)
+        }
+        return newUrl.trimStart('/')
+    }
+
     /**
      * Map a markdown image URL back to a loadable content:// URI. Accepts the
      * stable forms the uploader emits (`dir/image/name` or `image/name`, with
