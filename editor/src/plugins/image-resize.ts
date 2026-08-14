@@ -205,13 +205,29 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
     const applySize = () => {
       if (!naturalW || !naturalH) return;
       const maxW = maxWidth() || naturalW;
-      baseH = Math.min(maxW, naturalW) * (naturalH / naturalW);
-      if (config.maxHeight) baseH = Math.min(baseH, config.maxHeight);
+      const aspect = naturalW / naturalH;
+      const withMaxHeight = (h: number) =>
+        config.maxHeight ? Math.min(h, config.maxHeight) : h;
       if (currentW > 0 && currentH > 0) {
         const scale = Math.min(1, maxW / currentW);
         img.style.width = `${Math.max(MIN_SIZE, currentW * scale)}px`;
-        img.style.height = `${Math.max(MIN_SIZE, currentH * scale)}px`;
+        img.style.height = `${Math.max(MIN_SIZE, withMaxHeight(currentH * scale))}px`;
+      } else if (currentW > 0) {
+        const w = Math.min(currentW, maxW);
+        img.style.width = `${Math.max(MIN_SIZE, w)}px`;
+        img.style.height = `${Math.max(MIN_SIZE, withMaxHeight(w / aspect))}px`;
+      } else if (currentH > 0) {
+        let h = currentH;
+        let w = h * aspect;
+        if (w > maxW) {
+          w = maxW;
+          h = w / aspect;
+        }
+        img.style.width = `${Math.max(MIN_SIZE, w)}px`;
+        img.style.height = `${Math.max(MIN_SIZE, withMaxHeight(h))}px`;
       } else {
+        baseH = Math.min(maxW, naturalW) / aspect;
+        if (config.maxHeight) baseH = Math.min(baseH, config.maxHeight);
         img.style.width = "auto";
         img.style.height = `${baseH * currentRatio}px`;
       }

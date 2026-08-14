@@ -76,19 +76,44 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
       return false;
     };
 
+    const maxWidth = (): number => {
+      const table = wrapper.closest("table");
+      const host = table?.parentElement ?? wrapper.parentElement;
+      const hostWidth = host ? host.clientWidth : 0;
+      return hostWidth > 0 ? hostWidth : wrapper.getBoundingClientRect().width;
+    };
+
+    const contentWidth = (): number => {
+      const hostWidth = wrapper.parentElement?.clientWidth ?? 0;
+      return hostWidth > 0 ? hostWidth : maxWidth();
+    };
+
     const applySize = () => {
       if (!naturalW || !naturalH) return;
-      const hostWidth = wrapper.getBoundingClientRect().width || 0;
-      const maxW = hostWidth > 0 ? hostWidth : naturalW;
-      const baseH = Math.min(maxW, naturalW) * (naturalH / naturalW);
+      const aspect = naturalW / naturalH;
+      const maxW = contentWidth();
+      let w: number;
+      let h: number;
       if (currentW > 0 && currentH > 0) {
         const scale = Math.min(1, maxW / currentW);
-        img.style.width = `${Math.max(MIN_SIZE, currentW * scale)}px`;
-        img.style.height = `${Math.max(MIN_SIZE, currentH * scale)}px`;
+        w = Math.max(MIN_SIZE, currentW * scale);
+        h = Math.max(MIN_SIZE, currentH * scale);
+      } else if (currentW > 0) {
+        w = Math.min(currentW, maxW);
+        h = Math.max(MIN_SIZE, w / aspect);
+      } else if (currentH > 0) {
+        h = currentH;
+        w = h * aspect;
+        if (w > maxW) {
+          w = maxW;
+          h = w / aspect;
+        }
       } else {
-        img.style.width = "auto";
-        img.style.height = `${baseH}px`;
+        w = Math.min(naturalW, maxW);
+        h = w / aspect;
       }
+      img.style.width = `${w}px`;
+      img.style.height = `${h}px`;
     };
 
     img.addEventListener("load", () => {
@@ -170,8 +195,7 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
           if (vec.x !== 0) w = Math.max(MIN_SIZE, startW + vec.x * dx);
           if (vec.y !== 0) h = Math.max(MIN_SIZE, startH + vec.y * dy);
         }
-        const hostWidth = wrapper.getBoundingClientRect().width || 0;
-        const maxW = hostWidth > 0 ? hostWidth : Infinity;
+        const maxW = maxWidth() || Infinity;
         if (w > maxW) {
           w = maxW;
           if (vec.corner) h = w / aspect;
