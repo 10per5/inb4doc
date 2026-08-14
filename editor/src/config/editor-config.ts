@@ -34,9 +34,9 @@ const commonmark = _commonmark.filter(
 );
 
 import {
-  tableBlock,
   tableBlockConfig,
 } from "@milkdown/kit/component/table-block";
+import { fixedTableBlockView } from "@/plugins/table-block-view";
 import {
   imageBlockComponent,
   imageBlockConfig,
@@ -282,7 +282,8 @@ export async function createEditor(
     .use(hugoRefSchema)
     .use(shortcodeDecoration)
     .use(linkTooltipPlugin)
-    .use(tableBlock)
+    .use(tableBlockConfig)
+    .use(fixedTableBlockView)
     .use(imageBlockComponent)
     .use(imageResizeSchema)
     .use(imageResizeView)

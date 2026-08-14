@@ -64,8 +64,11 @@ function cellPosFromEvent(view: EditorView, event: DragEvent): number | null {
 /**
  * Convert every `image-block` in a fragment into an inline `image`, recursing
  * into block children so pasted/dropped content that wraps the image-block
- * (e.g. a paragraph) still ends up with valid inline content. Returns the
- * original fragment unchanged if there is nothing to convert.
+ * (e.g. a paragraph) still ends up with valid inline content. Inline `image`
+ * nodes pass through untouched but still mark the fragment as `changed`, so
+ * copy-pasted images (which arrive as inline `image` nodes, not image-blocks)
+ * are handled by the cell-drop path too. Returns the original fragment
+ * unchanged if there is nothing to convert.
  */
 function convertImageBlocksToInline(
   fragment: Fragment,
@@ -85,6 +88,9 @@ function convertImageBlocksToInline(
           title: a.caption ?? "",
         }),
       )
+    } else if (node.type === imageType) {
+      changed = true
+      nodes.push(node)
     } else if (node.isBlock && node.content.size > 0) {
       const nested = convertImageBlocksToInline(
         node.content,
@@ -126,32 +132,33 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: ImageTableDr
   const insertPos = cellPosFromEvent(view, event)
   if (insertPos == null) return
 
-  // In-editor drag of an image-block: convert the slice to inline images.
+  // In-editor drag of content (an image, text, or anything else): convert
+  // image-blocks to inline images so the cell gets inline content, then insert
+  // whatever is left. `view.dragging` is only ever set when the drag started
+  // outside the table (PM's dragstart never runs inside one), which is exactly
+  // the case that reaches here with a usable slice.
   const dragging = (view as any).dragging
   const slice = dragging?.slice
   if (slice && slice.content.size > 0) {
+    event.preventDefault()
+    event.stopPropagation()
     const converted = convertImageBlocksToInline(
       slice.content,
       imageBlockType,
       imageType,
     )
-    if (converted.changed) {
-      event.preventDefault()
-      event.stopPropagation()
-      const inlineSlice = new Slice(converted.fragment, 0, 0)
-      const tr = view.state.tr
-      if (dragging.move) {
-        if (dragging.node) dragging.node.replace(tr)
-        else tr.deleteSelection()
-      }
-      const pos = tr.mapping.map(insertPos)
-      tr.replaceRange(pos, pos, inlineSlice)
-      const $pos = tr.doc.resolve(pos)
-      tr.setSelection(TextSelection.near($pos))
-      view.dispatch(tr.setMeta("uiEvent", "drop"))
-      view.focus()
-      return
+    const tr = view.state.tr
+    if (dragging.move) {
+      if (dragging.node) dragging.node.replace(tr)
+      else tr.deleteSelection()
     }
+    const pos = tr.mapping.map(insertPos)
+    tr.replaceRange(pos, pos, new Slice(converted.fragment, 0, 0))
+    const $pos = tr.doc.resolve(pos)
+    tr.setSelection(TextSelection.near($pos))
+    view.dispatch(tr.setMeta("uiEvent", "drop"))
+    view.focus()
+    return
   }
 
   // OS file drop of an image into a cell.

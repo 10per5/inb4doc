@@ -2,6 +2,8 @@ import { $view } from "@milkdown/utils";
 import { imageSchema } from "@milkdown/kit/preset/commonmark";
 import { inlineImageConfig } from "@milkdown/kit/component/image-inline";
 import type { NodeView } from "@milkdown/kit/prose/view";
+import { NodeSelection } from "@milkdown/kit/prose/state";
+import { Fragment, Slice } from "@milkdown/kit/prose/model";
 import { parseAlt, encodeAlt } from "@/plugins/image-resize";
 
 const MIN_SIZE = 32;
@@ -226,6 +228,43 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
     for (const [dir, handle] of handles) {
       handle.addEventListener("pointerdown", (e) => startResize(e, dir));
     }
+
+    /**
+     * Dragging an in-cell image OUT of the table. Milkdown's tableBlock node
+     * view returns true from `stopEvent` for drag events, so PM's own
+     * dragstart (which installs `view.dragging`) never runs, and the table's
+     * root div cancels `dragstart` with `preventDefault` — a native drag from
+     * inside a table would do nothing. This handler runs in the CAPTURE phase
+     * on the wrapper, before the table's bubble handlers:
+     *
+     * - `stopPropagation()` keeps the table's `preventDefault` from canceling
+     *   the native drag.
+     * - Seeding `view.dragging` gives the subsequent drop a slice (and a
+     *   `NodeSelection` whose `replace(tr)` deletes the source for a move),
+     *   exactly what PM's own dragstart would have installed.
+     *
+     * The drop is then performed by PM's drop handler on the doc (outside the
+     * table) or by `image-table-drop.ts` when it lands in another cell.
+     */
+    const onDragStart = (e: DragEvent) => {
+      if (!inCell) return;
+      e.stopPropagation();
+      const pos = getPos();
+      if (pos == null) return;
+      const node = view.state.doc.nodeAt(pos);
+      if (!node || node.type.name !== "image") return;
+      (view as any).dragging = {
+        slice: new Slice(Fragment.from(node), 0, 0),
+        move: true,
+        node: NodeSelection.create(view.state.doc, pos),
+      };
+      e.dataTransfer?.setData("text/plain", node.attrs.alt ?? "");
+      e.dataTransfer?.setData(
+        "text/html",
+        `<img src="${node.attrs.src ?? ""}">`,
+      );
+    };
+    wrapper.addEventListener("dragstart", onDragStart, true);
 
     bindAttrs(initialNode);
 
