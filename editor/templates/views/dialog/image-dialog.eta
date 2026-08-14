@@ -1,0 +1,31 @@
+<div class="inb4doc-dialog-box inb4doc-image-box" onclick="event.stopPropagation()">
+  <h3><%= it.mode === "edit" ? "Edit Image" : "Insert Image" %></h3>
+  <div class="inb4doc-image-suggestions" data-image-dialog-target="suggestions">
+    <div class="inb4doc-image-empty">Loading&hellip;</div>
+  </div>
+  <% if (it.mode === "edit") { %>
+    <% if (it.isInline) { %>
+      <label for="<%= it.altId %>">Alt text</label>
+      <input id="<%= it.altId %>" type="text" value="<%= it.alt %>" data-image-dialog-target="alt" data-action="keydown->image-dialog#keydown">
+    <% } %>
+    <label for="<%= it.captionId %>"><%= it.isInline ? "Title" : "Caption" %></label>
+    <input id="<%= it.captionId %>" type="text" value="<%= it.caption %>" data-image-dialog-target="caption" data-action="keydown->image-dialog#keydown">
+    <% if (it.fileName) { %>
+      <label for="<%= it.fileId %>">File</label>
+      <input id="<%= it.fileId %>" type="text" value="<%= it.fileName %>" data-image-dialog-target="file" data-action="keydown->image-dialog#keydown">
+    <% } %>
+  <% } %>
+  <label for="<%= it.urlId %>">Image URL</label>
+  <input id="<%= it.urlId %>" type="text" placeholder="Paste image URL&hellip;" value="<%= it.src %>" data-image-dialog-target="url" data-action="keydown->image-dialog#keydown">
+  <label class="inb4doc-image-upload">
+    Upload from computer
+    <input type="file" accept="image/*" hidden data-image-dialog-target="upload" data-action="change->image-dialog#uploadChange">
+  </label>
+  <div class="inb4doc-dialog-actions">
+    <% if (it.mode === "edit") { %>
+      <button type="button" class="inb4doc-image-remove" data-action="click->image-dialog#remove">Remove</button>
+    <% } %>
+    <button type="button" data-action="click->image-dialog#cancel">Cancel</button>
+    <button type="button" class="inb4doc-dialog-confirm" data-action="click->image-dialog#save">OK</button>
+  </div>
+</div>

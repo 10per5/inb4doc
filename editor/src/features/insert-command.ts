@@ -22,6 +22,7 @@ import { createTable } from "@milkdown/kit/preset/gfm";
 import { SlashCommand, ProseNodeType, proseNodeTypeByName } from "@/config/enums";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { setListItemKind } from "@/utils/editor-mutator";
+import { openImageDialog } from "@/controllers/dialog/image-dialog";
 
 export interface InsertCommandOptions {
   /**
@@ -270,8 +271,8 @@ function insertTable(ctx: Ctx, view: EditorView): void {
 
 /**
  * Replace the caret's current block with an empty image block + paragraph, then
- * dispatch the same `inb4doc:edit-image` event the editor emits on image
- * double-click so the existing SlashView picker opens for URL/upload.
+ * open the image dialog so the user picks a URL/upload, mirroring the slash
+ * menu's Image command. The block is filled in once the dialog resolves.
  */
 function insertImageBlock(view: EditorView): void {
   const { state, dispatch } = view;
@@ -289,12 +290,25 @@ function insertImageBlock(view: EditorView): void {
   const tr = state.tr.replaceWith(pos, pos + blockSize, [img, para]);
   tr.setSelection(TextSelection.create(tr.doc, pos + img.nodeSize + 1));
   dispatch(tr.scrollIntoView());
-  view.dom.dispatchEvent(
-    new CustomEvent("inb4doc:edit-image", {
-      bubbles: true,
-      detail: { pos, src: "" },
-    }),
-  );
+  openImageDialog({
+    mode: "create",
+    pos,
+    src: "",
+    attrs: { ...img.attrs },
+  }).then((result) => {
+    if (result == null || result.action !== "save") return;
+    const { state: s, dispatch: d } = view;
+    const node = s.doc.nodeAt(pos);
+    if (!node) return;
+    d(
+      s.tr.setNodeMarkup(pos, null, {
+        ...(node.attrs as Record<string, unknown>),
+        src: result.src,
+        caption: result.caption,
+      }),
+    );
+    view.focus();
+  });
 }
 
 /**

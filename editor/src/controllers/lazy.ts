@@ -7,6 +7,7 @@ import { PromptDialogController } from "./dialog/prompt-dialog-controller"
 import { CreateDialogController } from "./dialog/create-dialog-controller"
 import { LinkDialogController } from "./dialog/link-dialog-controller"
 import { VideoDialogController } from "./dialog/video-dialog-controller"
+import { ImageDialogController } from "./dialog/image-dialog-controller"
 import { HugoRefDialogController } from "./dialog/hugoref-dialog-controller"
 import { ImportZipDialogController } from "./dialog/import-zip-dialog-controller"
 import { ExternalChangeDialogController } from "./dialog/external-change-dialog-controller"
@@ -32,6 +33,7 @@ const lazyRegistrations: ControllerRegistration[] = [
   { name: "create-dialog", controller: CreateDialogController },
   { name: "link-dialog", controller: LinkDialogController },
   { name: "video-dialog", controller: VideoDialogController },
+  { name: "image-dialog", controller: ImageDialogController },
   { name: "hugoref-dialog", controller: HugoRefDialogController },
   { name: "prefs", controller: PrefsController },
   { name: "import-zip-dialog", controller: ImportZipDialogController },

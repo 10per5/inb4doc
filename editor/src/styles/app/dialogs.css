@@ -348,6 +348,64 @@
   background: var(--color-bg-tertiary);
 }
 
+/* ── Image Dialog ──────────────────────────────────────────────────── */
+
+.inb4doc-image-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.inb4doc-image-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--color-text-primary);
+}
+.inb4doc-image-suggestion:hover {
+  background: var(--color-bg-tertiary);
+}
+.inb4doc-image-suggestion img {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+.inb4doc-image-suggestion em {
+  color: var(--color-text-secondary);
+  font-style: normal;
+}
+.inb4doc-image-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+.inb4doc-image-upload {
+  display: inline-block;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--color-text-primary);
+}
+.inb4doc-image-upload:hover {
+  background: var(--color-bg-tertiary);
+}
+.inb4doc-dialog-actions .inb4doc-image-remove {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+.inb4doc-dialog-actions .inb4doc-image-remove:hover {
+  background: var(--color-bg-tertiary);
+}
+
 /* ── Prefs Dialog ──────────────────────────────────────────────────── */
 
 .inb4doc-prefs-box {
