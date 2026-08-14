@@ -69,6 +69,17 @@ export class FileSyncService {
     return this.pendingOps;
   }
 
+  /**
+   * Rebuild the in-memory pending ops from the active provider's storage.
+   * Must run after the provider changes: the in-memory ops are keyed by path
+   * only, so carrying them across providers would flush edits and deletes
+   * queued for one provider into another.
+   */
+  reloadPendingOps(): void {
+    this.pendingOps = new PendingOps(pendingOpsStore.load());
+    dirtyTrackingService.setPendingOps(this.pendingOps);
+  }
+
   destroy(): void {
     this.unsubs.forEach((unsub) => unsub());
     this.unsubs = [];

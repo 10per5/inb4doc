@@ -304,7 +304,7 @@ export default class extends Controller {
   private async resolveInitialPath(): Promise<{ path: string; isNew: boolean }> {
     const requested = this.initialPath || HOME_PATH
     const tree = treeStore.getTree()
-    const pages = treePaths(tree)
+    const pages = treePaths(this.cache.getPendingOps().applyToTree(tree))
 
     if (pages.includes(requested)) {
       return { path: requested, isNew: false }
