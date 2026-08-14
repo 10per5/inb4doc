@@ -106,6 +106,35 @@ function findBlockStart($from: any): number | null {
   return $from.depth >= 1 ? $from.before(1) : null
 }
 
+// Ctrl+Enter inserts an empty paragraph below the block the caret is in,
+// regardless of where the caret sits inside the block, and focuses it. A
+// "block" is the top-level node (paragraph, heading, blockquote, ...) or,
+// inside a list, the list item — the same units findBlockStart treats as a
+// block. Handled here (not the default baseKeymap's Mod-Enter → exitCode, which
+// only applies to code blocks) so it works from any position inside the block.
+function insertBlockBelow(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from } = state.selection
+  let endPos: number | null = null
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === "list_item") {
+      endPos = $from.after(d)
+      break
+    }
+  }
+  if (endPos === null && $from.depth >= 1) {
+    endPos = $from.after(1)
+  }
+  if (endPos === null) return false
+  const paragraph = state.schema.nodes.paragraph
+  const tr = state.tr.insert(endPos, paragraph.create())
+  tr.setSelection(TextSelection.near(tr.doc.resolve(endPos)))
+  if (dispatch) dispatch(tr.scrollIntoView())
+  return true
+}
+
 // Ctrl+X with no selection → cut the whole current block (a bullet point cuts
 // the item, a paragraph cuts the paragraph). ProseMirror has no Mod-x binding —
 // the browser only cuts a real DOM selection — so this selects the block as a
@@ -253,6 +282,7 @@ export function createKeymap() {
     "Mod-Z": (state, dispatch) => redo(state, dispatch),
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-x": (state, dispatch, view) => cutBlock(state, dispatch, view),
+    "Mod-Enter": (state, dispatch) => insertBlockBelow(state, dispatch),
     // Stock PM sinkListItem returns false when the item is the FIRST child of
     // its parent list (startIndex == 0), so Tab indents when the item can sink
     // and otherwise inserts 4 non-breaking spaces. The edit-toolbar increase

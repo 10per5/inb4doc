@@ -4,7 +4,7 @@ import { ToolbarCommand } from "@/config/enums"
 import { ActiveBlockType, type ActiveBlockContext } from "@/config/enums/block-context"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
-import { trackKeyboardOffset, isMobileViewport } from "@/utils/mobile"
+import { trackKeyboardOffset, isMobileViewport, isTabletViewport, isMobileOrTabletUA } from "@/utils/mobile"
 import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/popover"
 import type { EditorController } from "@/controllers/editor-controller"
 
@@ -57,9 +57,12 @@ export default class EditToolbarController extends Controller {
     )
     // On-screen keyboard open → follow mode (the caret sits just above the
     // keys, so the strip would be hidden behind them). Visual-viewport
-    // pan/scroll re-anchors the popover to the caret's block.
+    // pan/scroll re-anchors the popover to the caret's block. Gated to touch
+    // devices: phone/tablet by viewport, plus tablet by UA (a tablet in
+    // landscape can still exceed the tablet breakpoint but pops the OSK).
     this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
-      this.followMode = offset > 0 && isMobileViewport()
+      this.followMode =
+        offset > 0 && (isMobileViewport() || isTabletViewport() || isMobileOrTabletUA())
       this.element.classList.toggle("is-follow-mode", this.followMode)
       this.updateVisibility()
       this.positionPopover()
