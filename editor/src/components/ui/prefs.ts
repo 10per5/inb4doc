@@ -1,6 +1,7 @@
 import type { ImageStorageMode } from "@/services/storage-service"
 import { prefsStore } from "@/stores/preferences-store"
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { applyTheme } from "@/utils/theme"
 
 /**
  * Shared preferences handlers — used by both the desktop dialog and the
@@ -15,11 +16,7 @@ export function onPrefsStickyChanged(sticky: boolean): void {
 
 export function onPrefsDarkChanged(dark: boolean): void {
   prefsStore.setDarkMode(dark)
-  if (dark) {
-    document.documentElement.setAttribute("data-theme", "dark")
-  } else {
-    document.documentElement.removeAttribute("data-theme")
-  }
+  applyTheme(dark)
 }
 
 export function onPrefsImageModeChanged(mode: ImageStorageMode): void {

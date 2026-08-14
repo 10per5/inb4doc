@@ -7,15 +7,20 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.util.Base64
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
@@ -28,6 +33,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -54,6 +62,24 @@ class WebViewActivity : AppCompatActivity() {
     private fun dataEditorDir(): File =
         getExternalFilesDir(null)?.let { File(it, "JsStaticFs") }
             ?: File(filesDir, "JsStaticFs")
+
+    private fun systemDarkTheme(): Boolean =
+        (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+
+    // Paint the reserved camera/status-bar strip with the web app's
+    // --color-bg-secondary (light #f8f9fa / dark #3b4252 — the same value the
+    // toolbar and mobile dock use), and flip the status/nav bar icon contrast so
+    // it stays legible on that background. Called from onCreate (system night
+    // mode, before JS boots) and from NativeBridge.setTheme (the app's real
+    // dark/light preference).
+    private fun applyTheme(dark: Boolean) {
+        val strip = if (dark) 0xFF3B4252.toInt() else 0xFFF8F9FA.toInt()
+        window.setBackgroundDrawable(ColorDrawable(strip))
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !dark
+        controller.isAppearanceLightNavigationBars = !dark
+    }
 
     // Custom scheme for the writable data-dir mount. Unlike plain file:// URLs
     // — which WebView can serve via its native file loader without consulting
@@ -120,6 +146,19 @@ class WebViewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+
+        // Reserve the camera/status-bar strip instead of drawing under it: the
+        // top part of the screen (status bar + display cutout) stays an empty,
+        // theme-colored band and the WebView sits below it. Android 15 enforces
+        // edge-to-edge for targetSdk 35, so the strip is inset by hand here
+        // (below) rather than via fitSystemWindows. The band paints the web
+        // app's --color-bg-secondary (toolbar/dock bg) and its bar icons follow
+        // the dark/light theme; applyTheme() swaps both when setTheme arrives
+        // from JS (or uses the system night mode before JS boots).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        applyTheme(systemDarkTheme())
 
         // Restore the last Open-Project pick so a relaunch reopens the same
         // content root (mirrors desktop inb4.config.toml content_root).
@@ -274,7 +313,29 @@ class WebViewActivity : AppCompatActivity() {
             addJavascriptInterface(NativeBridge(), "NativeBridge")
         }
 
-        setContentView(webView)
+        // The WebView is inset below the reserved system-bar strips (status
+        // bar + cutout at the top, gesture/nav bar at the bottom, and the soft
+        // keyboard when it opens) by padding a container around it. Padding the
+        // container — not the WebView — keeps the page viewport a plain
+        // rectangle that never scrolls under the bars.
+        val content = FrameLayout(this)
+        ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or
+                    WindowInsetsCompat.Type.ime()
+            )
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        content.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        setContentView(content)
 
         webView.loadUrl(assetEditorBase + "index.html")
     }
@@ -416,6 +477,15 @@ class WebViewActivity : AppCompatActivity() {
         @JavascriptInterface
         fun log(message: String) {
             Log.i("inb4doc", message)
+        }
+
+        // The web app reports its dark/light theme so the reserved system-bar
+        // strip (and its icon contrast) follows the app instead of the system.
+        // Runs on the JavaBridge thread — hop to the UI thread for window work.
+        @JavascriptInterface
+        fun setTheme(theme: String?) {
+            val dark = theme == "dark"
+            runOnUiThread { applyTheme(dark) }
         }
 
         // The writable data-dir mount URL (trailing slash) under the custom
