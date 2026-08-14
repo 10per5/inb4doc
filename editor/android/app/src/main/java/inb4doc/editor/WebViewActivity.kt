@@ -96,7 +96,7 @@ class WebViewActivity : AppCompatActivity() {
     private var treeUri: Uri? = null
     private var pendingPick: ((Uri?) -> Unit)? = null
 
-    private val safFs = SafFs(contentResolver)
+    private val safFs by lazy { SafFs(contentResolver) }
 
     private val treePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
