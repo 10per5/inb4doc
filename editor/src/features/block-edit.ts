@@ -26,7 +26,7 @@ import {
   videoCamera,
 } from "@/eta/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
-import { openVideoDialog, type VideoDialogResult } from "@/controllers/dialog/video-dialog.type";
+import { openVideoDialog, type VideoDialogAttrs } from "@/controllers/dialog/video-dialog.type";
 import { openImageDialog } from "@/controllers/dialog/image-dialog.type";
 import {
   SlashCommand, SLASH_CMD_PREFIX,
@@ -479,28 +479,23 @@ class SlashView {
     executeInsertCommand(this.milkdownCtx, cmd, level);
   }
 
-  private openVideoEditor(pos: number, attrs: VideoDialogResult) {
+  private openVideoEditor(pos: number, attrs: VideoDialogAttrs) {
     const view = this.view;
 
-    openVideoDialog(
-      attrs,
-      (result) => {
-        const { state, dispatch } = view;
-        const node = state.doc.nodeAt(pos);
-        if (node) {
-          dispatch(
-            state.tr.setNodeMarkup(pos, null, { ...node.attrs, ...result }),
-          );
-        }
-        view.focus();
-      },
-      () => {
-        const { state, dispatch } = view;
+    openVideoDialog(attrs).then((result) => {
+      if (result == null) return;
+      const { state, dispatch } = view;
+      if (result.action === "remove") {
         const tr = state.tr.delete(pos, pos + (state.doc.nodeAt(pos)?.nodeSize ?? 0));
         dispatch(tr);
-        view.focus();
-      },
-    );
+      } else {
+        const node = state.doc.nodeAt(pos);
+        if (node) {
+          dispatch(state.tr.setNodeMarkup(pos, null, { ...node.attrs, ...result }));
+        }
+      }
+      view.focus();
+    });
   }
 
   private highlight(items: NodeListOf<HTMLElement>) {
