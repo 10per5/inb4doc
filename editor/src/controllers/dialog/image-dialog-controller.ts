@@ -3,7 +3,7 @@ import renderImageDialog from "@/eta/views/dialog/image-dialog"
 import { imageService } from "@/services/image-service"
 import { showToast } from "@/bridge"
 import { imageFileName, imageDirFromSrc } from "@/utils/image-url"
-import type { ImageDialogViewPayload, ImageDialogResult } from "./image-dialog"
+import type { ImageDialogViewPayload, ImageDialogResult } from "./image-dialog.type"
 
 export class ImageDialogController extends BaseDialogController {
   static targets = ["url", "suggestions", "upload", "alt", "caption", "file"]

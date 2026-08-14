@@ -259,8 +259,9 @@ function computeChunkManifest(
 // src/eta/views/dialog/<id>.ts for dialogs) is bundled together with that
 // template — the pairing is the controller's own template import, scanned from
 // source (see TEMPLATE_IMPORT_RE). Dialog controllers additionally pull their
-// facade helper (src/controllers/dialog/<id>.ts) into the same chunk so
-// controller + helper + template reload as one unit.
+// facade helper (src/controllers/dialog/<id>.type.ts, holding the dialog types
+// and open*Dialog() opener) into the same chunk so controller + helper +
+// template reload as one unit.
 function discoverControllers(
   controllersDir: string,
   srcDir: string
@@ -318,7 +319,7 @@ function controllerRules(
         : null;
       const test = c.isDialog
         ? [
-            `.*src/controllers/dialog/${c.id}(?:-controller)?\\.ts`,
+            `.*src/controllers/dialog/${c.id}(?:-controller|\\.type)?\\.ts`,
             ...c.templates.map((t) => `.*${t}\\.ts`),
           ]
         : folder

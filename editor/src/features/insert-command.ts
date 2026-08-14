@@ -22,7 +22,7 @@ import { createTable } from "@milkdown/kit/preset/gfm";
 import { SlashCommand, ProseNodeType, proseNodeTypeByName } from "@/config/enums";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { setListItemKind } from "@/utils/editor-mutator";
-import { openImageDialog } from "@/controllers/dialog/image-dialog";
+import { openImageDialog } from "@/controllers/dialog/image-dialog.type";
 
 export interface InsertCommandOptions {
   /**
