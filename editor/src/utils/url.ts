@@ -2,14 +2,18 @@ import { editorSelfBase, staticSiteGeneration } from "@/config";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { isRootPath, HOME_PATH } from "@/utils/hugo-compat";
 
-const isGui = hasFunc(AppFunc.MountProvider);
+// Native shells (desktop Saucer app://, Android WebView file://) load the app
+// at a fixed shell URL — that URL is never a document path. MountProvider
+// covers GuiDesktop; SafProvider covers GuiMobile (which mounts the content via
+// SAF and has no MountProvider flag).
+const isGui = hasFunc(AppFunc.MountProvider) || hasFunc(AppFunc.SafProvider);
 
 export function getCurrentPath(): string {
   if (staticSiteGeneration) {
     return new URLSearchParams(window.location.search).get("path") || HOME_PATH;
   }
   if (isGui) {
-    return (window.location.pathname.replace(/^\//, "").replace(/\/$/, "") || HOME_PATH);
+    return HOME_PATH;
   }
   const base = editorSelfBase;
   const raw = window.location.pathname;
