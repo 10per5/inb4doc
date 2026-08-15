@@ -237,6 +237,21 @@ function flattenToInline(
  * bound directly on the editor view's DOM, where it runs after PM's own
  * (silently skipped) listener.
  */
+/**
+ * Whether a drop at the given event is over the table at all. Checks both the
+ * DOM target (inside the `.milkdown-table-block` wrapper, e.g. on the add-row
+ * bar or drag handles where no `td`/`th` sits) and the geometry cell lookup.
+ * Drops over the table must never reach ProseMirror, which would insert at the
+ * cell/table boundary or at an invalid depth.
+ */
+function isDropOverTable(view: EditorView, event: DragEvent): boolean {
+  const target = event.target
+  if (target instanceof Element && target.closest(".milkdown-table-block")) {
+    return true
+  }
+  return tableCellAtPoint(view, event.clientX, event.clientY) != null
+}
+
 function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDropConfig) {
   if (!view.editable) return
   const dataTransfer = event.dataTransfer
@@ -247,8 +262,9 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
   const imageType = schema.nodes["image"]
   if (!imageBlockType || !imageType) return
 
+  const overTable = isDropOverTable(view, event)
   const insertPos = cellPosFromEvent(view, event)
-  if (insertPos == null) return
+  if (!overTable && insertPos == null) return
 
   // In-editor drag of content (an image, text, or anything else): flatten to
   // inline cell content and insert. `view.dragging` is only ever set when the
@@ -260,7 +276,7 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
     event.preventDefault()
     event.stopPropagation()
     const inline = flattenToInline(slice.content, imageBlockType, imageType)
-    if (!inline) return
+    if (!inline || insertPos == null) return
     const tr = view.state.tr
     if (dragging.move) {
       if (dragging.node) dragging.node.replace(tr)
@@ -282,6 +298,7 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
       if (file.type.startsWith("image/")) {
         event.preventDefault()
         event.stopPropagation()
+        if (insertPos == null) return
         config.uploadImage(file).then((url) => {
           const node = imageType.create({ src: url, alt: "1.00", title: "" })
           const tr = view.state.tr
@@ -302,6 +319,51 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
     view: (view) => {
       const onDrop = (event: DragEvent) => handleCellDrop(view, event, config)
       view.dom.addEventListener("drop", onDrop)
+
+      /**
+       * Drop-target feedback during a native drag over the table: highlight
+       * the cell under the pointer (accent) when the dragged content is
+       * accepted inside a cell, red when it isn't (video, table, hr, unknown
+       * atoms, non-image OS files). Mirrors the check in `handleCellDrop`.
+       */
+      let hoverCell: Element | null = null
+
+      const clearHover = () => {
+        hoverCell?.classList.remove("text-drop-target", "drop-reject")
+        hoverCell = null
+      }
+
+      const contentIsCellValid = (event: DragEvent): boolean => {
+        const schema = view.state.schema
+        const imageBlockType = schema.nodes["image-block"]
+        const imageType = schema.nodes["image"]
+        const dragging = (view as any).dragging
+        const slice = dragging?.slice
+        if (slice && slice.content.size > 0 && imageBlockType && imageType) {
+          return flattenToInline(slice.content, imageBlockType, imageType) != null
+        }
+        const files = event.dataTransfer?.files
+        if (files && files.length > 0) {
+          return Array.from(files).every(
+            (f) => !f.type || f.type.startsWith("image/"),
+          )
+        }
+        return true
+      }
+
+      const onDragOver = (event: DragEvent) => {
+        if (!view.editable) return
+        const cell = tableCellAtPoint(view, event.clientX, event.clientY)
+        if (hoverCell && hoverCell !== cell) clearHover()
+        if (!cell) return
+        cell.classList.add("text-drop-target")
+        cell.classList.toggle("drop-reject", !contentIsCellValid(event))
+        hoverCell = cell
+      }
+
+      view.dom.addEventListener("dragover", onDragOver)
+      view.dom.addEventListener("dragleave", clearHover)
+      view.dom.addEventListener("dragend", clearHover)
 
       /**
        * Manual (pointer-based) drag of a text selection OUT of a table cell.
@@ -451,7 +513,11 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
         update: () => {},
         destroy: () => {
           endGesture()
+          clearHover()
           view.dom.removeEventListener("drop", onDrop)
+          view.dom.removeEventListener("dragover", onDragOver)
+          view.dom.removeEventListener("dragleave", clearHover)
+          view.dom.removeEventListener("dragend", clearHover)
           view.dom.removeEventListener("pointerdown", onPointerDown, true)
         },
       }
