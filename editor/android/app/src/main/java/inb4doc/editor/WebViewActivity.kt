@@ -313,19 +313,17 @@ class WebViewActivity : AppCompatActivity() {
             addJavascriptInterface(NativeBridge(), "NativeBridge")
         }
 
-        // The WebView is inset below the reserved system-bar strips (status
-        // bar + cutout at the top, gesture/nav bar at the bottom, and the soft
-        // keyboard when it opens) by padding a container around it. Padding the
-        // container — not the WebView — keeps the page viewport a plain
-        // rectangle that never scrolls under the bars.
+        // The WebView is pushed below the reserved camera/status-bar strip at
+        // the top only — the bottom stays edge-to-edge (content may draw behind
+        // the gesture/nav bar). Padding the container — not the WebView — keeps
+        // the page viewport a plain rectangle that never scrolls under the bar.
         val content = FrameLayout(this)
         ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
-            val bars = insets.getInsets(
+            val top = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or
-                    WindowInsetsCompat.Type.displayCutout() or
-                    WindowInsetsCompat.Type.ime()
-            )
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                    WindowInsetsCompat.Type.displayCutout()
+            ).top
+            v.setPadding(0, top, 0, 0)
             insets
         }
         content.addView(
