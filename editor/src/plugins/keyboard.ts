@@ -4,6 +4,7 @@ import { TextSelection, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/p
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList, sinkListItem } from "prosemirror-schema-list"
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { isInsideTableCell } from "@/plugins/table-drag-drop"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
 // after Home), Milkdown binds both Backspace and Delete to `liftFirstListItem`
@@ -283,12 +284,29 @@ export function createKeymap() {
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-x": (state, dispatch, view) => cutBlock(state, dispatch, view),
     "Mod-Enter": (state, dispatch) => insertBlockBelow(state, dispatch),
+    // A GFM table cell holds exactly one paragraph, so Enter can't split into a
+    // second paragraph. The gfm preset binds plain Enter to `exitTable` (same as
+    // Ctrl+Enter) — too aggressive. Ours runs first, so consume Enter inside a
+    // cell and insert a hard break (`<br>`), which the cell does support. Shift-
+    // Enter keeps working via the base keymap.
+    "Enter": (state, dispatch) => {
+      if (!isInsideTableCell(state.selection.$from)) return false
+      const hardbreak = state.schema.nodes.hardbreak
+      if (!hardbreak) return false
+      if (dispatch) {
+        dispatch(state.tr.replaceSelectionWith(hardbreak.create()).scrollIntoView())
+      }
+      return true
+    },
     // Stock PM sinkListItem returns false when the item is the FIRST child of
     // its parent list (startIndex == 0), so Tab indents when the item can sink
     // and otherwise inserts 4 non-breaking spaces. The edit-toolbar increase
     // button mirrors this: disabled when the item can't sink. This keymap runs
     // before Milkdown's listItemKeymap, so Tab is taken.
     "Tab": (state, dispatch) => {
+      // Inside a cell, Tab must fall through to the gfm table keymap's
+      // next-cell navigation instead of being swallowed here.
+      if (isInsideTableCell(state.selection.$from)) return false
       let itemDepth = -1
       for (let d = state.selection.$from.depth; d > 0; d--) {
         if (state.selection.$from.node(d).type.name === "list_item") {

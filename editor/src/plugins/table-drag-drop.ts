@@ -8,7 +8,7 @@ export interface TableDragDropConfig {
   uploadImage?: (file: File) => Promise<string>
 }
 
-function isInsideTableCell($pos: ResolvedPos): boolean {
+export function isInsideTableCell($pos: ResolvedPos): boolean {
   for (let d = $pos.depth; d > 0; d--) {
     const name = $pos.node(d).type.name
     if (name === "table_cell" || name === "table_header") return true
