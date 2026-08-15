@@ -1,30 +1,22 @@
 /**
- * Shared native-bridge envelope + project-directory helpers.
+ * JS → native transport + typed bridge-op helpers.
  *
  * The native host (desktop Saucer `window.saucer.exposed.*`, Android WebView
  * `window.NativeBridge.*` forwarded onto the same namespace) exposes JSON
- * string methods with the shape `{ok, status?, error?, data?}`. Everything in
- * this module is host-agnostic so the providers and the bridge wiring can
- * reuse it.
+ * string methods with the envelope shape `{ok, status?, error?, data?}` (see
+ * bridge/interface). This module is the host-agnostic caller side the
+ * providers use; the per-host wiring lives in bridge/desktop and bridge/mobile.
  */
 
 import { backendError } from "@/utils/backend-error"
 import { hasFunc, AppFunc } from "$/build/build-mode"
 import { BridgeOp, bridgeOpName } from "@/config/enums/bridge-op"
-
-export interface BridgeEnvelope {
-  ok: boolean
-  status?: number
-  error?: string
-  data?: unknown
-}
-
-export type BridgeFn = (...args: unknown[]) => Promise<string>
+import type { BridgeEnvelope, BridgeFn, NativeBridgeSurface } from "./interface"
 
 export async function callBridge(op: BridgeOp, ...args: unknown[]): Promise<BridgeEnvelope> {
   const fn = bridgeOpName(op)
-  const exposed = (window as any).saucer?.exposed as Record<string, BridgeFn> | undefined
-  const caller = exposed?.[fn]
+  const exposed = (window as any).saucer?.exposed as NativeBridgeSurface | undefined
+  const caller = exposed?.[fn as keyof NativeBridgeSurface]
   if (typeof caller !== "function") {
     throw backendError(500, `Native bridge function "${fn}" is unavailable`)
   }
