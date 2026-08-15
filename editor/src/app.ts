@@ -22,9 +22,9 @@ import { isMobileViewport } from "@/utils/mobile";
 // call shouldInterceptRequest for file:///android_asset/ URLs (documented), and
 // the thin APK ships no lazy chunks — so a relative base would resolve every
 // lazy pot under android_asset and 404. Point the loader at the writable data
-// dir via the custom app://editor/ scheme instead: it has no native WebView
-// handler, so every request deterministically reaches shouldInterceptRequest,
-// which serves the updater-downloaded chunk.
+// dir instead (NativeBridge.editorMountUrl() returns its plain file:// base):
+// WebView loads file:// from the app's own data dir natively (allowFileAccess),
+// and shouldInterceptRequest backs it up for any request WebView defers.
 const ANDROID_MOUNT = (() => {
   try {
     const nb = (window as any).NativeBridge
@@ -160,6 +160,13 @@ async function registerLazy(app: Application, retried = false): Promise<void> {
 async function init() {
   setSessionStarted(Date.now());
 
+  // Wire the native bridge BEFORE the provider boot: initializeProvider (Part A)
+  // synchronously calls through the bridge (getContentRoot / getTree) on
+  // GuiMobile, and the Android bridge exists only once initMobileBridge() has
+  // mirrored NativeBridge onto window.saucer.exposed. Run this below the boot
+  // and every startup logs "Native bridge function getTree is unavailable".
+  initNativeBridge();
+
   setProviderReady(initializeProvider());
 
   if (thinShell) {
@@ -174,8 +181,6 @@ async function init() {
   }
 
   await app.start();
-
-  initNativeBridge();
 
   if ("serviceWorker" in navigator && ["http:", "https:"].includes(location.protocol)) {
     const { registerSW } = await import("./services/sw-registrar-service");

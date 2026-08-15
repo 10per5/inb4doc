@@ -52,16 +52,25 @@ class WebViewActivity : AppCompatActivity() {
     // Bundled editor: the thin shell ships inside the APK at assets/editor/.
     // The fetch updater downloads the live editor into the writable data dir
     // (app-specific external storage: /sdcard/Android/data/<pkg>/files/JsStaticFs,
-    // visible to the user like the desktop ~/.local/share/inb4doc/JsStaticFs);
-    // shouldInterceptRequest serves that copy first, so a populated data dir wins
-    // over the bundled shell (Part C.1 W3). The URL path stays /editor/ (the APK
-    // asset mount); only the physical data dir is JsStaticFs, matching the desktop
-    // data layout (gui/src/platform.cpp).
+    // visible to the user like the desktop ~/.local/share/inb4doc/JsStaticFs).
+    // Once the data dir holds an index.html, this activity boots THAT copy
+    // directly — a populated data dir wins over the bundled shell (Part C.1 W3),
+    // matching the desktop data layout (gui/src/platform.cpp) — and the bundled
+    // shell is only a first-run bootstrap until the updater's transfer + reload.
+    // The URL path stays /editor/ (the APK asset mount); only the physical data
+    // dir is JsStaticFs.
     private val assetEditorBase = "file:///android_asset/editor/"
 
     private fun dataEditorDir(): File =
         getExternalFilesDir(null)?.let { File(it, "JsStaticFs") }
             ?: File(filesDir, "JsStaticFs")
+
+    // Default content root (mobile equivalent of the desktop default
+    // content_root): the app-specific external docs dir, Android/data/<pkg>/docs
+    // — sibling of files/ (which holds the updater's JsStaticFs). Backed by
+    // DocsProvider, so the editor can save before any "Open Project" pick.
+    private fun defaultContentDir(): File =
+        File(getExternalFilesDir(null)?.parentFile ?: filesDir, "docs")
 
     private fun systemDarkTheme(): Boolean =
         (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
@@ -81,14 +90,12 @@ class WebViewActivity : AppCompatActivity() {
         controller.isAppearanceLightNavigationBars = !dark
     }
 
-    // Custom scheme for the writable data-dir mount. Unlike plain file:// URLs
-    // — which WebView can serve via its native file loader without consulting
-    // shouldInterceptRequest, or block outright — a custom scheme has NO native
-    // handler, so every request is routed through shouldInterceptRequest
-    // deterministically. The page's own eager assets still load from the
-    // bundled file:///android_asset/editor/ shell; only the updater's data-dir
-    // chunks go through this scheme.
-    private val editorMountScheme = "app://editor/"
+    // The writable data-dir mount: editorMountUrl() returns the data dir's plain
+    // file:// base (RFC 8089 "file:/storage/..." local form), so Farm's lazy
+    // chunks resolve straight onto the updater-downloaded copies and WebView
+    // serves them from the app's own external files dir natively (allowFileAccess).
+    // shouldInterceptRequest backs that up for any file:// request WebView defers,
+    // and serves the bundled android_asset fallback when the data dir has no copy.
 
     // File-chooser plumbing for WebChromeClient.onShowFileChooser (Load-from-Zip
     // and any <input type="file">): WebView shows no picker without it, and the
@@ -169,6 +176,10 @@ class WebViewActivity : AppCompatActivity() {
             treeUri = if (stillHeld) uri else null
         }
 
+        // Ensure the default content dir exists so the docs tree is writable
+        // from the very first launch.
+        defaultContentDir().mkdirs()
+
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -198,31 +209,6 @@ class WebViewActivity : AppCompatActivity() {
                 ): WebResourceResponse? {
                     val uri = request?.url ?: return null
                     val url = uri.toString()
-
-                    // Custom-scheme mount (app://editor/): no native WebView
-                    // handler, so every request lands here deterministically —
-                    // unlike plain file:// URLs, which WebView may serve itself
-                    // or block outright. The part below the mount is the
-                    // data-dir-relative path the updater stored chunks under
-                    // (e.g. "assets/node_imports-<hash>.js").
-                    if (url.startsWith(editorMountScheme)) {
-                        val rel = url
-                            .removePrefix(editorMountScheme)
-                            .substringBefore('?')
-                            .substringBefore('#')
-                        if (rel.isEmpty()) return null
-                        val dataFile = resolveWithin(dataEditorDir(), rel)
-                        Log.i("inb4doc", "SIR scheme $rel exists=${dataFile?.isFile}")
-                        if (dataFile?.isFile == true) {
-                            return try {
-                                serveFile(rel, dataFile)
-                            } catch (e: Exception) {
-                                Log.w("inb4doc", "intercept failed for $rel", e)
-                                null
-                            }
-                        }
-                        return null
-                    }
 
                     // Updater-downloaded editor files (lazy chunks, css, the
                     // downloaded index/app): served explicitly from the writable
@@ -335,7 +321,15 @@ class WebViewActivity : AppCompatActivity() {
         )
         setContentView(content)
 
-        webView.loadUrl(assetEditorBase + "index.html")
+        // Boot the updater-downloaded copy of index.html once the data dir has
+        // one; the bundled thin shell is only the first-run bootstrap. Booting
+        // the bundled shell forever would loop: its build-time index hash never
+        // matches the remote manifest, so the updater keeps reloading.
+        val dataIndex = File(dataEditorDir(), "index.html")
+        webView.loadUrl(
+            if (dataIndex.isFile) dataIndex.toURI().toString()
+            else assetEditorBase + "index.html"
+        )
     }
 
     override fun onBackPressed() {
@@ -356,15 +350,20 @@ class WebViewActivity : AppCompatActivity() {
     private fun resolveWithin(root: File, rel: String): File? {
         val target = File(root, rel)
         val base = root.canonicalFile
-        val canon = target.canonicalFile
+        val canon = try {
+            target.canonicalFile
+        } catch (e: Exception) {
+            return null
+        }
         return if (canon.path.startsWith(base.path)) canon else null
     }
 
-    // Serve a data-dir file with the guessed MIME plus permissive CORS. The
-    // page boots from a file:// document but loads updater chunks from the
-    // custom app:// scheme; WebView's allowUniversalAccessFromFileURLs already
-    // relaxes cross-origin access, and the explicit header covers dynamic
-    // import() in updater hot-swaps and any webview where the flag is reset.
+    // Serve a data-dir file with the guessed MIME plus permissive CORS. WebView
+    // can load plain file:// from the app's own data dir natively
+    // (allowFileAccess); this is the backup for any request WebView defers here.
+    // allowUniversalAccessFromFileURLs already relaxes cross-origin access, and
+    // the explicit header covers dynamic import() in updater hot-swaps and any
+    // webview where the flag is reset.
     private fun serveFile(rel: String, file: File): WebResourceResponse {
         val headers = mapOf("Access-Control-Allow-Origin" to "*")
         return WebResourceResponse(
@@ -439,7 +438,11 @@ class WebViewActivity : AppCompatActivity() {
             put("data", data)
         }.toString()
 
-    private fun activeTree(): Uri? = treeUri
+    // The active content root: a user-picked SAF tree when set, otherwise the
+    // built-in docs tree (DocsProvider over Android/data/<pkg>/docs) — the
+    // mobile equivalent of the desktop default content_root, so the editor can
+    // save before any "Open Project" pick.
+    private fun activeTree(): Uri? = treeUri ?: Uri.parse(DocsProvider.ROOT_TREE_URI)
 
     private fun persistTree(uri: Uri) {
         treeUri = uri
@@ -486,14 +489,13 @@ class WebViewActivity : AppCompatActivity() {
             runOnUiThread { applyTheme(dark) }
         }
 
-        // The writable data-dir mount URL (trailing slash) under the custom
-        // app:// scheme. The page loads from the bundled android_asset shell,
-        // but Farm's lazy chunk loader must resolve chunks against this base so
-        // they reach the updater's downloaded copies. A custom scheme has no
-        // native WebView handler, so every request deterministically lands in
-        // shouldInterceptRequest, which serves the matching data-dir file.
+        // The writable data-dir mount URL (trailing slash, plain file:// base).
+        // Farm's lazy chunk loader resolves chunks against this base so they hit
+        // the updater's downloaded copies. WebView serves file:// from the app's
+        // own data dir natively, so the chunks load without needing
+        // shouldInterceptRequest to be consulted.
         @JavascriptInterface
-        fun editorMountUrl(): String = editorMountScheme
+        fun editorMountUrl(): String = dataEditorDir().toURI().toString()
 
         // ── Part C.1 W3 updater storage bridge ──
         // Mirrors the desktop saucer.exposed envelope ({ok, status?, error?,
@@ -553,7 +555,15 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun reload(): String {
-            runOnUiThread { webView.reload() }
+            runOnUiThread {
+                // After the updater's transfer, boot the downloaded index.html:
+                // its boot hash then matches the remote manifest, ending the
+                // reload loop. Falls back to the bundled shell on a virgin data
+                // dir.
+                val dataIndex = File(dataEditorDir(), "index.html")
+                if (dataIndex.isFile) webView.loadUrl(dataIndex.toURI().toString())
+                else webView.reload()
+            }
             return jsonOk()
         }
 
@@ -610,16 +620,20 @@ class WebViewActivity : AppCompatActivity() {
                 return jsonError(400, "Invalid path")
             }
             if (!DocumentsContract.isTreeUri(uri)) return jsonError(400, "Not a directory")
-            val held = contentResolver.persistedUriPermissions.any { it.uri == uri }
-            if (!held) {
-                try {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                } catch (e: Exception) {
-                    return jsonError(403, "No access to directory")
+            // The built-in docs tree needs no SAF grant (our own provider);
+            // anything else must still be held so a relaunch can re-open it.
+            if (uri.authority != DocsProvider.AUTHORITY) {
+                val held = contentResolver.persistedUriPermissions.any { it.uri == uri }
+                if (!held) {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                    } catch (e: Exception) {
+                        return jsonError(403, "No access to directory")
+                    }
                 }
             }
             persistTree(uri)

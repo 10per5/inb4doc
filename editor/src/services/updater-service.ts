@@ -115,19 +115,18 @@ function swapCssLink(url: string): void {
 
 // The manifest paths are site-absolute (e.g. "/assets/x.js"); resolve them
 // against the remote base for the fetch, and against the local origin for the
-// swap (the app:// data-dir copy the native bridge serves — Part C.1 W3).
+// swap (the file:// data-dir copy the native bridge serves — Part C.1 W3).
 function remoteUrl(path: string): string {
   if (/^https?:/.test(path)) return path
   return `${updateBase}${path.startsWith("/") ? "" : "/"}${path}`
 }
 function localUrlForChunk(name: string): string {
   // Android WebView (GuiMobile): the updater stores chunks in the writable data
-  // dir; the browser must fetch them through the custom app://editor/ scheme,
-  // which has no native WebView handler and so deterministically reaches
-  // shouldInterceptRequest (which serves the data-dir copy). Plain
-  // file:///android_asset/ URLs bypass shouldInterceptRequest and hold no lazy
-  // chunks in the thin APK. location.origin of a file:// page is unreliable, so
-  // the native side exposes the data-dir mount URL.
+  // dir; editorMountUrl() returns that dir's plain file:// base, so the swap
+  // resolves onto the data-dir copy (WebView loads file:// from the app's own
+  // data dir natively). Plain file:///android_asset/ URLs hold no lazy chunks
+  // in the thin APK. location.origin of a file:// page is unreliable, so the
+  // native side exposes the data-dir mount URL.
   if ((window as any).NativeBridge) {
     try {
       const nb = (window as any).NativeBridge
