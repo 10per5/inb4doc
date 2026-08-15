@@ -583,12 +583,13 @@ body.layout-mobile-shrink .book-layout {
   background: var(--color-accent-soft);
 }
 
-/* Tablet "+" FAB button in the quick-menu strip (the dock FAB is hidden at
- * tablet widths). Pins to the right edge of the strip and mirrors the FAB
- * accent. The controller shows it only at tablet width and hides it while the
- * focused block has its own contextual actions (list/table). [hidden] must be
- * explicit — the .edit-toolbar-group base rule sets display:flex, which would
- * otherwise beat the UA [hidden] rule. */
+/* "+" FAB button in the quick-menu strip (a dock FAB affordance for every
+ * mode; the dock FAB itself stays hidden at tablet widths). Pins to the right
+ * edge of the strip and mirrors the FAB accent. The controller shows it in
+ * every mode and hides it while the focused block has its own contextual
+ * actions (list/table). [hidden] must be explicit — the .edit-toolbar-group
+ * base rule sets display:flex, which would otherwise beat the UA [hidden]
+ * rule. */
 .edit-toolbar-group--add[hidden] {
   display: none;
 }
@@ -607,7 +608,7 @@ body.layout-mobile-shrink .book-layout {
   background: var(--color-accent);
 }
 
-/* The tablet "+" opens the shared add-block menu (same items as the dock FAB).
+/* The "+" opens the shared add-block menu (same items as the dock FAB).
  * The panel mounts in a fixed 0×0 anchor outside the strip, so hiding the
  * strip while the menu is open does not hide the panel. The Menu positions it
  * via applyPanelFlip (which sets the anchor's left/top); the shared

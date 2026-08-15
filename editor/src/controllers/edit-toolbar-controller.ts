@@ -22,7 +22,7 @@ import type { EditorController } from "@/controllers/editor-controller"
  *   does not count, e.g. right after pressing undo).
  * Undo/redo are always shown in both modes (disabled when the open file has
  * no history); the list/table groups appear contextually inside the bar.
- * Tablet only: a "+" FAB button on the strip opens the shared add-block menu
+ * A "+" FAB button on the strip opens the shared add-block menu in every mode
  * (the dock FAB is hidden at tablet widths). While that menu is open the strip
  * hides so the two never overlap.
  */
@@ -45,26 +45,22 @@ export default class EditToolbarController extends Controller {
   private followMode = false
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
-  private tablet = false
   private canUndo = false
   private addMenu: Menu | null = null
   private addMenuOpen = false
 
   connect(): void {
     this.element.innerHTML = renderEditToolbar({ icons: icons as Record<string, string> })
-    this.tablet = isTabletViewport()
-    if (this.tablet) {
-      this.addGroupTarget.hidden = false
-      this.addMenu = new Menu({
-        mountEl: this.fabMenuTarget,
-        triggerEl: this.addBtnTarget,
-        label: "Add",
-        items: () => menuRegistry.get("add-block")!,
-        panelClass: "edit-toolbar-fab-menu",
-        onOpen: () => this.setAddMenuOpen(true),
-        onClose: () => this.setAddMenuOpen(false),
-      })
-    }
+    this.addGroupTarget.hidden = false
+    this.addMenu = new Menu({
+      mountEl: this.fabMenuTarget,
+      triggerEl: this.addBtnTarget,
+      label: "Add",
+      items: () => menuRegistry.get("add-block")!,
+      panelClass: "edit-toolbar-fab-menu",
+      onOpen: () => this.setAddMenuOpen(true),
+      onClose: () => this.setAddMenuOpen(false),
+    })
     this.unsubs.push(
       appEvents.on(AppEvent.BlockContextChanged, ({ context }) => {
         this.currentType = context.type
@@ -96,10 +92,6 @@ export default class EditToolbarController extends Controller {
       this.element.classList.toggle("is-follow-mode", this.followMode)
       this.updateVisibility()
       this.positionPopover()
-      if (this.addMenu?.isOpen) {
-        this.addMenu.setAnchorRect(this.addMenuAnchor(), this.followMode)
-        this.addMenu.reposition()
-      }
     })
     // The follow-mode popover anchors to the focused block; document scroll
     // can carry the block out of the viewport. Capture-phase: scroll events
@@ -128,17 +120,18 @@ export default class EditToolbarController extends Controller {
     })
   }
 
-  // Tablet "+" FAB: toggle the shared add-block menu. Anchored at the button
-  // in dock mode; in follow mode at the strip's current position (the strip
-  // is already block-anchored, so the menu opens exactly where the popover
-  // was, then hides the popover — no overlap).
+  // "+" FAB: toggle the shared add-block menu. Anchored at the button in both
+  // modes (in follow mode the strip is the block-anchored popover, so the
+  // button rect points at the caret's block) — never at the 0×0 #edit-toolbar
+  // fixed anchor, which can still sit at the origin (left:0/top:0) until the
+  // async editor-context import positions it.
   openAddMenu(): void {
     if (!this.addMenu) return
     if (this.addMenu.isOpen) {
       this.addMenu.close()
       return
     }
-    this.addMenu.setAnchorRect(this.addMenuAnchor(), this.followMode)
+    this.addMenu.setAnchorRect(this.addBtnRect(), this.followMode)
     this.addMenu.openAndFocusFirst()
   }
 
@@ -154,6 +147,9 @@ export default class EditToolbarController extends Controller {
       ;(this.element as HTMLElement).style.left = ""
       ;(this.element as HTMLElement).style.top = ""
       this.setInViewport(true)
+      // The "+" button may be hidden while the add-block menu is open (the
+      // strip hides then); its rect is only meaningful when visible.
+      this.reanchorAddMenu(this.addBtnRect(), false)
       return
     }
     const milk = this.editor()?.getEditor()
@@ -174,6 +170,9 @@ export default class EditToolbarController extends Controller {
         positionAnchor: true,
         measureDisplay: "flex",
       })
+      // While the add-block menu is open the strip is hidden, so its "+"
+      // button has no rect — re-anchor the menu at the caret's block instead.
+      this.reanchorAddMenu(block, true)
     })
   }
 
@@ -218,9 +217,9 @@ export default class EditToolbarController extends Controller {
     const inTable = context.type === ActiveBlockType.Table
     this.listGroupTarget.hidden = !inList
     this.tableGroupTarget.hidden = !inTable
-    // Tablet "+" (FAB-in-quick-menu) hides while the focused block has its own
+    // The "+" FAB-in-quick-menu hides while the focused block has its own
     // contextual actions (list/table).
-    this.addGroupTarget.hidden = !this.tablet || inList || inTable
+    this.addGroupTarget.hidden = inList || inTable
     // Indent controls: always shown for a list item; increase indent is
     // disabled when the item can't sink (first child of its parent list).
     this.setVisible("tc-8", inList)
@@ -241,8 +240,8 @@ export default class EditToolbarController extends Controller {
 
   // Follow-mode popover visibility rule: follow only while the anchored block
   // is still on screen AND the popover has something useful — an enabled undo
-  // or contextual list/table actions (or the tablet "+"). A lone enabled redo
-  // (the post-undo state) never triggers the popover.
+  // or contextual list/table actions (or the "+" add-block button). A lone
+  // enabled redo (the post-undo state) never triggers the popover.
   private hasUsableActions(): boolean {
     return (
       this.canUndo ||
@@ -273,13 +272,23 @@ export default class EditToolbarController extends Controller {
     this.updateVisibility()
   }
 
-  // Anchor the add-block menu: follow mode → the 0×0 block-anchored #edit-toolbar
-  // itself (its left/top point at the caret's block); dock mode → the "+" button.
-  private addMenuAnchor(): FlipAnchorRect | null {
-    const el = this.followMode ? this.element : this.addBtnTarget
-    if (!el) return null
-    const rect = el.getBoundingClientRect()
+  // Anchor the add-block menu at the "+" button's rect. In follow mode the
+  // strip IS the block-anchored popover, so the button rect is already where
+  // the caret's block is; never fall back to the 0×0 #edit-toolbar fixed
+  // anchor, which can sit at left:0/top:0 until positionPopover's async
+  // editor-context import runs (that's what opened the menu at the top-left).
+  private addBtnRect(): FlipAnchorRect | null {
+    const rect = this.addBtnTarget.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return null
     return { left: rect.left, top: rect.top, bottom: rect.bottom, right: rect.right }
+  }
+
+  // While the add-block menu is open the strip hides, so the "+" button has no
+  // rect; positionPopover re-anchors the open menu at the caret's block then.
+  private reanchorAddMenu(rect: FlipAnchorRect | null, preferAbove: boolean): void {
+    if (!this.addMenu?.isOpen || !rect) return
+    this.addMenu.setAnchorRect(rect, preferAbove)
+    this.addMenu.reposition()
   }
 
   private setVisible(cmd: string, visible: boolean): void {
