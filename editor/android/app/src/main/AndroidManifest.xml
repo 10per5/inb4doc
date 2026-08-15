@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- Gates the built-in docs tree (DocsProvider) so only inb4doc can read
+         the default content dir; user-picked SAF projects are unaffected. -->
+    <permission
+        android:name="inb4doc.editor.docs.ACCESS"
+        android:protectionLevel="signature" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -24,5 +30,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name=".DocsProvider"
+            android:authorities="inb4doc.editor.docs"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="inb4doc.editor.docs.ACCESS" />
     </application>
 </manifest>

@@ -20,7 +20,7 @@ import type { SearchResult } from "@/providers/provider"
  * body and keep using the scheme via the inherited RemoteProvider fetch.
  */
 export class MountProvider extends RemoteProvider {
-  readonly name = ProviderType.Mount
+  readonly name: ProviderType = ProviderType.Mount
 
   protected url(path: string): string {
     return path

@@ -5,23 +5,59 @@ import { ProviderType } from "@/providers/index"
 import { stripFrontmatter } from "@/utils/frontmatter"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 import { sanitizeImageName } from "@/utils/sanitize"
+import { hasFunc, AppFunc } from "$/build/build-mode"
+import { pickProjectDirectory } from "@/bridge/native"
+import { SafProvider } from "@/providers/saf-provider"
 
 export class FileSystemProvider implements ContentProvider {
   readonly name = ProviderType.Filesystem
   private dirHandle: FileSystemDirectoryHandle | null = null
   private imageUrlCache = new Map<string, string>()
   private currentDir: string = ""
+  private safDelegate: SafProvider | null = null
+  private mobileInit = false
+
+  /** On Android (GuiMobile) there is no showDirectoryPicker; the FS provider
+   *  delegates to the SAF layer and its "pick" IS the native folder picker. */
+  private isMobile(): boolean {
+    return (
+      hasFunc(AppFunc.SafProvider) &&
+      typeof (window as any).showDirectoryPicker !== "function"
+    )
+  }
+
+  private delegate(): SafProvider {
+    if (!this.safDelegate) this.safDelegate = new SafProvider()
+    return this.safDelegate
+  }
+
+  /** On mobile, show the native SAF picker once (on first real use). */
+  private async ensurePicked(): Promise<void> {
+    if (this.mobileInit) return
+    this.mobileInit = true
+    const info = await pickProjectDirectory()
+    if (info) await this.delegate().setRoot(info.path)
+  }
 
   async isAvailable(): Promise<boolean> {
+    if (this.isMobile()) return true
     return typeof (window as any).showDirectoryPicker === "function"
   }
 
   async init(): Promise<void> {
+    if (this.isMobile()) {
+      await this.ensurePicked()
+      return
+    }
     if (this.dirHandle) return
     this.dirHandle = await (window as any).showDirectoryPicker()
   }
 
   async getTree(): Promise<TreeIndex> {
+    if (this.isMobile()) {
+      await this.ensurePicked()
+      return this.delegate().getTree()
+    }
     if (!this.dirHandle) await this.init()
     const paths: string[] = []
     const folderWeights: Record<string, number> = {}
@@ -64,6 +100,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async readFile(path: string): Promise<string | null> {
+    if (this.isMobile()) return this.delegate().readFile(path)
     if (!this.dirHandle) await this.init()
     const parts = path.split("/").filter(Boolean)
     let current: FileSystemDirectoryHandle = this.dirHandle!
@@ -81,6 +118,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async writeFile(path: string, content: string): Promise<void> {
+    if (this.isMobile()) return this.delegate().writeFile(path, content)
     if (!this.dirHandle) await this.init()
     const parts = path.split("/").filter(Boolean)
     let current: FileSystemDirectoryHandle = this.dirHandle!
@@ -95,6 +133,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async deleteFile(path: string): Promise<void> {
+    if (this.isMobile()) return this.delegate().deleteFile(path)
     if (!this.dirHandle) await this.init()
     const parts = path.split("/").filter(Boolean)
     const dir = parts.slice(0, -1).join("/")
@@ -109,6 +148,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async deleteFiles(paths: string[]): Promise<void> {
+    if (this.isMobile()) return this.delegate().deleteFiles(paths)
     const dirs = new Set<string>()
     for (const path of paths) {
       const parts = path.split("/").filter(Boolean)
@@ -161,6 +201,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async moveFile(from: string, to: string): Promise<void> {
+    if (this.isMobile()) return this.delegate().moveFile(from, to)
     const content = await this.readFile(from)
     if (content === null) throw new Error("Source not found")
     await this.writeFile(to, content)
@@ -168,6 +209,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async search(query: string): Promise<SearchResult[]> {
+    if (this.isMobile()) return this.delegate().search(query)
     if (!this.dirHandle) await this.init()
     return this.searchInDir(this.dirHandle!, "", query)
   }
@@ -204,6 +246,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async getServerTime(path: string): Promise<number | null> {
+    if (this.isMobile()) return this.delegate().getServerTime(path)
     if (!this.dirHandle) await this.init()
     const parts = path.split("/").filter(Boolean)
     let current: FileSystemDirectoryHandle = this.dirHandle!
@@ -231,6 +274,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async uploadImage(file: File, dir: string): Promise<string> {
+    if (this.isMobile()) return this.delegate().uploadImage(file, dir)
     const name = sanitizeImageName(file.name)
     const relPath = `image/${name}`
     const imageDir = await this.ensureImageDir(dir)
@@ -244,6 +288,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   resolveImageUrl(url: string): string | undefined {
+    if (this.isMobile()) return this.delegate().resolveImageUrl(url)
     const normalized = url.startsWith("/") ? url.slice(1) : url
     const exact = this.imageUrlCache.get(normalized)
     if (exact) return exact
@@ -254,6 +299,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async listImages(dir: string, refs?: boolean): Promise<ImageEntry[]> {
+    if (this.isMobile()) return this.delegate().listImages(dir, refs)
     this.currentDir = dir
     let imageDir: FileSystemDirectoryHandle
     try {
@@ -348,6 +394,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async deleteImage(name: string, dir: string): Promise<void> {
+    if (this.isMobile()) return this.delegate().deleteImage(name, dir)
     try {
       const imageDir = await this.ensureImageDir(dir)
       await imageDir.removeEntry(name)
@@ -355,6 +402,7 @@ export class FileSystemProvider implements ContentProvider {
   }
 
   async renameImage(name: string, dir: string, newName: string): Promise<string> {
+    if (this.isMobile()) return this.delegate().renameImage(name, dir, newName)
     const imageDir = await this.ensureImageDir(dir)
     const srcHandle = await imageDir.getFileHandle(name)
     const file = await srcHandle.getFile()
