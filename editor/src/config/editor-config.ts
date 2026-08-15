@@ -92,7 +92,7 @@ import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
-import { createImageTableDropPlugin } from "@/plugins/image-table-drop";
+import { createTableDragDropPlugin } from "@/plugins/table-drag-drop";
 import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
 import { imageStore } from "@/stores/image-store";
@@ -255,7 +255,7 @@ export async function createEditor(
           createImagePastePlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createLinkBoundaryPlugin(),
           createImageEditPlugin(),
-          createImageTableDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
+          createTableDragDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createKeymap(),
           createCodeBlockMovePlugin(),
           createBlockContextPlugin(),

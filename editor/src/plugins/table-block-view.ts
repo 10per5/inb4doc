@@ -13,7 +13,7 @@ const TABLE_DRAG_HANDLE =
  * over tables:
  *
  * - Drops INTO a table are handled by our own drop listener
- *   (`image-table-drop.ts`), which is why that direction works.
+ *   (`table-drag-drop.ts`), which is why that direction works.
  * - Drags STARTING inside a table never install `view.dragging`, and the
  *   component's root div additionally cancels `dragstart` with
  *   `preventDefault` — so nothing can be dragged OUT of a table. This is a
@@ -25,7 +25,7 @@ const TABLE_DRAG_HANDLE =
  * drag handles keep the tableBlock row/col move feature (stopEvent true),
  * while drags on cell content no longer get swallowed, so PM's machinery is
  * not the blocker for them. `drop`/`dragover` stay swallowed on purpose so
- * cell drops keep going through `image-table-drop.ts`.
+ * cell drops keep going through `table-drag-drop.ts`.
  *
  * The actual drag-OUT of an in-cell image is driven by the capture-phase
  * `dragstart` handler in `image-inline-resize.ts` (which stops the root

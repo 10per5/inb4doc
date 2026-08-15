@@ -164,12 +164,16 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
       currentW = size.w;
       currentH = size.h;
       inCell = view.editable && insideTableCell();
-      wrapper.classList.toggle("resizable", inCell);
+      // Resize handles show on every inline image (including ones dragged out
+      // of a table, which stay inline on the doc). `inCell` stays reserved for
+      // the drag-OUT seeding below: only in-cell images need the manual native
+      // drag, doc images use PM's normal drag-and-drop.
+      wrapper.classList.toggle("resizable", view.editable);
       if (naturalW && naturalH) applySize();
     };
 
     const startResize = (e: PointerEvent, dir: HandleDir) => {
-      if (!view.editable || !inCell) return;
+      if (!view.editable) return;
       e.preventDefault();
       e.stopPropagation();
       const handle = e.currentTarget as HTMLElement;
@@ -244,7 +248,7 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
      *   exactly what PM's own dragstart would have installed.
      *
      * The drop is then performed by PM's drop handler on the doc (outside the
-     * table) or by `image-table-drop.ts` when it lands in another cell.
+     * table) or by `table-drag-drop.ts` when it lands in another cell.
      */
     const onDragStart = (e: DragEvent) => {
       if (!inCell) return;

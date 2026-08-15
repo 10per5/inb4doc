@@ -159,6 +159,19 @@ bun --bun tsc --noEmit # TypeScript check
   - Serializes back to `> [!TYPE] ...` syntax
   - Supported types: note, tip, important, warning, caution, info, success, danger
 
+### Block / syntax feature requests — verify standard markdown first
+
+When a requested change involves **block or syntax behavior** (e.g. lists inside
+table cells, block content where the schema only allows inline, new rendering
+syntax), first check whether **standard markdown** (CommonMark + GFM, the
+formats the repo targets) supports it before implementing. GFM table cells, for
+example, only contain inline content — lists or other block nodes inside a cell
+are not valid standard markdown. If the request isn't supported by standard
+markdown, **warn the user** and confirm they still want it (or a non-standard
+extension) before writing code. Do not silently implement non-standard
+extensions, and do not work around the schema limit with lossy rewrites
+(flattening lists to literal bullet characters, etc.) without asking first.
+
 ## Clipboard / Paste
 
 - `@milkdown/plugin-clipboard` activated via `.use(clipboard)`
