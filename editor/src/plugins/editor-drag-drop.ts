@@ -1,12 +1,45 @@
-import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state"
+import type { Ctx } from "@milkdown/kit/ctx"
+import { dropIndicatorConfig } from "@milkdown/kit/plugin/cursor"
+import { NodeSelection, Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state"
 import { Fragment, Slice, type Node, type NodeType, type ResolvedPos } from "@milkdown/kit/prose/model"
 import { dropPoint } from "@milkdown/kit/prose/transform"
-import type { EditorView } from "@milkdown/kit/prose/view"
+import { Decoration, DecorationSet, type EditorView } from "@milkdown/kit/prose/view"
 import { encodeAlt } from "@/plugins/image-resize"
 
-export interface TableDragDropConfig {
+export interface EditorDragDropConfig {
   uploadImage?: (file: File) => Promise<string>
 }
+
+/**
+ * Configure Milkdown's drop indicator (the dropline overlay) for the dnd
+ * plugin. The class here is the handle the plugin toggles `drop-reject` on,
+ * so the indicator color is controlled from `dnd.css`, not from the editor
+ * config.
+ */
+export function configureDropIndicator(ctx: Ctx): void {
+  ctx.update(dropIndicatorConfig.key, () => ({
+    class: "inb4doc-drop-cursor",
+    width: 4,
+    color: false as const,
+  }))
+}
+
+/**
+ * The cell currently under a drag, held in plugin state. The drop-target
+ * styling is derived from this on every `updateState` via the plugin's
+ * `decorations` prop, which PM applies to the cell node's own DOM (the
+ * `td`/`th`) and re-applies after any view re-render or node-view re-mount —
+ * so the highlight can't be wiped the way imperative `classList` edits are.
+ */
+interface DropTarget {
+  from: number
+  to: number
+  rejected: boolean
+}
+
+const dropTargetKey = new PluginKey<DropTarget | null>(
+  "inb4doc-editor-drag-drop-target",
+)
 
 export function isInsideTableCell($pos: ResolvedPos): boolean {
   for (let d = $pos.depth; d > 0; d--) {
@@ -63,11 +96,31 @@ function tableCellAtPoint(
     }
     node = node.parentElement
   }
+  const nearest = nearestCellInBlock(view.dom, x, y)
+  if (!nearest) return null
+  const r = nearest.getBoundingClientRect()
+  const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
+  const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
+  return Math.hypot(dx, dy) <= 24 ? nearest : null
+}
+
+/**
+ * The `td`/`th` closest to the given point within `block`, without the 24px
+ * cap that `tableCellAtPoint` applies. Used when the pointer is on the table
+ * wrapper/borders/handles far from any cell: the rejected modifier still
+ * targets a real cell instead of the whole block.
+ */
+function nearestCellInBlock(
+  block: Element,
+  x: number,
+  y: number,
+): Element | null {
   let nearest: Element | null = null
   let nearestDist = Infinity
-  for (const cell of Array.from(view.dom.querySelectorAll("td, th"))) {
+  for (const cell of Array.from(block.querySelectorAll("td, th"))) {
     const r = cell.getBoundingClientRect()
-    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return cell
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+      return cell
     const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
     const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
     const dist = Math.hypot(dx, dy)
@@ -76,7 +129,7 @@ function tableCellAtPoint(
       nearest = cell
     }
   }
-  return nearestDist <= 24 ? nearest : null
+  return nearest
 }
 
 /**
@@ -89,6 +142,23 @@ function cellPosFromEvent(view: EditorView, event: DragEvent): number | null {
   const pos = view.posAtDOM(cell, 0)
   if (pos == null) return null
   return cellInsertPos(view.state.doc.resolve(pos))
+}
+
+/**
+ * Document range of the `table_cell`/`table_header` node that owns the given
+ * DOM cell. Used to target the node decoration for the drop-target highlight.
+ */
+function cellNodeRange(
+  view: EditorView,
+  cell: Element,
+): { from: number; to: number } | null {
+  const pos = view.posAtDOM(cell, 0)
+  if (pos == null) return null
+  const $pos = view.state.doc.resolve(pos)
+  const depth = cellDepthAt($pos)
+  if (depth < 0) return null
+  const node = $pos.node(depth)
+  return { from: $pos.before(depth), to: $pos.before(depth) + node.nodeSize }
 }
 
 /**
@@ -252,7 +322,7 @@ function isDropOverTable(view: EditorView, event: DragEvent): boolean {
   return tableCellAtPoint(view, event.clientX, event.clientY) != null
 }
 
-function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDropConfig) {
+function handleCellDrop(view: EditorView, event: DragEvent, config: EditorDragDropConfig) {
   if (!view.editable) return
   const dataTransfer = event.dataTransfer
   if (!dataTransfer) return
@@ -266,6 +336,16 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
   const insertPos = cellPosFromEvent(view, event)
   if (!overTable && insertPos == null) return
 
+  // Every drop that lands on the table — a cell, the wrapper, the borders, or
+  // (via geometry) the 24px band around it — is consumed here so it never
+  // reaches PM's default drop handling or the browser's native drop.
+  // Otherwise a dragged block that can't fit inside a cell (video, table,
+  // hr, unknown atom) falls through to PM, which inserts it at the
+  // cell/table boundary: orphaning the node view into the table wrapper or
+  // splitting the table in two.
+  event.preventDefault()
+  event.stopPropagation()
+
   // In-editor drag of content (an image, text, or anything else): flatten to
   // inline cell content and insert. `view.dragging` is only ever set when the
   // drag started outside the table (PM's dragstart never runs inside one),
@@ -273,8 +353,6 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
   const dragging = (view as any).dragging
   const slice = dragging?.slice
   if (slice && slice.content.size > 0) {
-    event.preventDefault()
-    event.stopPropagation()
     const inline = flattenToInline(slice.content, imageBlockType, imageType)
     if (!inline || insertPos == null) return
     const tr = view.state.tr
@@ -296,8 +374,6 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
   if (files.length && config.uploadImage) {
     for (const file of Array.from(files)) {
       if (file.type.startsWith("image/")) {
-        event.preventDefault()
-        event.stopPropagation()
         if (insertPos == null) return
         config.uploadImage(file).then((url) => {
           const node = imageType.create({ src: url, alt: "1.00", title: "" })
@@ -313,24 +389,40 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: TableDragDro
   }
 }
 
-export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
+export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
   return new Plugin({
-    key: new PluginKey("inb4doc-table-drag-drop"),
+    key: new PluginKey("inb4doc-editor-drag-drop"),
+    state: {
+      init: () => null,
+      apply: (tr, value) => {
+        const meta = tr.getMeta(dropTargetKey)
+        return meta === undefined ? value : meta
+      },
+    },
     view: (view) => {
       const onDrop = (event: DragEvent) => handleCellDrop(view, event, config)
       view.dom.addEventListener("drop", onDrop)
 
-      /**
-       * Drop-target feedback during a native drag over the table: highlight
-       * the cell under the pointer (accent) when the dragged content is
-       * accepted inside a cell, red when it isn't (video, table, hr, unknown
-       * atoms, non-image OS files). Mirrors the check in `handleCellDrop`.
-       */
-      let hoverCell: Element | null = null
-
-      const clearHover = () => {
-        hoverCell?.classList.remove("text-drop-target", "drop-reject")
-        hoverCell = null
+      const setDropTarget = (target: DropTarget | null) => {
+        // The reject signal lives on the dropline overlay (the drop indicator
+        // div milkdown appends to the editor's parent, styled in dnd.css).
+        // Toggling here avoids fighting PM over editor-DOM classes. The class
+        // is toggled unconditionally — the state guard only skips redundant
+        // dispatches, because the read-back is unreliable (getState returns
+        // `undefined` even right after `apply` stored a value), so guarding the
+        // toggle on it would leave a stale red dropline over a valid target.
+        const current = dropTargetKey.getState(view.state)
+        if (
+          current?.from !== target?.from ||
+          current?.to !== target?.to ||
+          current?.rejected !== target?.rejected
+        ) {
+          view.dispatch(view.state.tr.setMeta(dropTargetKey, target))
+        }
+        const dropline = view.dom.parentNode?.querySelector(
+          ".inb4doc-drop-cursor",
+        )
+        dropline?.classList.toggle("drop-reject", target?.rejected ?? false)
       }
 
       const contentIsCellValid = (event: DragEvent): boolean => {
@@ -354,16 +446,55 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
       const onDragOver = (event: DragEvent) => {
         if (!view.editable) return
         const cell = tableCellAtPoint(view, event.clientX, event.clientY)
-        if (hoverCell && hoverCell !== cell) clearHover()
-        if (!cell) return
-        cell.classList.add("text-drop-target")
-        cell.classList.toggle("drop-reject", !contentIsCellValid(event))
-        hoverCell = cell
+        if (!cell) {
+          // Pointer is on the table wrapper / borders / padding where no
+          // td/th sits. A border drop can never resolve a cell, so reject the
+          // nearest cell to give visible feedback instead of nothing.
+          const target = event.target as Element | null
+          const block =
+            target instanceof Element
+              ? target.closest(".milkdown-table-block")
+              : null
+          const nearest = block
+            ? nearestCellInBlock(block, event.clientX, event.clientY)
+            : null
+          if (nearest) {
+            const range = cellNodeRange(view, nearest)
+            if (range) {
+              setDropTarget({ ...range, rejected: true })
+              return
+            }
+          }
+          setDropTarget(null)
+          return
+        }
+        const range = cellNodeRange(view, cell)
+        if (range) {
+          setDropTarget({
+            ...range,
+            rejected: !contentIsCellValid(event),
+          })
+        }
+      }
+
+      const onDragLeave = (event: DragEvent) => {
+        // Native drag fires `dragleave` on every element-boundary crossing
+        // inside the table (th→td, cell→cell) and it bubbles to the view,
+        // wiping the drop-target highlight a frame after each `dragover`
+        // sets it — so the red/blue signal flickers off during a real drag.
+        // Only clear when the pointer is genuinely off the table region.
+        const el = view.dom.ownerDocument.elementFromPoint(
+          event.clientX,
+          event.clientY,
+        )
+        if (el instanceof Element && el.closest(".milkdown-table-block")) return
+        if (tableCellAtPoint(view, event.clientX, event.clientY)) return
+        setDropTarget(null)
       }
 
       view.dom.addEventListener("dragover", onDragOver)
-      view.dom.addEventListener("dragleave", clearHover)
-      view.dom.addEventListener("dragend", clearHover)
+      view.dom.addEventListener("dragleave", onDragLeave)
+      view.dom.addEventListener("dragend", () => setDropTarget(null))
 
       /**
        * Manual (pointer-based) drag of a text selection OUT of a table cell.
@@ -394,13 +525,12 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
         startY: number
         started: boolean
         ghost: HTMLDivElement | null
-        targetCell: Element | null
       } | null = null
 
       const endGesture = () => {
         if (!gesture) return
         gesture.ghost?.remove()
-        gesture.targetCell?.classList.remove("text-drop-target")
+        setDropTarget(null)
         gesture = null
         view.root.removeEventListener("pointermove", onPointerMove as EventListener)
         view.root.removeEventListener("pointerup", onPointerUp as EventListener)
@@ -450,7 +580,6 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
           startY: event.clientY,
           started: false,
           ghost: null,
-          targetCell: null,
         }
         view.root.addEventListener("pointermove", onPointerMove as EventListener)
         view.root.addEventListener("pointerup", onPointerUp as EventListener)
@@ -483,11 +612,8 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
           gesture.ghost.style.top = `${event.clientY + 14}px`
         }
         const cell = tableCellAtPoint(view, event.clientX, event.clientY)
-        if (gesture.targetCell !== cell) {
-          gesture.targetCell?.classList.remove("text-drop-target")
-          cell?.classList.add("text-drop-target")
-          gesture.targetCell = cell
-        }
+        const range = cell ? cellNodeRange(view, cell) : null
+        setDropTarget(range ? { ...range, rejected: false } : null)
       }
 
       const onPointerUp = (event: PointerEvent) => {
@@ -513,16 +639,86 @@ export function createTableDragDropPlugin(config: TableDragDropConfig = {}) {
         update: () => {},
         destroy: () => {
           endGesture()
-          clearHover()
+          setDropTarget(null)
           view.dom.removeEventListener("drop", onDrop)
           view.dom.removeEventListener("dragover", onDragOver)
-          view.dom.removeEventListener("dragleave", clearHover)
-          view.dom.removeEventListener("dragend", clearHover)
+          view.dom.removeEventListener("dragleave", onDragLeave)
+          view.dom.removeEventListener("dragend", () => setDropTarget(null))
           view.dom.removeEventListener("pointerdown", onPointerDown, true)
         },
       }
     },
     props: {
+      handleDOMEvents: {
+        // PM seeds `view.dragging` at dragstart but only attaches a
+        // `node.replace` deleter when the drag began on a node
+        // (NodeSelection). For a plain text-selection drag `view.dragging.node`
+        // stays null, so PM's drop handler falls back to `tr.deleteSelection()`
+        // (deletes nothing at the target) and the move silently becomes a
+        // copy. Attach the source-range deleter here so text drags move
+        // instead. PM's `dragstart` never runs for drags that START inside a
+        // table (the tableBlock `stopEvent` swallows them) — those are handled
+        // by the pointer gesture below.
+        dragstart(view, event) {
+          const dragging = (view as any).dragging
+          if (dragging?.move && !dragging.node) {
+            const { selection, doc } = view.state
+            let from: number
+            let to: number
+            if (selection instanceof NodeSelection) {
+              from = selection.from
+              to = selection.to
+            } else {
+              const $from = doc.resolve(selection.from)
+              const depth = Math.max(1, $from.depth)
+              from = $from.before(depth)
+              to = from + $from.node(depth).nodeSize
+            }
+            dragging.node = {
+              replace: (tr: any) => {
+                const mappedFrom = tr.mapping.map(from)
+                const mappedTo = tr.mapping.map(to)
+                tr.delete(mappedFrom, mappedTo)
+              },
+            }
+          }
+          return false
+        },
+      },
+      // The drop-target highlight, derived from plugin state on every
+      // `updateState`. PM applies the decoration's class to the cell node's
+      // own DOM (the `td`/`th`) and re-applies it after any re-render or
+      // node-view re-mount, which is why the accent signal survives a real
+      // drag in a way that ad-hoc `classList` edits never could. Rejected
+      // drops paint nothing here — the dropline overlay turns red instead
+      // (see `setDropTarget`).
+      decorations: (state) => {
+        const target = dropTargetKey.getState(state)
+        if (!target || target.rejected) return DecorationSet.empty
+        const cell = state.doc.nodeAt(target.from)
+        if (!cell) return DecorationSet.empty
+        return DecorationSet.create(state.doc, [
+          Decoration.node(target.from, target.to, {
+            class: "text-drop-target",
+          }),
+        ])
+      },
+      // Drops that land on the table (a cell, the wrapper, the borders, or
+      // within the geometry band around it) must never reach PM's default
+      // handling. PM's own drop listener is registered on `view.dom` before
+      // this plugin's, so for drops whose target sits just OUTSIDE the
+      // `.milkdown-table-block` wrapper (the "split the table" case) this
+      // `handleDrop` prop is the only hook that runs before PM inserts the
+      // dragged block at the table boundary. Returns true → PM consumes the
+      // event; the view.dom `drop` listener above then does the real cell
+      // insertion (or rejects when the content can't fit in a cell).
+      handleDrop: (view, event) => {
+        if (!view.editable) return false
+        if (!isDropOverTable(view, event)) return false
+        event.preventDefault()
+        event.stopPropagation()
+        return true
+      },
       handlePaste: (view, event, slice) => {
         if (!event.clipboardData) return false
         if (!isInsideTableCell(view.state.selection.$from)) return false

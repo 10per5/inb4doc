@@ -4,7 +4,7 @@ import { TextSelection, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/p
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList, sinkListItem } from "prosemirror-schema-list"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { isInsideTableCell } from "@/plugins/table-drag-drop"
+import { isInsideTableCell } from "@/plugins/editor-drag-drop"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
 // after Home), Milkdown binds both Backspace and Delete to `liftFirstListItem`

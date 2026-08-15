@@ -16,7 +16,6 @@ import {
 import { commonmark as _commonmark, wrapInHeadingInputRule, headingKeymap, inlineCodeInputRule } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
 import { nord } from "@milkdown/theme-nord";
-import { EditorState, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state";
 import { parserCtx, remarkStringifyOptionsCtx } from "@milkdown/core";
 import { clipboard } from "@milkdown/plugin-clipboard";
 import { history } from "@milkdown/kit/plugin/history";
@@ -25,8 +24,7 @@ import {
   configureLinkTooltip,
   linkTooltipConfig,
 } from "@milkdown/kit/component/link-tooltip";
-import { cursor, dropIndicatorConfig } from "@milkdown/kit/plugin/cursor";
-import { $prose } from "@milkdown/kit/utils";
+import { cursor } from "@milkdown/kit/plugin/cursor";
 import { fixedHeadingInputRule } from "@/plugins/heading-input-rule";
 
 const commonmark = _commonmark.filter(
@@ -92,7 +90,7 @@ import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
-import { createTableDragDropPlugin } from "@/plugins/table-drag-drop";
+import { createEditorDragDropPlugin, configureDropIndicator } from "@/plugins/editor-drag-drop";
 import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
 import { imageStore } from "@/stores/image-store";
@@ -164,11 +162,7 @@ export async function createEditor(
         DowngradeHeading: { ...prev.DowngradeHeading, shortcuts: [] },
       }));
 
-      ctx.update(dropIndicatorConfig.key, () => ({
-        class: "inb4doc-drop-cursor",
-        width: 4,
-        color: false as const,
-      }));
+      configureDropIndicator(ctx);
 
       ctx.update(remarkStringifyOptionsCtx, (prev) => ({
         ...prev,
@@ -255,7 +249,7 @@ export async function createEditor(
           createImagePastePlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createLinkBoundaryPlugin(),
           createImageEditPlugin(),
-          createTableDragDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
+          createEditorDragDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createKeymap(),
           createCodeBlockMovePlugin(),
           createBlockContextPlugin(),
@@ -303,43 +297,6 @@ export async function createEditor(
     .use(mathBlockInputRule)
     .use(blockLatexSchema)
     .use(toggleLatexCommand)
-    .use(
-      $prose(() => {
-        const dragDropPlugin = new Plugin({
-          key: new PluginKey("inb4doc-drag-drop"),
-          props: {
-            handleDOMEvents: {
-              dragstart(view, event) {
-                  const v = view as any;
-                  if (v.draggable?.move) {
-                      const { selection, doc } = view.state;
-                      let from: number, to: number;
-                      if (selection instanceof NodeSelection) {
-                          from = selection.from;
-                          to = selection.to;
-                      } else {
-                          const $from = doc.resolve(selection.from);
-                          const depth = Math.max(1, $from.depth);
-                          from = $from.before(depth);
-                          to = from + $from.node(depth).nodeSize;
-                      }
-
-                      (v.draggable as any).node = {
-                          replace: (tr: any) => {
-                              const mappedFrom = tr.mapping.map(from);
-                              const mappedTo = tr.mapping.map(to);
-                              tr.delete(mappedFrom, mappedTo);
-                          },
-                      };
-                  }
-                  return false;
-              },
-            },
-          },
-        });
-        return dragDropPlugin;
-      }),
-    )
     .create();
 
   editor.action((ctx) => {

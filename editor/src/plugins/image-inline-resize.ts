@@ -248,7 +248,7 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
      *   exactly what PM's own dragstart would have installed.
      *
      * The drop is then performed by PM's drop handler on the doc (outside the
-     * table) or by `table-drag-drop.ts` when it lands in another cell.
+     * table) or by `editor-drag-drop.ts` when it lands in another cell.
      */
     const onDragStart = (e: DragEvent) => {
       if (!inCell) return;

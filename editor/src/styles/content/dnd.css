@@ -1,0 +1,65 @@
+/* Drag-and-drop feedback shared by the editor drag-drop plugin and the
+ * table-block row/col drag handles. */
+
+/* Ghost shown while dragging a text selection out of a table cell. */
+.text-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 4px 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-text-primary, inherit);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  opacity: 0.85;
+}
+
+/* Dropline overlay: the drop indicator milkdown renders as a fixed div while
+ * something is dragged over the editor. The dnd plugin toggles `drop-reject`
+ * on it (see editor-drag-drop.ts `setDropTarget`) so a rejected drop over a
+ * table shows a red line instead of a red cell outline. */
+.inb4doc-drop-cursor {
+  position: fixed;
+  pointer-events: none;
+  background-color: var(--color-accent);
+  opacity: 0.5;
+  transition: all 0.2s;
+  z-index: 300;
+}
+
+.inb4doc-drop-cursor.drop-reject {
+  background-color: var(--color-error, #bf616a);
+  opacity: 0.8;
+}
+
+/* Cell under the pointer during a drag: accent when the content may land in
+ * the cell. Rejected drops (video, table, hr, unknown atoms, non-image
+ * files) are signalled by the dropline turning red instead of an outline. */
+.milkdown-table-block td.text-drop-target,
+.milkdown-table-block th.text-drop-target {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* Row/col drag preview shown while dragging a table row or column. */
+.milkdown-table-block .drag-preview {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0.6;
+  background: var(--color-bg-primary);
+  border: 1px dashed var(--color-accent);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.milkdown-table-block .drag-preview[data-show="false"] {
+  display: none;
+}
