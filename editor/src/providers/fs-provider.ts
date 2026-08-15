@@ -18,12 +18,12 @@ export class FileSystemProvider implements ContentProvider {
   private mobileInit = false
 
   /** On Android (GuiMobile) there is no showDirectoryPicker; the FS provider
-   *  delegates to the SAF layer and its "pick" IS the native folder picker. */
+   *  delegates to the SAF layer and its "pick" IS the native folder picker.
+   *  Gate on the build flag alone — modern Android WebView Chromium exposes a
+   *  showDirectoryPicker stub, so sniffing the API misroutes Local Files into
+   *  the desktop path and never asks for a directory. */
   private isMobile(): boolean {
-    return (
-      hasFunc(AppFunc.SafProvider) &&
-      typeof (window as any).showDirectoryPicker !== "function"
-    )
+    return hasFunc(AppFunc.SafProvider)
   }
 
   private delegate(): SafProvider {
@@ -31,12 +31,16 @@ export class FileSystemProvider implements ContentProvider {
     return this.safDelegate
   }
 
-  /** On mobile, show the native SAF picker once (on first real use). */
+  /** On mobile, show the native SAF picker once (on first real use). A
+   *  cancelled pick (or a bridge error) leaves the latch open so the next
+   *  "Local Files" tap asks again instead of silently latching shut. */
   private async ensurePicked(): Promise<void> {
     if (this.mobileInit) return
-    this.mobileInit = true
     const info = await pickProjectDirectory()
-    if (info) await this.delegate().setRoot(info.path)
+    if (info) {
+      this.mobileInit = true
+      await this.delegate().setRoot(info.path)
+    }
   }
 
   async isAvailable(): Promise<boolean> {
