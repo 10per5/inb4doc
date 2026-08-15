@@ -87,8 +87,10 @@ function tableCellAtPoint(
   view: EditorView,
   x: number,
   y: number,
+  ignore?: Element | null,
 ): Element | null {
   const el = view.dom.ownerDocument.elementFromPoint(x, y) as Element | null
+  if (el && ignore && (el === ignore || ignore.contains(el))) return null
   let node = el
   while (node && node !== view.dom) {
     if (node.tagName === "TD" || node.tagName === "TH") {
@@ -319,7 +321,22 @@ function isDropOverTable(view: EditorView, event: DragEvent): boolean {
   if (target instanceof Element && target.closest(".milkdown-table-block")) {
     return true
   }
-  return tableCellAtPoint(view, event.clientX, event.clientY) != null
+  if (tableCellAtPoint(view, event.clientX, event.clientY)) return true
+  // The DOM hit-test can miss the table during a drag: the pointer sits over
+  // the dragged element itself (its DOM node stays under the cursor), so the
+  // target isn't in the table block and no td/th is within the 24px band. Such
+  // a drop would fall through to PM's default handler, which inserts the
+  // dragged block at the table boundary and splits the table in two. Resolve
+  // the drop against the doc position instead: if it lands inside a table,
+  // the plugin owns it.
+  const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
+  if (!coords) return false
+  const $pos = view.state.doc.resolve(coords.pos)
+  return (
+    cellDepthAt($pos) >= 0 ||
+    $pos.parent.type.name === "table" ||
+    $pos.parent.type.name === "table_row"
+  )
 }
 
 function handleCellDrop(view: EditorView, event: DragEvent, config: EditorDragDropConfig) {
@@ -335,6 +352,7 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: EditorDragDr
   const overTable = isDropOverTable(view, event)
   const insertPos = cellPosFromEvent(view, event)
   if (!overTable && insertPos == null) return
+  const dragging = (view as any).dragging
 
   // Every drop that lands on the table — a cell, the wrapper, the borders, or
   // (via geometry) the 24px band around it — is consumed here so it never
@@ -350,7 +368,6 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: EditorDragDr
   // inline cell content and insert. `view.dragging` is only ever set when the
   // drag started outside the table (PM's dragstart never runs inside one),
   // which is exactly the case that reaches here with a usable slice.
-  const dragging = (view as any).dragging
   const slice = dragging?.slice
   if (slice && slice.content.size > 0) {
     const inline = flattenToInline(slice.content, imageBlockType, imageType)
@@ -390,6 +407,13 @@ function handleCellDrop(view: EditorView, event: DragEvent, config: EditorDragDr
 }
 
 export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
+  // The DOM element the native drag started on. While the pointer hovers over
+  // it, the position is over the dragged content, not a drop target: the
+  // geometry fallback would otherwise resolve a nearby table cell (the source
+  // can sit inside the table's DOM after a previous drop) and wrongly paint
+  // the table red. One editor = one view, so a single shared binding is fine.
+  let dragSource: Element | null = null
+
   return new Plugin({
     key: new PluginKey("inb4doc-editor-drag-drop"),
     state: {
@@ -400,7 +424,10 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
       },
     },
     view: (view) => {
-      const onDrop = (event: DragEvent) => handleCellDrop(view, event, config)
+      const onDrop = (event: DragEvent) => {
+        dragSource = null
+        handleCellDrop(view, event, config)
+      }
       view.dom.addEventListener("drop", onDrop)
 
       const setDropTarget = (target: DropTarget | null) => {
@@ -445,7 +472,19 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
 
       const onDragOver = (event: DragEvent) => {
         if (!view.editable) return
-        const cell = tableCellAtPoint(view, event.clientX, event.clientY)
+        if (
+          dragSource &&
+          event.target instanceof Element &&
+          (event.target === dragSource ||
+            dragSource.contains(event.target) ||
+            event.target.contains(dragSource))
+        ) {
+          setDropTarget(null)
+          return
+        }
+        const x = event.clientX
+        const y = event.clientY
+        const cell = tableCellAtPoint(view, x, y)
         if (!cell) {
           // Pointer is on the table wrapper / borders / padding where no
           // td/th sits. A border drop can never resolve a cell, so reject the
@@ -455,8 +494,9 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
             target instanceof Element
               ? target.closest(".milkdown-table-block")
               : null
+          if (block) event.preventDefault()
           const nearest = block
-            ? nearestCellInBlock(block, event.clientX, event.clientY)
+            ? nearestCellInBlock(block, x, y)
             : null
           if (nearest) {
             const range = cellNodeRange(view, nearest)
@@ -470,10 +510,14 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
         }
         const range = cellNodeRange(view, cell)
         if (range) {
-          setDropTarget({
-            ...range,
-            rejected: !contentIsCellValid(event),
-          })
+          // The tableBlock's `stopEvent` swallows every drag/drop event, so
+          // PM's `dragover` handler never runs over a table and nothing else
+          // cancels the event — the browser then treats the table as a no-drop
+          // zone and never fires `drop`. Cancel it here so the drop reaches
+          // `handleCellDrop` (which consumes it before PM or the browser can).
+          event.preventDefault()
+          const rejected = !contentIsCellValid(event)
+          setDropTarget({ ...range, rejected })
         }
       }
 
@@ -488,13 +532,51 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
           event.clientY,
         )
         if (el instanceof Element && el.closest(".milkdown-table-block")) return
-        if (tableCellAtPoint(view, event.clientX, event.clientY)) return
+        if (tableCellAtPoint(view, event.clientX, event.clientY, dragSource))
+          return
         setDropTarget(null)
       }
 
+      const onDragEnd = () => {
+        dragSource = null
+        setDropTarget(null)
+      }
       view.dom.addEventListener("dragover", onDragOver)
       view.dom.addEventListener("dragleave", onDragLeave)
-      view.dom.addEventListener("dragend", () => setDropTarget(null))
+      view.dom.addEventListener("dragend", onDragEnd)
+
+      // Milkdown's tableBlock is a native drop dead-zone: its root div
+      // preventDefaults every `dragover` (component.tsx) and `stopEvent`
+      // swallows all drag/drop events, so a stray serialized drag-copy of the
+      // dragged node (recognizable by `data-pm-slice`, which only PM's
+      // `serializeForClipboard` writes) can get re-mounted into
+      // `<table class="children">`. The node view's `ignoreMutation` ignores
+      // anything outside its tbody, so it's never reconciled and the DOM stays
+      // corrupted. Remove such strays whenever they appear — they are never a
+      // legitimate doc-rendered node (a live node view never carries
+      // `data-pm-slice`), so removal can't desync the document.
+      const sweepTableCorruption = () => {
+        if (view.isDestroyed) return
+        const strays = Array.from(
+          view.dom.querySelectorAll<HTMLElement>(
+            ".milkdown-table-block [data-pm-slice]",
+          ),
+        )
+        for (const stray of strays) {
+          stray.remove()
+        }
+      }
+      const corruptionObserver = new MutationObserver((records) => {
+        if (view.isDestroyed) return
+        const addedPmSlice = records.some((r) =>
+          Array.from(r.addedNodes).some(
+            (n) => n instanceof Element && n.matches("[data-pm-slice]"),
+          ),
+        )
+        if (!(view as any).dragging && !dragSource && !addedPmSlice) return
+        sweepTableCorruption()
+      })
+      corruptionObserver.observe(view.dom, { childList: true, subtree: true })
 
       /**
        * Manual (pointer-based) drag of a text selection OUT of a table cell.
@@ -636,14 +718,17 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
       view.dom.addEventListener("pointerdown", onPointerDown, true)
 
       return {
-        update: () => {},
+        update: () => {
+          sweepTableCorruption()
+        },
         destroy: () => {
+          corruptionObserver.disconnect()
           endGesture()
           setDropTarget(null)
           view.dom.removeEventListener("drop", onDrop)
           view.dom.removeEventListener("dragover", onDragOver)
           view.dom.removeEventListener("dragleave", onDragLeave)
-          view.dom.removeEventListener("dragend", () => setDropTarget(null))
+          view.dom.removeEventListener("dragend", onDragEnd)
           view.dom.removeEventListener("pointerdown", onPointerDown, true)
         },
       }
@@ -660,6 +745,7 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
         // table (the tableBlock `stopEvent` swallows them) — those are handled
         // by the pointer gesture below.
         dragstart(view, event) {
+          if (event.target instanceof Element) dragSource = event.target
           const dragging = (view as any).dragging
           if (dragging?.move && !dragging.node) {
             const { selection, doc } = view.state

@@ -10,6 +10,71 @@
 - **Stop early on rabbit holes.** During investigation, don't keep drilling into `node_modules` sources or tracing dependency internals hoping the answer surfaces. If a few targeted reads don't resolve it, stop and ask the user for input — many issues resolve faster with a web search (docs, issue trackers) or a fresh git clone than with local source spelunking.
 - **Verify CSS custom property names against the declarations before using them.** Color/semantic vars (`--color-*`, `--font-size-*`) are declared in `src/styles/foundation/base.css` (`:root` block, Nord theme; dark mode in the `:root[data-theme="dark"]` block). Layout/spacing vars (`--sidebar-width`, `--aside-width`, `--editor-padding-*`, visibility) live in `lib/style/layout.css`. Do not invent var names — e.g. `--color-danger` does not exist; the error/destructive color is `--color-error` (using a non-existent var silently falls back to the property's initial value, producing wrong colors with no build error). When in doubt, grep the declaration file for the exact name before writing `var(--...)`.
 
+## Milkdown Design Faults (worked around — revisit on a ProseKit migration)
+
+Milkdown has architectural faults that leak into app code as workarounds.
+They were debugged in Aug 2026 (drag/drop around tables was the trigger).
+Most trace back to a single root cause — `@milkdown/components` mounts Vue
+apps **inside** ProseMirror node views (`table-block/view/component.tsx` +
+`view.ts`), giving a second framework ownership of node-view DOM that PM
+normally manages. The faults are Milkdown's, not ProseMirror's, and the user
+has verified they do **not** reproduce on ProseKit (no framework in node
+views; smaller bundle) — the migration candidate to keep in mind. Before
+changing any workaround, re-read the surrounding code comments and confirm
+the underlying fault first; these are deliberately defensive.
+
+1. **Vue apps mounted inside ProseMirror node views.** `createApp(...).mount(dom)`
+   inside node views (table-block) puts Vue in the bundle and hands node-view
+   DOM over to a second framework outside PM's control. Almost every fault
+   below is a downstream effect. Also the single biggest contributor to the
+   1.3 MB `app.js` (see Bundle Analysis).
+
+2. **`stopEvent` returns `true` for all `drag*`/`drop` events**
+   (`view.ts:115`). PM's drag/drop handlers are skipped over tables, so
+   nothing cancels `dragover` → the browser treats tables as a no-drop zone
+   and never dispatches `drop`. Workaround: `onDragOver` in
+   `editor-drag-drop.ts` calls `preventDefault()` over the table region so
+   the drop lands on the plugin's own `view.dom` listener (`handleCellDrop`).
+
+3. **Vue component root `preventDefault()`s drag events** (`component.tsx`
+   `onDragover`/`onDragleave`/`onDragstart`). Tables are a native drop
+   dead-zone and a native `dragstart` from inside a cell is impossible.
+   Workaround: a pointer-gesture fallback (ghost + `pointerup` move
+   transaction) in `editor-drag-drop.ts`.
+
+4. **`ignoreMutation` ignores every mutation outside the tbody `contentDOM`**
+   (`view.ts:133-144`). DOM corruption inside the table wrapper is silently
+   accepted — PM never reconciles it, no error, no doc/markdown change, so
+   visual desync persists invisibly. Example seen: a serialized drag-copy of
+   a dragged block (the only DOM that ever carries `data-pm-slice`, written
+   solely by PM's `serializeForClipboard`) got mounted into
+   `<table class="children">` and stayed. Workaround: a `MutationObserver`
+   plus an `update`-hook sweep in `editor-drag-drop.ts` removes any
+   `[data-pm-slice]` element inside `.milkdown-table-block`. A live node view
+   never carries `data-pm-slice`, so removal can't desync the doc.
+
+5. **Markdown goes through a remark/unified (MDAST) AST, not PM-native
+   parsing.** Parsing and serialization are milkdown AST transforms, and
+   string-output behavior leaks into app code as workaround layers: the `{{`
+   shortcode text-handler override in `editor_controller.ts`, the `$remark`
+   race-condition handling in `shortcode.ts`. Consequence: "impossible"
+   markdown shapes can't be fixed with a clean schema/parser change — they
+   need override layers keyed to milkdown's transform pipeline.
+
+6. **The drop indicator is a sibling overlay appended to
+   `view.dom.parentNode`**, themed by a config class
+   (`dropIndicatorConfig` → `.inb4doc-drop-cursor`), not a PM decoration.
+   Its state must be toggled directly on that DOM (`.drop-reject`), which is
+   also why state read-back can't drive it (see next).
+
+7. **Plugin-state read-back gotcha (PM, not Milkdown):** `PluginKey.getState()`
+   read right after `apply` stored a value can return `undefined` when the
+   plugin's key wiring doesn't line up (seen with `dropTargetKey`). Don't
+   guard imperative DOM toggles on state equality.
+
+On a ProseKit migration, most of these workarounds can likely be deleted and
+native behavior restored — but verify each fault's behavior first.
+
 ## Content State Invariants (metadata / content-loss regressions)
 
 File content is stored **body-only**; frontmatter lives separately (`Page.frontmatter`, pending edits carry a `frontmatterPatch`). Several subtle invariants prevent metadata/content loss when a page is re-opened, flushed, or shown in the pending-changes dialog. Breaking any of them resurfaces the "metadata shows as discarded" / "body cleared on re-open" regression.
