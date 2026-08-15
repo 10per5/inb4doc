@@ -4,6 +4,8 @@ import { ToolbarCommand } from "@/config/enums"
 import { ActiveBlockType, type ActiveBlockContext } from "@/config/enums/block-context"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
+import { Menu } from "@/components/ui/menu"
+import { menuRegistry } from "@/config/menu-definitions"
 import { trackKeyboardOffset, isMobileViewport, isTabletViewport, isMobileOrTabletUA } from "@/utils/mobile"
 import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/popover"
 import type { EditorController } from "@/controllers/editor-controller"
@@ -15,17 +17,25 @@ import type { EditorController } from "@/controllers/editor-controller"
  *   in, so the actions stay next to where you type. The `.is-follow-mode`
  *   class on #edit-toolbar switches the CSS; this controller positions the
  *   0×0 fixed anchor via applyPanelFlip and hides the popover once the block
- *   scrolls out of the viewport.
+ *   scrolls out of the viewport — or once it has nothing useful to offer
+ *   (undo disabled AND no contextual list/table actions; a lone enabled redo
+ *   does not count, e.g. right after pressing undo).
  * Undo/redo are always shown in both modes (disabled when the open file has
  * no history); the list/table groups appear contextually inside the bar.
+ * Tablet only: a "+" FAB button on the strip opens the shared add-block menu
+ * (the dock FAB is hidden at tablet widths). While that menu is open the strip
+ * hides so the two never overlap.
  */
 export default class EditToolbarController extends Controller {
-  static targets = ["btn", "listGroup", "tableGroup"]
+  static targets = ["btn", "listGroup", "tableGroup", "addGroup", "addBtn", "fabMenu"]
   static outlets = ["editor"]
 
   declare readonly btnTargets: HTMLElement[]
   declare readonly listGroupTarget: HTMLElement
   declare readonly tableGroupTarget: HTMLElement
+  declare readonly addGroupTarget: HTMLElement
+  declare readonly addBtnTarget: HTMLElement
+  declare readonly fabMenuTarget: HTMLElement
   declare readonly editorOutletElement: Element
   declare readonly hasEditorOutlet: boolean
 
@@ -35,9 +45,26 @@ export default class EditToolbarController extends Controller {
   private followMode = false
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
+  private tablet = false
+  private canUndo = false
+  private addMenu: Menu | null = null
+  private addMenuOpen = false
 
   connect(): void {
     this.element.innerHTML = renderEditToolbar({ icons: icons as Record<string, string> })
+    this.tablet = isTabletViewport()
+    if (this.tablet) {
+      this.addGroupTarget.hidden = false
+      this.addMenu = new Menu({
+        mountEl: this.fabMenuTarget,
+        triggerEl: this.addBtnTarget,
+        label: "Add",
+        items: () => menuRegistry.get("add-block")!,
+        panelClass: "edit-toolbar-fab-menu",
+        onOpen: () => this.setAddMenuOpen(true),
+        onClose: () => this.setAddMenuOpen(false),
+      })
+    }
     this.unsubs.push(
       appEvents.on(AppEvent.BlockContextChanged, ({ context }) => {
         this.currentType = context.type
@@ -47,12 +74,15 @@ export default class EditToolbarController extends Controller {
       }),
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.viewIsEditor = view === "editor"
+        this.addMenu?.close()
         this.updateVisibility()
         this.positionPopover()
       }),
       appEvents.on(AppEvent.HistoryChanged, ({ canUndo, canRedo }) => {
+        this.canUndo = canUndo
         this.setDisabled("tc-19", !canUndo)
         this.setDisabled("tc-20", !canRedo)
+        this.updateVisibility()
       }),
     )
     // On-screen keyboard open → follow mode (the caret sits just above the
@@ -66,6 +96,10 @@ export default class EditToolbarController extends Controller {
       this.element.classList.toggle("is-follow-mode", this.followMode)
       this.updateVisibility()
       this.positionPopover()
+      if (this.addMenu?.isOpen) {
+        this.addMenu.setAnchorRect(this.addMenuAnchor(), this.followMode)
+        this.addMenu.reposition()
+      }
     })
     // The follow-mode popover anchors to the focused block; document scroll
     // can carry the block out of the viewport. Capture-phase: scroll events
@@ -81,6 +115,8 @@ export default class EditToolbarController extends Controller {
     this.stopKeyboardTrack = null
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
+    this.addMenu?.destroy()
+    this.addMenu = null
   }
 
   exec(event: Event): void {
@@ -90,6 +126,20 @@ export default class EditToolbarController extends Controller {
     appEvents.emit(AppEvent.ToolbarCommandExec, {
       command: Number(cmd.replace("tc-", "")) as ToolbarCommand,
     })
+  }
+
+  // Tablet "+" FAB: toggle the shared add-block menu. Anchored at the button
+  // in dock mode; in follow mode at the strip's current position (the strip
+  // is already block-anchored, so the menu opens exactly where the popover
+  // was, then hides the popover — no overlap).
+  openAddMenu(): void {
+    if (!this.addMenu) return
+    if (this.addMenu.isOpen) {
+      this.addMenu.close()
+      return
+    }
+    this.addMenu.setAnchorRect(this.addMenuAnchor(), this.followMode)
+    this.addMenu.openAndFocusFirst()
   }
 
   // Default mode is a plain bottom strip — nothing to position. Follow mode
@@ -168,6 +218,9 @@ export default class EditToolbarController extends Controller {
     const inTable = context.type === ActiveBlockType.Table
     this.listGroupTarget.hidden = !inList
     this.tableGroupTarget.hidden = !inTable
+    // Tablet "+" (FAB-in-quick-menu) hides while the focused block has its own
+    // contextual actions (list/table).
+    this.addGroupTarget.hidden = !this.tablet || inList || inTable
     // Indent controls: always shown for a list item; increase indent is
     // disabled when the item can't sink (first child of its parent list).
     this.setVisible("tc-8", inList)
@@ -186,13 +239,47 @@ export default class EditToolbarController extends Controller {
     }
   }
 
+  // Follow-mode popover visibility rule: follow only while the anchored block
+  // is still on screen AND the popover has something useful — an enabled undo
+  // or contextual list/table actions (or the tablet "+"). A lone enabled redo
+  // (the post-undo state) never triggers the popover.
+  private hasUsableActions(): boolean {
+    return (
+      this.canUndo ||
+      !this.listGroupTarget.hidden ||
+      !this.tableGroupTarget.hidden ||
+      !this.addGroupTarget.hidden
+    )
+  }
+
   private updateVisibility(): void {
     // Default mode: always visible in the editor view. Follow mode: only while
-    // the anchored block is still on screen.
-    ;(this.element as HTMLElement).hidden = !(
-      this.viewIsEditor &&
-      (!this.followMode || this.inViewport)
-    )
+    // the anchored block is still on screen with something useful to offer.
+    // While the add-block menu is open the element must stay visible — it
+    // hosts the menu's fixed mount — only the strip hides (via
+    // .edit-toolbar-fab-menu-open).
+    ;(this.element as HTMLElement).hidden = this.addMenuOpen
+      ? false
+      : !(
+          this.viewIsEditor &&
+          (!this.followMode || (this.inViewport && this.hasUsableActions()))
+        )
+  }
+
+  private setAddMenuOpen(open: boolean): void {
+    if (this.addMenuOpen === open) return
+    this.addMenuOpen = open
+    this.element.classList.toggle("edit-toolbar-fab-menu-open", open)
+    this.updateVisibility()
+  }
+
+  // Anchor the add-block menu: follow mode → the 0×0 block-anchored #edit-toolbar
+  // itself (its left/top point at the caret's block); dock mode → the "+" button.
+  private addMenuAnchor(): FlipAnchorRect | null {
+    const el = this.followMode ? this.element : this.addBtnTarget
+    if (!el) return null
+    const rect = el.getBoundingClientRect()
+    return { left: rect.left, top: rect.top, bottom: rect.bottom, right: rect.right }
   }
 
   private setVisible(cmd: string, visible: boolean): void {

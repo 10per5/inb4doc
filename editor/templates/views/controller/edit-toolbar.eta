@@ -47,4 +47,10 @@
       <span class="edit-toolbar-icon"><%~ it.icons.trash %></span>
     </button>
   </div>
+  <div class="edit-toolbar-group edit-toolbar-group--add" data-edit-toolbar-target="addGroup" hidden>
+    <button type="button" class="edit-toolbar-btn edit-toolbar-btn--add" data-edit-toolbar-target="addBtn" data-action="edit-toolbar#openAddMenu" title="Add block" aria-label="Add block">
+      <span class="edit-toolbar-icon"><%~ it.icons.plus %></span>
+    </button>
+  </div>
 </div>
+<div class="edit-toolbar-fab-menu-anchor" data-edit-toolbar-target="fabMenu"></div>
