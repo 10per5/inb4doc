@@ -1,4 +1,4 @@
-<% if (it.ASSET_BASE) { %><base href="<%= it.ASSET_BASE %>" /><% } %>
+<% if (it.webAdaptive) { %><base href="<%= it.ASSET_BASE || "/" %>" /><% } %>
   <meta name="editor-self-base" content="<%= it.EDITOR_SELF_BASE %>" />
 
   <meta name="live-url-base" content="<%= it.LIVE_URL_BASE %>" />
