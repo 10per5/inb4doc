@@ -69,7 +69,7 @@ export class MountProvider extends RemoteProvider {
   }
 }
 
-function fileToBase64(file: File): Promise<string> {
+export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"))
