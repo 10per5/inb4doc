@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Base64
+import java.io.File
 import java.io.FileNotFoundException
 
 /**
@@ -14,8 +15,19 @@ import java.io.FileNotFoundException
  * creating directories/files via `createDocument` and never touching anything
  * outside the tree. Envelopes (ok/status/error/data) are built by the caller
  * (NativeBridge); this class throws on failure so the caller can map the error.
+ *
+ * When `ownedRoot` is set and the tree belongs to our own DocsProvider, the
+ * doc IS a local File we own (Android/data/<pkg>/docs), so every operation
+ * routes straight to the filesystem instead of the SAF protocol. That bypass
+ * is the fix for saves failing on the built-in docs tree: the protocol's
+ * createDocument round-trip returned null (DocsProvider.call() empty-Bundle
+ * branch), and a direct File write to our own app dir is unambiguous. Only
+ * user-picked external trees go through the SAF protocol below.
  */
-class SafFs(private val resolver: ContentResolver) {
+class SafFs(
+    private val resolver: ContentResolver,
+    private val ownedRoot: File? = null,
+) {
 
     data class Doc(val id: String, val name: String, val mime: String?, val lastModified: Long)
 
@@ -83,8 +95,51 @@ class SafFs(private val resolver: ContentResolver) {
 
     fun rootDocId(tree: Uri): String = DocumentsContract.getTreeDocumentId(tree)
 
+    // ── Owned-tree (DocsProvider) direct-File path ──────────────────────
+    // The built-in docs tree backs our own Android/data/<pkg>/docs dir, so
+    // doc ids below are rel paths from ownedRoot (mirroring DocsProvider's
+    // fileForId). The canonical-path guard confines every id/relPath to the
+    // root, mirroring the provider's confinement.
+
+    private fun isOwned(tree: Uri): Boolean =
+        ownedRoot != null && tree.authority == DocsProvider.AUTHORITY
+
+    private fun fileForId(tree: Uri, id: String): File? {
+        if (!isOwned(tree)) return null
+        if (id.isEmpty() || id == DocsProvider.ROOT_ID) return ownedRoot
+        val root = ownedRoot ?: return null
+        return File(root, id).canonicalFile.takeIf { it.path.startsWith(root.canonicalFile.path) }
+    }
+
+    private fun fileForRel(tree: Uri, relPath: String): File? {
+        if (!isOwned(tree)) return null
+        val root = ownedRoot ?: return null
+        val parts = relPath.split('/').filter { it.isNotEmpty() && it != "." && it != ".." }
+        var f = root
+        for (p in parts) f = File(f, p)
+        return f.canonicalFile.takeIf { it.path.startsWith(root.canonicalFile.path) }
+    }
+
+    private fun deleteRecursive(file: File): Boolean {
+        if (file.isDirectory) file.listFiles()?.forEach { deleteRecursive(it) }
+        return file.delete()
+    }
+
+    private fun ownedDocId(parentId: String, name: String): String =
+        if (parentId.isEmpty() || parentId == DocsProvider.ROOT_ID) name else "$parentId/$name"
+
     /** Immediate children of `parentId`, hidden entries (leading `.`) skipped. */
     fun children(tree: Uri, parentId: String): List<Doc> {
+        val ownedDir = fileForId(tree, parentId)
+        if (ownedDir != null) {
+            return ownedDir.listFiles()
+                ?.filter { !it.name.startsWith(".") }
+                ?.sortedBy { it.name.lowercase() }
+                ?.map { f ->
+                    val mime = if (f.isDirectory) DIR_MIME else mimeFor(f.name)
+                    Doc(ownedDocId(parentId, f.name), f.name, mime, f.lastModified())
+                } ?: emptyList()
+        }
         val uri = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
         val out = ArrayList<Doc>()
         resolver.query(uri, COLUMNS, null, null, null)?.use { c ->
@@ -105,6 +160,12 @@ class SafFs(private val resolver: ContentResolver) {
 
     /** Metadata for a single document id. */
     fun doc(tree: Uri, id: String): Doc? {
+        val ownedFile = fileForId(tree, id)
+        if (ownedFile != null) {
+            if (!ownedFile.exists()) return null
+            val mime = if (ownedFile.isDirectory) DIR_MIME else mimeFor(ownedFile.name)
+            return Doc(id, ownedFile.name, mime, ownedFile.lastModified())
+        }
         val uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
         resolver.query(uri, COLUMNS, null, null, null)?.use { c ->
             if (c.moveToFirst()) {
@@ -129,6 +190,8 @@ class SafFs(private val resolver: ContentResolver) {
     }
 
     fun readText(tree: Uri, id: String): String? {
+        val ownedFile = fileForId(tree, id)
+        if (ownedFile != null) return if (ownedFile.isFile) ownedFile.readText() else null
         val uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
         return try {
             resolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.UTF_8) }
@@ -141,6 +204,12 @@ class SafFs(private val resolver: ContentResolver) {
 
     /** Create (or truncate) `relPath` and write UTF-8 content. */
     fun writeText(tree: Uri, relPath: String, content: String) {
+        val ownedFile = fileForRel(tree, relPath)
+        if (ownedFile != null) {
+            ownedFile.parentFile?.mkdirs()
+            ownedFile.writeText(content)
+            return
+        }
         val parts = relPath.split('/').filter { it.isNotEmpty() && it != "." && it != ".." }
         val name = parts.lastOrNull() ?: throw IllegalArgumentException("empty path")
         var parentId = rootDocId(tree)
@@ -166,12 +235,16 @@ class SafFs(private val resolver: ContentResolver) {
         }
     }
 
-    fun delete(tree: Uri, id: String): Boolean = try {
-        DocumentsContract.deleteDocument(
-            resolver, DocumentsContract.buildDocumentUriUsingTree(tree, id)
-        )
-    } catch (e: Exception) {
-        false
+    fun delete(tree: Uri, id: String): Boolean {
+        val ownedFile = fileForId(tree, id)
+        if (ownedFile != null) return if (ownedFile.exists()) deleteRecursive(ownedFile) else false
+        return try {
+            DocumentsContract.deleteDocument(
+                resolver, DocumentsContract.buildDocumentUriUsingTree(tree, id)
+            )
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**
@@ -289,6 +362,13 @@ class SafFs(private val resolver: ContentResolver) {
     fun uploadImage(tree: Uri, rawName: String, dir: String, dataB64: String): String {
         val name = sanitizeImageName(rawName)
         val bytes = Base64.decode(dataB64, Base64.DEFAULT)
+        val ownedBase = fileForRel(tree, dir)
+        if (ownedBase != null) {
+            val imageDir = File(ownedBase, "image")
+            imageDir.mkdirs()
+            File(imageDir, name).writeBytes(bytes)
+            return if (dir.isEmpty()) "image/$name" else "$dir/image/$name"
+        }
         var parentId = rootDocId(tree)
         for (d in dir.split('/').filter { it.isNotEmpty() && it != "." && it != ".." }) {
             parentId = ensureDir(tree, parentId, d)
@@ -327,6 +407,24 @@ class SafFs(private val resolver: ContentResolver) {
             ?: throw FileNotFoundException("Image not found")
         if (resolve(tree, "$relDir/$newName") != null) {
             throw IllegalStateException("Target already exists")
+        }
+        val ownedBase = fileForRel(tree, relDir)
+        if (ownedBase != null) {
+            val oldFile = File(ownedBase, name)
+            val newFile = File(ownedBase, newName)
+            if (!oldFile.isFile) throw FileNotFoundException("Image not found")
+            if (newFile.exists()) throw IllegalStateException("Target already exists")
+            if (!oldFile.renameTo(newFile)) throw IllegalStateException("Rename failed")
+            val oldUrl = if (dir.isEmpty()) "/image/$name" else "/$dir/image/$name"
+            val newUrl = if (dir.isEmpty()) "/image/$newName" else "/$dir/image/$newName"
+            walkTree(tree) { rel, isDir, content ->
+                if (isDir || !rel.endsWith(".md") || content == null) return@walkTree
+                val replaced = content.replace(oldUrl, "\u0001")
+                    .replace(name, newName)
+                    .replace("\u0001", newUrl)
+                if (replaced != content) writeText(tree, rel, replaced)
+            }
+            return newUrl.trimStart('/')
         }
         val bytes = resolver.openInputStream(
             DocumentsContract.buildDocumentUriUsingTree(tree, src.id)
@@ -389,6 +487,12 @@ class SafFs(private val resolver: ContentResolver) {
     }
 
     private fun ensureDir(tree: Uri, parentId: String, name: String): String {
+        val ownedParent = fileForId(tree, parentId)
+        if (ownedParent != null) {
+            val dir = File(ownedParent, name)
+            if (!dir.exists() && !dir.mkdirs()) throw IllegalStateException("mkdir failed for $name")
+            return ownedDocId(parentId, name)
+        }
         val existing = childrenMap(tree, parentId)[name]
         if (existing != null) {
             if (existing.mime == DIR_MIME) return existing.id
