@@ -22,10 +22,11 @@ const DOCS_TREE_URI = "content://inb4doc.editor.docs/tree/docs"
  * document origin is `file://` and the content lives behind DocumentsContract
  * (SafFs + DocsProvider).
  *
- * Every bridge FS op passes `rootTreeUri` explicitly (first arg) so the native
- * side never falls back to shared pick state. "On This Device" pins to
- * DOCS_TREE_URI; the Local Files delegate pins to its own picked tree via
- * setRoot(). The two trees are fully independent.
+ * All bridge FS ops take RELATIVE PATHS only — the Kotlin side decides the
+ * root from the active provider (setNativeProvider): Saf ("On This Device")
+ * roots at the built-in docs tree, the Local Files delegate roots at its picked
+ * tree. JS never knows where a provider is hooked. `rootTreeUri` remains only
+ * for building deterministic content:// image URLs on the built-in docs tree.
  */
 export class SafProvider extends MountProvider {
   readonly name = ProviderType.Saf
@@ -38,7 +39,7 @@ export class SafProvider extends MountProvider {
   }
 
   async getTree(): Promise<TreeIndex> {
-    const env = await callBridge(BridgeOp.GetTree, this.rootTreeUri)
+    const env = await callBridge(BridgeOp.GetTree)
     const data = env.data as
       | { paths?: string[]; folderWeights?: Record<string, number>; fileWeights?: Record<string, number> }
       | undefined
@@ -51,20 +52,20 @@ export class SafProvider extends MountProvider {
   }
 
   async readFile(path: string): Promise<string | null> {
-    const env = await callBridge(BridgeOp.ReadFile, this.rootTreeUri, `${path}.md`)
+    const env = await callBridge(BridgeOp.ReadFile, `${path}.md`)
     return env.data as string | null
   }
 
   async writeFile(path: string, content: string): Promise<void> {
-    await callBridge(BridgeOp.WriteFile, this.rootTreeUri, `${path}.md`, content)
+    await callBridge(BridgeOp.WriteFile, `${path}.md`, content)
   }
 
   async deleteFiles(paths: string[]): Promise<void> {
-    await callBridge(BridgeOp.DeleteFiles, this.rootTreeUri, paths.map((p) => `${p}.md`))
+    await callBridge(BridgeOp.DeleteFiles, paths.map((p) => `${p}.md`))
   }
 
   async moveFile(from: string, to: string): Promise<void> {
-    await callBridge(BridgeOp.MoveFile, this.rootTreeUri, `${from}.md`, `${to}.md`)
+    await callBridge(BridgeOp.MoveFile, `${from}.md`, `${to}.md`)
   }
 
   async deleteFile(path: string): Promise<void> {
@@ -72,18 +73,18 @@ export class SafProvider extends MountProvider {
   }
 
   async getServerTime(path: string): Promise<number | null> {
-    const env = await callBridge(BridgeOp.GetServerTime, this.rootTreeUri, `${path}.md`)
+    const env = await callBridge(BridgeOp.GetServerTime, `${path}.md`)
     return (env.data as number | null) ?? null
   }
 
   async search(query: string): Promise<SearchResult[]> {
-    const env = await callBridge(BridgeOp.Search, this.rootTreeUri, query)
+    const env = await callBridge(BridgeOp.Search, query)
     const data = env.data as { results?: SearchResult[] } | undefined
     return data?.results ?? []
   }
 
   async listImages(dir: string, refs?: boolean): Promise<ImageEntry[]> {
-    const env = await callBridge(BridgeOp.ListImages, this.rootTreeUri, dir, refs ?? false)
+    const env = await callBridge(BridgeOp.ListImages, dir, refs ?? false)
     const data = env.data as { images?: ImageEntry[] } | undefined
     const images = data?.images ?? []
     for (const img of images) {
@@ -94,21 +95,21 @@ export class SafProvider extends MountProvider {
 
   async uploadImage(file: File, dir: string): Promise<string> {
     const b64 = await fileToBase64(file)
-    const env = await callBridge(BridgeOp.UploadImage, this.rootTreeUri, file.name, dir, b64)
+    const env = await callBridge(BridgeOp.UploadImage, file.name, dir, b64)
     const url = (env.data as { url?: string } | undefined)?.url
     if (!url) throw backendError(500, "Upload returned no URL")
     return url
   }
 
   async renameImage(name: string, dir: string, newName: string): Promise<string> {
-    const env = await callBridge(BridgeOp.RenameImage, this.rootTreeUri, name, dir, newName)
+    const env = await callBridge(BridgeOp.RenameImage, name, dir, newName)
     const url = (env.data as { url?: string } | undefined)?.url
     if (!url) throw backendError(500, "Rename returned no URL")
     return url
   }
 
   async deleteImage(name: string, dir: string): Promise<void> {
-    await callBridge(BridgeOp.DeleteImage, this.rootTreeUri, name, dir)
+    await callBridge(BridgeOp.DeleteImage, name, dir)
   }
 
   private cacheImage(dir: string, name: string, uri?: string): void {

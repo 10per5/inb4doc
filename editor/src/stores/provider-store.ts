@@ -1,5 +1,6 @@
 import type { ContentProvider } from "@/providers/provider";
 import { ProviderType, createProviderByType } from "@/providers/index";
+import { setNativeProvider } from "@/bridge/native";
 import { treeStore } from "@/stores/tree-store";
 import { createEmptyTreeIndex } from "@/utils/tree";
 import { cloud, packageIcon, laptop, database, helpCircle, smartphoneDevice } from "@/eta/icons";
@@ -101,6 +102,13 @@ export async function initializeProvider(): Promise<void> {
   if (!provider) provider = createProviderByType(ProviderType.LocalStorage);
 
   setProvider(provider);
+  // Native FS ops root by the active provider; tell the host before the first
+  // relative-path getTree so Saf lands on the docs tree, not a stale pick.
+  try {
+    await setNativeProvider(provider.name);
+  } catch (e) {
+    console.warn("[content] failed to notify native host of provider:", e);
+  }
 
   try {
     treeStore.setTree(await provider.getTree());
@@ -115,6 +123,13 @@ export async function switchProvider(type: ProviderType): Promise<void> {
   const provider = createProviderByType(type);
   setProvider(provider);
   saveLastProvider(type);
+  // The native host must route FS ops to the right root (Saf → docs tree,
+  // Fs → picked tree) BEFORE the first relative-path op of this provider.
+  try {
+    await setNativeProvider(type);
+  } catch (e) {
+    console.warn("[content] failed to notify native host of provider:", e);
+  }
 
   treeStore.setTree(createEmptyTreeIndex());
 

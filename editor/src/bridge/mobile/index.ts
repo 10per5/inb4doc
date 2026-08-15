@@ -53,6 +53,7 @@ export function initMobileBridge(): void {
     "pickDirectory",
     "setContentRoot",
     "getContentRoot",
+    "setProvider",
     "getTree",
     "readFile",
     "writeFile",

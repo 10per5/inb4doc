@@ -129,6 +129,21 @@ class WebViewActivity : AppCompatActivity() {
     private var treeUri: Uri? = null
     private var pendingPick: ((Uri?) -> Unit)? = null
 
+    // Mirrors the JS ProviderType ints (src/providers/index.ts). The native
+    // side routes every FS op to a root by the currently selected provider:
+    // Saf ("On This Device") → built-in docs tree; Fs (Local Files) → the
+    // user-picked tree (full path). JS passes relative paths only — it never
+    // knows where a provider is rooted.
+    private enum class ProviderEnum(val bridge: Int) {
+        Remote(0), Filesystem(1), LocalStorage(2), Mount(3), Saf(4);
+
+        companion object {
+            fun from(bridge: Int): ProviderEnum =
+                entries.firstOrNull { it.bridge == bridge } ?: Saf
+        }
+    }
+    private var currentProvider: ProviderEnum = ProviderEnum.Saf
+
     private val safFs by lazy { SafFs(contentResolver, defaultContentDir()) }
 
     private val treePickerLauncher = registerForActivityResult(
@@ -175,6 +190,9 @@ class WebViewActivity : AppCompatActivity() {
             val stillHeld = contentResolver.persistedUriPermissions.any { it.uri == uri }
             treeUri = if (stillHeld) uri else null
         }
+        currentProvider = ProviderEnum.from(
+            projectPrefs.getInt("provider", ProviderEnum.Saf.bridge)
+        )
 
         // Ensure the default content dir exists so the docs tree is writable
         // from the very first launch.
@@ -438,27 +456,15 @@ class WebViewActivity : AppCompatActivity() {
             put("data", data)
         }.toString()
 
-    // The active content root: a user-picked SAF tree when set, otherwise the
-    // built-in docs tree (DocsProvider over Android/data/<pkg>/docs) — the
-    // mobile equivalent of the desktop default content_root, so the editor can
-    // save before any "Open Project" pick.
-    private fun activeTree(): Uri? = treeUri ?: Uri.parse(DocsProvider.ROOT_TREE_URI)
-
-    /**
-     * Resolve the tree an FS op should hit: the explicit tree arg the JS layer
-     * passes (SafProvider "On This Device" → the built-in docs tree; the Local
-     * Files delegate → the user-picked tree) wins; a missing/empty arg falls
-     * back to the active tree so pre-threading callers keep working.
-     */
-    private fun treeFor(tree: String?): Uri? {
-        if (!tree.isNullOrEmpty()) {
-            return try {
-                Uri.parse(tree).takeIf { DocumentsContract.isTreeUri(it) }
-            } catch (e: Exception) {
-                null
-            }
-        }
-        return activeTree()
+    // The content root an FS op hits, decided by the currently selected
+    // provider (JS never passes a tree URI — it works in relative paths only):
+    //   Saf ("On This Device") → the built-in docs tree (Android/data/<pkg>/docs)
+    //   Fs (Local Files)       → the user-picked tree (full path), docs fallback
+    // Everything else (Remote/LocalStorage/Mount) doesn't use the SAF FS ops.
+    private fun activeTree(): Uri? = when (currentProvider) {
+        ProviderEnum.Saf -> Uri.parse(DocsProvider.ROOT_TREE_URI)
+        ProviderEnum.Filesystem -> treeUri ?: Uri.parse(DocsProvider.ROOT_TREE_URI)
+        else -> treeUri ?: Uri.parse(DocsProvider.ROOT_TREE_URI)
     }
 
     private fun persistTree(uri: Uri) {
@@ -626,6 +632,15 @@ class WebViewActivity : AppCompatActivity() {
             return jsonData(projectRootObject(uri))
         }
 
+        // The JS layer reports which provider is active so the native FS ops
+        // (which receive relative paths only) know which tree to root at.
+        @JavascriptInterface
+        fun setProvider(type: Int): String {
+            currentProvider = ProviderEnum.from(type)
+            projectPrefs.edit().putInt("provider", currentProvider.bridge).apply()
+            return jsonOk()
+        }
+
         // Point the SAF layer at a new tree Uri. Validates + persists + sets it
         // active, so a relaunch reopens the same project.
         @JavascriptInterface
@@ -658,8 +673,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun getTree(tree: String?): String {
-            val treeUri = treeFor(tree) ?: return jsonData(treeJson(emptyList(), emptyMap(), emptyMap()))
+        fun getTree(): String {
+            val treeUri = activeTree() ?: return jsonData(treeJson(emptyList(), emptyMap(), emptyMap()))
             return try {
                 val t = safFs.buildTree(treeUri)
                 jsonData(treeJson(t.paths, t.folderWeights, t.fileWeights))
@@ -670,8 +685,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun readFile(tree: String?, path: String): String {
-            val treeUri = treeFor(tree) ?: return nullDataJson()
+        fun readFile(path: String): String {
+            val treeUri = activeTree() ?: return nullDataJson()
             return try {
                 val doc = safFs.resolve(treeUri, path) ?: return nullDataJson()
                 val content = safFs.readText(treeUri, doc.id)
@@ -683,8 +698,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun writeFile(tree: String?, path: String, content: String): String {
-            val treeUri = treeFor(tree) ?: return jsonError(400, "No project directory")
+        fun writeFile(path: String, content: String): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             if (path.isEmpty() || path.contains("..")) return jsonError(403, "Forbidden")
             return try {
                 safFs.writeText(treeUri, path, content)
@@ -696,8 +711,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun deleteFiles(tree: String?, paths: Array<String>): String {
-            val treeUri = treeFor(tree) ?: return jsonError(400, "No project directory")
+        fun deleteFiles(paths: Array<String>): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
                 val parents = safFs.deleteRelPaths(treeUri, paths.toList())
                 safFs.pruneEmptyDirs(treeUri, parents)
@@ -709,8 +724,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun moveFile(tree: String?, from: String, to: String): String {
-            val treeUri = treeFor(tree) ?: return jsonError(400, "No project directory")
+        fun moveFile(from: String, to: String): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
                 safFs.move(treeUri, from, to)
                 jsonOk()
@@ -725,8 +740,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun getServerTime(tree: String?, path: String): String {
-            val treeUri = treeFor(tree) ?: return nullDataJson()
+        fun getServerTime(path: String): String {
+            val treeUri = activeTree() ?: return nullDataJson()
             return try {
                 val doc = safFs.resolve(treeUri, path)
                 if (doc == null || doc.lastModified <= 0L) {
@@ -741,8 +756,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun search(tree: String?, query: String): String {
-            val treeUri = treeFor(tree) ?: return jsonData(JSONObject().put("results", JSONArray()))
+        fun search(query: String): String {
+            val treeUri = activeTree() ?: return jsonData(JSONObject().put("results", JSONArray()))
             return try {
                 val hits = safFs.search(treeUri, query)
                 val arr = JSONArray()
@@ -760,8 +775,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun uploadImage(tree: String?, name: String, dir: String, dataB64: String): String {
-            val treeUri = treeFor(tree) ?: return jsonError(400, "No project directory")
+        fun uploadImage(name: String, dir: String, dataB64: String): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
                 val url = safFs.uploadImage(treeUri, name, dir, dataB64)
                 jsonData(JSONObject().apply { put("url", url) })
@@ -772,8 +787,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun listImages(tree: String?, dir: String, refs: Boolean): String {
-            val treeUri = treeFor(tree) ?: return jsonData(JSONObject().put("images", JSONArray()))
+        fun listImages(dir: String, refs: Boolean): String {
+            val treeUri = activeTree() ?: return jsonData(JSONObject().put("images", JSONArray()))
             return try {
                 val images = safFs.listImages(treeUri, dir, refs)
                 val arr = JSONArray()
@@ -793,8 +808,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun renameImage(tree: String?, name: String, dir: String, newName: String): String {
-            val treeUri = treeFor(tree) ?: return jsonError(400, "No project directory")
+        fun renameImage(name: String, dir: String, newName: String): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
                 val url = safFs.renameImage(treeUri, name, dir, newName)
                 jsonData(JSONObject().apply { put("url", url) })
@@ -805,8 +820,8 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
-        fun deleteImage(tree: String?, name: String, dir: String): String {
-            val treeUri = treeFor(tree) ?: return jsonError(400, "No project directory")
+        fun deleteImage(name: String, dir: String): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
                 val rel = if (dir.isEmpty()) "image/$name" else "$dir/image/$name"
                 val id = safFs.resolve(treeUri, rel)?.id ?: return jsonError(404, "Not found")
@@ -820,8 +835,8 @@ class WebViewActivity : AppCompatActivity() {
 
         // Map a markdown image URL to a loadable content:// URI, or null.
         @JavascriptInterface
-        fun resolveImage(tree: String?, url: String): String {
-            val treeUri = treeFor(tree) ?: return nullDataJson()
+        fun resolveImage(url: String): String {
+            val treeUri = activeTree() ?: return nullDataJson()
             return try {
                 val uri = safFs.resolveImage(treeUri, url)
                 if (uri == null) nullDataJson() else jsonData(uri)

@@ -22,6 +22,7 @@ export enum BridgeOp {
   PickDirectory,
   SetContentRoot,
   GetContentRoot,
+  SetProvider,
 }
 
 const BRIDGE_OP_NAMES: Record<BridgeOp, string> = {
@@ -40,6 +41,7 @@ const BRIDGE_OP_NAMES: Record<BridgeOp, string> = {
   [BridgeOp.PickDirectory]: "pickDirectory",
   [BridgeOp.SetContentRoot]: "setContentRoot",
   [BridgeOp.GetContentRoot]: "getContentRoot",
+  [BridgeOp.SetProvider]: "setProvider",
 }
 
 export function bridgeOpName(op: BridgeOp): string {

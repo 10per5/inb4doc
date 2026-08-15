@@ -9,6 +9,7 @@
  */
 
 import { backendError } from "@/utils/backend-error"
+import { hasFunc, AppFunc } from "$/build/build-mode"
 import { BridgeOp, bridgeOpName } from "@/config/enums/bridge-op"
 
 export interface BridgeEnvelope {
@@ -72,4 +73,15 @@ export async function getContentRoot(): Promise<ProjectRootInfo | null> {
   const data = env.data as { path?: string | null; name?: string } | undefined
   if (!data?.path) return null
   return { path: data.path, name: data.name ?? data.path }
+}
+
+/**
+ * Tell the native host which provider is active so its FS ops root at the
+ * right tree. Mobile-only: Android WebView needs this (Saf → built-in docs,
+ * Fs → picked tree); the desktop host has no such op. No-op in every other
+ * build mode.
+ */
+export async function setNativeProvider(type: number): Promise<void> {
+  if (!hasFunc(AppFunc.SafProvider)) return
+  await callBridge(BridgeOp.SetProvider, type)
 }
