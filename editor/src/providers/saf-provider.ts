@@ -5,6 +5,7 @@ import { buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { hasFunc, AppFunc } from "$/build/build-mode"
 import { callBridge, setContentRoot } from "@/bridge/native"
+import { BridgeOp } from "@/config/enums/bridge-op"
 import { backendError } from "@/utils/backend-error"
 import { MountProvider, fileToBase64 } from "@/providers/mount-provider"
 
@@ -37,7 +38,7 @@ export class SafProvider extends MountProvider {
   }
 
   async getTree(): Promise<TreeIndex> {
-    const env = await callBridge("getTree", this.rootTreeUri)
+    const env = await callBridge(BridgeOp.GetTree, this.rootTreeUri)
     const data = env.data as
       | { paths?: string[]; folderWeights?: Record<string, number>; fileWeights?: Record<string, number> }
       | undefined
@@ -50,20 +51,20 @@ export class SafProvider extends MountProvider {
   }
 
   async readFile(path: string): Promise<string | null> {
-    const env = await callBridge("readFile", this.rootTreeUri, `${path}.md`)
+    const env = await callBridge(BridgeOp.ReadFile, this.rootTreeUri, `${path}.md`)
     return env.data as string | null
   }
 
   async writeFile(path: string, content: string): Promise<void> {
-    await callBridge("writeFile", this.rootTreeUri, `${path}.md`, content)
+    await callBridge(BridgeOp.WriteFile, this.rootTreeUri, `${path}.md`, content)
   }
 
   async deleteFiles(paths: string[]): Promise<void> {
-    await callBridge("deleteFiles", this.rootTreeUri, paths.map((p) => `${p}.md`))
+    await callBridge(BridgeOp.DeleteFiles, this.rootTreeUri, paths.map((p) => `${p}.md`))
   }
 
   async moveFile(from: string, to: string): Promise<void> {
-    await callBridge("moveFile", this.rootTreeUri, `${from}.md`, `${to}.md`)
+    await callBridge(BridgeOp.MoveFile, this.rootTreeUri, `${from}.md`, `${to}.md`)
   }
 
   async deleteFile(path: string): Promise<void> {
@@ -71,18 +72,18 @@ export class SafProvider extends MountProvider {
   }
 
   async getServerTime(path: string): Promise<number | null> {
-    const env = await callBridge("getServerTime", this.rootTreeUri, `${path}.md`)
+    const env = await callBridge(BridgeOp.GetServerTime, this.rootTreeUri, `${path}.md`)
     return (env.data as number | null) ?? null
   }
 
   async search(query: string): Promise<SearchResult[]> {
-    const env = await callBridge("search", this.rootTreeUri, query)
+    const env = await callBridge(BridgeOp.Search, this.rootTreeUri, query)
     const data = env.data as { results?: SearchResult[] } | undefined
     return data?.results ?? []
   }
 
   async listImages(dir: string, refs?: boolean): Promise<ImageEntry[]> {
-    const env = await callBridge("listImages", this.rootTreeUri, dir, refs ?? false)
+    const env = await callBridge(BridgeOp.ListImages, this.rootTreeUri, dir, refs ?? false)
     const data = env.data as { images?: ImageEntry[] } | undefined
     const images = data?.images ?? []
     for (const img of images) {
@@ -93,21 +94,21 @@ export class SafProvider extends MountProvider {
 
   async uploadImage(file: File, dir: string): Promise<string> {
     const b64 = await fileToBase64(file)
-    const env = await callBridge("uploadImage", this.rootTreeUri, file.name, dir, b64)
+    const env = await callBridge(BridgeOp.UploadImage, this.rootTreeUri, file.name, dir, b64)
     const url = (env.data as { url?: string } | undefined)?.url
     if (!url) throw backendError(500, "Upload returned no URL")
     return url
   }
 
   async renameImage(name: string, dir: string, newName: string): Promise<string> {
-    const env = await callBridge("renameImage", this.rootTreeUri, name, dir, newName)
+    const env = await callBridge(BridgeOp.RenameImage, this.rootTreeUri, name, dir, newName)
     const url = (env.data as { url?: string } | undefined)?.url
     if (!url) throw backendError(500, "Rename returned no URL")
     return url
   }
 
   async deleteImage(name: string, dir: string): Promise<void> {
-    await callBridge("deleteImage", this.rootTreeUri, name, dir)
+    await callBridge(BridgeOp.DeleteImage, this.rootTreeUri, name, dir)
   }
 
   private cacheImage(dir: string, name: string, uri?: string): void {

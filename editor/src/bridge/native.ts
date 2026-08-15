@@ -9,6 +9,7 @@
  */
 
 import { backendError } from "@/utils/backend-error"
+import { BridgeOp, bridgeOpName } from "@/config/enums/bridge-op"
 
 export interface BridgeEnvelope {
   ok: boolean
@@ -19,7 +20,8 @@ export interface BridgeEnvelope {
 
 export type BridgeFn = (...args: unknown[]) => Promise<string>
 
-export async function callBridge(fn: string, ...args: unknown[]): Promise<BridgeEnvelope> {
+export async function callBridge(op: BridgeOp, ...args: unknown[]): Promise<BridgeEnvelope> {
+  const fn = bridgeOpName(op)
   const exposed = (window as any).saucer?.exposed as Record<string, BridgeFn> | undefined
   const caller = exposed?.[fn]
   if (typeof caller !== "function") {
@@ -53,7 +55,7 @@ export interface ProjectRootInfo {
  * Android: SAF OpenDocumentTree). Resolves null when the user cancels.
  */
 export async function pickProjectDirectory(): Promise<ProjectRootInfo | null> {
-  const env = await callBridge("pickDirectory")
+  const env = await callBridge(BridgeOp.PickDirectory)
   const data = env.data as { path?: string | null; name?: string } | undefined
   if (!data?.path) return null
   return { path: data.path, name: data.name ?? data.path }
@@ -61,12 +63,12 @@ export async function pickProjectDirectory(): Promise<ProjectRootInfo | null> {
 
 /** Switch the native host's content root (validated host-side). */
 export async function setContentRoot(path: string): Promise<void> {
-  await callBridge("setContentRoot", path)
+  await callBridge(BridgeOp.SetContentRoot, path)
 }
 
 /** Current native content root (used by mobile to restore the last project). */
 export async function getContentRoot(): Promise<ProjectRootInfo | null> {
-  const env = await callBridge("getContentRoot")
+  const env = await callBridge(BridgeOp.GetContentRoot)
   const data = env.data as { path?: string | null; name?: string } | undefined
   if (!data?.path) return null
   return { path: data.path, name: data.name ?? data.path }

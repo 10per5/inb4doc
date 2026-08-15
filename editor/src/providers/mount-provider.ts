@@ -3,6 +3,7 @@ import { ProviderType } from "@/providers/index"
 import { hasFunc, AppFunc } from "$/build/build-mode"
 import { backendError } from "@/utils/backend-error"
 import { callBridge, setContentRoot } from "@/bridge/native"
+import { BridgeOp } from "@/config/enums/bridge-op"
 import type { SearchResult } from "@/providers/provider"
 
 /**
@@ -31,33 +32,33 @@ export class MountProvider extends RemoteProvider {
   }
 
   async writeFile(path: string, content: string): Promise<void> {
-    await callBridge("writeFile", `${path}.md`, content)
+    await callBridge(BridgeOp.WriteFile, `${path}.md`, content)
   }
 
   async deleteFiles(paths: string[]): Promise<void> {
-    await callBridge("deleteFiles", paths.map((p) => `${p}.md`))
+    await callBridge(BridgeOp.DeleteFiles, paths.map((p) => `${p}.md`))
   }
 
   async moveFile(from: string, to: string): Promise<void> {
-    await callBridge("moveFile", `${from}.md`, `${to}.md`)
+    await callBridge(BridgeOp.MoveFile, `${from}.md`, `${to}.md`)
   }
 
   async search(query: string): Promise<SearchResult[]> {
-    const env = await callBridge("search", query)
+    const env = await callBridge(BridgeOp.Search, query)
     const data = env.data as { results?: SearchResult[] } | undefined
     return data?.results ?? []
   }
 
   async uploadImage(file: File, dir: string): Promise<string> {
     const b64 = await fileToBase64(file)
-    const env = await callBridge("uploadImage", file.name, dir, b64)
+    const env = await callBridge(BridgeOp.UploadImage, file.name, dir, b64)
     const url = (env.data as { url?: string } | undefined)?.url
     if (!url) throw backendError(500, "Upload returned no URL")
     return url
   }
 
   async renameImage(name: string, dir: string, newName: string): Promise<string> {
-    const env = await callBridge("renameImage", name, dir, newName)
+    const env = await callBridge(BridgeOp.RenameImage, name, dir, newName)
     const url = (env.data as { url?: string } | undefined)?.url
     if (!url) throw backendError(500, "Rename returned no URL")
     return url
