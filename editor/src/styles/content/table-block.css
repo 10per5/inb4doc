@@ -119,21 +119,6 @@
   align-items: center;
 }
 
-.milkdown-table-block .drag-preview {
-  position: absolute;
-  z-index: 20;
-  pointer-events: none;
-  opacity: 0.6;
-  background: var(--color-bg-primary);
-  border: 1px dashed var(--color-accent);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.milkdown-table-block .drag-preview[data-show="false"] {
-  display: none;
-}
-
 .milkdown-table-block .button-group {
   position: absolute;
   display: flex;

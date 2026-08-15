@@ -1,7 +1,7 @@
-import { createNewItem, deletePages, renamePage, movePage, setPageWeights } from "@/services/editor-actions";
+import { createNewItem, deletePages, renamePage, movePage, setPageWeights } from "@/features/editor-actions";
 import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
-import { storageService } from "@/services/storage";
+import { storageService } from "@/services/storage-service";
 import { getProvider, switchProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { showNotification } from "@/components/notification/notification";
 import { pagesStore } from "@/stores/page-store";
@@ -9,7 +9,7 @@ import { pushPath, replacePath } from "@/utils/url";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
-import { updateEditorTint, clearEditorTint } from "@/services/file-status-tint";
+import { updateEditorTint, clearEditorTint } from "@/utils/file-status-tint";
 import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
@@ -82,6 +82,17 @@ export class NavigationService {
 
       if (samePath) {
         appEvents.emit(AppEvent.SidebarActive, { path });
+        if (this.cache.getPendingOps().findCreate(path)) {
+          // The file was just created for the already-open path (empty-dir
+          // index template, first page, sidebar "New" on an empty dir). The
+          // same-path early return would leave the editor showing the previous
+          // document, so the draft the user sees and edits would never match
+          // what is queued to be created — load it now.
+          await this.editor.loadContent(
+            path,
+            () => appEvents.emit(AppEvent.MetaPanelReload)
+          );
+        }
         dirtyTrackingService.recompute();
         addRecent(path);
         return;
@@ -217,10 +228,13 @@ export class NavigationService {
 
     const pages = Array.from(treeStore.getTree().paths);
     const home = resolveHomePageFromPaths(pages);
+    // Reset so navigate() reloads even when the new root's home equals the
+    // previously open path (otherwise the old root's document would stay in
+    // the editor and could be saved into the new root).
+    this.currentPath = "";
     if (home) {
       await this.navigate(home);
     } else {
-      this.currentPath = "";
       this.editor.hideSkeleton();
       appEvents.emit(AppEvent.NoFileView, {});
     }
@@ -236,9 +250,20 @@ export class NavigationService {
     if (result.type === current.name && !result.configChanged) return;
 
     try {
+      // Commit any debounced edits to the current provider's pending ops. This
+      // also clears the body timers, so nothing later writes the old ops under
+      // the new provider's storage prefix.
+      dirtyTrackingService.flush();
+
       pagesStore.clearAll();
 
       await switchProvider(result.type);
+
+      // Rebuild pending ops from the *new* provider's storage. The in-memory
+      // ops are keyed by path only; carrying them over would flush edits and
+      // deletes queued for the old provider into the new one.
+      this.cache.reloadPendingOps();
+
       const providerId = String(getProvider().name)
       const files = storageService.loadProviderFiles(providerId)
       appEvents.emit(AppEvent.ProviderFilesLoaded, files)
@@ -246,11 +271,17 @@ export class NavigationService {
       await this.loadSidebar();
       dirtyTrackingService.recompute();
 
+      // Reset the current path so navigate() reloads even when the new
+      // provider's home equals the previously open path. Otherwise the editor
+      // keeps showing the old provider's document and a save would write it
+      // into the new provider's file.
+      this.currentPath = "";
       const pages = Array.from(treeStore.getTree().paths);
       const home = resolveHomePageFromPaths(pages);
       if (home) {
-        this.navigate(home);
+        await this.navigate(home);
       } else {
+        this.editor.hideSkeleton();
         appEvents.emit(AppEvent.NoFileView, {});
       }
 

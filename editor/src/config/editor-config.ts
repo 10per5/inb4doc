@@ -13,10 +13,9 @@ import {
   editorViewCtx,
   prosePluginsCtx,
 } from "@milkdown/kit/core";
-import { commonmark as _commonmark, wrapInHeadingInputRule, headingKeymap } from "@milkdown/kit/preset/commonmark";
+import { commonmark as _commonmark, wrapInHeadingInputRule, headingKeymap, inlineCodeInputRule } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
 import { nord } from "@milkdown/theme-nord";
-import { EditorState, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state";
 import { parserCtx, remarkStringifyOptionsCtx } from "@milkdown/core";
 import { clipboard } from "@milkdown/plugin-clipboard";
 import { history } from "@milkdown/kit/plugin/history";
@@ -25,28 +24,31 @@ import {
   configureLinkTooltip,
   linkTooltipConfig,
 } from "@milkdown/kit/component/link-tooltip";
-import { cursor, dropIndicatorConfig } from "@milkdown/kit/plugin/cursor";
-import { $prose } from "@milkdown/kit/utils";
+import { cursor } from "@milkdown/kit/plugin/cursor";
 import { fixedHeadingInputRule } from "@/plugins/heading-input-rule";
 
 const commonmark = _commonmark.filter(
-  (p) => p !== wrapInHeadingInputRule,
+  (p) => p !== wrapInHeadingInputRule && p !== inlineCodeInputRule,
 );
 
 import {
-  tableBlock,
   tableBlockConfig,
 } from "@milkdown/kit/component/table-block";
+import { fixedTableBlockView } from "@/plugins/table-block-view";
 import {
   imageBlockComponent,
   imageBlockConfig,
 } from "@milkdown/kit/component/image-block";
+import { inlineImageConfig } from "@milkdown/kit/component/image-inline";
+import { imageResizeSchema, imageResizeView } from "@/plugins/image-resize";
+import { imageInlineResizeView } from "@/plugins/image-inline-resize";
 import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
 import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createTextStatePlugin } from "@/plugins/text-state";
 import { createHistoryContextPlugin } from "@/plugins/history-context";
 import { createCaretScrollPlugin } from "@/plugins/caret-scroll";
 import { createPlainPastePlugin } from "@/plugins/plain-paste";
+import { createInlineCodeInputPlugin } from "@/plugins/inline-code-input";
 import { isMobileDock } from "@/utils/mobile";
 import {
   copy,
@@ -88,6 +90,7 @@ import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
+import { createEditorDragDropPlugin, configureDropIndicator } from "@/plugins/editor-drag-drop";
 import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
 import { imageStore } from "@/stores/image-store";
@@ -102,6 +105,41 @@ export interface EditorHost {
     setLastSet(path: string, content: string): void
   }
   onMentionView(mv: MentionView | null): void
+}
+
+/**
+ * Resolves a stored image src to something the DOM can load. Pending/blob/
+ * data URLs pass through; registered pending images map to their blob URLs;
+ * everything else resolves against the current document directory so stored
+ * content-relative paths render regardless of the mount point.
+ */
+function proxyDomURLFor(host: EditorHost): (url: string) => string {
+  return (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
+    if (url.startsWith("inb4doc-image:")) {
+      const name = url.slice("inb4doc-image:".length);
+      return imageStore.getImage(name) || url;
+    }
+    if (url.startsWith("pending-image:")) {
+      const blobUrl = imageService.getBlobUrl(url.slice("pending-image:".length));
+      if (blobUrl) return blobUrl;
+    }
+    const provider = getProvider();
+    const resolved = provider.resolveImageUrl?.(url);
+    if (resolved) return resolved;
+    const dir = host.currentPathDir();
+    // Absolute URLs are already server paths: the content-asset route
+    // (HTTP) and the GUI scheme handler both serve them with a MIME
+    // guessed from the extension. Relative URLs resolve against the
+    // current document directory.
+    if (url.startsWith("/")) return url;
+    let relPath = url;
+    if (dir && relPath.startsWith(dir + "/")) {
+      relPath = relPath.slice(dir.length + 1);
+    }
+    return `/${dir}/${relPath}`;
+  };
 }
 
 export async function createEditor(
@@ -124,11 +162,7 @@ export async function createEditor(
         DowngradeHeading: { ...prev.DowngradeHeading, shortcuts: [] },
       }));
 
-      ctx.update(dropIndicatorConfig.key, () => ({
-        class: "inb4doc-drop-cursor",
-        width: 4,
-        color: false as const,
-      }));
+      configureDropIndicator(ctx);
 
       ctx.update(remarkStringifyOptionsCtx, (prev) => ({
         ...prev,
@@ -187,39 +221,24 @@ export async function createEditor(
         },
       }));
 
+      const proxyDomURL = proxyDomURLFor(host);
+
       ctx.update(imageBlockConfig.key, (prev) => ({
         ...prev,
         onUpload: (file: File) => imageService.uploadImage(file),
-        proxyDomURL: (url: string) => {
-          if (!url) return url;
-          if (url.startsWith("data:") || url.startsWith("http") || url.startsWith("blob:")) return url;
-          if (url.startsWith("/uploads/")) return url;
-          if (url.startsWith("inb4doc-image:")) {
-            const name = url.slice("inb4doc-image:".length);
-            return imageStore.getImage(name) || url;
-          }
-          if (url.startsWith("pending-image:")) {
-            const blobUrl = imageService.getBlobUrl(url.slice("pending-image:".length));
-            if (blobUrl) return blobUrl;
-          }
-          const provider = getProvider();
-          const resolved = provider.resolveImageUrl?.(url);
-          if (resolved) return resolved;
-          const dir = host.currentPathDir();
-          let relPath = url;
-          if (relPath.startsWith("/")) {
-            relPath = relPath.slice(1);
-            if (dir && relPath.startsWith(dir + "/")) {
-              relPath = relPath.slice(dir.length + 1);
-            }
-          }
-          return `/uploads/${dir}/${relPath}`;
-        },
+        proxyDomURL,
+      }));
+
+      ctx.update(inlineImageConfig.key, (prev) => ({
+        ...prev,
+        onUpload: (file: File) => imageService.uploadImage(file),
+        proxyDomURL,
       }));
 
       ctx.update(prosePluginsCtx, (plugins) => {
         return plugins.concat(
           createPlainPastePlugin(),
+          createInlineCodeInputPlugin(),
           createUrlPastePlugin(),
           createDirtyPlugin(ctx, {
             getLastSetContent: (path) => host.stateCache.getLastSet(path),
@@ -230,6 +249,7 @@ export async function createEditor(
           createImagePastePlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createLinkBoundaryPlugin(),
           createImageEditPlugin(),
+          createEditorDragDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
           createKeymap(),
           createCodeBlockMovePlugin(),
           createBlockContextPlugin(),
@@ -256,8 +276,13 @@ export async function createEditor(
     .use(hugoRefSchema)
     .use(shortcodeDecoration)
     .use(linkTooltipPlugin)
-    .use(tableBlock)
+    .use(tableBlockConfig)
+    .use(fixedTableBlockView)
     .use(imageBlockComponent)
+    .use(imageResizeSchema)
+    .use(imageResizeView)
+    .use(inlineImageConfig)
+    .use(imageInlineResizeView)
     .use(codeBlockUI)
     .use(videoRemarkPlugin)
     .use(videoSchema)
@@ -272,43 +297,6 @@ export async function createEditor(
     .use(mathBlockInputRule)
     .use(blockLatexSchema)
     .use(toggleLatexCommand)
-    .use(
-      $prose(() => {
-        const dragDropPlugin = new Plugin({
-          key: new PluginKey("inb4doc-drag-drop"),
-          props: {
-            handleDOMEvents: {
-              dragstart(view, event) {
-                  const v = view as any;
-                  if (v.draggable?.move) {
-                      const { selection, doc } = view.state;
-                      let from: number, to: number;
-                      if (selection instanceof NodeSelection) {
-                          from = selection.from;
-                          to = selection.to;
-                      } else {
-                          const $from = doc.resolve(selection.from);
-                          const depth = Math.max(1, $from.depth);
-                          from = $from.before(depth);
-                          to = from + $from.node(depth).nodeSize;
-                      }
-
-                      (v.draggable as any).node = {
-                          replace: (tr: any) => {
-                              const mappedFrom = tr.mapping.map(from);
-                              const mappedTo = tr.mapping.map(to);
-                              tr.delete(mappedFrom, mappedTo);
-                          },
-                      };
-                  }
-                  return false;
-              },
-            },
-          },
-        });
-        return dragDropPlugin;
-      }),
-    )
     .create();
 
   editor.action((ctx) => {

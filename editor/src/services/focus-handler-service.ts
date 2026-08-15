@@ -2,7 +2,7 @@
  * FocusHandler — tracks and restores focus across UI transitions.
  *
  * Usage:
- *   import * as focusHandler from "@/services/focus-handler";
+ *   import * as focusHandler from "@/services/focus-handler-service";
  *   focusHandler.save();
  *   // ... do something that changes focus ...
  *   focusHandler.restore();

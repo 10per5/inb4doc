@@ -19,7 +19,7 @@ The server is a single-file Bun module with no framework, no database, and no mi
 | GET        | `/api/tree`                     | `handleTree`        | List content directory tree |
 | POST       | `/api/move`                     | `handleMove`        | Rename / move a file        |
 | POST       | `/api/upload`                   | `handleUpload`      | Upload an image             |
-| GET        | `/uploads/<path>`               | `handleUploads`     | Serve uploaded files        |
+| GET        | `/<content-path>`               | content-asset       | Serve a content file by its natural path, MIME by extension |
 | GET        | `/api/images?dir=<d>&refs=true` | `handleListImages`  | List images in a doc dir    |
 | DELETE     | `/api/images/<name>?dir=<d>`    | `handleDeleteImage` | Delete an image             |
 
@@ -82,27 +82,27 @@ All content paths are relative to `contentDir`. Paths that don't end in `.md` (a
 Response:
 
 ```json
-{ "url": "image/my-photo-a1b2c3.png" }
+{ "url": "/docs/image/my-photo-a1b2c3.png" }
 ```
 
-URL format:
+URL format (the image's natural content-relative path — the same URL Hugo publishes):
 
-* With `dir`: `image/<name>` (relative, resolved by the editor's `proxyDomURL`)
+* With `dir`: `/<dir>/image/<name>` (absolute)
 
-* Without `dir`: `/uploads/image/<name>` (absolute, served by the server)
+* Without `dir`: `/image/<name>` (absolute)
 
 Filenames are sanitized: lowercased, non-alphanumeric → hyphens, truncated to 40 chars, appended with a random 6-char suffix. Only `png`, `jpg`, `jpeg`, `gif`, `svg`, `webp`, `bmp`, `ico` extensions are accepted (others default to `.png`).
 
 ### Image Serving
 
-**`GET /uploads/<path>`** — Serve files from `contentDir/<path>`:
+**`GET /<content-path>`** — Serve a content file by its natural content-relative path. Any non-markdown GET that resolves to a real file inside `contentDir` is served with a MIME type guessed from its extension:
 
-| URL                           | Serves from                       |
-| ----------------------------- | --------------------------------- |
-| `/uploads/image/foo.png`      | `{contentDir}/image/foo.png`      |
-| `/uploads/docs/image/foo.png` | `{contentDir}/docs/image/foo.png` |
+| URL                       | Serves from                       |
+| ------------------------- | --------------------------------- |
+| `/image/foo.png`          | `{contentDir}/image/foo.png`      |
+| `/docs/image/foo.png`     | `{contentDir}/docs/image/foo.png` |
 
-This is the only route that serves binary files. MIME types are determined by file extension.
+Because the URL is the file's real content path, the same reference works in the editor, the GUI scheme handler, and the Hugo static site (which publishes `content/` at the site root). Markdown stays served only via `/content/<path>`.
 
 ### Image Listing
 
@@ -118,7 +118,7 @@ Response:
 ```json
 {
   "images": [
-    { "name": "foo-a1b2c3.png", "url": "/uploads/docs/image/foo-a1b2c3.png", "usedIn": ["docs/page.md"] }
+    { "name": "foo-a1b2c3.png", "url": "/docs/image/foo-a1b2c3.png", "storageUrl": "/docs/image/foo-a1b2c3.png", "usedIn": ["docs/page.md"] }
   ]
 }
 ```

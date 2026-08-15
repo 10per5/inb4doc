@@ -69,6 +69,90 @@ await page.addInitScript(() => {
   `templates/views/controller/sidebar.eta`), **restore the file afterward** and
   confirm `git status` is clean.
 
+## Reusable e2e classes
+
+The `e2e/` helpers are organized as small classes; import them and inject the
+browser yourself:
+
+```ts
+import { chromium } from "/home/user/project/editor/e2e/launch";
+import { EditorSession } from "/home/user/project/editor/e2e/session";
+import { DragHarness } from "/home/user/project/editor/e2e/drag";
+import { DomTimeline } from "/home/user/project/editor/e2e/dom-timeline";
+import { CssProbe } from "/home/user/project/editor/e2e/css-probe";
+
+const browser = await chromium.launch();
+const session = await EditorSession.open(browser, "e2e-video-drop");
+
+const drag = await DragHarness.attach(session);
+await drag.selectBlockNode(".video-wrapper video");          // NodeSelection
+await drag.startNativeDrag(".video-wrapper video");          // real dragstart → seeds view.dragging
+await drag.dispatch("dragEnter", x, y);                      // CDP moves the drag (mouse.move won't)
+await drag.dispatch("dragOver", x, y);
+console.log(JSON.stringify(await drag.dragLog()));           // drag events + elementFromPoint
+```
+
+Classes:
+
+- **`EditorSession`** (`session.ts`) — boot a page wired to :32600
+  (`localStorage` seeded before the bundle runs via `addInitScript`), capture
+  console/page errors into `session.errors`, and assert what hit disk/DOM vs.
+  what only flickered in the editor (`contentOnDisk`, `pendingOps`, `tableBox`).
+- **`DragHarness`** (`drag.ts`) — native drag simulation. A real drag is
+  started with real mouse events (`startNativeDrag`); that is the only thing
+  that fires `dragstart` and lets PM seed `view.dragging`. Once dragging, the
+  drag is moved **only** via CDP `Input.dispatchDragEvent` (`dispatch`) —
+  `page.mouse.move` alone does not fire `dragover`. `installDragLog`/`dragLog`
+  record every drag event plus the in-page `elementFromPoint` result.
+- **`DomTimeline`** (`dom-timeline.ts`) — a unified-clock MutationObserver
+  that records `class` mutations and element add/remove for a set of watch
+  selectors (default: table blocks, video wrappers, ghost). Stable per-element
+  ids make element **replacement** visible — the case where a highlighted
+  cell's classes vanish with no class mutation because its element was
+  re-rendered.
+- **`CssProbe`** (`css-probe.ts`) — "which stylesheet rule paints this
+  element". `computedStyle(sel, props)` reports computed outline/background;
+  `matchingRules(sel, props)` walks every stylesheet and returns the rules
+  whose selector matches, optionally filtered to declared properties.
+
+## Salt vs. meat — pick the cheaper check first
+
+Reproducing a runtime behavior in a browser is **salt**: one Playwright run
+costs a build, a boot, connection seeding, CDP drag dispatch and ~10-60 s, and
+every run is a fresh, flaky context. Reading the actual source that decides
+the behavior is **meat**: deterministic, offline, a few targeted reads. Before
+reaching for a browser, decide which side the question lives on.
+
+Prefer **meat** (read the source) when the question is:
+
+- "Which handler runs, in what order, and who registered it" — event-listener
+  ordering and gating live in the code (PM `initInput`/`eventBelongsToView`,
+  the table-block `stopEvent`, `EditorView` constructor order).
+- "Who dispatches a transaction / what re-renders the DOM" — a single call
+  chain traced through the plugin sources settles it.
+- "Why does feature X behave like this" in the first place — start with the
+  docs/issue tracker/web search before either grepping or running a browser.
+
+Prefer **salt** (the browser) when the question is:
+
+- "Does the thing actually *paint* / is it *visible*" — computed styles,
+  outline colors, layout — only a browser knows.
+- "Does this re-render replace DOM element identity" — needs a runtime
+  MutationObserver; you cannot conclude it from source alone.
+- "Did the fix work end-to-end" — a confirming pass after the source-level
+  change is understood.
+
+Rules of thumb:
+
+- If one read of 30-100 lines settles it, reading is cheaper than any run.
+- If you do run the browser, make it count: one instrumented run with a
+  unified-clock log (`DragHarness.installDragLog`) beats five
+  click-and-dump runs. Move helpers you reuse into `e2e/dnd.ts`, not into
+  `/tmp/opencode/`.
+- Don't chase an answer in `node_modules` with more greps when the question is
+  runtime-observable, and don't launch browsers when the question is
+  source-observable. When in doubt, ask which the user wants.
+
 ## Template-HMR / SW swap repro recipe
 
 To observe a hot swap vs. reload without a real editor session:

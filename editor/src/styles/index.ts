@@ -11,6 +11,7 @@ import "./editor/editor.css"
 import "./editor/math.css"
 import "./editor/milkdown.css"
 import "./editor/source-editor.css"
+import "./content/dnd.css"
 
 /* ── Panels ─────────────────────────────────────────────────────── */
 import "./panels/panels.css"

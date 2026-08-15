@@ -2,7 +2,7 @@ import { createRegistry } from "@/components/ui/menu";
 import type { MenuItem } from "@/components/ui/menu";
 import { MenuType } from "@/components/ui/menu";
 import { appEvents, AppEvent } from "@/stores/app-events";
-import type { ViewType } from "@/services/view-controller";
+import type { ViewType } from "@/services/view-service";
 import { LayoutService } from "@/services/layout-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { SlashCommand, LayoutWidth } from "@/config/enums";
@@ -275,7 +275,7 @@ menuRegistry.register("view", (): MenuItem[] => {
         screen("disk-usage", "Disk Usage"),
         // Navigation is the nav tree as a center fullview; on tablet the tree
         // is already the left sidebar, so the redundant screen entry is hidden.
-        // The sidebar-collapse path (ViewController.switchTo → setLeftPanel)
+        // The sidebar-collapse path (ViewService.switchTo → setLeftPanel)
         // stays central for future reuse.
         ...(layout.getWidth() === LayoutWidth.Tablet
           ? []

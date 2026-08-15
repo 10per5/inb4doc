@@ -7,15 +7,20 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.util.Base64
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
@@ -28,6 +33,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -44,25 +52,50 @@ class WebViewActivity : AppCompatActivity() {
     // Bundled editor: the thin shell ships inside the APK at assets/editor/.
     // The fetch updater downloads the live editor into the writable data dir
     // (app-specific external storage: /sdcard/Android/data/<pkg>/files/JsStaticFs,
-    // visible to the user like the desktop ~/.local/share/inb4doc/JsStaticFs);
-    // shouldInterceptRequest serves that copy first, so a populated data dir wins
-    // over the bundled shell (Part C.1 W3). The URL path stays /editor/ (the APK
-    // asset mount); only the physical data dir is JsStaticFs, matching the desktop
-    // data layout (gui/src/platform.cpp).
+    // visible to the user like the desktop ~/.local/share/inb4doc/JsStaticFs).
+    // Once the data dir holds an index.html, this activity boots THAT copy
+    // directly — a populated data dir wins over the bundled shell (Part C.1 W3),
+    // matching the desktop data layout (gui/src/platform.cpp) — and the bundled
+    // shell is only a first-run bootstrap until the updater's transfer + reload.
+    // The URL path stays /editor/ (the APK asset mount); only the physical data
+    // dir is JsStaticFs.
     private val assetEditorBase = "file:///android_asset/editor/"
 
     private fun dataEditorDir(): File =
         getExternalFilesDir(null)?.let { File(it, "JsStaticFs") }
             ?: File(filesDir, "JsStaticFs")
 
-    // Custom scheme for the writable data-dir mount. Unlike plain file:// URLs
-    // — which WebView can serve via its native file loader without consulting
-    // shouldInterceptRequest, or block outright — a custom scheme has NO native
-    // handler, so every request is routed through shouldInterceptRequest
-    // deterministically. The page's own eager assets still load from the
-    // bundled file:///android_asset/editor/ shell; only the updater's data-dir
-    // chunks go through this scheme.
-    private val editorMountScheme = "app://editor/"
+    // Default content root (mobile equivalent of the desktop default
+    // content_root): the app-specific external docs dir, Android/data/<pkg>/docs
+    // — sibling of files/ (which holds the updater's JsStaticFs). Backed by
+    // DocsProvider, so the editor can save before any "Open Project" pick.
+    private fun defaultContentDir(): File =
+        File(getExternalFilesDir(null)?.parentFile ?: filesDir, "docs")
+
+    private fun systemDarkTheme(): Boolean =
+        (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+
+    // Paint the reserved camera/status-bar strip with the web app's
+    // --color-bg-secondary (light #f8f9fa / dark #3b4252 — the same value the
+    // toolbar and mobile dock use), and flip the status/nav bar icon contrast so
+    // it stays legible on that background. Called from onCreate (system night
+    // mode, before JS boots) and from NativeBridge.setTheme (the app's real
+    // dark/light preference).
+    private fun applyTheme(dark: Boolean) {
+        val strip = if (dark) 0xFF3B4252.toInt() else 0xFFF8F9FA.toInt()
+        window.setBackgroundDrawable(ColorDrawable(strip))
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !dark
+        controller.isAppearanceLightNavigationBars = !dark
+    }
+
+    // The writable data-dir mount: editorMountUrl() returns the data dir's plain
+    // file:// base (RFC 8089 "file:/storage/..." local form), so Farm's lazy
+    // chunks resolve straight onto the updater-downloaded copies and WebView
+    // serves them from the app's own external files dir natively (allowFileAccess).
+    // shouldInterceptRequest backs that up for any file:// request WebView defers,
+    // and serves the bundled android_asset fallback when the data dir has no copy.
 
     // File-chooser plumbing for WebChromeClient.onShowFileChooser (Load-from-Zip
     // and any <input type="file">): WebView shows no picker without it, and the
@@ -96,7 +129,22 @@ class WebViewActivity : AppCompatActivity() {
     private var treeUri: Uri? = null
     private var pendingPick: ((Uri?) -> Unit)? = null
 
-    private val safFs = SafFs(contentResolver)
+    // Mirrors the JS ProviderType ints (src/providers/index.ts). The native
+    // side routes every FS op to a root by the currently selected provider:
+    // Saf ("On This Device") → built-in docs tree; Fs (Local Files) → the
+    // user-picked tree (full path). JS passes relative paths only — it never
+    // knows where a provider is rooted.
+    private enum class ProviderEnum(val bridge: Int) {
+        Remote(0), Filesystem(1), LocalStorage(2), Mount(3), Saf(4);
+
+        companion object {
+            fun from(bridge: Int): ProviderEnum =
+                entries.firstOrNull { it.bridge == bridge } ?: Saf
+        }
+    }
+    private var currentProvider: ProviderEnum = ProviderEnum.Saf
+
+    private val safFs by lazy { SafFs(contentResolver, defaultContentDir()) }
 
     private val treePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -121,6 +169,19 @@ class WebViewActivity : AppCompatActivity() {
 
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
+        // Reserve the camera/status-bar strip instead of drawing under it: the
+        // top part of the screen (status bar + display cutout) stays an empty,
+        // theme-colored band and the WebView sits below it. Android 15 enforces
+        // edge-to-edge for targetSdk 35, so the strip is inset by hand here
+        // (below) rather than via fitSystemWindows. The band paints the web
+        // app's --color-bg-secondary (toolbar/dock bg) and its bar icons follow
+        // the dark/light theme; applyTheme() swaps both when setTheme arrives
+        // from JS (or uses the system night mode before JS boots).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        applyTheme(systemDarkTheme())
+
         // Restore the last Open-Project pick so a relaunch reopens the same
         // content root (mirrors desktop inb4.config.toml content_root).
         val savedTree = projectPrefs.getString("tree_uri", null)
@@ -129,6 +190,13 @@ class WebViewActivity : AppCompatActivity() {
             val stillHeld = contentResolver.persistedUriPermissions.any { it.uri == uri }
             treeUri = if (stillHeld) uri else null
         }
+        currentProvider = ProviderEnum.from(
+            projectPrefs.getInt("provider", ProviderEnum.Saf.bridge)
+        )
+
+        // Ensure the default content dir exists so the docs tree is writable
+        // from the very first launch.
+        defaultContentDir().mkdirs()
 
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -159,31 +227,6 @@ class WebViewActivity : AppCompatActivity() {
                 ): WebResourceResponse? {
                     val uri = request?.url ?: return null
                     val url = uri.toString()
-
-                    // Custom-scheme mount (app://editor/): no native WebView
-                    // handler, so every request lands here deterministically —
-                    // unlike plain file:// URLs, which WebView may serve itself
-                    // or block outright. The part below the mount is the
-                    // data-dir-relative path the updater stored chunks under
-                    // (e.g. "assets/node_imports-<hash>.js").
-                    if (url.startsWith(editorMountScheme)) {
-                        val rel = url
-                            .removePrefix(editorMountScheme)
-                            .substringBefore('?')
-                            .substringBefore('#')
-                        if (rel.isEmpty()) return null
-                        val dataFile = resolveWithin(dataEditorDir(), rel)
-                        Log.i("inb4doc", "SIR scheme $rel exists=${dataFile?.isFile}")
-                        if (dataFile?.isFile == true) {
-                            return try {
-                                serveFile(rel, dataFile)
-                            } catch (e: Exception) {
-                                Log.w("inb4doc", "intercept failed for $rel", e)
-                                null
-                            }
-                        }
-                        return null
-                    }
 
                     // Updater-downloaded editor files (lazy chunks, css, the
                     // downloaded index/app): served explicitly from the writable
@@ -274,9 +317,37 @@ class WebViewActivity : AppCompatActivity() {
             addJavascriptInterface(NativeBridge(), "NativeBridge")
         }
 
-        setContentView(webView)
+        // The WebView is pushed below the reserved camera/status-bar strip at
+        // the top only — the bottom stays edge-to-edge (content may draw behind
+        // the gesture/nav bar). Padding the container — not the WebView — keeps
+        // the page viewport a plain rectangle that never scrolls under the bar.
+        val content = FrameLayout(this)
+        ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
+            val top = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout()
+            ).top
+            v.setPadding(0, top, 0, 0)
+            insets
+        }
+        content.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        setContentView(content)
 
-        webView.loadUrl(assetEditorBase + "index.html")
+        // Boot the updater-downloaded copy of index.html once the data dir has
+        // one; the bundled thin shell is only the first-run bootstrap. Booting
+        // the bundled shell forever would loop: its build-time index hash never
+        // matches the remote manifest, so the updater keeps reloading.
+        val dataIndex = File(dataEditorDir(), "index.html")
+        webView.loadUrl(
+            if (dataIndex.isFile) dataIndex.toURI().toString()
+            else assetEditorBase + "index.html"
+        )
     }
 
     override fun onBackPressed() {
@@ -297,15 +368,20 @@ class WebViewActivity : AppCompatActivity() {
     private fun resolveWithin(root: File, rel: String): File? {
         val target = File(root, rel)
         val base = root.canonicalFile
-        val canon = target.canonicalFile
+        val canon = try {
+            target.canonicalFile
+        } catch (e: Exception) {
+            return null
+        }
         return if (canon.path.startsWith(base.path)) canon else null
     }
 
-    // Serve a data-dir file with the guessed MIME plus permissive CORS. The
-    // page boots from a file:// document but loads updater chunks from the
-    // custom app:// scheme; WebView's allowUniversalAccessFromFileURLs already
-    // relaxes cross-origin access, and the explicit header covers dynamic
-    // import() in updater hot-swaps and any webview where the flag is reset.
+    // Serve a data-dir file with the guessed MIME plus permissive CORS. WebView
+    // can load plain file:// from the app's own data dir natively
+    // (allowFileAccess); this is the backup for any request WebView defers here.
+    // allowUniversalAccessFromFileURLs already relaxes cross-origin access, and
+    // the explicit header covers dynamic import() in updater hot-swaps and any
+    // webview where the flag is reset.
     private fun serveFile(rel: String, file: File): WebResourceResponse {
         val headers = mapOf("Access-Control-Allow-Origin" to "*")
         return WebResourceResponse(
@@ -380,7 +456,16 @@ class WebViewActivity : AppCompatActivity() {
             put("data", data)
         }.toString()
 
-    private fun activeTree(): Uri? = treeUri
+    // The content root an FS op hits, decided by the currently selected
+    // provider (JS never passes a tree URI — it works in relative paths only):
+    //   Saf ("On This Device") → the built-in docs tree (Android/data/<pkg>/docs)
+    //   Fs (Local Files)       → the user-picked tree (full path), docs fallback
+    // Everything else (Remote/LocalStorage/Mount) doesn't use the SAF FS ops.
+    private fun activeTree(): Uri? = when (currentProvider) {
+        ProviderEnum.Saf -> Uri.parse(DocsProvider.ROOT_TREE_URI)
+        ProviderEnum.Filesystem -> treeUri ?: Uri.parse(DocsProvider.ROOT_TREE_URI)
+        else -> treeUri ?: Uri.parse(DocsProvider.ROOT_TREE_URI)
+    }
 
     private fun persistTree(uri: Uri) {
         treeUri = uri
@@ -418,14 +503,22 @@ class WebViewActivity : AppCompatActivity() {
             Log.i("inb4doc", message)
         }
 
-        // The writable data-dir mount URL (trailing slash) under the custom
-        // app:// scheme. The page loads from the bundled android_asset shell,
-        // but Farm's lazy chunk loader must resolve chunks against this base so
-        // they reach the updater's downloaded copies. A custom scheme has no
-        // native WebView handler, so every request deterministically lands in
-        // shouldInterceptRequest, which serves the matching data-dir file.
+        // The web app reports its dark/light theme so the reserved system-bar
+        // strip (and its icon contrast) follows the app instead of the system.
+        // Runs on the JavaBridge thread — hop to the UI thread for window work.
         @JavascriptInterface
-        fun editorMountUrl(): String = editorMountScheme
+        fun setTheme(theme: String?) {
+            val dark = theme == "dark"
+            runOnUiThread { applyTheme(dark) }
+        }
+
+        // The writable data-dir mount URL (trailing slash, plain file:// base).
+        // Farm's lazy chunk loader resolves chunks against this base so they hit
+        // the updater's downloaded copies. WebView serves file:// from the app's
+        // own data dir natively, so the chunks load without needing
+        // shouldInterceptRequest to be consulted.
+        @JavascriptInterface
+        fun editorMountUrl(): String = dataEditorDir().toURI().toString()
 
         // ── Part C.1 W3 updater storage bridge ──
         // Mirrors the desktop saucer.exposed envelope ({ok, status?, error?,
@@ -485,7 +578,15 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun reload(): String {
-            runOnUiThread { webView.reload() }
+            runOnUiThread {
+                // After the updater's transfer, boot the downloaded index.html:
+                // its boot hash then matches the remote manifest, ending the
+                // reload loop. Falls back to the bundled shell on a virgin data
+                // dir.
+                val dataIndex = File(dataEditorDir(), "index.html")
+                if (dataIndex.isFile) webView.loadUrl(dataIndex.toURI().toString())
+                else webView.reload()
+            }
             return jsonOk()
         }
 
@@ -531,6 +632,15 @@ class WebViewActivity : AppCompatActivity() {
             return jsonData(projectRootObject(uri))
         }
 
+        // The JS layer reports which provider is active so the native FS ops
+        // (which receive relative paths only) know which tree to root at.
+        @JavascriptInterface
+        fun setProvider(type: Int): String {
+            currentProvider = ProviderEnum.from(type)
+            projectPrefs.edit().putInt("provider", currentProvider.bridge).apply()
+            return jsonOk()
+        }
+
         // Point the SAF layer at a new tree Uri. Validates + persists + sets it
         // active, so a relaunch reopens the same project.
         @JavascriptInterface
@@ -542,16 +652,20 @@ class WebViewActivity : AppCompatActivity() {
                 return jsonError(400, "Invalid path")
             }
             if (!DocumentsContract.isTreeUri(uri)) return jsonError(400, "Not a directory")
-            val held = contentResolver.persistedUriPermissions.any { it.uri == uri }
-            if (!held) {
-                try {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                } catch (e: Exception) {
-                    return jsonError(403, "No access to directory")
+            // The built-in docs tree needs no SAF grant (our own provider);
+            // anything else must still be held so a relaunch can re-open it.
+            if (uri.authority != DocsProvider.AUTHORITY) {
+                val held = contentResolver.persistedUriPermissions.any { it.uri == uri }
+                if (!held) {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                    } catch (e: Exception) {
+                        return jsonError(403, "No access to directory")
+                    }
                 }
             }
             persistTree(uri)
@@ -560,9 +674,9 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun getTree(): String {
-            val tree = activeTree() ?: return jsonData(treeJson(emptyList(), emptyMap(), emptyMap()))
+            val treeUri = activeTree() ?: return jsonData(treeJson(emptyList(), emptyMap(), emptyMap()))
             return try {
-                val t = safFs.buildTree(tree)
+                val t = safFs.buildTree(treeUri)
                 jsonData(treeJson(t.paths, t.folderWeights, t.fileWeights))
             } catch (e: Exception) {
                 Log.w("inb4doc", "getTree failed", e)
@@ -572,10 +686,10 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun readFile(path: String): String {
-            val tree = activeTree() ?: return nullDataJson()
+            val treeUri = activeTree() ?: return nullDataJson()
             return try {
-                val doc = safFs.resolve(tree, path) ?: return nullDataJson()
-                val content = safFs.readText(tree, doc.id)
+                val doc = safFs.resolve(treeUri, path) ?: return nullDataJson()
+                val content = safFs.readText(treeUri, doc.id)
                 if (content == null) nullDataJson() else jsonData(content)
             } catch (e: Exception) {
                 Log.w("inb4doc", "readFile failed for $path", e)
@@ -585,10 +699,10 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun writeFile(path: String, content: String): String {
-            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             if (path.isEmpty() || path.contains("..")) return jsonError(403, "Forbidden")
             return try {
-                safFs.writeText(tree, path, content)
+                safFs.writeText(treeUri, path, content)
                 jsonOk()
             } catch (e: Exception) {
                 Log.w("inb4doc", "writeFile failed for $path", e)
@@ -598,10 +712,10 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun deleteFiles(paths: Array<String>): String {
-            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
-                val parents = safFs.deleteRelPaths(tree, paths.toList())
-                safFs.pruneEmptyDirs(tree, parents)
+                val parents = safFs.deleteRelPaths(treeUri, paths.toList())
+                safFs.pruneEmptyDirs(treeUri, parents)
                 jsonOk()
             } catch (e: Exception) {
                 Log.w("inb4doc", "deleteFiles failed", e)
@@ -611,9 +725,9 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun moveFile(from: String, to: String): String {
-            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
-                safFs.move(tree, from, to)
+                safFs.move(treeUri, from, to)
                 jsonOk()
             } catch (e: FileNotFoundException) {
                 jsonError(404, "Source not found")
@@ -627,9 +741,9 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun getServerTime(path: String): String {
-            val tree = activeTree() ?: return nullDataJson()
+            val treeUri = activeTree() ?: return nullDataJson()
             return try {
-                val doc = safFs.resolve(tree, path)
+                val doc = safFs.resolve(treeUri, path)
                 if (doc == null || doc.lastModified <= 0L) {
                     nullDataJson()
                 } else {
@@ -643,9 +757,9 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun search(query: String): String {
-            val tree = activeTree() ?: return jsonData(JSONObject().put("results", JSONArray()))
+            val treeUri = activeTree() ?: return jsonData(JSONObject().put("results", JSONArray()))
             return try {
-                val hits = safFs.search(tree, query)
+                val hits = safFs.search(treeUri, query)
                 val arr = JSONArray()
                 for (h in hits) {
                     arr.put(JSONObject().apply {
@@ -662,9 +776,9 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun uploadImage(name: String, dir: String, dataB64: String): String {
-            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
-                val url = safFs.uploadImage(tree, name, dir, dataB64)
+                val url = safFs.uploadImage(treeUri, name, dir, dataB64)
                 jsonData(JSONObject().apply { put("url", url) })
             } catch (e: Exception) {
                 Log.w("inb4doc", "uploadImage failed $name", e)
@@ -674,9 +788,9 @@ class WebViewActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun listImages(dir: String, refs: Boolean): String {
-            val tree = activeTree() ?: return jsonData(JSONObject().put("images", JSONArray()))
+            val treeUri = activeTree() ?: return jsonData(JSONObject().put("images", JSONArray()))
             return try {
-                val images = safFs.listImages(tree, dir, refs)
+                val images = safFs.listImages(treeUri, dir, refs)
                 val arr = JSONArray()
                 for (img in images) {
                     arr.put(JSONObject().apply {
@@ -694,12 +808,24 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun renameImage(name: String, dir: String, newName: String): String {
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
+            return try {
+                val url = safFs.renameImage(treeUri, name, dir, newName)
+                jsonData(JSONObject().apply { put("url", url) })
+            } catch (e: Exception) {
+                Log.w("inb4doc", "renameImage failed $name -> $newName", e)
+                jsonError(500, "Rename failed")
+            }
+        }
+
+        @JavascriptInterface
         fun deleteImage(name: String, dir: String): String {
-            val tree = activeTree() ?: return jsonError(400, "No project directory")
+            val treeUri = activeTree() ?: return jsonError(400, "No project directory")
             return try {
                 val rel = if (dir.isEmpty()) "image/$name" else "$dir/image/$name"
-                val id = safFs.resolve(tree, rel)?.id ?: return jsonError(404, "Not found")
-                if (!safFs.delete(tree, id)) return jsonError(500, "Delete failed")
+                val id = safFs.resolve(treeUri, rel)?.id ?: return jsonError(404, "Not found")
+                if (!safFs.delete(treeUri, id)) return jsonError(500, "Delete failed")
                 jsonOk()
             } catch (e: Exception) {
                 Log.w("inb4doc", "deleteImage failed $name", e)
@@ -710,9 +836,9 @@ class WebViewActivity : AppCompatActivity() {
         // Map a markdown image URL to a loadable content:// URI, or null.
         @JavascriptInterface
         fun resolveImage(url: String): String {
-            val tree = activeTree() ?: return nullDataJson()
+            val treeUri = activeTree() ?: return nullDataJson()
             return try {
-                val uri = safFs.resolveImage(tree, url)
+                val uri = safFs.resolveImage(treeUri, url)
                 if (uri == null) nullDataJson() else jsonData(uri)
             } catch (e: Exception) {
                 Log.w("inb4doc", "resolveImage failed for $url", e)

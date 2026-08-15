@@ -285,6 +285,18 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
         return data_json(json);
     });
 
+    // POST /api/rename-image — rename a committed image file on disk.
+    wv.expose("renameImage", [cfg](const std::string &name,
+                                   const std::string &dir,
+                                   const std::string &new_name)
+    {
+        auto res = handle_rename_image(*cfg, name, dir, new_name);
+        auto json = response_data(res);
+        if (json.empty())
+            return err_json(res.status, "Rename failed");
+        return data_json(json);
+    });
+
     // ── Runtime directory reselection (File → Open Project…) ──
 
     // Native folder picker. Returns null when the user cancels.

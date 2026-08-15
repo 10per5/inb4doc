@@ -10,7 +10,7 @@
  *
  * **For `ctx.get()` calls** (needs the service instance):
  * ```ts
- * import { editorContext } from "@/services/editor-context"
+ * import { editorContext } from "@/services/editor-context-service"
  * editor.action((ctx) => {
  *   const view = ctx.get(editorContext.editorViewCtx)
  * })
@@ -18,12 +18,12 @@
  *
  * **For type-only imports** (zero bundle cost, for annotations):
  * ```ts
- * import type { EditorViewLike, EditorLike } from "@/services/editor-context"
+ * import type { EditorViewLike, EditorLike } from "@/services/editor-context-service"
  * ```
  *
  * **For simple view access** (convenience wrappers):
  * ```ts
- * import { getView, getMarkdown, focusView } from "@/services/editor-context"
+ * import { getView, getMarkdown, focusView } from "@/services/editor-context-service"
  * const md = getMarkdown(editor)
  * focusView(editor)
  * ```

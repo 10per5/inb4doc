@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- System-dark launch frame. The web app reports the real user-pref theme
+         via NativeBridge.setTheme once JS boots; this only styles the moment
+         before that lands. Colors mirror values/themes.xml with the dark
+         color-bg-secondary (#3b4252). -->
+    <style name="Theme.Inb4doc" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowBackground">#3B4252</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

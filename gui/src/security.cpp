@@ -137,8 +137,7 @@ verdict check(const url_parts &url)
 bool is_api_path(std::string_view path)
 {
     return path.starts_with("/api/") ||
-           path.starts_with("/content/") ||
-           path.starts_with("/uploads/");
+           path.starts_with("/content/");
 }
 
 // ── whitelist ──────────────────────────────────────────────────────────

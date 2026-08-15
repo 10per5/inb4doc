@@ -14,6 +14,25 @@ interface PendingImageRecord {
   file: File
 }
 
+export interface ImageCommitFailure {
+  id: string
+  name: string
+  error: Error
+}
+
+export interface ImageCommitResult {
+  urlMap: Map<string, string>
+  committedIds: string[]
+  failed: ImageCommitFailure[]
+}
+
+/**
+ * Master switch for orphan-image cleanup. When true (default), an image file
+ * is deleted only when the current document dropped its last reference this
+ * save. Flip to false to stop deleting images entirely.
+ */
+export const DELETE_ORPHANED_IMAGES = true
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
@@ -109,41 +128,56 @@ class ImageService {
     return `pending-image:${id}`
   }
 
-  async commitPendingImages(dir: string): Promise<Map<string, string>> {
-    if (!this.hasPending(dir)) return new Map()
+  /**
+   * Upload every pending image, independently. A failed upload is collected
+   * (record kept, so it can be retried or discarded) and never aborts the
+   * whole save — the page still writes, with whatever images succeeded.
+   *
+   * Records are NOT removed here: they are kept until the doc write that
+   * references them succeeds (`confirmCommitted`). If the write fails, the
+   * pending→real URL mapping survives for the next save instead of being lost
+   * (which would orphan-delete the freshly uploaded file).
+   */
+  async commitAllPendingImages(): Promise<ImageCommitResult> {
     const provider = getProvider()
-    const upload = async (file: File, d: string) => {
-      if (provider.uploadImage) {
-        return provider.uploadImage(file, d)
-      }
+    const upload = (file: File, dir: string) => {
+      if (provider.uploadImage) return provider.uploadImage(file, dir)
       return readFileAsBase64(file)
     }
-    return this.commitPending(dir, upload)
-  }
-
-  async commitAllPendingImages(): Promise<Map<string, string>> {
-    const combined = new Map<string, string>()
-    const dirs = this.getAllPendingDirs()
-    for (const dir of dirs) {
-      const map = await this.commitPendingImages(dir)
-      for (const [k, v] of map) {
-        combined.set(k, v)
+    const urlMap = new Map<string, string>()
+    const committedIds: string[] = []
+    const failed: ImageCommitFailure[] = []
+    for (const dir of this.getAllPendingDirs()) {
+      const list = this.pendingByDir.get(dir) || []
+      for (const img of list) {
+        if (!img.file) {
+          failed.push({
+            id: img.id,
+            name: img.id,
+            error: new Error("Image file is no longer available"),
+          })
+          continue
+        }
+        try {
+          const url = await upload(img.file, img.dir)
+          urlMap.set(`pending-image:${img.id}`, url)
+          committedIds.push(img.id)
+        } catch (e) {
+          const error = e instanceof Error ? e : new Error(String(e))
+          failed.push({ id: img.id, name: img.id, error })
+        }
       }
     }
-    return combined
+    return { urlMap, committedIds, failed }
   }
 
-  private async commitPending(dir: string, upload: (file: File, dir: string) => Promise<string>): Promise<Map<string, string>> {
-    const list = this.pendingByDir.get(dir) || []
-    const urlMap = new Map<string, string>()
-    for (const img of list) {
-      const url = await upload(img.file!, dir)
-      urlMap.set(`pending-image:${img.id}`, url)
-      img.commit(url)
-      try { await removeRecordById(img.id) } catch {}
+  /** Drop the pending records whose upload AND referencing doc write both
+   *  succeeded. Call only after the flush wrote the files using `urlMap`. */
+  async confirmCommitted(urlMap: Map<string, string>): Promise<void> {
+    for (const key of urlMap.keys()) {
+      if (!key.startsWith("pending-image:")) continue
+      await this.removePending(key.slice("pending-image:".length))
     }
-    this.pendingByDir.delete(dir)
-    return urlMap
   }
 
   getPending(dir: string): Image[] {
@@ -258,6 +292,64 @@ class ImageService {
     if (provider.deleteImage) {
       return provider.deleteImage(name, this.currentDocDir)
     }
+  }
+
+  /** Rename a committed image file on disk. Pending images cannot be renamed
+   *  (they are renamed implicitly at upload time). Returns the new URL and
+   *  refreshes the known-image cache for `dir`. */
+  async renameImage(name: string, newName: string, dir?: string): Promise<string> {
+    if (name.startsWith("pi-")) {
+      throw new Error("Cannot rename a pending image")
+    }
+    const provider = getProvider()
+    if (!provider.renameImage) {
+      throw new Error("Renaming images is not supported in this mode")
+    }
+    const docDir = dir ?? this.currentDocDir
+    const url = await provider.renameImage(name, docDir, newName)
+    const list = this.knownByDir.get(docDir)
+    if (list) {
+      const idx = list.findIndex(k => k.id === name)
+      if (idx !== -1) list.splice(idx, 1)
+      list.push(Image.fromEntry({ name: newName, url, storageUrl: url, usedIn: [] }, docDir))
+    }
+    return url
+  }
+
+  /**
+   * Conservative orphan cleanup, gated by `DELETE_ORPHANED_IMAGES`.
+   *
+   * Deletes an image from `dir` only when ALL of these hold:
+   *   - the current document's pre-edit body (`baselineBody`) referenced it,
+   *   - the current document's just-saved body (`newBody`) no longer does,
+   *   - the backend reports no references at all (checked against the exact
+   *     `docPath` and every other document).
+   *
+   * Images the current document never referenced are left alone, so unrelated
+   * orphaned files in the folder are never touched. The `newBody` check is the
+   * authoritative "deleted from the current document" signal — it is immune to
+   * backend ref-scan caps/staleness (if the scan misses the current doc, the
+   * client-side `newBody` check still keeps the file).
+   */
+  async cleanupOrphanedImages(opts: {
+    dir: string
+    docPath: string
+    baselineBody: string | undefined
+    newBody: string
+  }): Promise<void> {
+    if (!DELETE_ORPHANED_IMAGES) return
+    if (opts.baselineBody === undefined) return
+    const provider = getProvider()
+    if (!provider.listImages || !provider.deleteImage) return
+    try {
+      const images = await provider.listImages(opts.dir, true)
+      for (const img of images) {
+        if (!opts.baselineBody.includes(img.name)) continue
+        if (opts.newBody.includes(img.name)) continue
+        if (img.usedIn.length > 0) continue
+        await provider.deleteImage(img.name, opts.dir)
+      }
+    } catch {}
   }
 }
 

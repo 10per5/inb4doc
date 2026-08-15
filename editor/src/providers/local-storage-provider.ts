@@ -4,7 +4,7 @@ import { buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
 import { extractSnippets, contentMatches } from "@/utils/content-search"
 import { imageKey, IMAGE_PREFIX, STORE_FILES, type FileEntry } from "@/config/storage-keys"
-import { storageService } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
 import { imageStore } from "@/stores/image-store"
 
 
@@ -149,6 +149,23 @@ export class LocalStorageProvider implements ContentProvider {
 
   async deleteImage(name: string, _dir: string): Promise<void> {
     imageStore.deleteImage(name)
+  }
+
+  async renameImage(name: string, _dir: string, newName: string): Promise<string> {
+    const data = imageStore.getImage(name)
+    if (!data) throw new Error("Image not found")
+    imageStore.setImage(newName, data)
+    imageStore.deleteImage(name)
+    const files = storageService.loadProviderFiles(this.providerId)
+    let changed = false
+    for (const [path, entry] of Object.entries(files)) {
+      if (entry.content?.includes(`inb4doc-image:${name}`)) {
+        entry.content = entry.content.split(`inb4doc-image:${name}`).join(`inb4doc-image:${newName}`)
+        changed = true
+      }
+    }
+    if (changed) storageService.saveProviderFiles(this.providerId, files)
+    return `inb4doc-image:${newName}`
   }
 
   private removeOrphanedImages(): void {

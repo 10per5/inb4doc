@@ -582,4 +582,56 @@ body.layout-mobile-shrink .book-layout {
   color: var(--color-accent);
   background: var(--color-accent-soft);
 }
+
+/* "+" FAB button in the quick-menu strip (a dock FAB affordance for every
+ * mode; the dock FAB itself stays hidden at tablet widths). Pins to the right
+ * edge of the strip and mirrors the FAB accent. The controller shows it in
+ * every mode and hides it while the focused block has its own contextual
+ * actions (list/table). [hidden] must be explicit — the .edit-toolbar-group
+ * base rule sets display:flex, which would otherwise beat the UA [hidden]
+ * rule. */
+.edit-toolbar-group--add[hidden] {
+  display: none;
+}
+
+.edit-toolbar-group--add {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.edit-toolbar-btn--add {
+  color: var(--color-accent);
+}
+
+.edit-toolbar-btn--add:active {
+  color: var(--color-btn-active-text);
+  background: var(--color-accent);
+}
+
+/* The "+" opens the shared add-block menu (same items as the dock FAB).
+ * The panel mounts in a fixed 0×0 anchor outside the strip, so hiding the
+ * strip while the menu is open does not hide the panel. The Menu positions it
+ * via applyPanelFlip (which sets the anchor's left/top); the shared
+ * toolbar-menu--up/--right flip classes handle direction. */
+.edit-toolbar-fab-menu-anchor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 300;
+}
+
+/* While the FAB add-block menu is open the strip hides so the two never
+ * overlap (e.g. follow mode, where both would sit at the caret's block). */
+.edit-toolbar-fab-menu-open .edit-toolbar {
+  display: none;
+}
+
+/* The add-block panel's grouped submenus open leftward when the panel is
+ * right-aligned (follow mode / narrow tablet), mirroring the dock FAB rule. */
+.edit-toolbar-fab-menu-anchor .edit-toolbar-fab-menu.toolbar-menu--right .menu-item-submenu .menu-submenu {
+  left: auto;
+  right: 100%;
+}
 <% } %>

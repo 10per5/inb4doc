@@ -461,20 +461,6 @@ saucer::scheme::response handle_app_request(
                 .mime = "text/plain", .status = 405};
     }
 
-    // -- Image API: GET /uploads/{path} --
-
-    const std::string uploads_prefix = "uploads/";
-    if (path.size() > uploads_prefix.size() &&
-        path.substr(0, uploads_prefix.size()) == uploads_prefix &&
-        method == "GET")
-    {
-        auto rel_path = path.substr(uploads_prefix.size());
-        auto qm = rel_path.find('?');
-        if (qm != std::string::npos)
-            rel_path = rel_path.substr(0, qm);
-        return handle_serve_image(cfg, rel_path);
-    }
-
     // -- Image API: GET /api/images --
 
     if (path == "api/images" && method == "GET")
@@ -494,6 +480,26 @@ saucer::scheme::response handle_app_request(
         name = url_decode(name);
         auto qs = extract_query(req_url.string());
         return handle_delete_image(cfg, name, qs);
+    }
+
+    // -- Content asset: GET {path} -- any file inside the content root is
+    //    served by its natural content-relative path with a MIME guessed
+    //    from the extension (the same URL Hugo publishes), e.g.
+    //    app://docs/image/foo.png -> <root>/docs/image/foo.png. Markdown
+    //    stays handled by /content/ above.
+    if (method == "GET")
+    {
+        auto asset = fs::path(cfg.root()) / path;
+        fs::path asset_resolved;
+        std::error_code asset_ec;
+        if (security::within_base(asset, cfg.root(), asset_resolved) &&
+            fs::is_regular_file(asset_resolved, asset_ec) && !asset_ec &&
+            asset_resolved.extension() != ".md")
+        {
+            return {.data = stash_from_file(asset_resolved.string()),
+                    .mime = guess_mime(asset_resolved.string()),
+                    .status = 200};
+        }
     }
 
     // -- Static files (Part C.1 W3) --

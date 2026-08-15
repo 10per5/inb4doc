@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The web app paints color-bg-secondary (light #f8f9fa / dark #3b4252)
+         behind the toolbar and mobile dock; the reserved camera/status-bar strip
+         matches that value so it blends into the app chrome (WebViewActivity
+         applyTheme() keeps it in step when the app's dark/light theme changes). -->
     <style name="Theme.Inb4doc" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowDisablePreview">true</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:statusBarColor">#FF1A1A2E</item>
-        <item name="android:navigationBarColor">#FF1A1A2E</item>
+        <item name="android:windowBackground">#F8F9FA</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

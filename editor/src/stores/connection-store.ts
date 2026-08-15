@@ -1,6 +1,6 @@
 import { hasFunc, AppFunc } from "$/build/build-mode"
-import { storageService } from "@/services/storage"
-import type { ConnectionConfig } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
+import type { ConnectionConfig } from "@/services/storage-service"
 import { ProviderType } from "@/providers"
 import { STORE_CONNECTIONS } from "@/config/storage-keys"
 

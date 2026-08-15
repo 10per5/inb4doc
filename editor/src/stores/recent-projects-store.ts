@@ -1,4 +1,4 @@
-import { storageService } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
 import { STORE_RECENT_PROJECTS } from "@/config/storage-keys"
 
 export interface RecentProject {

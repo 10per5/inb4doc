@@ -42,6 +42,8 @@ export interface MenuOptions {
   panelClass?: string
   anchorRect?: FlipAnchorRect
   preferAbove?: boolean
+  onOpen?: () => void
+  onClose?: () => void
 }
 
 export interface MenuRegistry {
@@ -138,6 +140,8 @@ export class Menu {
   private panelClass?: string
   private anchorRect: FlipAnchorRect | null = null
   private preferAbove = false
+  private onOpen?: () => void
+  private onClose?: () => void
 
   constructor(opts: MenuOptions) {
     this.mountEl = opts.mountEl
@@ -147,6 +151,8 @@ export class Menu {
     this.panelClass = opts.panelClass
     this.anchorRect = opts.anchorRect ?? null
     this.preferAbove = opts.preferAbove ?? false
+    this.onOpen = opts.onOpen
+    this.onClose = opts.onClose
     this.boundOutsideClick = this.onOutsideClick.bind(this)
     this.boundPanelKeyDown = this.onPanelKeyDown.bind(this)
     this.build(opts.label, opts.title, opts.triggerEl)
@@ -197,6 +203,7 @@ export class Menu {
     openMenus.add(this)
     requestAnimationFrame(() => this.triggerEl.focus())
     document.addEventListener("click", this.boundOutsideClick, true)
+    this.onOpen?.()
   }
 
   openAndFocusFirst() {
@@ -210,6 +217,7 @@ export class Menu {
     this._isOpen = false
     openMenus.delete(this)
     document.removeEventListener("click", this.boundOutsideClick, true)
+    this.onClose?.()
   }
 
   focusFirstItem() {

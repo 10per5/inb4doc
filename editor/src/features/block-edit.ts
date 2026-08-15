@@ -26,11 +26,10 @@ import {
   videoCamera,
 } from "@/eta/icons";
 import { defaultVideoAttrs } from "@/plugins/video";
-import { openVideoDialog, type VideoDialogResult } from "@/controllers/dialog/video-dialog";
-import { imageService } from "@/services/image-service";
+import { openVideoDialog, type VideoDialogAttrs } from "@/controllers/dialog/video-dialog.type";
+import { openImageDialog } from "@/controllers/dialog/image-dialog.type";
 import {
   SlashCommand, SLASH_CMD_PREFIX,
-  ImageAction, IMG_ACTION_PREFIX,
   ProseNodeType, proseNodeTypeByName,
 } from "@/config/enums";
 
@@ -219,12 +218,6 @@ class SlashView {
   private filterText = "";
   #programmaticPos: number | null = null;
   #programmaticActive = false;
-  #imageSlashStart: number = -1;
-  #editState:
-    | { type: "create" }
-    | { type: "edit"; pos: number; src: string }
-    | null = null;
-  #imageMode = false;
 
   constructor(view: EditorView, ctx: Ctx) {
     this.view = view;
@@ -270,8 +263,29 @@ class SlashView {
       }
     };
     view.dom.addEventListener("inb4doc:edit-image", ((e: CustomEvent) => {
-      const { pos, src } = e.detail;
-      this.openImageEditor(pos, src);
+      const { pos, src, attrs } = e.detail;
+      openImageDialog({ mode: "edit", pos, src, attrs: attrs ?? {} }).then(
+        (result) => {
+          if (result == null) return;
+          const view = this.view;
+          const { state, dispatch } = view;
+          const node = state.doc.nodeAt(pos);
+          if (!node) return;
+          if (result.action === "remove") {
+            dispatch(state.tr.delete(pos, pos + node.nodeSize));
+          } else {
+            const a = node.attrs as Record<string, unknown>;
+            const next: Record<string, unknown> = { ...a, src: result.src };
+            if ("caption" in a) next.caption = result.caption;
+            else {
+              next.alt = result.alt;
+              next.title = result.caption;
+            }
+            dispatch(state.tr.setNodeMarkup(pos, null, next));
+          }
+          view.focus();
+        },
+      );
     }) as EventListener);
 
     view.dom.addEventListener("inb4doc:edit-video", ((e: CustomEvent) => {
@@ -294,14 +308,9 @@ class SlashView {
             view.state.doc.resolve(view.state.selection.from).node()
           ) {
             self.#programmaticPos = null;
-            self.#imageMode = false;
             return false;
           }
           self.#programmaticPos = null;
-          if (self.#imageMode) {
-            self.#imageMode = false;
-            return true;
-          }
           self.filterText = "";
           self.renderItems();
           return true;
@@ -367,56 +376,18 @@ class SlashView {
   }
 
   private execute(item: HTMLElement) {
-    const imgActionStr = item.dataset.imgAction;
     const cmdStr = item.dataset.cmd;
     const level = parseInt(item.dataset.level || "0");
     const view = this.view;
     const isProgrammatic = this.#programmaticActive;
     this.#programmaticActive = false;
 
-    // Image picker commands (via data-img-action)
-    if (imgActionStr) {
-      const imgAction = Number(imgActionStr.replace(IMG_ACTION_PREFIX, "")) as ImageAction;
-      if (imgAction === ImageAction.Select) {
-        const url = item.dataset.url || "";
-        if (url) this.confirmImageUrl(url);
-        return;
-      }
-      if (imgAction === ImageAction.UrlSubmit) {
-        const input = this.content.querySelector(
-          ".slash-url-input",
-        ) as HTMLInputElement;
-        const url = input?.value.trim() || "";
-        if (url) this.confirmImageUrl(url);
-        return;
-      }
-      if (imgAction === ImageAction.Cancel) {
-        this.#editState = null;
-        this.provider.hide();
-        this.view.focus();
-        return;
-      }
-      if (imgAction === ImageAction.Remove) {
-        if (this.#editState?.type === "edit") {
-          const { state, dispatch } = this.view;
-          const pos = this.#editState.pos;
-          const node = state.doc.nodeAt(pos);
-          if (node) {
-            dispatch(state.tr.delete(pos, pos + node.nodeSize));
-          }
-        }
-        this.#editState = null;
-        this.provider.hide();
-        this.view.focus();
-        return;
-      }
-    }
-
     // Slash commands (via data-cmd)
     if (!cmdStr) return;
     const cmd = Number(cmdStr.replace(SLASH_CMD_PREFIX, "")) as SlashCommand;
 
-    // Handle slash image command: show picker instead of inserting empty block
+    // Handle slash image command: open the image dialog instead of inserting
+    // an empty block (mirrors the video flow below)
     if (cmd === SlashCommand.Image) {
       const { $from } = view.state.selection;
       const textBefore = $from.parent.textBetween(
@@ -424,12 +395,40 @@ class SlashView {
         $from.parentOffset,
       );
       const slashPos = textBefore.lastIndexOf("/");
-      this.#imageSlashStart =
+      const deleteFrom =
         slashPos >= 0 ? $from.pos - ($from.parentOffset - slashPos) : -1;
-      this.#editState = { type: "create" };
-      this.#programmaticActive = true;
-      this.#programmaticPos = $from.pos;
-      this.renderImagePicker();
+      if (deleteFrom >= 0) {
+        view.dispatch(view.state.tr.delete(deleteFrom, $from.pos));
+      }
+      const { state } = view;
+      const { $from: afterDel } = state.selection;
+      const blockStart = afterDel.before(afterDel.depth);
+      const blockEnd = afterDel.end(afterDel.depth);
+      const imageNode = state.schema.nodes["image-block"]?.create();
+      if (imageNode) {
+        const tr = state.tr.replaceWith(blockStart, blockEnd, imageNode);
+        view.dispatch(tr.scrollIntoView());
+        openImageDialog({
+          mode: "create",
+          pos: blockStart,
+          src: "",
+          attrs: { ...imageNode.attrs },
+        }).then((result) => {
+          if (result == null || result.action !== "save") return;
+          const { state: s, dispatch: d } = this.view;
+          const node = s.doc.nodeAt(blockStart);
+          if (!node) return;
+          d(
+            s.tr.setNodeMarkup(blockStart, null, {
+              ...(node.attrs as Record<string, unknown>),
+              src: result.src,
+              caption: result.caption,
+            }),
+          );
+          this.view.focus();
+        });
+      }
+      view.focus();
       return;
     }
 
@@ -480,179 +479,22 @@ class SlashView {
     executeInsertCommand(this.milkdownCtx, cmd, level);
   }
 
-  private openImageEditor(pos: number, src: string) {
-    this.#editState = { type: "edit", pos, src };
-    this.renderImagePicker();
-    const { state, dispatch } = this.view;
-    const tr = state.tr.setSelection(TextSelection.create(state.doc, pos));
-    dispatch(tr);
-  }
-
-  private openVideoEditor(pos: number, attrs: VideoDialogResult) {
+  private openVideoEditor(pos: number, attrs: VideoDialogAttrs) {
     const view = this.view;
 
-    openVideoDialog(
-      attrs,
-      (result) => {
-        const { state, dispatch } = view;
-        const node = state.doc.nodeAt(pos);
-        if (node) {
-          dispatch(
-            state.tr.setNodeMarkup(pos, null, { ...node.attrs, ...result }),
-          );
-        }
-        view.focus();
-      },
-      () => {
-        const { state, dispatch } = view;
+    openVideoDialog(attrs).then((result) => {
+      if (result == null) return;
+      const { state, dispatch } = view;
+      if (result.action === "remove") {
         const tr = state.tr.delete(pos, pos + (state.doc.nodeAt(pos)?.nodeSize ?? 0));
         dispatch(tr);
-        view.focus();
-      },
-    );
-  }
-
-  private renderImagePicker() {
-    const editState = this.#editState;
-    const currentSrc = editState?.type === "edit" ? editState.src : "";
-    const html = `
-      <div class="slash-image-picker">
-        <div class="slash-image-suggestions" data-area="suggestions">
-          <div class="slash-image-empty">Loading\u2026</div>
-        </div>
-        <div class="slash-url-row">
-          <input class="slash-url-input" type="text" placeholder="Paste image URL\u2026" value="${currentSrc}">
-          <button class="slash-url-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.UrlSubmit}">OK</button>
-          <button class="slash-url-btn slash-cancel-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Cancel}">Cancel</button>
-          ${editState?.type === "edit" ? `<button class="slash-url-btn slash-remove-btn" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Remove}">Remove</button>` : ""}
-        </div>
-        <div class="slash-upload-row">
-          <label class="slash-upload-label">
-            Upload from computer
-            <input type="file" accept="image/*" class="slash-upload-input" hidden>
-          </label>
-        </div>
-      </div>
-    `;
-    this.content.innerHTML = html;
-    this.#imageMode = true;
-    const es = this.#editState;
-    const pos =
-      es?.type === "edit"
-        ? es.pos
-        : this.#imageSlashStart >= 0
-          ? this.#imageSlashStart
-          : this.view.state.selection.from;
-    this.#programmaticPos = pos;
-    this.#programmaticActive = true;
-
-    const coords = this.view.coordsAtPos(pos);
-    if (coords) {
-      this.content.style.left = `${coords.left}px`;
-      this.content.style.top = `${coords.bottom + 4}px`;
-    }
-    this.provider.show();
-
-    const uploadInput = this.content.querySelector(
-      ".slash-upload-input",
-    ) as HTMLInputElement;
-    if (uploadInput) {
-      uploadInput.addEventListener("change", () => {
-        const file = uploadInput.files?.[0];
-        if (file) this.triggerImageUpload(file);
-      });
-    }
-
-    const urlInput = this.content.querySelector(
-      ".slash-url-input",
-    ) as HTMLInputElement;
-    if (urlInput) {
-      urlInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          this.confirmImageUrl(urlInput.value.trim());
+      } else {
+        const node = state.doc.nodeAt(pos);
+        if (node) {
+          dispatch(state.tr.setNodeMarkup(pos, null, { ...node.attrs, ...result }));
         }
-      });
-      urlInput.focus();
-      urlInput.select();
-    }
-
-    imageService.listImages()
-      .catch(() => {})
-      .then(() => {
-        this.renderImageSuggestions();
-      });
-  }
-
-  private renderImageSuggestions() {
-    const el = this.content.querySelector("[data-area='suggestions']");
-    if (!el) return;
-    const allImages = imageService.getAllImages();
-    el.innerHTML =
-      allImages
-        .slice(0, 3)
-        .map(
-          (img) => `
-      <div class="slash-image-item" data-img-action="${IMG_ACTION_PREFIX}${ImageAction.Select}" data-url="${img.url}">
-        <img src="${img.url}" />
-        <span>${img.name}</span>
-        ${img.pending ? '<span class="slash-image-pending">(pending)</span>' : ""}
-      </div>
-    `,
-        )
-        .join("") || '<div class="slash-image-empty">No images yet</div>';
-  }
-
-  private confirmImageUrl(url: string) {
-    const view = this.view;
-    const { state, dispatch } = view;
-
-    if (this.#editState?.type === "edit") {
-      const pos = this.#editState.pos;
-      const node = state.doc.nodeAt(pos);
-      if (node) {
-        dispatch(
-          state.tr.setNodeMarkup(pos, null, { ...node.attrs, src: url }),
-        );
       }
-      this.#editState = null;
-      this.provider.hide();
       view.focus();
-      return;
-    }
-
-    const img = state.schema.nodes["image-block"]?.create({
-      src: url,
-      caption: "",
-      ratio: 1,
-    });
-    const para = state.schema.nodes.paragraph.create();
-    if (!img) return;
-
-    let tr = state.tr;
-    if (this.#imageSlashStart >= 0) {
-      const currentPos = state.selection.$from.pos;
-      tr = tr.delete(this.#imageSlashStart, currentPos);
-    }
-
-    const { $from } = tr.selection;
-    const depth = $from.depth;
-    const pos = depth > 0 ? $from.before(depth) : $from.pos;
-    const blockSize = depth > 0 ? $from.node(depth).nodeSize : 0;
-    tr = tr.replaceWith(pos, pos + blockSize, [img, para]);
-    tr = tr.setSelection(TextSelection.create(tr.doc, pos + 1));
-    dispatch(tr.scrollIntoView());
-
-    this.#editState = null;
-    this.#imageSlashStart = -1;
-    this.provider.hide();
-    view.focus();
-  }
-
-  private triggerImageUpload(file: File) {
-    imageService.uploadImage(file).then((url) => {
-      this.confirmImageUrl(url);
     });
   }
 

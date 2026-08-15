@@ -51,7 +51,6 @@ export class VideoDialogController extends BaseDialogController {
   }
 
   remove() {
-    this.confirm({})
-    this.dispatch("remove", { bubbles: true })
+    this.confirm({ action: "remove" })
   }
 }

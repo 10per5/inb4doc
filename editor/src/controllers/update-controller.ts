@@ -94,7 +94,7 @@ export default class UpdateController extends Controller {
     // A change that cannot be applied in place (entry pot / shell / stateful
     // pot). Production builds ask first — the page may hold unsaved edits — and
     // let the user reload on their terms. Dev mode never emits this (it reloads
-    // immediately in sw-registrar).
+    // immediately in sw-registrar-service).
     if (this.toast) this.toast.remove();
     this.toast = null;
     if (this.dismissTimer) clearTimeout(this.dismissTimer);

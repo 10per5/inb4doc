@@ -1,5 +1,5 @@
-import type { ModuleRegistry } from "@/services/module-registry"
-import { getLoadedChunkNames } from "@/services/module-registry"
+import type { ModuleRegistry } from "@/services/module-registry-service"
+import { getLoadedChunkNames } from "@/services/module-registry-service"
 import { updaterDiff, isStaleVersion } from "@/eta/updater-core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { appState } from "@/stores/app-state"

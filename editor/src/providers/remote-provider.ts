@@ -123,4 +123,16 @@ export class RemoteProvider implements ContentProvider {
     })
     if (!resp.ok) throw backendError(resp.status, `Failed to delete image: ${resp.statusText}`)
   }
+
+  async renameImage(name: string, dir: string, newName: string): Promise<string> {
+    const resp = await fetch(this.url("/api/rename-image"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, dir, newName }),
+    })
+    if (!resp.ok) throw backendError(resp.status, `Failed to rename image: ${resp.statusText}`)
+    const data = await resp.json()
+    if (!data.url) throw backendError(500, "Rename returned no URL")
+    return data.url
+  }
 }

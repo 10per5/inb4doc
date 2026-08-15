@@ -62,19 +62,27 @@ function visitVideo(ast: Node) {
     const parent = parents[parents.length - 1] as Node & { children: Node[] }
     if (!parent) return
 
-    const videoNode = { type: "video", ...parseVideoAttrs(trimmed) } as any
-
     if (parent.type === "paragraph") {
-      if (parent.children.length !== 1) return
+      // `<video ...></video>` is inline HTML, so remark tokenizes the opening
+      // and closing tags into *separate* html nodes inside the paragraph.
+      // Rebuild the full markup from every child so attrs parse on reload,
+      // then swap the whole paragraph for the video node.
       const grandParent = parents.length > 1 ? parents[parents.length - 2] as Node & { children: Node[] } : null
       if (!grandParent) return
+      const fullHtml = (parent.children as Node[])
+        .map((c) => (c as Node & { value?: string }).value ?? "")
+        .join("")
+      const videoNode = { type: "video", ...parseVideoAttrs(fullHtml) } as any
       const pIndex = grandParent.children.indexOf(parent)
       if (pIndex === -1) return
       grandParent.children.splice(pIndex, 1, videoNode)
       return
     }
 
-    parent.children.splice(indexOfNode(parent, node), 1, videoNode)
+    parent.children.splice(indexOfNode(parent, node), 1, {
+      type: "video",
+      ...parseVideoAttrs(trimmed),
+    } as any)
   })
 }
 

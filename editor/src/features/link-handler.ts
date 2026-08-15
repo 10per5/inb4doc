@@ -14,7 +14,7 @@ export function initLinkHandler(getEditor: () => Editor | null) {
     const editor = getEditor()
     if (!editor) return
 
-    const { editorContext } = await import("@/services/editor-context")
+    const { editorContext } = await import("@/services/editor-context-service")
     const { commandService } = await import("@/services/command-service")
     await Promise.all([editorContext.load(), commandService.load()])
 

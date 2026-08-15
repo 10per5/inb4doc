@@ -60,6 +60,7 @@ export class PendingOps {
     const paths: string[] = []
     for (const [id, op] of this.ops) {
       if (op.type === PendingOpType.Edit) paths.push(id)
+      else if (op.type === PendingOpType.Create) paths.push(id)
     }
     return paths
   }

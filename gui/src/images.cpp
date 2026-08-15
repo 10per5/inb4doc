@@ -15,22 +15,6 @@ namespace fs = std::filesystem;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-static std::string guess_image_mime(const std::string &path)
-{
-    auto dot = path.rfind('.');
-    if (dot == std::string::npos) return "application/octet-stream";
-    auto ext = path.substr(dot);
-    for (auto &c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    if (ext == ".png")  return "image/png";
-    if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
-    if (ext == ".gif")  return "image/gif";
-    if (ext == ".svg")  return "image/svg+xml";
-    if (ext == ".webp") return "image/webp";
-    if (ext == ".bmp")  return "image/bmp";
-    if (ext == ".ico")  return "image/x-icon";
-    return "application/octet-stream";
-}
-
 static saucer::stash stash_from_file(const std::string &path)
 {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -92,6 +76,19 @@ static std::map<std::string, std::string> parse_query(const std::string &qs)
     return result;
 }
 
+static std::string replace_all(std::string s, const std::string &from,
+                               const std::string &to)
+{
+    if (from.empty()) return s;
+    size_t pos = 0;
+    while ((pos = s.find(from, pos)) != std::string::npos)
+    {
+        s.replace(pos, from.size(), to);
+        pos += to.size();
+    }
+    return s;
+}
+
 // ── Filename sanitizer ──────────────────────────────────────────────────
 
 static std::string sanitize_image_name(const std::string &name)
@@ -144,47 +141,7 @@ static std::string sanitize_image_name(const std::string &name)
     return (clean.empty() ? "image" : clean) + "-" + suffix + ext;
 }
 
-// ── Handle: GET /uploads/{path} ─────────────────────────────────────────
-
-saucer::scheme::response handle_serve_image(
-    const config &cfg,
-    const std::string &rel_path)
-{
-    if (rel_path.empty())
-        return {.data = saucer::stash::from_str("Not Found"),
-                .mime = "text/plain", .status = 404};
-
-    auto target = fs::path(cfg.root()) / rel_path;
-
-    fs::path resolved;
-    if (!security::within_base(target, cfg.root(), resolved))
-        return {.data = saucer::stash::from_str("Forbidden"),
-                .mime = "text/plain", .status = 403};
-
-    // Check extension is allowed image type
-    if (!security::is_image_file(resolved.string()))
-        return {.data = saucer::stash::from_str("Forbidden"),
-                .mime = "text/plain", .status = 403};
-
-    // Must contain /image/ or end with /image
-    std::error_code rel_ec;
-    auto rel = fs::relative(resolved, cfg.root(), rel_ec).string();
-    if (rel_ec)
-        return {.data = saucer::stash::from_str("Forbidden"),
-                .mime = "text/plain", .status = 403};
-    if (rel.find("/image/") == std::string::npos && !rel.ends_with("/image"))
-        return {.data = saucer::stash::from_str("Forbidden"),
-                .mime = "text/plain", .status = 403};
-
-    std::error_code exist_ec;
-    if (!fs::exists(resolved, exist_ec) || fs::is_directory(resolved, exist_ec))
-        return {.data = saucer::stash::from_str("Not Found"),
-                .mime = "text/plain", .status = 404};
-
-    auto data = stash_from_file(resolved.string());
-    auto mime = guess_image_mime(resolved.string());
-    return {.data = data, .mime = mime, .status = 200};
-}
+// ── Handle: upload ───────────────────────────────────────────────────────
 
 saucer::scheme::response save_uploaded_image(
     const config &cfg,
@@ -229,12 +186,14 @@ saucer::scheme::response save_uploaded_image(
         f.write(file_content.data(), static_cast<std::streamsize>(file_content.size()));
     }
 
-    // Build URL response
+    // Build URL response — the image's natural content-relative path, the
+    // same URL Hugo publishes and the scheme/HTTP server now serves with a
+    // MIME guessed from the extension. No virtual /uploads/ prefix.
     std::string url;
     if (!doc_dir.empty())
-        url = "image/" + safe_name;
+        url = "/" + doc_dir + "/image/" + safe_name;
     else
-        url = "/uploads/image/" + safe_name;
+        url = "/image/" + safe_name;
 
     std::ostringstream out;
     out << "{\"url\":\"" << json_escape(url) << "\"}";
@@ -364,8 +323,8 @@ saucer::scheme::response handle_list_images(
         if (!first) out << ",";
         first = false;
         auto rel_url = doc_dir.empty()
-            ? "/uploads/image/" + name
-            : "/uploads/" + doc_dir + "/image/" + name;
+            ? "/image/" + name
+            : "/" + doc_dir + "/image/" + name;
         out << "{\"name\":\"" << json_escape(name)
             << "\",\"url\":\"" << json_escape(rel_url) << "\"";
 
@@ -440,6 +399,96 @@ saucer::scheme::response handle_delete_image(
 
     std::string ok = "{\"ok\":true}";
     return {.data = saucer::stash::from_str(ok),
+            .mime = "application/json", .status = 200};
+}
+
+// ── Handle: rename image ─────────────────────────────────────────────────
+
+saucer::scheme::response handle_rename_image(
+    const config &cfg,
+    const std::string &name,
+    const std::string &doc_dir,
+    const std::string &new_name)
+{
+    if (name.empty() || new_name.empty())
+        return {.data = saucer::stash::from_str("Missing image name"),
+                .mime = "text/plain", .status = 400};
+
+    if (!security::is_image_file(name))
+        return {.data = saucer::stash::from_str("Not found"),
+                .mime = "text/plain", .status = 404};
+
+    auto safe_new = sanitize_image_name(new_name);
+
+    fs::path image_dir;
+    if (!doc_dir.empty())
+        image_dir = fs::path(cfg.root()) / doc_dir / "image";
+    else
+        image_dir = fs::path(cfg.root()) / "image";
+
+    fs::path resolved_base;
+    if (!security::within_base(image_dir, cfg.root(), resolved_base))
+        return {.data = saucer::stash::from_str("Forbidden"),
+                .mime = "text/plain", .status = 403};
+
+    auto src = resolved_base / name;
+    auto dst = resolved_base / safe_new;
+
+    fs::path resolved_src;
+    fs::path resolved_dst;
+    if (!security::within_base(src, cfg.root(), resolved_src) ||
+        !security::within_base(dst, cfg.root(), resolved_dst))
+        return {.data = saucer::stash::from_str("Forbidden"),
+                .mime = "text/plain", .status = 403};
+
+    std::error_code exist_ec;
+    if (!fs::exists(resolved_src, exist_ec) ||
+        fs::is_directory(resolved_src, exist_ec))
+        return {.data = saucer::stash::from_str("Not found"),
+                .mime = "text/plain", .status = 404};
+
+    std::error_code exist_ec2;
+    if (fs::exists(resolved_dst, exist_ec2))
+        return {.data = saucer::stash::from_str("Target already exists"),
+                .mime = "text/plain", .status = 409};
+
+    std::error_code ec;
+    fs::rename(resolved_src, resolved_dst, ec);
+    if (ec)
+        return {.data = saucer::stash::from_str("Rename failed"),
+                .mime = "text/plain", .status = 500};
+
+    // Rewrite every reference across the content tree. Files that mention the
+    // old name are pre-selected by the same substring scan find_image_refs
+    // uses, so relative/alternate reference forms are covered too.
+    auto old_url = doc_dir.empty()
+        ? "/image/" + name
+        : "/" + doc_dir + "/image/" + name;
+    auto new_url = doc_dir.empty()
+        ? "/image/" + safe_new
+        : "/" + doc_dir + "/image/" + safe_new;
+    const std::string SENTINEL("\x01");
+    auto refs = find_image_refs(cfg.root(), resolved_base, name);
+    for (const auto &rel : refs)
+    {
+        auto full = fs::path(cfg.root()) / rel;
+        std::ifstream f(full);
+        if (!f) continue;
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        std::string rewritten = replace_all(content, old_url, SENTINEL);
+        rewritten = replace_all(rewritten, name, safe_new);
+        rewritten = replace_all(rewritten, SENTINEL, new_url);
+        if (rewritten != content)
+        {
+            std::ofstream out(full, std::ios::trunc);
+            out << rewritten;
+        }
+    }
+
+    std::ostringstream out;
+    out << "{\"url\":\"" << json_escape(new_url) << "\"}";
+    return {.data = saucer::stash::from_str(out.str()),
             .mime = "application/json", .status = 200};
 }
 

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, rmSync, renameSync, writeFileSync } from "fs";
 import { join, extname, dirname, relative, resolve } from "path";
 import { sanitizeImageName } from "../src/utils/sanitize";
 
@@ -18,7 +18,10 @@ const MIME: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
   ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
   ".ico": "image/x-icon",
   ".md": "text/markdown",
   ".woff": "font/woff",
@@ -340,21 +343,6 @@ async function handleUpload(req: Request, ctx: ServerContext): Promise<Response 
   });
 }
 
-function handleUploads(relPath: string, ctx: ServerContext): Response | null {
-  const filePath = resolveWithin(join(ctx.contentDir, relPath), ctx.contentDir);
-  if (!filePath) return new Response(null, { status: 403 });
-  const ext = extname(filePath).toLowerCase();
-  if (!IMAGE_EXTS.has(ext)) return new Response(null, { status: 403 });
-  if (!filePath.includes("/image/") && !filePath.endsWith("/image"))
-    return new Response(null, { status: 403 });
-  if (!existsSync(filePath)) return new Response(null, { status: 404 });
-  if (statSync(filePath).isDirectory()) return new Response(null, { status: 403 });
-  const raw = readFileSync(filePath);
-  return new Response(raw, {
-    headers: { "Content-Type": contentType(filePath) },
-  });
-}
-
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".ico"]);
 
 // ── Search API ────────────────────────────────────────────────────────────
@@ -461,7 +449,7 @@ function handleListImages(req: Request, ctx: ServerContext): Response | null {
   const images = names.map((name) => {
     const entry: { name: string; url: string; storageUrl: string; usedIn?: string[] } = {
       name,
-      url: `/uploads/${join(docDir, "image", name)}`,
+      url: `/${docDir}/image/${name}`,
       storageUrl: `/${docDir}/image/${name}`,
     };
     if (refs) {
@@ -518,6 +506,73 @@ function handleDeleteImage(req: Request, path: string, ctx: ServerContext): Resp
 
   rmSync(target, { force: true });
   return new Response(JSON.stringify({ ok: true }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** Rewrite every reference to the renamed image in all .md files under
+ *  `scanDir`. The canonical absolute URL (`/{dir}/image/{name}`) and the bare
+ *  file name (covers relative/alternate reference forms) are both rewritten;
+ *  a sentinel guards the URL from being clobbered by a bare-name pass when the
+ *  new name contains the old one. */
+function rewriteImageRefs(
+  scanDir: string,
+  oldUrl: string,
+  oldName: string,
+  newUrl: string,
+  newName: string
+): void {
+  const SENTINEL = "\u0000";
+  function scan(dir: string) {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (entry.startsWith(".")) continue;
+      if (statSync(full).isDirectory()) {
+        if (entry === "image") continue;
+        scan(full);
+      } else if (entry.endsWith(".md")) {
+        const before = readFileSync(full, "utf-8");
+        const replaced = before
+          .split(oldUrl).join(SENTINEL)
+          .split(oldName).join(newName)
+          .split(SENTINEL).join(newUrl);
+        if (replaced !== before) writeFileSync(full, replaced, "utf-8");
+      }
+    }
+  }
+  scan(scanDir);
+}
+
+async function handleRenameImage(req: Request, ctx: ServerContext): Promise<Response | null> {
+  const body = await req.json();
+  const name = typeof body.name === "string" ? body.name : "";
+  const docDir = typeof body.dir === "string" ? body.dir : "";
+  const newName = typeof body.newName === "string" ? body.newName : "";
+  if (!name || !newName) return new Response("Missing image name", { status: 400 });
+  if (!IMAGE_EXTS.has(extname(newName).toLowerCase()))
+    return new Response("Not an image file", { status: 400 });
+
+  const imageDir = docDir ? join(ctx.contentDir, docDir, "image") : join(ctx.contentDir, "image");
+  const imageBase = resolveWithin(imageDir, ctx.contentDir);
+  if (!imageBase) return new Response("Forbidden", { status: 403 });
+  const src = resolveWithin(join(imageBase, name), ctx.contentDir);
+  const dst = resolveWithin(join(imageBase, newName), ctx.contentDir);
+  if (!src || !dst) return new Response("Forbidden", { status: 403 });
+
+  const oldUrl = docDir ? `/${docDir}/image/${name}` : `/image/${name}`;
+  const newUrl = docDir ? `/${docDir}/image/${newName}` : `/image/${newName}`;
+  if (src === dst) {
+    return new Response(JSON.stringify({ url: newUrl }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (!existsSync(src)) return new Response("Not found", { status: 404 });
+  if (existsSync(dst)) return new Response("Target already exists", { status: 409 });
+
+  renameSync(src, dst);
+  rewriteImageRefs(dirname(imageBase), oldUrl, name, newUrl, newName);
+
+  return new Response(JSON.stringify({ url: newUrl }), {
     headers: { "Content-Type": "application/json" },
   });
 }
@@ -620,11 +675,6 @@ export async function handleApiRoutes(
     return handleUpload(req, ctx);
   }
 
-  if (path.startsWith("/uploads/") && req.method === "GET") {
-    const relPath = path.slice("/uploads/".length);
-    return handleUploads(relPath, ctx);
-  }
-
   if (path === "/api/move" && req.method === "POST") {
     return handleMove(req, ctx);
   }
@@ -641,8 +691,32 @@ export async function handleApiRoutes(
     return handleDeleteImage(req, path, ctx);
   }
 
+  if (path === "/api/rename-image" && req.method === "POST") {
+    return handleRenameImage(req, ctx);
+  }
+
   if (path === "/api/search" && req.method === "POST") {
     return handleSearch(req, ctx);
+  }
+
+  // Content asset by natural path. Any GET whose path resolves to a real
+  // non-markdown file inside contentDir is served with a MIME guessed from
+  // its extension (e.g. /docs/image/foo.png → {contentDir}/docs/image/foo.png).
+  // This is the URL Hugo publishes, so stored markdown references images by
+  // their real content-relative path.
+  if (req.method === "GET" && !path.startsWith("/api/")) {
+    const assetPath = resolveWithin(join(ctx.contentDir, path), ctx.contentDir);
+    if (
+      assetPath &&
+      extname(assetPath).toLowerCase() !== ".md" &&
+      existsSync(assetPath) &&
+      statSync(assetPath).isFile()
+    ) {
+      const raw = readFileSync(assetPath);
+      return new Response(raw, {
+        headers: { "Content-Type": contentType(assetPath) },
+      });
+    }
   }
 
   return null;

@@ -1,6 +1,6 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate"
 import { showNotification } from "@/components/notification/notification"
-import { storageService } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
 import { IMAGE_PREFIX } from "@/config/storage-keys"
 
 const IMAGE_DATA_PREFIX = "inb4doc:image:"

@@ -1,5 +1,5 @@
 import type { PendingOp } from "@/entities/PendingOps"
-import { storageService } from "@/services/storage"
+import { storageService } from "@/services/storage-service"
 import { STORE_PENDING_OPS } from "@/config/storage-keys"
 import { activeProviderId } from "@/stores/provider-store"
 

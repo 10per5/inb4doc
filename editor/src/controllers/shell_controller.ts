@@ -3,17 +3,17 @@
  *
  * Finds child Stimulus controllers (editor, sidebar, topbar) via targets/outlets,
  * creates plain-class sub-services (NavigationService, FileSyncService,
- * ViewController), and wires event subscriptions.
+ * ViewService), and wires event subscriptions.
  */
 
 import { Controller } from "@hotwired/stimulus"
 import type { Editor } from "@milkdown/kit/core"
-import { applyThemeFromPrefs } from "@/services/theme";
+import { applyThemeFromPrefs } from "@/utils/theme";
 import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";
 import type { EditorController } from "@/controllers/editor-controller";
 import { FileSyncService } from "@/services/file-sync-service";
-import { ViewController } from "@/services/view-controller";
+import { ViewService } from "@/services/view-service";
 import { LayoutService } from "@/services/layout-service";
 import { NavigationService } from "@/services/navigation-service";
 import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
@@ -32,8 +32,8 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { changesScreenStore } from "@/stores/changes-screen-store";
 import { PendingOpType } from "@/entities/PendingOps";
-import { updateEditorTint } from "@/services/file-status-tint";
-import { storageService } from "@/services/storage";
+import { updateEditorTint } from "@/utils/file-status-tint";
+import { storageService } from "@/services/storage-service";
 import { isMobileDock } from "@/utils/mobile";
 
 let sessionStarted = 0;
@@ -55,7 +55,7 @@ export default class extends Controller {
   private editor!: EditorController
   private cache!: FileSyncService
   private nav!: NavigationService
-  private view!: ViewController
+  private view!: ViewService
 
   private initialPath: string = ""
   private uiService: UIService = UIService.getInstance()
@@ -81,7 +81,7 @@ export default class extends Controller {
     applyThemeFromPrefs()
 
     this.cache = new FileSyncService(this.editor as any)
-    this.view = new ViewController(this.editor as any, sessionStarted)
+    this.view = new ViewService(this.editor as any, sessionStarted)
     this.nav = new NavigationService(this.editor as any, this.cache)
     // Apply the boot layout preset (focused by default) so the View-menu panel
     // toggles are in effect from first paint.
@@ -304,7 +304,7 @@ export default class extends Controller {
   private async resolveInitialPath(): Promise<{ path: string; isNew: boolean }> {
     const requested = this.initialPath || HOME_PATH
     const tree = treeStore.getTree()
-    const pages = treePaths(tree)
+    const pages = treePaths(this.cache.getPendingOps().applyToTree(tree))
 
     if (pages.includes(requested)) {
       return { path: requested, isNew: false }

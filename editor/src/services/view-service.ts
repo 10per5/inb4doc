@@ -1,5 +1,5 @@
 /**
- * ViewController — manages view switching and disk usage view.
+ * ViewService — manages view switching and disk usage view.
  *
  * ViewManager was inlined here since it was only used as an implementation
  * detail of this controller. The view type and switching logic live together.
@@ -7,14 +7,13 @@
 
 import { stripFrontmatter } from "@/utils/frontmatter";
 import type NoFileController from "@/controllers/no-file-controller";
-import type { NoFileViewData } from "@/controllers/no-file-controller";
 import type DirIndexEmptyController from "@/controllers/dir-index-empty-controller";
 import type DiskUsageController from "@/controllers/disk-usage-controller";
 import type { DiskUsageData } from "@/controllers/disk-usage-controller";
 import type ImageManagerController from "@/controllers/image-manager-controller";
 import type ChangesController from "@/controllers/changes-controller";
 import type MoreController from "@/controllers/more-controller";
-import { registerEditorView } from "@/services/editor-view";
+import { registerEditorView } from "@/utils/editor-view";
 import { pagesStore } from "@/stores/page-store";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { treeStore } from "@/stores/tree-store";
@@ -24,17 +23,31 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import { isMobileDock } from "@/utils/mobile";
 import { LayoutService } from "@/services/layout-service";
 import type { EditorController } from "@/controllers/editor-controller";
-import * as focusHandler from "@/services/focus-handler";
+import * as focusHandler from "@/services/focus-handler-service";
 
-export type ViewType = "editor" | "disk-usage" | "no-file" | "dir-index-empty" | "navigation" | "more" | "meta" | "prefs" | "images" | "changes"
+export type ViewType =
+  | "editor"
+  | "disk-usage"
+  | "no-file"
+  | "dir-index-empty"
+  | "navigation"
+  | "more"
+  | "meta"
+  | "prefs"
+  | "images"
+  | "changes";
 
-type ViewHandlers = { activate: () => void; deactivate: () => void; focus?: () => void }
+type ViewHandlers = {
+  activate: () => void;
+  deactivate: () => void;
+  focus?: () => void;
+};
 
-export class ViewController {
-  private current: ViewType = "editor"
-  private views = new Map<ViewType, ViewHandlers>()
-  private editor: EditorController
-  private sessionStarted: number
+export class ViewService {
+  private current: ViewType = "editor";
+  private views = new Map<ViewType, ViewHandlers>();
+  private editor: EditorController;
+  private sessionStarted: number;
   private unsubs: (() => void)[] = [];
   private noFileLastPath: string = "";
   private dirIndexEmptyPath: string = "";
@@ -63,24 +76,24 @@ export class ViewController {
         // via the "more" screen). On tablet it is a left-bar panel and on
         // desktop the aside column — so drop any leftover center meta view.
         if (this.current === "meta") this.switchTo("editor");
-      }),
+      })
     );
   }
 
   switchTo(type: ViewType): void {
-    if (type === this.current) return
-    if (type === "meta") this.ensureMetaScreenView()
+    if (type === this.current) return;
+    if (type === "meta") this.ensureMetaScreenView();
     if (type === "navigation") {
-      this.ensureNavigationScreenView()
+      this.ensureNavigationScreenView();
       // The navigation screen is the nav tree as the center view — collapse the
       // left nav panel so the tree isn't shown twice. setLeftPanel(false)
       // no-ops when it's already off (mobile drawer is independent of this state).
-      LayoutService.getInstance().setLeftPanel(false)
+      LayoutService.getInstance().setLeftPanel(false);
     }
-    this.views.get(this.current)?.deactivate()
-    this.current = type
-    this.views.get(type)?.activate()
-    appEvents.emit(AppEvent.ViewChanged, { view: type })
+    this.views.get(this.current)?.deactivate();
+    this.current = type;
+    this.views.get(type)?.activate();
+    appEvents.emit(AppEvent.ViewChanged, { view: type });
   }
 
   setNoFileLastPath(path: string): void {
@@ -88,16 +101,16 @@ export class ViewController {
   }
 
   getCurrent(): ViewType {
-    return this.current
+    return this.current;
   }
 
   focusCurrent(): void {
-    this.views.get(this.current)?.focus?.()
+    this.views.get(this.current)?.focus?.();
   }
 
   /** Expose register for editor-view.ts registration. */
   get register(): (type: ViewType, handlers: ViewHandlers) => void {
-    return (type, handlers) => this.views.set(type, handlers)
+    return (type, handlers) => this.views.set(type, handlers);
   }
 
   initialize(): void {
@@ -143,10 +156,11 @@ export class ViewController {
         const recents = getRecents();
         const suggestions = getSuggestions(tree, this.noFileLastPath);
         noFileEl.style.display = "";
-        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
-          noFileEl,
-          "no-file",
-        ) as NoFileController | null;
+        const ctrl =
+          this.editor.application.getControllerForElementAndIdentifier(
+            noFileEl,
+            "no-file"
+          ) as NoFileController | null;
         ctrl?.load({ isEmpty, recents, suggestions });
       },
       deactivate: () => {
@@ -192,10 +206,11 @@ export class ViewController {
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
         dirIndexEmptyEl.style.display = "";
-        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
-          dirIndexEmptyEl,
-          "dir-index-empty",
-        ) as DirIndexEmptyController | null;
+        const ctrl =
+          this.editor.application.getControllerForElementAndIdentifier(
+            dirIndexEmptyEl,
+            "dir-index-empty"
+          ) as DirIndexEmptyController | null;
         ctrl?.load({ path: this.dirIndexEmptyPath });
       },
       deactivate: () => {
@@ -267,10 +282,11 @@ export class ViewController {
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
         moreEl.style.display = "";
-        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
-          moreEl,
-          "more",
-        ) as MoreController | null;
+        const ctrl =
+          this.editor.application.getControllerForElementAndIdentifier(
+            moreEl,
+            "more"
+          ) as MoreController | null;
         ctrl?.load();
       },
       deactivate: () => {
@@ -283,10 +299,11 @@ export class ViewController {
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
         imagesEl.style.display = "";
-        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
-          imagesEl,
-          "image-manager",
-        ) as ImageManagerController | null;
+        const ctrl =
+          this.editor.application.getControllerForElementAndIdentifier(
+            imagesEl,
+            "image-manager"
+          ) as ImageManagerController | null;
         void ctrl?.load();
       },
       deactivate: () => {
@@ -298,10 +315,11 @@ export class ViewController {
         milkdownEl.style.display = "none";
         sourceEl.style.display = "none";
         changesEl.style.display = "";
-        const ctrl = this.editor.application.getControllerForElementAndIdentifier(
-          changesEl,
-          "changes",
-        ) as ChangesController | null;
+        const ctrl =
+          this.editor.application.getControllerForElementAndIdentifier(
+            changesEl,
+            "changes"
+          ) as ChangesController | null;
         ctrl?.load();
       },
       deactivate: () => {
@@ -404,7 +422,9 @@ export class ViewController {
 
       const freshTree = treeStore.getTree();
       const el = self.editor.element as HTMLElement;
-      const diskUsageEl = el.querySelector<HTMLElement>('[data-controller="disk-usage"]');
+      const diskUsageEl = el.querySelector<HTMLElement>(
+        '[data-controller="disk-usage"]'
+      );
       if (!diskUsageEl) return;
 
       const data: DiskUsageData = {
@@ -417,7 +437,7 @@ export class ViewController {
 
       const ctrl = self.editor.application.getControllerForElementAndIdentifier(
         diskUsageEl,
-        "disk-usage",
+        "disk-usage"
       ) as DiskUsageController | null;
       ctrl?.load(data);
     })();
