@@ -14,7 +14,6 @@ import { copyStaticAssets } from "./build/static"
 import { renderShell } from "./build/shell"
 import { writeThinShell, writeFullBundle } from "./build/thin"
 import { compileStyles } from "./build/styles"
-import { processThemeNordAssets } from "./build/theme-nord"
 import { runBundle, runBundleWatch, getChunkMap, pruneStaleChunks, getLatestChunkGraphManifest, computeAppHash, computeIndexHash, injectHashMeta } from "./build/bundle"
 
 const __dir = dirname(fileURLToPath(import.meta.url))
@@ -178,7 +177,7 @@ if (!renderTemplates) {
     const allFiles = readdirSync(assetsDir)
       .filter((f) => f.endsWith(".js") || f.endsWith(".css"))
       .map((f) => `${SW_PREFIX}/${f}`)
-    const important = [BASE, `${SW_PREFIX}/app.js`, `${SW_PREFIX}/theme-nord.css`, `${SW_PREFIX}/katex.css`, `${BASE}favicon.png`, `${BASE}inb4doc-256.png`, `${BASE}inb4doc-512.png`, `${BASE}manifest.json`]
+    const important = [BASE, `${SW_PREFIX}/app.js`, `${SW_PREFIX}/katex.css`, `${BASE}favicon.png`, `${BASE}inb4doc-256.png`, `${BASE}inb4doc-512.png`, `${BASE}manifest.json`]
     // Watch mode precaches the same chunk set so an edited controller's new
     // chunk is part of the SW-install transfer (and shows up in the loader).
     // Cache-skip in the SW makes re-installs transfer only the changed files.
@@ -244,7 +243,7 @@ if (!renderTemplates) {
   function linkEmittedCss() {
     const cssFiles = readdirSync(assetsDir)
       .filter((f) => f.endsWith(".css"))
-      .filter((f) => f !== "katex.css" && f !== "theme-nord.css")
+      .filter((f) => f !== "katex.css")
       .sort()
     if (cssFiles.length === 0) return
     const indexPath = join(publicDir, "index.html")
@@ -257,16 +256,11 @@ if (!renderTemplates) {
   if (watch) {
     rmSync(assetsDir, { recursive: true, force: true })
     mkdirSync(assetsDir, { recursive: true })
-    processThemeNordAssets({ publicDir })
     await runBundleWatch(root, generateSWFiles)
   } else {
     const result = await runBundle({ cwd: root, dev: false, withMeta })
     if (result.exitCode !== 0) process.exit(result.exitCode)
     linkEmittedCss()
-    // runBundle() clears public/assets before compiling, so theme-nord.css
-    // (a Tailwind-compiled asset from @milkdown/theme-nord) must be written
-    // AFTER the bundle — and before generateSWFiles, which precaches it.
-    processThemeNordAssets({ publicDir })
     generateSWFiles()
   }
 

@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state"
+import { Plugin, PluginKey, TextSelection } from "prosemirror-state"
 
 export function createLinkBoundaryPlugin() {
   return new Plugin({

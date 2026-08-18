@@ -1,7 +1,6 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
-import type { EditorState } from "@milkdown/kit/prose/state"
-import type { Node } from "@milkdown/kit/prose/model"
-import type { EditorView } from "@milkdown/kit/prose/view"
+import { Plugin, PluginKey, type EditorState } from "prosemirror-state"
+import type { Node } from "prosemirror-model"
+import type { EditorView } from "prosemirror-view"
 
 interface ResolvedImage {
   node: Node

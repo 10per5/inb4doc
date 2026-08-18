@@ -1,15 +1,10 @@
-import type { Ctx } from "@milkdown/kit/ctx";
-import type { EditorView } from "@milkdown/kit/prose/view";
-import { TextSelection, type EditorState } from "@milkdown/kit/prose/state";
-import { editorViewCtx } from "@milkdown/kit/core";
-import { block, BlockProvider, blockConfig } from "@milkdown/kit/plugin/block";
-import { slashFactory, SlashProvider } from "@milkdown/kit/plugin/slash";
-import { paragraphSchema } from "@milkdown/kit/preset/commonmark";
+import type { EditorView } from "prosemirror-view"
+import { Plugin, PluginKey, TextSelection, type EditorState } from "prosemirror-state"
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
 import { isMobileDock } from "@/utils/mobile";
 import { executeInsertCommand } from "@/features/insert-command";
-import { menuAPI, type MenuAPI } from "@/features/menu-api";
+import { menuAPI } from "@/features/menu-api";
 import {
   plus,
   menuScale,
@@ -33,7 +28,15 @@ import {
   ProseNodeType, proseNodeTypeByName,
 } from "@/config/enums";
 
-const slash = slashFactory("inb4doc");
+// ── View-factory maps (populated by configureBlockEdit, read by plugin views) ──
+
+type BlockViewFactory = (view: EditorView) => { update: () => void; destroy: () => void }
+type SlashViewFactory = (view: EditorView) => { update: (v: EditorView, s?: EditorState) => void; destroy: () => void }
+
+const blockViewFactories = new Map<string, BlockViewFactory>()
+const slashViewFactories = new Map<string, SlashViewFactory>()
+
+// ── Slash items ──
 
 type SlashItem = { cmd: SlashCommand; label: string; icon: string; level?: number };
 const SLASH_ITEMS: SlashItem[] = [
@@ -52,15 +55,18 @@ const SLASH_ITEMS: SlashItem[] = [
   { cmd: SlashCommand.Video, label: "Video", icon: videoCamera },
 ];
 
+// ── BlockHandleView ──
+
 class BlockHandleView {
+  #view: EditorView;
   #content: HTMLElement;
-  #provider: BlockProvider;
-  #ctx: Ctx;
   #menu: Menu | null = null;
   #menuAnchor: HTMLElement | null = null;
+  #activeEl: Element | null = null;
+  #activeBlockStart: number = 0;
 
-  constructor(ctx: Ctx) {
-    this.#ctx = ctx;
+  constructor(view: EditorView) {
+    this.#view = view;
     const content = document.createElement("div");
     content.className = "milkdown-block-handle";
     content.innerHTML = `
@@ -73,116 +79,106 @@ class BlockHandleView {
         e.preventDefault();
         this.onAdd();
       });
-
     this.#content = content;
-    this.#provider = new BlockProvider({
-      ctx,
-      content,
-      getOffset: () => {
-        const w = window.innerWidth;
-        const rem =
-          parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-        if (w >= 1350) return Math.round(0.5 * rem);
-        if (w >= 700) return 16;
-        return Math.round(0.25 * rem);
-      },
-      getPlacement: ({ active, blockDom }) => {
-        if (window.innerWidth < 700) return "right-start";
-        const dom = active.el;
-        const domRect = dom.getBoundingClientRect();
-        const handleRect = blockDom.getBoundingClientRect();
-        const style = window.getComputedStyle(dom);
-        const paddingTop = Number.parseInt(style.paddingTop, 10) || 0;
-        const paddingBottom = Number.parseInt(style.paddingBottom, 10) || 0;
-        const height = domRect.height - paddingTop - paddingBottom;
-        const handleHeight = handleRect.height;
-        return handleHeight < height ? "left-start" : "left";
-      },
-      getPosition: ({ active }) => {
-        const w = window.innerWidth;
-        const domRect = active.el.getBoundingClientRect();
-        const style = window.getComputedStyle(active.el);
-        let paddingTop = Number.parseInt(style.paddingTop, 10) || 10;
-        const paddingBottom = Number.parseInt(style.paddingBottom, 10) || 0;
-        const rem =
-          parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-        let left: number;
-        if (w >= 1350) {
-          const prose = document.querySelector("#editor-area .ProseMirror");
-          const proseRect = prose?.getBoundingClientRect();
-          left = proseRect
-            ? proseRect.left + Math.round(2 * rem)
-            : domRect.left;
-        } else if (w >= 800) {
-          // The left column can be the nav tree OR — at tablet width, when the
-          // meta panel is open — the meta panel pulled into the left gutter
-          // (lib/style/layout.css: .book-leftpanel display:none, .book-rightpanel
-          // order:-1). Anchor to whichever left panel is actually visible.
-          const navEl = document.querySelector(".book-leftpanel");
-          const navRect = navEl?.getBoundingClientRect();
-          let panelRight: number | null = null;
-          if (navRect && navRect.width > 0) {
-            panelRight = navRect.right;
-          } else if (w < 1200) {
-            const metaEl = document.querySelector(".book-rightpanel");
-            const metaRect = metaEl?.getBoundingClientRect();
-            if (metaRect && metaRect.width > 0) panelRight = metaRect.right;
-          }
-          left =
-            panelRight !== null
-              ? panelRight + Math.round(4.25 * rem)
-              : domRect.left;
-        } else {
-          left = domRect.right + Math.round(1.25 * rem);
-          paddingTop -= 12.5;
-        }
-        return {
-          x: left,
-          y: domRect.y + paddingTop,
-          width: 0,
-          height: domRect.height - paddingTop - paddingBottom,
-          top: domRect.y + paddingTop,
-          left,
-          bottom: domRect.y + domRect.height - paddingBottom,
-          right: left,
-        };
-      },
-    });
-    this.#provider.update();
+    (view.dom.parentNode as Element)?.appendChild(content);
+    content.style.display = "none";
+    this.#updatePosition();
   }
 
   update = () => {
-    this.#provider.update();
+    this.#updatePosition();
   };
 
   destroy = () => {
-    this.#provider.destroy();
     this.#content.remove();
     this.#menu?.destroy();
     this.#menuAnchor?.remove();
   };
 
+  #updatePosition = () => {
+    const { selection } = this.#view.state;
+    const $from = selection.$from;
+
+    if (isMobileDock()) {
+      this.#content.style.display = "none";
+      this.#activeEl = null;
+      return;
+    }
+
+    const isAtBlockStart =
+      $from.depth === 1 &&
+      $from.parent.content.size === 0 &&
+      $from.parent.type.name === "paragraph" &&
+      $from.node(1).type.name !== "table_cell" &&
+      $from.node(1).type.name !== "table_header";
+
+    if (!isAtBlockStart) {
+      this.#content.style.display = "none";
+      this.#activeEl = null;
+      return;
+    }
+
+    const blockStart = $from.before(1);
+    const { node: domNode } = this.#view.domAtPos(blockStart, 0);
+    const el = domNode.nodeType === Node.ELEMENT_NODE
+      ? domNode as HTMLElement
+      : (domNode.parentElement as HTMLElement | null);
+    if (!el) {
+      this.#content.style.display = "none";
+      return;
+    }
+
+    const domRect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    const paddingTop = Number.parseInt(style.paddingTop, 10) || 10;
+    const paddingBottom = Number.parseInt(style.paddingBottom, 10) || 0;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const w = window.innerWidth;
+
+    this.#content.style.display = "";
+    this.#activeEl = el;
+    this.#activeBlockStart = blockStart;
+
+    let left: number;
+    if (w >= 1350) {
+      const prose = document.querySelector("#editor-area .ProseMirror");
+      const proseRect = prose?.getBoundingClientRect();
+      left = proseRect ? proseRect.left + Math.round(2 * rem) : domRect.left;
+    } else if (w >= 800) {
+      const navEl = document.querySelector(".book-leftpanel");
+      const navRect = navEl?.getBoundingClientRect();
+      let panelRight: number | null = null;
+      if (navRect && navRect.width > 0) {
+        panelRight = navRect.right;
+      } else if (w < 1200) {
+        const metaEl = document.querySelector(".book-rightpanel");
+        const metaRect = metaEl?.getBoundingClientRect();
+        if (metaRect && metaRect.width > 0) panelRight = metaRect.right;
+      }
+      left = panelRight !== null
+        ? panelRight + Math.round(4.25 * rem)
+        : domRect.left;
+    } else {
+      left = domRect.right + Math.round(1.25 * rem);
+    }
+
+    const top = domRect.y + paddingTop;
+    this.#content.style.left = `${left}px`;
+    this.#content.style.top = `${top}px`;
+  };
+
   private onAdd = () => {
-    const ctx = this.#ctx;
-    const view = ctx.get(editorViewCtx);
+    const view = this.#view;
     if (!view.hasFocus()) view.focus();
-    const active = this.#provider.active;
-    if (!active) return;
-    const $pos = active.$pos;
-    const pos = $pos.pos + active.node.nodeSize;
-    const tr = view.state.tr.insert(pos, paragraphSchema.type(ctx).create());
+    if (this.#activeBlockStart <= 0) return;
+    const pos = this.#activeBlockStart + this.#view.state.doc.resolve(this.#activeBlockStart).node().nodeSize;
+    const tr = view.state.tr.insert(pos, view.state.schema.nodes.paragraph.create());
     tr.setSelection(TextSelection.near(tr.doc.resolve(pos)));
     view.dispatch(tr.scrollIntoView());
-    this.#provider.hide();
+    this.#content.style.display = "none";
     this.openAddMenu();
   };
 
-  // Open the shared "add-block" menu (same definition the mobile FAB "+"
-  // popup uses) anchored at the block-handle add button. The panel lives in a
-  // body-level position:fixed mount — NOT inside the floating handle, which
-  // fades on mouse-leave and would hide the panel. The caret already sits in
-  // the fresh empty paragraph below the active block, so the menu's commands
-  // (appendBelow) convert it in place.
   private openAddMenu() {
     if (!this.#menu) {
       const anchor = document.createElement("div");
@@ -191,9 +187,7 @@ class BlockHandleView {
       this.#menuAnchor = anchor;
       this.#menu = new Menu({
         mountEl: anchor,
-        triggerEl: this.#content.querySelector(
-          ".block-handle-add",
-        ) as HTMLElement,
+        triggerEl: this.#content.querySelector(".block-handle-add") as HTMLElement,
         label: "Add",
         items: () => menuRegistry.get("add-block")!,
       });
@@ -208,20 +202,22 @@ class BlockHandleView {
   }
 }
 
+// ── SlashView ──
+
 class SlashView {
-  provider: SlashProvider;
   content: HTMLElement;
   private view: EditorView;
-  private milkdownCtx: Ctx;
   private activeIndex = 0;
-  private handleKeydown: (e: KeyboardEvent) => void;
   private filterText = "";
   #programmaticPos: number | null = null;
   #programmaticActive = false;
+  #visible = false;
+  #handleKeydown: (e: KeyboardEvent) => void;
+  #editImageHandler: ((e: Event) => void);
+  #editVideoHandler: ((e: Event) => void);
 
-  constructor(view: EditorView, ctx: Ctx) {
+  constructor(view: EditorView) {
     this.view = view;
-    this.milkdownCtx = ctx;
     this.content = document.createElement("div");
     this.content.className = "milkdown-slash";
     this.content.dataset.show = "false";
@@ -235,7 +231,7 @@ class SlashView {
       this.execute(item);
     });
 
-    this.handleKeydown = (e: KeyboardEvent) => {
+    this.#handleKeydown = (e: KeyboardEvent) => {
       if (this.content.dataset.show !== "true") return;
       const domItems = this.content.querySelectorAll<HTMLElement>("[data-cmd]");
       if (domItems.length === 0) return;
@@ -259,16 +255,16 @@ class SlashView {
         e.preventDefault();
         e.stopPropagation();
         this.#programmaticActive = false;
-        this.provider.hide();
+        this.hide();
       }
     };
-    view.dom.addEventListener("inb4doc:edit-image", ((e: CustomEvent) => {
+
+    this.#editImageHandler = ((e: CustomEvent) => {
       const { pos, src, attrs } = e.detail;
       openImageDialog({ mode: "edit", pos, src, attrs: attrs ?? {} }).then(
         (result) => {
           if (result == null) return;
-          const view = this.view;
-          const { state, dispatch } = view;
+          const { state, dispatch } = this.view;
           const node = state.doc.nodeAt(pos);
           if (!node) return;
           if (result.action === "remove") {
@@ -283,72 +279,55 @@ class SlashView {
             }
             dispatch(state.tr.setNodeMarkup(pos, null, next));
           }
-          view.focus();
+          this.view.focus();
         },
       );
-    }) as EventListener);
+    }) as EventListener;
 
-    view.dom.addEventListener("inb4doc:edit-video", ((e: CustomEvent) => {
+    this.#editVideoHandler = ((e: CustomEvent) => {
       const { pos, attrs } = e.detail;
       this.openVideoEditor(pos, attrs);
-    }) as EventListener);
+    }) as EventListener;
 
-    document.addEventListener("keydown", this.handleKeydown, true);
+    view.dom.addEventListener("inb4doc:edit-image", this.#editImageHandler);
+    view.dom.addEventListener("inb4doc:edit-video", this.#editVideoHandler);
+    document.addEventListener("keydown", this.#handleKeydown, true);
 
-    const self = this;
-    this.provider = new SlashProvider({
-      content: this.content,
-      debounce: 20,
-      shouldShow(view) {
-        if (typeof self.#programmaticPos === "number") {
-          const maxSize = view.state.doc.nodeSize - 2;
-          const validPos = Math.min(self.#programmaticPos, maxSize);
-          if (
-            view.state.doc.resolve(validPos).node() !==
-            view.state.doc.resolve(view.state.selection.from).node()
-          ) {
-            self.#programmaticPos = null;
-            return false;
-          }
-          self.#programmaticPos = null;
-          self.filterText = "";
-          self.renderItems();
-          return true;
-        }
-        const text = (this as any).getContent(view, (node: any) =>
-          [ProseNodeType.Paragraph, ProseNodeType.Heading].includes(proseNodeTypeByName.get(node.type.name)!),
-        );
-        if (text == null) return false;
-        if (!text.startsWith("/")) return false;
-        self.filterText = text.slice(1);
-        self.renderItems();
-        return true;
-      },
+    menuAPI.set(view, {
+      show: (pos: number) => this.showAt(pos),
+      hide: () => this.hide(),
     });
-
-    this.provider.onShow = () => {
-      this.activeIndex = 0;
-      const domItems = this.content.querySelectorAll<HTMLElement>("[data-cmd]");
-      this.highlight(domItems);
-    };
-
-    ctx.set(
-      menuAPI.key as any,
-      {
-        show: (pos: number) => this.showAt(pos),
-        hide: () => this.provider.hide(),
-      } as MenuAPI,
-    );
   }
 
   update(view: EditorView, prevState?: EditorState) {
     this.view = view;
-    this.provider.update(view, prevState);
+    if (this.#programmaticActive) {
+      this.#updateProgrammaticPosition();
+      return;
+    }
+    this.#detectAndShow(view);
   }
 
   destroy() {
-    document.removeEventListener("keydown", this.handleKeydown, true);
-    this.provider.destroy();
+    document.removeEventListener("keydown", this.#handleKeydown, true);
+    this.view.dom.removeEventListener("inb4doc:edit-image", this.#editImageHandler);
+    this.view.dom.removeEventListener("inb4doc:edit-video", this.#editVideoHandler);
+    this.hide();
+  }
+
+  show() {
+    this.#visible = true;
+    this.content.dataset.show = "true";
+    this.activeIndex = 0;
+    const domItems = this.content.querySelectorAll<HTMLElement>("[data-cmd]");
+    this.highlight(domItems);
+  }
+
+  hide() {
+    this.#visible = false;
+    this.#programmaticActive = false;
+    this.#programmaticPos = null;
+    this.content.dataset.show = "false";
   }
 
   private showAt(pos: number) {
@@ -356,7 +335,52 @@ class SlashView {
     this.renderItems();
     this.#programmaticPos = pos;
     this.#programmaticActive = true;
-    this.provider.show();
+    this.show();
+  }
+
+  #updateProgrammaticPosition() {
+    if (typeof this.#programmaticPos !== "number") return;
+    const maxSize = this.view.state.doc.nodeSize - 2;
+    const validPos = Math.min(this.#programmaticPos, maxSize);
+    if (
+      this.view.state.doc.resolve(validPos).node() !==
+      this.view.state.doc.resolve(this.view.state.selection.from).node()
+    ) {
+      this.hide();
+      return;
+    }
+    this.#programmaticPos = null;
+    this.filterText = "";
+    this.renderItems();
+    this.#positionMenu();
+  }
+
+  #detectAndShow(view: EditorView) {
+    const { selection } = view.state;
+    const $from = selection.$from;
+    if ($from.parent.type.name !== "paragraph" && $from.parent.type.name !== "heading") {
+      this.hide();
+      return;
+    }
+    const text = $from.parent.textBetween(0, $from.parentOffset, undefined, "\uFFFC");
+    if (!text.startsWith("/")) {
+      this.hide();
+      return;
+    }
+    this.filterText = text.slice(1);
+    this.renderItems();
+    if (!this.#visible) this.show();
+    this.#positionMenu();
+  }
+
+  #positionMenu() {
+    const { selection } = this.view.state;
+    const coords = this.view.coordsAtPos(selection.from);
+    const parent = this.content.parentElement;
+    if (parent) {
+      this.content.style.left = `${coords.left}px`;
+      this.content.style.top = `${coords.bottom + 4}px`;
+    }
   }
 
   private renderItems() {
@@ -382,12 +406,9 @@ class SlashView {
     const isProgrammatic = this.#programmaticActive;
     this.#programmaticActive = false;
 
-    // Slash commands (via data-cmd)
     if (!cmdStr) return;
     const cmd = Number(cmdStr.replace(SLASH_CMD_PREFIX, "")) as SlashCommand;
 
-    // Handle slash image command: open the image dialog instead of inserting
-    // an empty block (mirrors the video flow below)
     if (cmd === SlashCommand.Image) {
       const { $from } = view.state.selection;
       const textBefore = $from.parent.textBetween(
@@ -472,11 +493,7 @@ class SlashView {
       view.dispatch(view.state.tr.delete(deleteFrom, $from.pos));
     }
 
-    // Everything past the "/text" deletion is shared with the insert menus
-    // (mobile FAB "+" / desktop block-handle "+"): same special cases for
-    // empty blocks in lists/headings, divider, and wrap/list/code/table
-    // commands. Image/Video keep their in-content picker/dialog paths above.
-    executeInsertCommand(this.milkdownCtx, cmd, level);
+    executeInsertCommand(this.view, cmd, level);
   }
 
   private openVideoEditor(pos: number, attrs: VideoDialogAttrs) {
@@ -505,29 +522,33 @@ class SlashView {
   }
 }
 
-export function configureBlockEdit(ctx: Ctx) {
-  // The dock layout (gui-mobile always, web builds on a mobile viewport) has no
-  // hover affordance: the block handle is disabled and the FAB "+" is the insert
-  // entry point. Desktop keeps the hover block handle.
+// ── Public API ──
+
+export function configureBlockEdit(view: EditorView) {
+  const blockKey = "inb4doc-block";
+  const slashKey = "inb4doc-slash";
+
   if (!isMobileDock()) {
-    ctx.set(block.key, {
-      view: () => new BlockHandleView(ctx),
-    });
+    blockViewFactories.set(blockKey, (v) => new BlockHandleView(v));
   }
-  ctx.update(blockConfig.key, (prev) => ({
-    ...prev,
-    filterNodes: (pos) => {
-      if (isMobileDock()) return false;
-      for (let d = pos.depth; d > 0; d--) {
-        const node = pos.node(d);
-        const typeName = proseNodeTypeByName.get(node.type.name);
-        if (typeName === ProseNodeType.Table || typeName === ProseNodeType.Blockquote)
-          return false;
-      }
-      return true;
-    },
-  }));
-  ctx.set(slash.key, { view: (v: any) => new SlashView(v, ctx) });
+
+  slashViewFactories.set(slashKey, (v) => new SlashView(v));
 }
+
+const block = new Plugin({
+  key: new PluginKey("inb4doc-block"),
+  view(view) {
+    const factory = blockViewFactories.get("inb4doc-block");
+    return factory ? factory(view) : { update: () => {}, destroy: () => {} };
+  },
+});
+
+const slash = new Plugin({
+  key: new PluginKey("inb4doc-slash"),
+  view(view) {
+    const factory = slashViewFactories.get("inb4doc-slash");
+    return factory ? factory(view) : { update: () => {}, destroy: () => {} };
+  },
+});
 
 export { block, slash, menuAPI };

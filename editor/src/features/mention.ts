@@ -1,23 +1,18 @@
-import { SlashProvider } from "@milkdown/kit/plugin/slash"
-import type { EditorView } from "@milkdown/kit/prose/view"
-import type { EditorState } from "@milkdown/kit/prose/state"
-import { editorViewCtx } from "@milkdown/kit/core"
-import type { Ctx } from "@milkdown/kit/ctx"
+import type { EditorView } from "prosemirror-view"
+import type { EditorState } from "prosemirror-state"
 import { pagesStore } from "@/stores/page-store"
 
 export class MentionView {
-  provider: SlashProvider
   content: HTMLElement
   private view: EditorView
-  private milkdownCtx: Ctx
   private activeIndex = 0
   private handleKeydown: (e: KeyboardEvent) => void
   private mentionFrom: number | null = null
   private filterText = ""
+  private visible = false
 
-  constructor(view: EditorView, ctx: Ctx) {
+  constructor(view: EditorView) {
     this.view = view
-    this.milkdownCtx = ctx
     this.content = document.createElement("div")
     this.content.className = "milkdown-mention"
     this.content.dataset.show = "false"
@@ -52,40 +47,56 @@ export class MentionView {
       } else if (e.key === "Escape") {
         e.preventDefault()
         e.stopPropagation()
-        this.provider.hide()
+        this.hide()
       }
     }
 
     document.addEventListener("keydown", this.handleKeydown, true)
-
-    const self = this
-    this.provider = new SlashProvider({
-      content: this.content,
-      shouldShow(view) {
-        const text = (this as any).getContent(view, (node: any) =>
-          ["paragraph", "heading"].includes(node.type.name)
-        )
-        if (text == null) return false
-        if (!text.startsWith("@")) return false
-        self.filterText = text.slice(1)
-        self.renderItems(self.filterText)
-        return true
-      },
-    })
-
-    this.provider.onShow = () => {
-      this.mentionFrom = this.view.state.selection.from
-    }
   }
 
   update(view: EditorView, prevState?: EditorState) {
     this.view = view
-    this.provider.update(view, prevState)
+    const { selection } = view.state
+    const $from = selection.$from
+    if ($from.parent.type.name !== "paragraph" && $from.parent.type.name !== "heading") {
+      this.hide()
+      return
+    }
+    const text = $from.parent.textBetween(0, $from.parentOffset, undefined, "\uFFFC")
+    if (!text.startsWith("@")) {
+      this.hide()
+      return
+    }
+    this.filterText = text.slice(1)
+    this.renderItems(this.filterText)
+    if (!this.visible) this.show()
+    this.#position()
   }
 
   destroy() {
     document.removeEventListener("keydown", this.handleKeydown, true)
-    this.provider.destroy()
+    this.hide()
+  }
+
+  show() {
+    this.visible = true
+    this.content.dataset.show = "true"
+    this.mentionFrom = this.view.state.selection.from
+  }
+
+  hide() {
+    this.visible = false
+    this.content.dataset.show = "false"
+  }
+
+  #position() {
+    const { selection } = this.view.state
+    const coords = this.view.coordsAtPos(selection.from)
+    const parent = this.content.parentElement
+    if (parent) {
+      this.content.style.left = `${coords.left}px`
+      this.content.style.top = `${coords.bottom + 4}px`
+    }
   }
 
   private pageList: string[] = []
@@ -104,8 +115,7 @@ export class MentionView {
     })
 
     if (matching.length === 0) {
-      this.content.dataset.show = "false"
-      this.provider.hide()
+      this.hide()
       return
     }
 
@@ -121,7 +131,7 @@ export class MentionView {
   }
 
   private insertLink(pagePath: string, title: string) {
-    const view = this.milkdownCtx.get(editorViewCtx)
+    const view = this.view
     const nodeType = view.state.schema.nodes.hugoRef
 
     const { from } = view.state.selection
@@ -136,7 +146,7 @@ export class MentionView {
       const link = `[${title}](/${pagePath.replace(/\.md$/, "")}) `
       view.dispatch(view.state.tr.insertText(link))
       view.focus()
-      this.provider.hide()
+      this.hide()
       return
     }
 
@@ -148,7 +158,7 @@ export class MentionView {
 
     view.dispatch(view.state.tr.replaceWith(atPos, from, node))
     view.focus()
-    this.provider.hide()
+    this.hide()
   }
 
   private highlight(items: NodeListOf<HTMLElement>) {

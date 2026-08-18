@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, exis
 //
 // Core set = index.html, sw.js, the SW's asset inventory (sw-assets.js +
 // manifest.json), the entry pot (app.js + __farm_runtime.js), every emitted css
-// (theme-nord/katex + rotated styles-*.css), and the static icons/manifest the
+// (katex + rotated styles-*.css), and the static icons/manifest the
 // shell references. The eager core chunk set (everything app.js statically
 // imports — the shell/controller/service/domain pots) ships here too; Part D's
 // lazy editor means node_imports/editor/dialog chunks are NOT in this set and

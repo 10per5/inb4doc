@@ -1,11 +1,10 @@
-import { codeBlockSchema } from "@milkdown/kit/preset/commonmark";
-import { $view } from "@milkdown/kit/utils";
-import type { NodeViewConstructor } from "@milkdown/kit/prose/view";
-import type { EditorView as PMEditorView } from "@milkdown/kit/prose/view";
-import type { Node } from "@milkdown/kit/prose/model";
-import { TextSelection } from "@milkdown/kit/prose/state";
-import { exitCode } from "@milkdown/kit/prose/commands";
-import { redo, undo } from "@milkdown/kit/prose/history";
+import { defineNodeView } from "@prosekit/core";
+import type { NodeViewConstructor } from "prosemirror-view";
+import type { EditorView as PMEditorView } from "prosemirror-view";
+import type { Node } from "prosemirror-model";
+import { TextSelection } from "prosemirror-state";
+import { exitCode } from "prosemirror-commands";
+import { redo, undo } from "prosemirror-history";
 
 import { createEditor } from "prism-code-editor";
 import type { PrismEditor } from "prism-code-editor";
@@ -708,8 +707,8 @@ function computeChange(
 
 // ---- Export ----
 
-export const codeBlockUI = $view(
-  codeBlockSchema.node,
-  (): NodeViewConstructor => (node, view, getPos) =>
+export const codeBlockUI = defineNodeView({
+  name: "code_block",
+  constructor: (node, view, getPos) =>
     new PrismEditorBlock(node, view, getPos),
-);
+});

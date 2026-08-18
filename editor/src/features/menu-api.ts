@@ -1,11 +1,18 @@
-import { $ctx } from "@milkdown/kit/utils"
+import type { EditorView } from "prosemirror-view"
 
 export interface MenuAPI {
   show: (pos: number) => void
   hide: () => void
 }
 
-export const menuAPI = $ctx(
-  { show: () => {}, hide: () => {} } as MenuAPI,
-  "menuAPICtx"
-)
+const store = new WeakMap<EditorView, MenuAPI>()
+
+export const menuAPI = {
+  key: "menuAPICtx" as const,
+  get(view: EditorView): MenuAPI {
+    return store.get(view) ?? { show: () => {}, hide: () => {} }
+  },
+  set(view: EditorView, api: MenuAPI) {
+    store.set(view, api)
+  },
+}

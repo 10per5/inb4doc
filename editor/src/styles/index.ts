@@ -1,3 +1,7 @@
+/* ── ProseKit base (PM structural styles: gap-cursor, selected-node,
+     hideselection, table layout, placeholder) ─────────────────────── */
+import "@prosekit/basic/style.css"
+
 /* ── Foundation ────────────────────────────────────────────────── */
 import "./foundation/base.css"
 import "./app/buttons.css"

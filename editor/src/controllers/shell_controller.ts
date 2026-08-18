@@ -7,7 +7,7 @@
  */
 
 import { Controller } from "@hotwired/stimulus"
-import type { Editor } from "@milkdown/kit/core"
+import type { EditorInstance } from "@/config/editor-config"
 import { applyThemeFromPrefs } from "@/utils/theme";
 import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";

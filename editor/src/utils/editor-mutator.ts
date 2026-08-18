@@ -11,21 +11,22 @@
  * hand-rolled replacements that drop sibling items.
  */
 
-import type { CmdKey } from "@milkdown/core"
-import type { Node, Schema } from "@milkdown/kit/prose/model"
-import { TextSelection } from "@milkdown/kit/prose/state"
-import type { EditorState, Transaction } from "@milkdown/kit/prose/state"
-import type { EditorView } from "@milkdown/kit/prose/view"
+import type { Node, Schema } from "prosemirror-model"
+import { TextSelection } from "prosemirror-state"
+import type { EditorState, Transaction } from "prosemirror-state"
+import type { EditorView } from "prosemirror-view"
 
 export type ListItemKind = "bullet" | "ordered" | "task"
 
+type PMCommand = (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean
+
 interface ListCommands {
-  call: (key: string | CmdKey<unknown>, ...args: unknown[]) => boolean
+  call: (key: string | PMCommand, ...args: unknown[]) => boolean
 }
 
 interface ListCommandService {
-  wrapInBulletListCommand: { key: CmdKey<unknown> }
-  wrapInOrderedListCommand: { key: CmdKey<unknown> }
+  wrapInBulletListCommand: PMCommand
+  wrapInOrderedListCommand: PMCommand
 }
 
 export function setTaskChecked(view: EditorView, checked: boolean): void {
@@ -140,7 +141,7 @@ export function clearListItems(view: EditorView): void {
  */
 export function setListItemKind(
   view: EditorView,
-  commands: ListCommands,
+  _commands: ListCommands,
   service: ListCommandService,
   kind: ListItemKind,
 ): void {
@@ -158,11 +159,11 @@ export function setListItemKind(
   }
 
   if (itemDepth === -1) {
-    const listKey =
+    const listCmd =
       kind === "ordered"
-        ? service.wrapInOrderedListCommand.key
-        : service.wrapInBulletListCommand.key
-    if (commands.call(listKey) && kind === "task") setTaskChecked(view, false)
+        ? service.wrapInOrderedListCommand
+        : service.wrapInBulletListCommand
+    if (listCmd(state, dispatch) && kind === "task") setTaskChecked(view, false)
     return
   }
 

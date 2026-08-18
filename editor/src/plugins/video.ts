@@ -1,7 +1,5 @@
-import { $remark, $nodeSchema, $view } from "@milkdown/utils"
-import type { Node } from "@milkdown/transformer"
-import type { NodeView } from "@milkdown/kit/prose/view"
-import { visitParents } from "unist-util-visit-parents"
+import { defineNodeView } from "@prosekit/core"
+import type { NodeView } from "prosemirror-view"
 import { editPencil } from "@/eta/icons"
 
 export interface VideoAttrs {
@@ -28,7 +26,7 @@ export const defaultVideoAttrs: VideoAttrs = {
   height: "",
 }
 
-function parseVideoAttrs(html: string): VideoAttrs {
+export function parseVideoAttrs(html: string): VideoAttrs {
   const openingTag = html.match(/<video\s[^>]*>/)?.[0] || ""
   const srcVideo = openingTag.match(/src\s*=\s*"([^"]+)"/)?.[1] || ""
   const srcSource = html.match(/<source\s[^>]*src\s*=\s*"([^"]+)"/)?.[1] || ""
@@ -53,163 +51,6 @@ function parseVideoAttrs(html: string): VideoAttrs {
   }
 }
 
-function visitVideo(ast: Node) {
-  visitParents(ast, "html", (node: Node & { value?: string }, parents: Node[]) => {
-    if (!node.value || typeof node.value !== "string") return
-    const trimmed = node.value.trim()
-    if (!trimmed.startsWith("<video")) return
-
-    const parent = parents[parents.length - 1] as Node & { children: Node[] }
-    if (!parent) return
-
-    if (parent.type === "paragraph") {
-      // `<video ...></video>` is inline HTML, so remark tokenizes the opening
-      // and closing tags into *separate* html nodes inside the paragraph.
-      // Rebuild the full markup from every child so attrs parse on reload,
-      // then swap the whole paragraph for the video node.
-      const grandParent = parents.length > 1 ? parents[parents.length - 2] as Node & { children: Node[] } : null
-      if (!grandParent) return
-      const fullHtml = (parent.children as Node[])
-        .map((c) => (c as Node & { value?: string }).value ?? "")
-        .join("")
-      const videoNode = { type: "video", ...parseVideoAttrs(fullHtml) } as any
-      const pIndex = grandParent.children.indexOf(parent)
-      if (pIndex === -1) return
-      grandParent.children.splice(pIndex, 1, videoNode)
-      return
-    }
-
-    parent.children.splice(indexOfNode(parent, node), 1, {
-      type: "video",
-      ...parseVideoAttrs(trimmed),
-    } as any)
-  })
-}
-
-function indexOfNode(parent: Node & { children: Node[] }, node: Node): number {
-  for (let i = 0; i < parent.children.length; i++) {
-    if (parent.children[i] === node) return i
-  }
-  return -1
-}
-
-export const videoRemarkPlugin = $remark("remark-video", () => () => visitVideo)
-
-export const videoSchema = $nodeSchema("video", () => ({
-  group: "block",
-  selectable: true,
-  draggable: true,
-  isolating: true,
-  marks: "",
-  atom: true,
-  priority: 200,
-  attrs: {
-    src: { default: "", validate: "string" },
-    poster: { default: "", validate: "string" },
-    controls: { default: true },
-    loop: { default: false },
-    muted: { default: false },
-    autoplay: { default: false },
-    playsinline: { default: false },
-    width: { default: "", validate: "string" },
-    height: { default: "", validate: "string" },
-  },
-  parseDOM: [
-    {
-      tag: "div.video-wrapper",
-      getAttrs: (dom) => {
-        const el = dom as HTMLElement
-        const video = el.querySelector("video")
-        return {
-          src: video?.getAttribute("src") || el.getAttribute("data-src") || "",
-          poster: video?.getAttribute("poster") || "",
-          controls: video?.hasAttribute("controls") ?? true,
-          loop: video?.hasAttribute("loop") ?? false,
-          muted: video?.hasAttribute("muted") ?? false,
-          autoplay: video?.hasAttribute("autoplay") ?? false,
-          playsinline: video?.hasAttribute("playsinline") ?? false,
-          width: video?.getAttribute("width") || "",
-          height: video?.getAttribute("height") || "",
-        }
-      },
-    },
-    {
-      tag: "video",
-      getAttrs: (dom) => {
-        const el = dom as HTMLVideoElement
-        const source = el.querySelector("source")
-        return {
-          src: source?.getAttribute("src") || el.getAttribute("src") || "",
-          poster: el.getAttribute("poster") || "",
-          controls: el.hasAttribute("controls"),
-          loop: el.hasAttribute("loop"),
-          muted: el.hasAttribute("muted"),
-          autoplay: el.hasAttribute("autoplay"),
-          playsinline: el.hasAttribute("playsinline"),
-          width: el.getAttribute("width") || "",
-          height: el.getAttribute("height") || "",
-        }
-      },
-    },
-  ],
-  toDOM: (node) => {
-    const a = node.attrs
-    const videoAttrs: Record<string, string> = {}
-    if (a.poster) videoAttrs.poster = a.poster
-    if (a.width) videoAttrs.width = a.width
-    if (a.height) videoAttrs.height = a.height
-    if (a.controls) videoAttrs.controls = ""
-    if (a.loop) videoAttrs.loop = ""
-    if (a.muted) videoAttrs.muted = ""
-    if (a.autoplay) videoAttrs.autoplay = ""
-    if (a.playsinline) videoAttrs.playsinline = ""
-    const children: any[] = []
-    if (a.src) {
-      videoAttrs.src = a.src
-    }
-    return ["div", { class: "video-wrapper", "data-type": "video" }, ["video", videoAttrs]]
-  },
-  parseMarkdown: {
-    match: ({ type }) => type === "video",
-    runner: (state, node, proseType) => {
-      const n = node as any
-      state.addNode(proseType, {
-        src: n.src || "",
-        poster: n.poster || "",
-        controls: n.controls ?? true,
-        loop: n.loop ?? false,
-        muted: n.muted ?? false,
-        autoplay: n.autoplay ?? false,
-        playsinline: n.playsinline ?? false,
-        width: n.width || "",
-        height: n.height || "",
-      })
-    },
-  },
-  toMarkdown: {
-    match: (node) => node.type.name === "video",
-    runner: (state, node) => {
-      const a = node.attrs
-      let html = "<video"
-      if (a.width) html += ` width="${a.width}"`
-      if (a.height) html += ` height="${a.height}"`
-      if (a.controls) html += ` controls`
-      if (a.loop) html += ` loop`
-      if (a.muted) html += ` muted`
-      if (a.autoplay) html += ` autoplay`
-      if (a.playsinline) html += ` playsinline`
-      if (a.poster) html += ` poster="${a.poster}"`
-      if (a.src) {
-        html += ' src="' + a.src + '">'
-      } else {
-        html += ">"
-      }
-      html += "</video>"
-      state.addNode("html", undefined, html)
-    },
-  },
-}))
-
 function dispatchEditEvent(view: any, getPos: () => number | undefined) {
   const pos = getPos()
   if (pos == null) return
@@ -221,8 +62,9 @@ function dispatchEditEvent(view: any, getPos: () => number | undefined) {
   }))
 }
 
-export const videoView = $view(videoSchema.node, () => {
-  return (node, view, getPos, decorations): NodeView => {
+export const videoView = defineNodeView({
+  name: "video",
+  constructor: (node, view, getPos): NodeView => {
     const wrapper = document.createElement("div")
     wrapper.className = "video-wrapper"
     wrapper.contentEditable = "false"
@@ -300,5 +142,5 @@ export const videoView = $view(videoSchema.node, () => {
       destroy: () => wrapper.remove(),
       ignoreMutation: () => true,
     }
-  }
+  },
 })

@@ -1,5 +1,5 @@
 /**
- * EditorController — Stimulus controller managing Milkdown editor lifecycle and state.
+ * EditorController — Stimulus controller managing ProseKit editor lifecycle and state.
  *
  * Editor creation is delegated to config/editor-config.ts.
  * Conflict resolution is delegated to features/conflict-resolver.ts.
@@ -7,9 +7,12 @@
  */
 
 import { Controller } from "@hotwired/stimulus";
-import type { Editor } from "@milkdown/kit/core";
+import type { EditorInstance } from "@/config/editor-config";
 import { createEditor, type EditorHost } from "@/config/editor-config";
 import { editorContext, getMarkdown, getView } from "@/services/editor-context-service";
+import { createMarkdownBridge } from "@/config/editor-markdown";
+import { TextSelection } from "prosemirror-state";
+import { EditorState } from "prosemirror-state";
 import { initEditorMutationService } from "@/services/editor-mutation-service";
 import { initLinkHandler } from "@/features/link-handler";
 import { appEvents, AppEvent } from "@/stores/app-events";
@@ -49,7 +52,7 @@ export class EditorController extends Controller {
   declare readonly sourceTarget: HTMLElement;
   declare readonly loadLogoTarget: HTMLElement;
 
-  private editor: Editor | null = null;
+  private editor: EditorInstance | null = null;
   private host: EditorHost | null = null;
   private editorStates = new Map<string, any>();
   private editorContents = new Map<string, string>();
@@ -62,7 +65,7 @@ export class EditorController extends Controller {
 
   // ── Accessors ──
 
-  getEditor(): Editor | null {
+  getEditor(): EditorInstance | null {
     return this.editor;
   }
   getMentionView(): MentionView | null {
@@ -142,11 +145,10 @@ export class EditorController extends Controller {
     };
     this.host = host;
     this.lastSetContent.delete(this.currentPath);
-    await editorContext.load();
     this.editor = await createEditor(editorEl, content, host);
     this.lastSetContent.set(
       this.currentPath,
-      this.serializeDoc(getView(this.editor))
+      this.serializeDoc(this.editor.view)
     );
     appEvents.emit(AppEvent.OutlineChanged);
   }
@@ -311,21 +313,14 @@ export class EditorController extends Controller {
       }
     }
     if (!this.editor) return "";
-    return this.editor.action((ctx) => {
-      const serializer = ctx.get(editorContext.serializerCtx);
-      return serializer(ctx.get(editorContext.editorViewCtx).state.doc)
-        .replace(/\r\n/g, "\n")
-        .replace(/\n+$/, "\n");
-    });
+    return this.serializeDoc(this.editor.view);
   }
 
   private serializeDoc(view: any): string {
-    return this.editor!.action((ctx) => {
-      const serializer = ctx.get(editorContext.serializerCtx);
-      return serializer(view.state.doc)
-        .replace(/\r\n/g, "\n")
-        .replace(/\n+$/, "\n");
-    });
+    const bridge = createMarkdownBridge(view.state.schema);
+    return bridge.serialize(view.state.doc)
+      .replace(/\r\n/g, "\n")
+      .replace(/\n+$/, "\n");
   }
 
   scrollToText(query: string, matchIndex?: number, snippetText?: string): void {
@@ -348,12 +343,11 @@ export class EditorController extends Controller {
       return;
     }
     if (fallbackPos == null) return;
-    this.editor.action((ctx) => {
-      const view = ctx.get(editorContext.editorViewCtx);
+    this.editor.action(({ view }) => {
       const doc = view.state.doc;
       if (fallbackPos < 0 || fallbackPos > doc.content.size) return;
       const tr = view.state.tr.setSelection(
-        editorContext.TextSelection.near(doc.resolve(fallbackPos + 1)),
+        TextSelection.near(doc.resolve(fallbackPos + 1)),
       );
       view.dispatch(tr.scrollIntoView());
     });
@@ -364,12 +358,11 @@ export class EditorController extends Controller {
     if (proseMirror) (proseMirror as HTMLElement).focus();
 
     requestAnimationFrame(() => {
-      this.editor!.action((ctx) => {
-        const view = ctx.get(editorContext.editorViewCtx);
+      this.editor!.action(({ view }) => {
         const pos = view.posAtDOM(match.node, match.offset);
         if (pos == null) return;
         const tr = view.state.tr.setSelection(
-          editorContext.TextSelection.create(
+          TextSelection.create(
             view.state.doc,
             pos,
             pos + match.length,
@@ -392,8 +385,7 @@ export class EditorController extends Controller {
 
   getOutline(): OutlineItem[] {
     if (!this.editor || this.sourceMode) return [];
-    return this.editor.action((ctx) => {
-      const view = ctx.get(editorContext.editorViewCtx);
+    return this.editor.action(({ view }) => {
       const items: OutlineItem[] = [];
       view.state.doc.descendants((node, pos) => {
         if (node.type.name === "heading") {
@@ -413,7 +405,7 @@ export class EditorController extends Controller {
     }
     this.unsubs.push(
       initEditorMutationService(() => this.editor),
-      initLinkHandler(() => this.editor),
+      initLinkHandler(() => this.editor?.action(({ view }) => view) ?? null),
       appEvents.on(
         AppEvent.ScrollToText,
         ({ query, matchIndex, snippetText }) => {
@@ -438,7 +430,7 @@ export class EditorController extends Controller {
     this.editorContents.clear();
     this.lastSetContent.clear();
     if (editor) {
-      void editor.destroy().catch(() => {});
+      editor.destroy();
       this.milkdownTarget.replaceChildren();
     }
   }
@@ -455,17 +447,15 @@ export class EditorController extends Controller {
       const persistedBody =
         page?.bodyState.body ?? page?.bodyState.baseline ?? "";
       this.lastSetContent.set(this.currentPath, persistedBody);
-      this.editor.action((ctx) => {
-        const view = ctx.get(editorContext.editorViewCtx);
+      this.editor.action(({ view }) => {
         view.updateState(cached);
       });
     } else {
       this.lastSetContent.delete(this.currentPath);
-      this.editor.action((ctx) => {
-        const parser = ctx.get(editorContext.parserCtx);
-        const view = ctx.get(editorContext.editorViewCtx);
-        const doc = parser(content);
-        const newState = editorContext.EditorState.create({
+      this.editor.action(({ view }) => {
+        const bridge = createMarkdownBridge(view.state.schema);
+        const doc = bridge.parse(content);
+        const newState = EditorState.create({
           schema: view.state.schema,
           doc,
           plugins: view.state.plugins,
@@ -480,11 +470,10 @@ export class EditorController extends Controller {
 
   private setEditorContent(content: string): void {
     if (!this.editor) return;
-    this.editor.action((ctx) => {
-      const parser = ctx.get(editorContext.parserCtx);
-      const view = ctx.get(editorContext.editorViewCtx);
-      const doc = parser(content);
-      const newState = editorContext.EditorState.create({
+    this.editor.action(({ view }) => {
+      const bridge = createMarkdownBridge(view.state.schema);
+      const doc = bridge.parse(content);
+      const newState = EditorState.create({
         schema: view.state.schema,
         doc,
         plugins: view.state.plugins,

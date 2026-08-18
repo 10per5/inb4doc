@@ -1,112 +1,117 @@
-/**
- * CommandService — lazy-loads CommonMark/GFM command presets.
- *
- * These are only needed when toolbar buttons are clicked. Lazy-loading
- * avoids pulling ~50KB of preset code into the main bundle.
- *
- * Context keys (`commandsCtx`, `editorViewCtx`) come from
- * `editorContext` — this service only provides the command objects.
- *
- * Command objects are `$Command<T>` (functions with `.key` and `.meta`).
- * `.key` is populated after the editor installs the plugin via `.use()`.
- * Access `.key` only inside `editor.action()` callbacks.
- */
+import { toggleMark, wrapIn, setBlockType, lift } from "prosemirror-commands"
+import { wrapInList, liftListItem } from "prosemirror-schema-list"
+import { addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, selectedRect, selectionCell, CellSelection } from "prosemirror-tables"
+import type { EditorState, Transaction } from "prosemirror-state"
 
-import type { $Command } from "@milkdown/utils"
-
-type CommonmarkModule = typeof import("@milkdown/kit/preset/commonmark")
-type GfmModule = typeof import("@milkdown/kit/preset/gfm")
+type PMCommand = (state: EditorState, dispatch?: (tr: Transaction) => void) => boolean
 
 class CommandService {
-  private _cm: CommonmarkModule | null = null
-  private _gfm: GfmModule | null = null
-  private _loadPromise: Promise<void> | null = null
-
   load(): Promise<void> {
-    if (this._cm && this._gfm) return Promise.resolve()
-    if (this._loadPromise) return this._loadPromise
-
-    this._loadPromise = Promise.all([
-      import("@milkdown/kit/preset/commonmark"),
-      import("@milkdown/kit/preset/gfm"),
-    ]).then(([cm, gfm]) => {
-      this._cm = cm
-      this._gfm = gfm
-    })
-
-    return this._loadPromise
+    return Promise.resolve()
   }
 
   get loaded(): boolean {
-    return this._cm !== null && this._gfm !== null
+    return true
   }
 
-  get toggleStrongCommand(): $Command<unknown> {
-    return this._cm!.toggleStrongCommand
+  get toggleStrongCommand(): PMCommand {
+    return (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch)
   }
 
-  get toggleEmphasisCommand(): $Command<unknown> {
-    return this._cm!.toggleEmphasisCommand
+  get toggleEmphasisCommand(): PMCommand {
+    return (state, dispatch) => toggleMark(state.schema.marks.emphasis)(state, dispatch)
   }
 
-  get toggleInlineCodeCommand(): $Command<unknown> {
-    return this._cm!.toggleInlineCodeCommand
+  get toggleInlineCodeCommand(): PMCommand {
+    return (state, dispatch) => toggleMark(state.schema.marks.inlineCode)(state, dispatch)
   }
 
-  get wrapInHeadingCommand(): $Command<number> {
-    return this._cm!.wrapInHeadingCommand
+  get wrapInHeadingCommand(): PMCommand {
+    return (state, dispatch) => {
+      const nodeType = state.schema.nodes.heading
+      return nodeType ? setBlockType(nodeType)(state, dispatch) : false
+    }
   }
 
-  get insertHrCommand(): $Command<unknown> {
-    return this._cm!.insertHrCommand
+  get insertHrCommand(): PMCommand {
+    return (state, dispatch) => {
+      const nodeType = state.schema.nodes.hr
+      if (!nodeType) return false
+      if (dispatch) {
+        const tr = state.tr.replaceSelectionWith(nodeType.create())
+        dispatch(tr)
+      }
+      return true
+    }
   }
 
-  get sinkListItemCommand(): $Command<unknown> {
-    return this._cm!.sinkListItemCommand
+  get sinkListItemCommand(): PMCommand {
+    return (state, dispatch) => liftListItem(state.schema.nodes.list_item)(state, dispatch)
   }
 
-  get liftListItemCommand(): $Command<unknown> {
-    return this._cm!.liftListItemCommand
+  get liftListItemCommand(): PMCommand {
+    return lift
   }
 
-  get wrapInBulletListCommand(): $Command<unknown> {
-    return this._cm!.wrapInBulletListCommand
+  get wrapInBulletListCommand(): PMCommand {
+    return (state, dispatch) => wrapInList(state.schema.nodes.bullet_list)(state, dispatch)
   }
 
-  get wrapInOrderedListCommand(): $Command<unknown> {
-    return this._cm!.wrapInOrderedListCommand
+  get wrapInOrderedListCommand(): PMCommand {
+    return (state, dispatch) => wrapInList(state.schema.nodes.ordered_list)(state, dispatch)
   }
 
-  get wrapInBlockquoteCommand(): $Command<unknown> {
-    return this._cm!.wrapInBlockquoteCommand
+  get wrapInBlockquoteCommand(): PMCommand {
+    return (state, dispatch) => wrapIn(state.schema.nodes.blockquote)(state, dispatch)
   }
 
-  get toggleStrikethroughCommand(): $Command<unknown> {
-    return this._gfm!.toggleStrikethroughCommand
+  get toggleStrikethroughCommand(): PMCommand {
+    return (state, dispatch) => toggleMark(state.schema.marks.strike_through)(state, dispatch)
   }
 
-  get addRowAfterCommand(): $Command<unknown> {
-    return this._gfm!.addRowAfterCommand
+  get addRowAfterCommand(): PMCommand {
+    return addRowAfter
   }
 
-  get addColAfterCommand(): $Command<unknown> {
-    return this._gfm!.addColAfterCommand
+  get addColAfterCommand(): PMCommand {
+    return addColumnAfter
   }
 
-  get selectRowCommand(): $Command<{ index: number; pos?: number }> {
-    return this._gfm!.selectRowCommand
+  get selectRowCommand(): PMCommand {
+    return (state, dispatch) => {
+      if (!dispatch || !isInTable(state)) return false
+      const $cell = selectionCell(state)
+      const sel = CellSelection.rowSelection($cell)
+      dispatch(state.tr.setSelection(sel))
+      return true
+    }
   }
 
-  get selectColCommand(): $Command<{ index: number; pos?: number }> {
-    return this._gfm!.selectColCommand
+  get selectColCommand(): PMCommand {
+    return (state, dispatch) => {
+      if (!dispatch || !isInTable(state)) return false
+      const $cell = selectionCell(state)
+      const sel = CellSelection.colSelection($cell)
+      dispatch(state.tr.setSelection(sel))
+      return true
+    }
   }
 
-  get selectTableCommand(): $Command<unknown> {
-    return this._gfm!.selectTableCommand
+  get selectTableCommand(): PMCommand {
+    return (state, dispatch) => {
+      if (!dispatch || !isInTable(state)) return false
+      const { left, right, top, bottom } = selectedRect(state)
+      const { doc } = state
+      const anchor = doc.resolve(top === 0 ? 0 : top)
+      const head = doc.resolve(Math.min(right, doc.content.size))
+      const sel = CellSelection.create(doc, anchor.pos, head.pos)
+      dispatch(state.tr.setSelection(sel))
+      return true
+    }
   }
 
-  get deleteSelectedCellsCommand(): $Command<unknown> {
-    return this._gfm!.deleteSelectedCellsCommand
+  get deleteSelectedCellsCommand(): PMCommand {
+    return (state, dispatch) => deleteRow(state, dispatch)
   }
 }
 

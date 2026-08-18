@@ -1,4 +1,4 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
+import { Plugin, PluginKey } from "prosemirror-state"
 // __parseFromClipboard is exported from the prosemirror-view bundle but not
 // present in its public types (it is the same helper ProseMirror's own paste
 // handler uses internally).
@@ -22,7 +22,7 @@ function normalizePlainText(text: string): string {
  * ProseMirror implements this natively: its paste handler reads
  * `view.input.shiftKey && view.input.lastKeyCode != 45` and rebuilds the
  * paste with `plainText=true`. That path never runs here because
- * `@milkdown/plugin-clipboard`'s `handlePaste` intercepts every paste first
+ * The clipboard plugin's `handlePaste` intercepts every paste first
  * and re-interprets plain text as Markdown.
  *
  * This plugin is prepended to the plugin chain (before the Milkdown clipboard

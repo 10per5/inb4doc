@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state"
+import { Plugin, PluginKey, TextSelection } from "prosemirror-state"
 
 // Owns the whole backtick gesture: typing the closing backtick converts
 // `` `text `` to inline code (caret lands outside, stored marks cleared), and

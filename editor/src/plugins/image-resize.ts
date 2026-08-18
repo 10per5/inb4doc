@@ -1,22 +1,10 @@
-import { $nodeSchema, $view } from "@milkdown/utils";
-import {
-  imageBlockConfig,
-  IMAGE_DATA_TYPE,
-} from "@milkdown/kit/component/image-block";
-import type { NodeView } from "@milkdown/kit/prose/view";
+import { defineNodeView } from "@prosekit/core";
+import type { NodeView } from "prosemirror-view";
 
 const MIN_SIZE = 32;
 
-/**
- * Alt encoding for persisted size, backward-compatible with the stock
- * image-block serialization (`![1.00](src "caption")`):
- *
- *   - no explicit size  → `1.00` (ratio only)
- *   - explicit size     → `1.00;w=320;h=240`
- *
- * Legacy `ratio`-only alts keep working; once a non-proportional (edge) drag
- * happens, `w`/`h` win and `ratio` is reset to 1.
- */
+export const IMAGE_DATA_TYPE = "image-block";
+
 export function parseAlt(
   alt: string | undefined | null
 ): { ratio: number; w: number; h: number } {
@@ -45,79 +33,6 @@ export function encodeAlt(ratio: number, w: number, h: number): string {
   return parts.join(";");
 }
 
-export const imageResizeSchema = $nodeSchema("image-block", () => ({
-  inline: false,
-  group: "block",
-  selectable: true,
-  draggable: true,
-  isolating: true,
-  marks: "",
-  atom: true,
-  priority: 100,
-  attrs: {
-    src: { default: "", validate: "string" },
-    caption: { default: "", validate: "string" },
-    ratio: { default: 1, validate: "number" },
-    // Explicit pixel size. 0 = not set (fall back to `ratio`).
-    w: { default: 0, validate: "number" },
-    h: { default: 0, validate: "number" },
-  },
-  parseDOM: [
-    {
-      tag: `img[data-type="${IMAGE_DATA_TYPE}"]`,
-      getAttrs: (dom: HTMLElement) => {
-        const num = (v: string | null): number => {
-          const n = Number(v ?? 0);
-          return Number.isNaN(n) || n <= 0 ? 0 : n;
-        };
-        return {
-          src: dom.getAttribute("src") || "",
-          caption: dom.getAttribute("caption") || "",
-          ratio: num(dom.getAttribute("ratio")) || 1,
-          w: num(dom.getAttribute("w")),
-          h: num(dom.getAttribute("h")),
-        };
-      },
-    },
-  ],
-  toDOM: (node) => {
-    const a = node.attrs;
-    const attrs: Record<string, string> = { "data-type": IMAGE_DATA_TYPE };
-    for (const key of ["src", "caption", "ratio", "w", "h"] as const) {
-      const v = a[key];
-      if (v !== undefined && v !== null && v !== "") attrs[key] = String(v);
-    }
-    return ["img", attrs];
-  },
-  parseMarkdown: {
-    match: ({ type }) => type === "image-block",
-    runner: (state, node, type) => {
-      const n = node as any;
-      const { ratio, w, h } = parseAlt(n.alt);
-      state.addNode(type, {
-        src: n.url || "",
-        caption: n.title || "",
-        ratio,
-        w,
-        h,
-      });
-    },
-  },
-  toMarkdown: {
-    match: (node) => node.type.name === "image-block",
-    runner: (state, node) => {
-      const a = node.attrs;
-      state.openNode("paragraph");
-      state.addNode("image", void 0, void 0, {
-        title: a.caption,
-        url: a.src,
-        alt: encodeAlt(a.ratio, a.w, a.h),
-      });
-      state.closeNode();
-    },
-  },
-}));
-
 const HANDLE_DIRS = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
 type HandleDir = (typeof HANDLE_DIRS)[number];
 
@@ -135,10 +50,10 @@ const DIR_VECTOR: Record<
   w: { x: -1, y: 0, corner: false },
 };
 
-export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
-  return (initialNode, view, getPos): NodeView => {
-    const config = ctx.get(imageBlockConfig.key);
-
+function makeImageBlockNodeView(
+  proxyDomURL?: (url: string) => string,
+): (node: any, view: any, getPos: () => number | undefined) => NodeView {
+  return (initialNode, view, getPos) => {
     const block = document.createElement("div");
     block.className = "milkdown-image-block";
     block.contentEditable = "false";
@@ -158,7 +73,6 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
     const captionToggle = document.createElement("div");
     captionToggle.className = "operation-item";
     captionToggle.title = "Toggle caption";
-    captionToggle.innerHTML = config.captionIcon ?? "";
     operation.appendChild(captionToggle);
 
     const handles = new Map<HandleDir, HTMLElement>();
@@ -172,7 +86,7 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
 
     const captionInput = document.createElement("input");
     captionInput.className = "caption-input";
-    captionInput.placeholder = config.captionPlaceholderText ?? "";
+    captionInput.placeholder = "Caption…";
     captionInput.draggable = true;
     captionInput.addEventListener("dragstart", (e) => {
       e.preventDefault();
@@ -197,8 +111,6 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
 
     const maxWidth = (): number => {
       const hostWidth = block.getBoundingClientRect().width || 0;
-      if (config.maxWidth && config.maxWidth < hostWidth)
-        return config.maxWidth;
       return hostWidth;
     };
 
@@ -206,16 +118,14 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
       if (!naturalW || !naturalH) return;
       const maxW = maxWidth() || naturalW;
       const aspect = naturalW / naturalH;
-      const withMaxHeight = (h: number) =>
-        config.maxHeight ? Math.min(h, config.maxHeight) : h;
       if (currentW > 0 && currentH > 0) {
         const scale = Math.min(1, maxW / currentW);
         img.style.width = `${Math.max(MIN_SIZE, currentW * scale)}px`;
-        img.style.height = `${Math.max(MIN_SIZE, withMaxHeight(currentH * scale))}px`;
+        img.style.height = `${Math.max(MIN_SIZE, currentH * scale)}px`;
       } else if (currentW > 0) {
         const w = Math.min(currentW, maxW);
         img.style.width = `${Math.max(MIN_SIZE, w)}px`;
-        img.style.height = `${Math.max(MIN_SIZE, withMaxHeight(w / aspect))}px`;
+        img.style.height = `${Math.max(MIN_SIZE, w / aspect)}px`;
       } else if (currentH > 0) {
         let h = currentH;
         let w = h * aspect;
@@ -224,10 +134,9 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
           h = w / aspect;
         }
         img.style.width = `${Math.max(MIN_SIZE, w)}px`;
-        img.style.height = `${Math.max(MIN_SIZE, withMaxHeight(h))}px`;
+        img.style.height = `${Math.max(MIN_SIZE, h)}px`;
       } else {
         baseH = Math.min(maxW, naturalW) / aspect;
-        if (config.maxHeight) baseH = Math.min(baseH, config.maxHeight);
         img.style.width = "auto";
         img.style.height = `${baseH * currentRatio}px`;
       }
@@ -262,20 +171,8 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
       const src = a.src || "";
       if (src !== currentSrc) {
         currentSrc = src;
-        const proxy = config.proxyDomURL;
-        if (proxy) {
-          const resolved = proxy(src);
-          if (typeof resolved === "string") {
-            img.src = resolved;
-          } else if (resolved && typeof resolved.then === "function") {
-            resolved
-              .then((u) => {
-                img.src = u;
-              })
-              .catch(() => {});
-          } else {
-            img.src = src;
-          }
+        if (proxyDomURL) {
+          img.src = proxyDomURL(src);
         } else {
           img.src = src;
         }
@@ -342,7 +239,6 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
         let w = startW;
         let h = startH;
         if (vec.corner) {
-          // Corners keep proportion (drive by the dominant axis).
           h = Math.max(MIN_SIZE, startH + vec.y * dy);
           w = h * aspect;
         } else {
@@ -407,4 +303,12 @@ export const imageResizeView = $view(imageResizeSchema.node, (ctx) => {
       },
     };
   };
-});
+}
+
+export function createImageResizeView(proxyDomURL?: (url: string) => string) {
+  return defineNodeView({
+    name: "image-block",
+    constructor: (node, view, getPos) =>
+      makeImageBlockNodeView(proxyDomURL)(node, view, getPos),
+  });
+}

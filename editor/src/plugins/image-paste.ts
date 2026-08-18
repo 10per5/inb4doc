@@ -1,6 +1,6 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
-import type { ResolvedPos } from "@milkdown/kit/prose/model"
-import type { EditorView } from "@milkdown/kit/prose/view"
+import { Plugin, PluginKey } from "prosemirror-state"
+import type { ResolvedPos } from "prosemirror-model"
+import type { EditorView } from "prosemirror-view"
 
 export interface ImagePasteConfig {
   uploadImage: (file: File) => Promise<string>

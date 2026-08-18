@@ -1,25 +1,15 @@
-import { $view } from "@milkdown/utils";
-import { imageSchema } from "@milkdown/kit/preset/commonmark";
-import { inlineImageConfig } from "@milkdown/kit/component/image-inline";
-import type { NodeView } from "@milkdown/kit/prose/view";
-import { NodeSelection } from "@milkdown/kit/prose/state";
-import { Fragment, Slice } from "@milkdown/kit/prose/model";
+import { defineNodeView } from "@prosekit/core";
+import type { NodeView } from "prosemirror-view";
+import { NodeSelection } from "prosemirror-state";
+import { Fragment, Slice } from "prosemirror-model";
 import { parseAlt, encodeAlt } from "@/plugins/image-resize";
 
 const MIN_SIZE = 32;
 
-/**
- * Node view for the inline `image` node. Applies the same proxyDomURL as the
- * image-block (so pasted/dropped images in table cells render) and adds the
- * image-block resize handles when the image lives inside a table cell — where
- * `cellContent: "paragraph"` forces images to be inline nodes rather than
- * image-blocks. Resized dimensions persist through the alt encoding
- * (`1.00;w=320;h=240`) shared with image-block.
- */
-export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
-  return (initialNode, view, getPos): NodeView => {
-    const config = ctx.get(inlineImageConfig.key);
-
+function makeInlineImageNodeView(
+  proxyDomURL?: (url: string) => string,
+): (node: any, view: any, getPos: () => number | undefined) => NodeView {
+  return (initialNode, view, getPos) => {
     const wrapper = document.createElement("span");
     wrapper.className = "milkdown-image-inline";
     wrapper.contentEditable = "false";
@@ -140,20 +130,8 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
       const src = a.src || "";
       if (src !== currentSrc) {
         currentSrc = src;
-        const proxy = config.proxyDomURL;
-        if (proxy) {
-          const resolved = proxy(src);
-          if (typeof resolved === "string") {
-            img.src = resolved;
-          } else if (resolved && typeof resolved.then === "function") {
-            resolved
-              .then((u) => {
-                img.src = u;
-              })
-              .catch(() => {});
-          } else {
-            img.src = src;
-          }
+        if (proxyDomURL) {
+          img.src = proxyDomURL(src);
         } else {
           img.src = src;
         }
@@ -164,10 +142,6 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
       currentW = size.w;
       currentH = size.h;
       inCell = view.editable && insideTableCell();
-      // Resize handles show on every inline image (including ones dragged out
-      // of a table, which stay inline on the doc). `inCell` stays reserved for
-      // the drag-OUT seeding below: only in-cell images need the manual native
-      // drag, doc images use PM's normal drag-and-drop.
       wrapper.classList.toggle("resizable", view.editable);
       if (naturalW && naturalH) applySize();
     };
@@ -233,23 +207,6 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
       handle.addEventListener("pointerdown", (e) => startResize(e, dir));
     }
 
-    /**
-     * Dragging an in-cell image OUT of the table. Milkdown's tableBlock node
-     * view returns true from `stopEvent` for drag events, so PM's own
-     * dragstart (which installs `view.dragging`) never runs, and the table's
-     * root div cancels `dragstart` with `preventDefault` — a native drag from
-     * inside a table would do nothing. This handler runs in the CAPTURE phase
-     * on the wrapper, before the table's bubble handlers:
-     *
-     * - `stopPropagation()` keeps the table's `preventDefault` from canceling
-     *   the native drag.
-     * - Seeding `view.dragging` gives the subsequent drop a slice (and a
-     *   `NodeSelection` whose `replace(tr)` deletes the source for a move),
-     *   exactly what PM's own dragstart would have installed.
-     *
-     * The drop is then performed by PM's drop handler on the doc (outside the
-     * table) or by `editor-drag-drop.ts` when it lands in another cell.
-     */
     const onDragStart = (e: DragEvent) => {
       if (!inCell) return;
       e.stopPropagation();
@@ -292,4 +249,12 @@ export const imageInlineResizeView = $view(imageSchema.node, (ctx) => {
       },
     };
   };
-});
+}
+
+export function createImageInlineResizeView(proxyDomURL?: (url: string) => string) {
+  return defineNodeView({
+    name: "image",
+    constructor: (node, view, getPos) =>
+      makeInlineImageNodeView(proxyDomURL)(node, view, getPos),
+  });
+}

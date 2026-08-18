@@ -1,5 +1,5 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
-import type { EditorView } from "@milkdown/kit/prose/view"
+import { Plugin, PluginKey } from "prosemirror-state"
+import type { EditorView } from "prosemirror-view"
 
 const CARET_MARGIN = 12
 

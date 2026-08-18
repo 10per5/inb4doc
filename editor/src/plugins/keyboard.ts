@@ -1,6 +1,6 @@
-import { keymap } from "@milkdown/kit/prose/keymap"
-import { undo, redo } from "@milkdown/kit/prose/history"
-import { TextSelection, NodeSelection, Plugin, PluginKey } from "@milkdown/kit/prose/state"
+import { keymap } from "prosemirror-keymap"
+import { undo, redo } from "prosemirror-history"
+import { TextSelection, NodeSelection, Plugin, PluginKey } from "prosemirror-state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList, sinkListItem } from "prosemirror-schema-list"
 import { appEvents, AppEvent } from "@/stores/app-events"
@@ -263,11 +263,11 @@ export function createKeymap() {
   return keymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
     "Mod-B": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
-    "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.em)(state, dispatch),
-    "Mod-I": (state, dispatch) => toggleMark(state.schema.marks.em)(state, dispatch),
+    "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.emphasis)(state, dispatch),
+    "Mod-I": (state, dispatch) => toggleMark(state.schema.marks.emphasis)(state, dispatch),
     "Mod-`": (state, dispatch) => toggleMark(codeMark(state))(state, dispatch),
-    "Mod-Shift-s": (state, dispatch) => toggleMark(state.schema.marks.strikethrough)(state, dispatch),
-    "Mod-Shift-x": (state, dispatch) => toggleMark(state.schema.marks.strikethrough)(state, dispatch),
+    "Mod-Shift-s": (state, dispatch) => toggleMark(state.schema.marks.strike_through)(state, dispatch),
+    "Mod-Shift-x": (state, dispatch) => toggleMark(state.schema.marks.strike_through)(state, dispatch),
     "Mod-Alt-1": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 1 })(state, dispatch),
     "Mod-Alt-2": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 2 })(state, dispatch),
     "Mod-Alt-3": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 3 })(state, dispatch),

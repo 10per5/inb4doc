@@ -17,7 +17,7 @@
 <% } %>
     <style><%~ it.criticalCss %></style>
     <link rel="stylesheet" href="assets/katex.css?ver=<%= it.APP_VERSION %>" />
-    <link rel="stylesheet" href="assets/theme-nord.css?ver=<%= it.APP_VERSION %>" />
+
   </head>
   <body>
     <div id="app" data-controller="shell" data-shell-editor-outlet="#editor-area">

@@ -23,7 +23,7 @@ export interface ControllerRegistration {
 
 // Part D two-stage entry: the FastStartup build registers exactly these
 // controllers synchronously (their value-import graph must never reach
-// editor-controller, the dialog controllers, or @milkdown/* — see core/lazy
+// editor-controller, the dialog controllers, or @prosekit/* — see core/lazy
 // split invariants in app.ts). Everything interactive is a lazy chunk.
 const coreRegistrations: ControllerRegistration[] = [
   { name: "shell", controller: ShellController },

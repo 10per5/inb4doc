@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state"
+import { Plugin, PluginKey, type EditorState } from "prosemirror-state"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import {
   ActiveBlockType,

@@ -1,5 +1,5 @@
-import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state"
-import type { MarkType } from "@milkdown/kit/prose/model"
+import { Plugin, PluginKey, type EditorState } from "prosemirror-state"
+import type { MarkType } from "prosemirror-model"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import type { TextState } from "@/config/enums/text-state"
 

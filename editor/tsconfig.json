@@ -10,7 +10,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "$/*": ["lib/*"]
+      "$/*": ["lib/*"],
+      "prosemirror-model": ["node_modules/prosemirror-model"],
+      "prosemirror-view": ["node_modules/prosemirror-view"],
+      "prosemirror-state": ["node_modules/prosemirror-state"],
+      "prosemirror-commands": ["node_modules/prosemirror-commands"],
+      "prosemirror-transform": ["node_modules/prosemirror-transform"]
     }
   },
   "include": ["src", "lib"]

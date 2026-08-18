@@ -1,4 +1,4 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
+import { Plugin, PluginKey } from "prosemirror-state"
 
 const URL_PATTERN = /^(?:https?|ftp):\/\/[^\s]+$/i
 
@@ -11,7 +11,7 @@ const URL_PATTERN = /^(?:https?|ftp):\/\/[^\s]+$/i
  * Selections spanning more than one block (or an empty selection) fall
  * through to default paste behavior, which replaces the text with the URL.
  *
- * Registered as a `$prose` plugin so it runs before `@milkdown/plugin-clipboard`
+ * Registered as a prose plugin so it runs before the clipboard plugin
  * in the ProseMirror plugin chain (`handlePaste` is consulted in plugin order,
  * first handler returning `true` wins). Returns `false` for anything that is
  * not a URL, for an empty selection, or for cross-block selections.

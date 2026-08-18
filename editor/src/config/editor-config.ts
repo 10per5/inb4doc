@@ -1,47 +1,24 @@
 /**
- * createEditor — builds the Milkdown editor with all plugins.
+ * createEditor — builds the ProseKit editor with all plugins.
  *
  * Extracted from EditorController to keep config separate from lifecycle.
  * The `host` callback interface lets the editor communicate back to the
  * controller without circular imports.
  */
 
-import {
-  Editor,
-  rootCtx,
-  defaultValueCtx,
-  editorViewCtx,
-  prosePluginsCtx,
-} from "@milkdown/kit/core";
-import { commonmark as _commonmark, wrapInHeadingInputRule, headingKeymap, inlineCodeInputRule } from "@milkdown/kit/preset/commonmark";
-import { gfm } from "@milkdown/kit/preset/gfm";
-import { nord } from "@milkdown/theme-nord";
-import { parserCtx, remarkStringifyOptionsCtx } from "@milkdown/core";
-import { clipboard } from "@milkdown/plugin-clipboard";
-import { history } from "@milkdown/kit/plugin/history";
-import {
-  linkTooltipPlugin,
-  configureLinkTooltip,
-  linkTooltipConfig,
-} from "@milkdown/kit/component/link-tooltip";
-import { cursor } from "@milkdown/kit/plugin/cursor";
-import { fixedHeadingInputRule } from "@/plugins/heading-input-rule";
+import { createEditor as prosekitCreateEditor, definePlugin, union } from "@prosekit/core";
+import type { Extension } from "@prosekit/core";
+import type { EditorView } from "prosemirror-view";
+import type { Schema } from "prosemirror-model";
+import { history } from "prosemirror-history";
+import { dropCursor } from "prosemirror-dropcursor";
+import { gapCursor } from "prosemirror-gapcursor";
 
-const commonmark = _commonmark.filter(
-  (p) => p !== wrapInHeadingInputRule && p !== inlineCodeInputRule,
-);
+import { createSchemaExtension } from "./editor-schema";
+import { createMarkdownBridge } from "./editor-markdown";
 
-import {
-  tableBlockConfig,
-} from "@milkdown/kit/component/table-block";
-import { fixedTableBlockView } from "@/plugins/table-block-view";
-import {
-  imageBlockComponent,
-  imageBlockConfig,
-} from "@milkdown/kit/component/image-block";
-import { inlineImageConfig } from "@milkdown/kit/component/image-inline";
-import { imageResizeSchema, imageResizeView } from "@/plugins/image-resize";
-import { imageInlineResizeView } from "@/plugins/image-inline-resize";
+import { createImageResizeView } from "@/plugins/image-resize";
+import { createImageInlineResizeView } from "@/plugins/image-inline-resize";
 import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
 import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createTextStatePlugin } from "@/plugins/text-state";
@@ -49,62 +26,39 @@ import { createHistoryContextPlugin } from "@/plugins/history-context";
 import { createCaretScrollPlugin } from "@/plugins/caret-scroll";
 import { createPlainPastePlugin } from "@/plugins/plain-paste";
 import { createInlineCodeInputPlugin } from "@/plugins/inline-code-input";
-import { isMobileDock } from "@/utils/mobile";
-import {
-  copy,
-  editPencil,
-  trash,
-  check,
-  plus,
-  x,
-  alignLeft,
-  alignCenter,
-  alignRight,
-  menuScale,
-  table,
-} from "@/eta/icons";
-import { alertRemarkPlugin, alertSchema } from "@/plugins/alert";
 import { shortcodeDecoration } from "@/plugins/shortcode";
-import { hugoRefSchema, initHugoRefClicks } from "@/plugins/hugo-ref";
-import {
-  configureBlockEdit,
-  block,
-  slash,
-  menuAPI,
-} from "@/features/block-edit";
-import {
-  remarkMathPlugin,
-  remarkMathBlockPlugin,
-  mathInlineSchema,
-  mathInlineInputRule,
-  mathBlockInputRule,
-  blockLatexSchema,
-  toggleLatexCommand,
-} from "@/plugins/math";
+import { initHugoRefClicks } from "@/plugins/hugo-ref";
+import { configureBlockEdit, block, slash } from "@/features/block-edit";
+import { mathInlineInputRule, mathBlockInputRule } from "@/plugins/math";
 import { codeBlockUI } from "@/plugins/code-block-ui";
-import { videoRemarkPlugin, videoSchema, videoView } from "@/plugins/video";
-import { divCenterRemarkPlugin, divCenterSchema } from "@/plugins/div-center";
+import { videoView } from "@/plugins/video";
+import { fixedTableBlockView } from "@/plugins/table-block-view";
+import { fixedHeadingInputRule } from "@/plugins/heading-input-rule";
 import { createDirtyPlugin } from "@/plugins/dirty";
 import { createMentionPlugin } from "@/plugins/mention";
 import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
-import { createEditorDragDropPlugin, configureDropIndicator } from "@/plugins/editor-drag-drop";
+import {
+  createEditorDragDropPlugin,
+  configureDropIndicator,
+} from "@/plugins/editor-drag-drop";
 import { imageService } from "@/services/image-service";
 import { getProvider } from "@/stores/provider-store";
 import { imageStore } from "@/stores/image-store";
 import type { MentionView } from "@/features/mention";
+import { isMobileDock } from "@/utils/mobile";
 
 /** Callbacks the editor uses to talk back to the controller. */
 export interface EditorHost {
-  currentPathDir(): string
-  currentPath: string
+  currentPathDir(): string;
+  currentPath: string;
   stateCache: {
-    getLastSet(path: string): string | undefined
-    setLastSet(path: string, content: string): void
-  }
-  onMentionView(mv: MentionView | null): void
+    getLastSet(path: string): string | undefined;
+    setLastSet(path: string, content: string): void;
+  };
+  onMentionView(mv: MentionView | null): void;
 }
 
 /**
@@ -129,10 +83,6 @@ function proxyDomURLFor(host: EditorHost): (url: string) => string {
     const resolved = provider.resolveImageUrl?.(url);
     if (resolved) return resolved;
     const dir = host.currentPathDir();
-    // Absolute URLs are already server paths: the content-asset route
-    // (HTTP) and the GUI scheme handler both serve them with a MIME
-    // guessed from the extension. Relative URLs resolve against the
-    // current document directory.
     if (url.startsWith("/")) return url;
     let relPath = url;
     if (dir && relPath.startsWith(dir + "/")) {
@@ -142,167 +92,116 @@ function proxyDomURLFor(host: EditorHost): (url: string) => string {
   };
 }
 
+/**
+ * EditorInstance wraps a ProseKit editor with an `.action()` helper for
+ * backward compatibility with controller code that expects
+ * `editor.action(ctx => ctx.get(editorViewCtx))`.
+ */
+export interface EditorInstance {
+  readonly view: EditorView;
+  readonly schema: Schema;
+  action<T>(fn: (ctx: { view: EditorView; schema: Schema }) => T): T;
+  mount(): void;
+  unmount(): void;
+  destroy(): void;
+}
+
 export async function createEditor(
   container: HTMLElement,
   content: string,
   host: EditorHost,
-): Promise<Editor> {
-  const editor = await Editor.make()
-    .config((ctx) => {
-      ctx.set(rootCtx, container);
-      ctx.set(defaultValueCtx, content);
-      configureBlockEdit(ctx);
+): Promise<EditorInstance> {
+  const pdURL = proxyDomURLFor(host);
 
-      // Milkdown's DowngradeHeading binds Backspace/Delete at heading start to
-      // step the level down one `#` at a time (## → # → paragraph). Disable the
-      // shortcut; the replacement (heading → paragraph directly) lives in
-      // @/plugins/keyboard.
-      ctx.update(headingKeymap.key, (prev) => ({
-        ...prev,
-        DowngradeHeading: { ...prev.DowngradeHeading, shortcuts: [] },
-      }));
+  const extensions: Extension[] = [
+    ...createSchemaExtension(),
 
-      configureDropIndicator(ctx);
+    definePlugin(history()),
+    definePlugin(dropCursor()),
+    definePlugin(gapCursor()),
 
-      ctx.update(remarkStringifyOptionsCtx, (prev) => ({
-        ...prev,
-        // Keep list markers consistent: bullets as `*` (not `-`), numbers as
-        // `1.` (not `1)`). These are mdast-util-to-markdown options; Milkdown
-        // emits the marker for the `listItem` node via the stringifier.
-        // (bulletOther is intentionally left at its default — it must differ
-        // from `bullet` so nested same-type lists can be disambiguated.)
-        bullet: "*" as const,
-        bulletOrdered: "." as const,
-        handlers: {
-          ...prev.handlers,
-          text: (node: any, _: any, state: any, info: any) => {
-            const value = node.value;
-            if (!value) return "";
-            if (/^[^*_\\]*\s+$/.test(value)) return value;
-            if (value.includes("{{")) return value;
-            return state.safe(value, { ...info, encode: [] });
-          },
-        },
-      }));
+    definePlugin([
+      createPlainPastePlugin(),
+      createInlineCodeInputPlugin(),
+      createUrlPastePlugin(),
+      createDirtyPlugin({
+        getLastSetContent: (path) => host.stateCache.getLastSet(path),
+        setLastSetContent: (path, c) => host.stateCache.setLastSet(path, c),
+        getCurrentPath: () => host.currentPath,
+      }),
+      createMentionPlugin((_mv: MentionView | null) => {
+        host.onMentionView(_mv);
+      }),
+      createImagePastePlugin({
+        uploadImage: (file: File) => imageService.uploadImage(file),
+      }),
+      createLinkBoundaryPlugin(),
+      createImageEditPlugin(),
+      createEditorDragDropPlugin({
+        uploadImage: (file: File) => imageService.uploadImage(file),
+      }),
+      createKeymap(),
+      createCodeBlockMovePlugin(),
+      createBlockContextPlugin(),
+      createTextStatePlugin(),
+      createHistoryContextPlugin(),
+      ...(isMobileDock() ? [createCaretScrollPlugin()] : []),
+      block,
+      slash,
+      shortcodeDecoration,
+      fixedHeadingInputRule,
+      mathInlineInputRule,
+      mathBlockInputRule,
+    ]),
 
-      configureLinkTooltip(ctx);
-      ctx.update(linkTooltipConfig.key, (prev) => ({
-        ...prev,
-        linkIcon: copy,
-        editButton: editPencil,
-        removeButton: trash,
-        confirmButton: check,
-        inputPlaceholder: "Paste link...",
-      }));
+    fixedTableBlockView,
+    createImageResizeView(pdURL),
+    createImageInlineResizeView(pdURL),
+    codeBlockUI,
+    videoView,
+  ];
 
-      ctx.update(tableBlockConfig.key, (prev) => ({
-        ...prev,
-        renderButton: (renderType) => {
-          switch (renderType) {
-            case "add_row":
-              return `${plus} Row`;
-            case "add_col":
-              return `${plus} Col`;
-            case "delete_row":
-              return x;
-            case "delete_col":
-              return x;
-            case "align_col_left":
-              return alignLeft;
-            case "align_col_center":
-              return alignCenter;
-            case "align_col_right":
-              return alignRight;
-            case "col_drag_handle":
-              return menuScale;
-            case "row_drag_handle":
-              return table;
-          }
-        },
-      }));
+  const prosekitEditor = prosekitCreateEditor({ extension: union(extensions) });
 
-      const proxyDomURL = proxyDomURLFor(host);
+  // Set content: parse markdown into a PM doc, then set it directly on the
+  // editor's state (before mount, the schema is available via editor.schema).
+  const bridge = createMarkdownBridge(prosekitEditor.schema);
+  const doc = bridge.parse(content);
+  prosekitEditor.setContent(doc);
 
-      ctx.update(imageBlockConfig.key, (prev) => ({
-        ...prev,
-        onUpload: (file: File) => imageService.uploadImage(file),
-        proxyDomURL,
-      }));
+  configureDropIndicator();
 
-      ctx.update(inlineImageConfig.key, (prev) => ({
-        ...prev,
-        onUpload: (file: File) => imageService.uploadImage(file),
-        proxyDomURL,
-      }));
+  // Mount into the DOM
+  prosekitEditor.mount(container);
 
-      ctx.update(prosePluginsCtx, (plugins) => {
-        return plugins.concat(
-          createPlainPastePlugin(),
-          createInlineCodeInputPlugin(),
-          createUrlPastePlugin(),
-          createDirtyPlugin(ctx, {
-            getLastSetContent: (path) => host.stateCache.getLastSet(path),
-            setLastSetContent: (path, content) => host.stateCache.setLastSet(path, content),
-            getCurrentPath: () => host.currentPath,
-          }),
-          createMentionPlugin(ctx, (mv) => { host.onMentionView(mv) }),
-          createImagePastePlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
-          createLinkBoundaryPlugin(),
-          createImageEditPlugin(),
-          createEditorDragDropPlugin({ uploadImage: (file: File) => imageService.uploadImage(file) }),
-          createKeymap(),
-          createCodeBlockMovePlugin(),
-          createBlockContextPlugin(),
-          createTextStatePlugin(),
-          createHistoryContextPlugin(),
-          // Mobile-only: taps that leave the caret outside the visible band
-          // get scrolled back into view. Skipped entirely on desktop builds
-          // (and desktop-sized viewports in adaptive web builds).
-          ...(isMobileDock() ? [createCaretScrollPlugin()] : []),
-        );
+  // Post-mount: wire up behaviors that need the live EditorView
+  initHugoRefClicks(prosekitEditor.view);
+  configureBlockEdit(prosekitEditor.view);
+
+  // Wrap in an EditorInstance that provides .action() for backward compat
+  const instance: EditorInstance = {
+    get view() {
+      return prosekitEditor.view;
+    },
+    get schema() {
+      return prosekitEditor.view.state.schema;
+    },
+    action<T>(fn: (ctx: { view: EditorView; schema: Schema }) => T): T {
+      return fn({
+        view: prosekitEditor.view,
+        schema: prosekitEditor.view.state.schema,
       });
-    })
-    .use(nord as any)
-    .use(commonmark)
-    .use(fixedHeadingInputRule)
-    .use(gfm)
-    .use(block)
-    .use(slash)
-    .use(menuAPI)
-    .use(history)
-    .use(clipboard)
-    .use(alertRemarkPlugin)
-    .use(alertSchema)
-    .use(hugoRefSchema)
-    .use(shortcodeDecoration)
-    .use(linkTooltipPlugin)
-    .use(tableBlockConfig)
-    .use(fixedTableBlockView)
-    .use(imageBlockComponent)
-    .use(imageResizeSchema)
-    .use(imageResizeView)
-    .use(inlineImageConfig)
-    .use(imageInlineResizeView)
-    .use(codeBlockUI)
-    .use(videoRemarkPlugin)
-    .use(videoSchema)
-    .use(videoView)
-    .use(divCenterRemarkPlugin)
-    .use(divCenterSchema)
-    .use(cursor)
-    .use(remarkMathPlugin)
-    .use(remarkMathBlockPlugin)
-    .use(mathInlineSchema)
-    .use(mathInlineInputRule)
-    .use(mathBlockInputRule)
-    .use(blockLatexSchema)
-    .use(toggleLatexCommand)
-    .create();
+    },
+    mount() {
+      prosekitEditor.mount(container);
+    },
+    unmount() {
+      prosekitEditor.unmount();
+    },
+    destroy() {
+      prosekitEditor.unmount();
+    },
+  };
 
-  editor.action((ctx) => {
-    const view = ctx.get(editorViewCtx);
-    initHugoRefClicks(view);
-  });
-
-  return editor;
+  return instance;
 }

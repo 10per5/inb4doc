@@ -144,8 +144,8 @@ self.addEventListener("activate", (event) => {
 
 // Entry shell + app.js are versioned only by build, not by content hash, so a
 // cache-first policy would serve the stale bundle forever. Always go to the
-// network for IMPORTANT paths (falling back to cache offline). theme-nord.css
-// and katex.css are likewise build-versioned (the shell links them with
+// network for IMPORTANT paths (falling back to cache offline). katex.css is
+// likewise build-versioned (the shell links it with
 // ?ver=<APP_VERSION>), so they are network-first too. Lazy chunks are
 // content-hashed URLs, so cache-first is safe and keeps them available offline.
 const IMPORTANT_PATHS = new Set(
