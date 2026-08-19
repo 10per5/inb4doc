@@ -708,7 +708,7 @@ function computeChange(
 // ---- Export ----
 
 export const codeBlockUI = defineNodeView({
-  name: "code_block",
+  name: "codeBlock",
   constructor: (node, view, getPos) =>
     new PrismEditorBlock(node, view, getPos),
 });

@@ -27,7 +27,7 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
     if (node.type.name === "blockquote") {
       return { type: ActiveBlockType.Blockquote, checked: null, canSink: false }
     }
-    if (node.type.name !== "list_item") continue
+    if (node.type.name !== "list") continue
     // The item's index within its parent list (depth d-1). sinkListItem fails
     // when the item is the first child of the list (startIndex == 0), so only
     // items at index > 0 can be indented further.
@@ -39,7 +39,7 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
     const parentName = $from.node(d - 1).type.name
     return {
       type:
-        parentName === "ordered_list"
+        node.attrs.kind === "ordered"
           ? ActiveBlockType.OrderedList
           : ActiveBlockType.BulletList,
       checked: null,

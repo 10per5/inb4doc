@@ -2,75 +2,39 @@
 
 ## Rules
 
-- **Never modify `node_modules/`** — use custom Milkdown plugins or project source files instead.
+- **Never modify `node_modules/`** — use custom plugins or project source files instead.
 - **Never create postinstall/patch scripts** that modify node_modules at install time.
-- **No raw global (document/window) event bindings outside `src/plugins/keyboard.ts`.** All global key handling is a static list in `src/plugins/keyboard.ts` (the `globalKeyBindings` array), which owns the single document-level `keydown` listener. Its handlers emit app events (e.g. Escape → `AppEvent.SidebarCancel`); controllers subscribe to those events instead of registering their own document listeners. Editor keybindings live in the Milkdown keymap (`createKeymap`) in the same file. Do NOT call `document.addEventListener` in controllers, services, or other plugins.
+- **No raw global (document/window) event bindings outside `src/plugins/keyboard.ts`.** All global key handling is a static list in `src/plugins/keyboard.ts` (the `globalKeyBindings` array), which owns the single document-level `keydown` listener. Its handlers emit app events (e.g. Escape → `AppEvent.SidebarCancel`); controllers subscribe to those events instead of registering their own document listeners. Editor keybindings live in the ProseKit keymap (`createKeymap`) in the same file. Do NOT call `document.addEventListener` in controllers, services, or other plugins.
 - **Do not run Playwright/E2E browser tests unless the user explicitly asks.** Verify changes with `bun --bun tsc --noEmit` and static reasoning; leave E2E repro scripts out of the repo (keep them in `/tmp/opencode/` only if asked).
 - **Verify once, then stop.** `bun --bun tsc --noEmit` (and a build when CSS/Eta changed) is the whole verification step — do not re-grep built artifacts or re-inspect output files to confirm a fact you already confirmed. If the primary check passes, ask the user to verify the behavior rather than running further checks.
 - **Stop early on rabbit holes.** During investigation, don't keep drilling into `node_modules` sources or tracing dependency internals hoping the answer surfaces. If a few targeted reads don't resolve it, stop and ask the user for input — many issues resolve faster with a web search (docs, issue trackers) or a fresh git clone than with local source spelunking.
 - **Verify CSS custom property names against the declarations before using them.** Color/semantic vars (`--color-*`, `--font-size-*`) are declared in `src/styles/foundation/base.css` (`:root` block, Nord theme; dark mode in the `:root[data-theme="dark"]` block). Layout/spacing vars (`--sidebar-width`, `--aside-width`, `--editor-padding-*`, visibility) live in `lib/style/layout.css`. Do not invent var names — e.g. `--color-danger` does not exist; the error/destructive color is `--color-error` (using a non-existent var silently falls back to the property's initial value, producing wrong colors with no build error). When in doubt, grep the declaration file for the exact name before writing `var(--...)`.
 
-## Milkdown Design Faults (worked around — revisit on a ProseKit migration)
+## ProseKit Migration (completed Aug 2026)
 
-Milkdown has architectural faults that leak into app code as workarounds.
-They were debugged in Aug 2026 (drag/drop around tables was the trigger).
-Most trace back to a single root cause — `@milkdown/components` mounts Vue
-apps **inside** ProseMirror node views (`table-block/view/component.tsx` +
-`view.ts`), giving a second framework ownership of node-view DOM that PM
-normally manages. The faults are Milkdown's, not ProseMirror's, and the user
-has verified they do **not** reproduce on ProseKit (no framework in node
-views; smaller bundle) — the migration candidate to keep in mind. Before
-changing any workaround, re-read the surrounding code comments and confirm
-the underlying fault first; these are deliberately defensive.
+The editor was migrated from Milkdown to ProseKit (`@prosekit/basic` +
+`@prosekit/extensions`). Milkdown had architectural faults that leaked into
+app code as workarounds — most traced back to `@milkdown/components` mounting
+Vue apps **inside** ProseMirror node views, giving a second framework
+ownership of node-view DOM. ProseKit has no framework in node views and a
+smaller bundle. The migration removed the Vue dependency entirely.
 
-1. **Vue apps mounted inside ProseMirror node views.** `createApp(...).mount(dom)`
-   inside node views (table-block) puts Vue in the bundle and hands node-view
-   DOM over to a second framework outside PM's control. Almost every fault
-   below is a downstream effect. Also the single biggest contributor to the
-   1.3 MB `app.js` (see Bundle Analysis).
+The following Milkdown workarounds were deleted during migration. If any
+residual references to these patterns remain in the code, they can be removed:
 
-2. **`stopEvent` returns `true` for all `drag*`/`drop` events**
-   (`view.ts:115`). PM's drag/drop handlers are skipped over tables, so
-   nothing cancels `dragover` → the browser treats tables as a no-drop zone
-   and never dispatches `drop`. Workaround: `onDragOver` in
-   `editor-drag-drop.ts` calls `preventDefault()` over the table region so
-   the drop lands on the plugin's own `view.dom` listener (`handleCellDrop`).
-
-3. **Vue component root `preventDefault()`s drag events** (`component.tsx`
-   `onDragover`/`onDragleave`/`onDragstart`). Tables are a native drop
-   dead-zone and a native `dragstart` from inside a cell is impossible.
-   Workaround: a pointer-gesture fallback (ghost + `pointerup` move
-   transaction) in `editor-drag-drop.ts`.
-
-4. **`ignoreMutation` ignores every mutation outside the tbody `contentDOM`**
-   (`view.ts:133-144`). DOM corruption inside the table wrapper is silently
-   accepted — PM never reconciles it, no error, no doc/markdown change, so
-   visual desync persists invisibly. Example seen: a serialized drag-copy of
-   a dragged block (the only DOM that ever carries `data-pm-slice`, written
-   solely by PM's `serializeForClipboard`) got mounted into
-   `<table class="children">` and stayed. Workaround: a `MutationObserver`
-   plus an `update`-hook sweep in `editor-drag-drop.ts` removes any
-   `[data-pm-slice]` element inside `.milkdown-table-block`. A live node view
-   never carries `data-pm-slice`, so removal can't desync the doc.
-
-5. **Markdown goes through a remark/unified (MDAST) AST, not PM-native
-   parsing.** Parsing and serialization are milkdown AST transforms, and
-   string-output behavior leaks into app code as workaround layers: the `{{`
-   shortcode text-handler override in `editor_controller.ts`, the `$remark`
-   race-condition handling in `shortcode.ts`. Consequence: "impossible"
-   markdown shapes can't be fixed with a clean schema/parser change — they
-   need override layers keyed to milkdown's transform pipeline.
-
-6. **The drop indicator is a sibling overlay appended to
-   `view.dom.parentNode`**, themed by a config class
-   (`dropIndicatorConfig` → `.inb4doc-drop-cursor`), not a PM decoration.
-   Its state must be toggled directly on that DOM (`.drop-reject`), which is
-   also why state read-back can't drive it (see next).
-
-7. **Plugin-state read-back gotcha (PM, not Milkdown):** `PluginKey.getState()`
-   read right after `apply` stored a value can return `undefined` when the
-   plugin's key wiring doesn't line up (seen with `dropTargetKey`). Don't
-   guard imperative DOM toggles on state equality.
+1. **Vue apps mounted inside PM node views** — table views now use native
+   ProseMirror node views via `@prosekit/extensions` table extension.
+2. **`stopEvent` returning `true` for drag/drop** — native PM drag/drop
+   works correctly without workarounds.
+3. **Vue component `preventDefault()` on drag events** — removed.
+4. **`ignoreMutation` ignoring tbody mutations** — removed; PM reconciliation
+   works natively.
+5. **MDAST remark pipeline** — ProseKit uses the same remark/unified pipeline
+   for markdown parsing (this is a ProseKit feature, not a Milkdown fault),
+   but without the Vue framework overhead.
+6. **Drop indicator sibling overlay** — now uses `dropIndicatorConfig` with
+   `.inb4doc-drop-cursor` class (unchanged pattern, just renamed).
+7. **Plugin-state read-back gotcha** — general PM gotcha, not Milkdown-specific.
 
 On a ProseKit migration, most of these workarounds can likely be deleted and
 native behavior restored — but verify each fault's behavior first.
@@ -217,8 +181,8 @@ bun --bun tsc --noEmit # TypeScript check
 
 ## Supported Formatting in WYSIWYG
 
-- **CommonMark** — via `@milkdown/kit/preset/commonmark`
-- **GFM** — via `@milkdown/kit/preset/gfm` (tables, strikethrough, task lists, auto-links)
+- **CommonMark** — via `@prosekit/basic` (includes commonmark extension)
+- **GFM** — via `@prosekit/extensions` (tables, strikethrough, task lists, auto-links)
 - **Markdown alerts** (`> [!NOTE]`, `> [!WARNING]`, etc.) — custom `$remark` + `$nodeSchema` in `src/plugins/alert.ts`
   - Transforms MDAST blockquote nodes with `[!TYPE]` prefix into custom `alert` nodes
   - Renders as `<blockquote class="book-hint TYPE">` in the editor
@@ -240,7 +204,7 @@ extensions, and do not work around the schema limit with lossy rewrites
 
 ## Clipboard / Paste
 
-- `@milkdown/plugin-clipboard` activated via `.use(clipboard)`
+- ProseKit clipboard extension (via `@prosekit/extensions`)
 - Handles VS Code paste detection (code block with language)
 - Handles Google Docs multi-table paste (strips `docs-internal-guid` wrapper)
 - If rich paste formatting is still lost, add a `$prose` plugin with turndown HTML→Markdown conversion
@@ -277,27 +241,37 @@ Only backend: **Hugo + Hugo Book theme** (v0.14.0)
 
 When rendering popups, pickers, or floating UIs that must anchor to a ProseMirror position:
 
-### SlashProvider (recommended for `/cmd` menus)
+### Slash Menu (custom `SlashView`)
 
-Uses `@milkdown/plugin-slash`'s `SlashProvider`. The provider positions itself via `posToDOMRect(view, from, to)` using the current text selection. The positioning happens inside `#onUpdate` which is called by `provider.update(view, prevState)` — debounced at 20ms by default.
+The `/` slash menu is implemented as a custom ProseMirror plugin view in
+`src/features/block-edit.ts` (`SlashView` class). It is NOT based on
+`@milkdown/plugin-slash` — that was removed during the ProseKit migration.
+
+The slash menu mounts its DOM element to `#inb4doc-editor` (the
+`view.dom.parentNode`) in the constructor. Positioning uses
+`view.coordsAtPos()` converted to container-relative coordinates by
+subtracting the parent element's `getBoundingClientRect()`.
 
 **Key flow:**
 
-1. Set a `#programmaticPos` before calling `provider.show()`
-2. In the `shouldShow` callback, read `#programmaticPos`, validate the position node matches the selection node, then return true
-3. The provider calls `posToDOMRect(view, from, to)` to compute position → `computePosition()` via Floating UI → sets `left`/`top` on the element
+1. `SlashView.update()` calls `#detectAndShow()` on every state update
+2. `#detectAndShow()` checks if the cursor is in a paragraph/heading and the text starts with `/`
+3. If matched, `show()` sets `data-show="true"` and `#positionMenu()` sets `left`/`top`
+4. Arrow keys navigate items; Enter executes; Escape hides
 
-**Gotchas:**
+**Important:** All coordinates from `view.coordsAtPos()` are viewport-relative.
+When positioning inside a `position: absolute` container, subtract the
+container's `getBoundingClientRect()` to get container-relative values.
 
-- `provider.show()` only sets `data-show="true"` — it does NOT position the element. Positioning requires `provider.update()` → `#onUpdate` to fire (debounced).
-- `shouldShow` returns false if `#programmaticPos` resolves to a different node than `selection.from` — important guard against stale positions.
-- For immediate positioning without waiting for the debounce, manually compute coords:
+### Block Handle (custom `BlockHandleView`)
 
-  ```ts
-  const coords = view.coordsAtPos(pos);
-  element.style.left = `${coords.left}px`;
-  element.style.top = `${coords.bottom + 4}px`;
-  ```
+The drag handle (`+` and `grab` icons) is implemented as a custom ProseMirror
+plugin view in `src/features/block-edit.ts` (`BlockHandleView` class).
+
+It mounts to `#inb4doc-editor` (`view.dom.parentNode`). The handle only
+appears when the cursor is at the start of an empty paragraph at depth 1
+(not inside a table cell). Positioning converts viewport coordinates to
+container-relative via `parentRect`.
 
 ### ProseMirror Plugin with `handleDOMEvents`
 
@@ -328,9 +302,9 @@ Listen for the custom event on `view.dom` in the component that manages the popu
 
 ### Avoiding Position Flash
 
-When a floating element transitions from hidden to shown, it may briefly appear at (0,0) before `#onUpdate` repositions it. To prevent this:
+When a floating element transitions from hidden to shown, it may briefly appear at (0,0) before repositioning. To prevent this:
 
-1. Set CSS `left`/`top` BEFORE calling `provider.show()` using `view.coordsAtPos(pos)`
+1. Set CSS `left`/`top` BEFORE setting `data-show="true"` using `view.coordsAtPos(pos)` converted to container-relative coordinates
 2. Set `data-show="false"` on the element until coordinates are computed, then set to `"true"`
 
 ## Bundle Analysis
@@ -347,7 +321,7 @@ This generates an LLM-friendly markdown report with largest modules, dependency 
 
 | Asset     | Size           | Cause                                                                                                                                  |
 | --------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `app.js`  | 1.3 MB initial | Milkdown + ProseMirror + CM core                                                                                                       |
+| `app.js`  | ~1.3 MB initial | ProseKit + ProseMirror + CM core                                                                                                       |
 | `app.css` | 1.5 MB         | `katex/dist/katex.min.css` has `@font-face` blocks → Bun inlines all woff2/woff/ttf fonts as base64 data URIs (~60 font files, 1.2 MB) |
 
 ## Playwright Testing

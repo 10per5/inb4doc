@@ -1,7 +1,7 @@
-/* ── Milkdown Editor Styles ────────────────────────────────────────────
+/* ── Editor Component Styles ──────────────────────────────────────────
  *
- * Editor-specific UI components for Milkdown editor.
- * Organized by feature category: alerts, content, processor, ui.
+ * UI components: slash menu, block handle, menus, icons, toolbars.
+ * Content styles: links, lists, alerts, images, video, div-center, etc.
  */
 
 @import "../ui/slash.css";
@@ -15,7 +15,6 @@
 @import "../processor/shortcode.css";
 @import "../content/hugo-ref.css";
 @import "../content/task-list.css";
-@import "../content/table-block.css";
 @import "../ui/menu.css";
 @import "../content/image-block.css";
 @import "../content/video.css";

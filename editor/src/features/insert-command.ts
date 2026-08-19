@@ -60,14 +60,14 @@ export function executeInsertCommand(
   const dispatch = (tr: import("prosemirror-state").Transaction) => view.dispatch(tr);
   const listCommands: { call(key: string | PMCommand, ...args: unknown[]): boolean } = {
     call(key: string, ..._args: unknown[]) {
-      if (key === "bullet") return wrapInList(schema.nodes.bullet_list)(view.state, dispatch);
-      if (key === "ordered") return wrapInList(schema.nodes.ordered_list)(view.state, dispatch);
+      if (key === "bullet") return wrapInList(schema.nodes.list)(view.state, dispatch);
+      if (key === "ordered") return wrapInList(schema.nodes.list)(view.state, dispatch);
       return false;
     },
   };
   const listService = {
-    wrapInBulletListCommand: wrapInList(schema.nodes.bullet_list) as PMCommand,
-    wrapInOrderedListCommand: wrapInList(schema.nodes.ordered_list) as PMCommand,
+    wrapInBulletListCommand: wrapInList(schema.nodes.list) as PMCommand,
+    wrapInOrderedListCommand: wrapInList(schema.nodes.list) as PMCommand,
   };
 
   if (cmd === SlashCommand.BulletList) {
@@ -92,8 +92,8 @@ export function executeInsertCommand(
     for (let d = $from.depth; d > 0; d--) {
       const node = $from.node(d);
       if (
-        node.type === schema.nodes.bullet_list ||
-        node.type === schema.nodes.ordered_list ||
+        node.type === schema.nodes.list ||
+        node.type === schema.nodes.list ||
         node.type === schema.nodes.blockquote
       ) {
         parentType = proseNodeTypeByName.get(node.type.name) ?? null;
@@ -180,7 +180,7 @@ function insertBelow(view: EditorView): void {
   const { schema } = state;
   const { $from } = state.selection;
   const afterPos = $from.after($from.depth);
-  const hr = schema.nodes.hr.create();
+  const hr = schema.nodes.horizontalRule.create();
   const para = schema.nodes.paragraph.create();
   const tr = state.tr.insert(afterPos, hr).insert(afterPos + 2, para);
   dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
@@ -193,7 +193,7 @@ function insertDivider(view: EditorView): void {
 
   const pos = $from.before($from.depth);
   const blockSize = $from.node($from.depth).nodeSize;
-  const hr = schema.nodes.hr.create();
+  const hr = schema.nodes.horizontalRule.create();
   const para = schema.nodes.paragraph.create();
   const tr = state.tr.replaceWith(pos, pos + blockSize, [hr, para]);
   dispatch(
@@ -204,7 +204,7 @@ function insertDivider(view: EditorView): void {
 function convertToCodeBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { $from } = state.selection;
-  const codeBlock = state.schema.nodes.code_block.create({ language: "" });
+  const codeBlock = state.schema.nodes.codeBlock.create({ language: "" });
   const pos = $from.before($from.depth);
   const tr = state.tr.replaceWith(
     pos,
@@ -221,7 +221,7 @@ function convertToCodeBlock(view: EditorView): void {
 function convertToMathBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { $from } = state.selection;
-  const codeBlock = state.schema.nodes.code_block.create({
+  const codeBlock = state.schema.nodes.codeBlock.create({
     language: "LaTeX",
   });
   const pos = $from.before($from.depth);
@@ -243,9 +243,9 @@ function insertTable(view: EditorView): void {
   const pos = $from.before($from.depth);
   const { schema } = state;
   const tableNode = schema.nodes.table;
-  const tableRow = schema.nodes.table_row;
-  const tableCell = schema.nodes.table_cell;
-  const tableHeader = schema.nodes.table_header;
+  const tableRow = schema.nodes.tableRow;
+  const tableCell = schema.nodes.tableCell;
+  const tableHeader = schema.nodes.tableHeaderCell;
   const para = schema.nodes.paragraph;
   const rows = [];
   for (let r = 0; r < 3; r++) {

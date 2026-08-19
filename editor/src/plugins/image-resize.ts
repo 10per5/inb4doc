@@ -55,7 +55,7 @@ function makeImageBlockNodeView(
 ): (node: any, view: any, getPos: () => number | undefined) => NodeView {
   return (initialNode, view, getPos) => {
     const block = document.createElement("div");
-    block.className = "milkdown-image-block";
+    block.className = "inb4doc-image-block";
     block.contentEditable = "false";
 
     const wrapper = document.createElement("div");

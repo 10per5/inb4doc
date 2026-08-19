@@ -24,7 +24,7 @@ const dropTargetKey = new PluginKey<DropTarget | null>(
 export function isInsideTableCell($pos: ResolvedPos): boolean {
   for (let d = $pos.depth; d > 0; d--) {
     const name = $pos.node(d).type.name
-    if (name === "table_cell" || name === "table_header") return true
+    if (name === "tableCell" || name === "tableHeaderCell") return true
   }
   return false
 }
@@ -32,7 +32,7 @@ export function isInsideTableCell($pos: ResolvedPos): boolean {
 function cellDepthAt($pos: ResolvedPos): number {
   for (let d = $pos.depth; d > 0; d--) {
     const name = $pos.node(d).type.name
-    if (name === "table_cell" || name === "table_header") return d
+    if (name === "tableCell" || name === "tableHeaderCell") return d
   }
   return -1
 }
@@ -168,7 +168,7 @@ function flattenToInline(
       out.push(node)
       return
     }
-    const hardBreak = node.type.schema.nodes["hardbreak"]
+    const hardBreak = node.type.schema.nodes["hardBreak"]
     const separator = () => {
       if (hardBreak && out.length > 0) out.push(hardBreak.create())
     }
@@ -187,9 +187,7 @@ function flattenToInline(
     const name = node.type.name
     const isTextContainer =
       node.isTextblock ||
-      name === "list_item" ||
-      name === "bullet_list" ||
-      name === "ordered_list" ||
+      name === "list" ||
       name === "blockquote" ||
       name === "alert"
     if (!isTextContainer) {
@@ -212,7 +210,7 @@ function flattenToInline(
 
 function isDropOverTable(view: EditorView, event: DragEvent): boolean {
   const target = event.target
-  if (target instanceof Element && target.closest(".milkdown-table-block")) {
+  if (target instanceof Element && target.closest(".ProseMirror-table-node")) {
     return true
   }
   if (tableCellAtPoint(view, event.clientX, event.clientY)) return true
@@ -222,7 +220,7 @@ function isDropOverTable(view: EditorView, event: DragEvent): boolean {
   return (
     cellDepthAt($pos) >= 0 ||
     $pos.parent.type.name === "table" ||
-    $pos.parent.type.name === "table_row"
+    $pos.parent.type.name === "tableRow"
   )
 }
 
@@ -352,7 +350,7 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
           const target = event.target as Element | null
           const block =
             target instanceof Element
-              ? target.closest(".milkdown-table-block")
+              ? target.closest(".ProseMirror-table-node")
               : null
           if (block) event.preventDefault()
           const nearest = block
@@ -381,7 +379,7 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
           event.clientX,
           event.clientY,
         )
-        if (el instanceof Element && el.closest(".milkdown-table-block")) return
+        if (el instanceof Element && el.closest(".ProseMirror-table-node")) return
         if (tableCellAtPoint(view, event.clientX, event.clientY, dragSource))
           return
         setDropTarget(null)
@@ -399,7 +397,7 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
         if (view.isDestroyed) return
         const strays = Array.from(
           view.dom.querySelectorAll<HTMLElement>(
-            ".milkdown-table-block [data-pm-slice]",
+            ".ProseMirror-table-node [data-pm-slice]",
           ),
         )
         for (const stray of strays) {
@@ -450,10 +448,10 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
               ? rawTarget.parentElement
               : null
         if (!target) return
-        if (!target.closest(".milkdown-table-block")) return
+        if (!target.closest(".ProseMirror-table-node")) return
         if (
           target.closest(
-            '.milkdown-image-inline, .image-resize-handle, button, [data-role="col-drag-handle"], [data-role="row-drag-handle"]',
+            '.inb4doc-image-inline, .image-resize-handle, button, [data-role="col-drag-handle"], [data-role="row-drag-handle"]',
           )
         )
           return

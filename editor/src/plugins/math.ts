@@ -35,7 +35,7 @@ export const mathBlockInputRule = inputRules({
     new InputRule(
       /^\$\$[\s\n]$/,
       (state, _match, start, _end) => {
-        const nodeType: NodeType | undefined = state.schema.nodes.code_block;
+        const nodeType: NodeType | undefined = state.schema.nodes.codeBlock;
         if (!nodeType) return null;
         const tr = state.tr;
         tr.delete(start - 1, start + 1);

@@ -9,7 +9,7 @@ export interface ImagePasteConfig {
 function isInsideTableCell($pos: ResolvedPos): boolean {
   for (let d = $pos.depth; d > 0; d--) {
     const name = $pos.node(d).type.name
-    if (name === "table_cell" || name === "table_header") return true
+    if (name === "tableCell" || name === "tableHeaderCell") return true
   }
   return false
 }

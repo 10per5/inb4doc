@@ -33,7 +33,7 @@ export function setTaskChecked(view: EditorView, checked: boolean): void {
   const { $from } = view.state.selection
   for (let d = $from.depth; d > 0; d--) {
     const node = $from.node(d)
-    if (node.type.name !== "list_item") continue
+    if (node.type.name !== "list") continue
     view.dispatch(
       view.state.tr.setNodeMarkup($from.before(d), undefined, {
         ...node.attrs,
@@ -96,7 +96,7 @@ export function clearListItems(view: EditorView): void {
   for (const t of [...touched].sort((a, b) => a.pos - b.pos)) {
     const curPos = tr.mapping.map(t.pos)
     const list = tr.doc.nodeAt(curPos)
-    if (!list || (list.type.name !== "bullet_list" && list.type.name !== "ordered_list")) continue
+    if (!list || list.type.name !== "list") continue
 
     const before: Node[] = []
     const mid: Node[] = []
@@ -152,7 +152,7 @@ export function setListItemKind(
 
   let itemDepth = -1
   for (let d = $from.depth; d > 0; d--) {
-    if ($from.node(d).type.name === "list_item") {
+    if ($from.node(d).type.name === "list") {
       itemDepth = d
       break
     }
@@ -235,7 +235,7 @@ export function setListItemKind(
     const curNode = tr.doc.nodeAt(curPos)
     // A neighbor that an earlier (lower) list absorbed now maps into a
     // list_item inside the merged list; it needs no further work.
-    if (!curNode || (curNode.type.name !== "bullet_list" && curNode.type.name !== "ordered_list")) continue
+    if (!curNode || curNode.type.name !== "list") continue
     const result = replaceListRange(tr, state.schema, curNode, curPos, t.first, t.last, kind, {
       mid: (pos, size) => outside(pos, size, curFrom, curTo) || covered(pos, size, curFrom, curTo),
       segment: (pos, size) => outside(pos, size, curFrom, curTo),
@@ -265,12 +265,11 @@ interface TouchedList {
 function collectTouchedLists(state: EditorState, from: number, to: number): TouchedList[] {
   const touched: TouchedList[] = []
   state.doc.nodesBetween(from, to, (node, pos) => {
-    if (node.type.name !== "bullet_list" && node.type.name !== "ordered_list") return true
+    if (node.type.name !== "list") return true
     let first = -1
     let last = -1
     let firstOffset = 0
     node.forEach((child, offset, index) => {
-      if (child.type.name !== "list_item") return
       // Count an item only when the selection touches its own paragraph, not
       // when it merely reaches a nested list inside the item — that nested
       // list is visited separately below and converted on its own.
@@ -327,9 +326,9 @@ function replaceListRange(
   kind: "bullet" | "ordered",
   allow: { mid: (pos: number, size: number) => boolean; segment: (pos: number, size: number) => boolean },
 ): { firstCoveredItem: number } | null {
-  const isOrdered = listNode.type.name === "ordered_list"
+  const isOrdered = listNode.attrs.order != null
   const origName = listNode.type.name
-  const targetName = kind === "ordered" ? "ordered_list" : "bullet_list"
+  const targetName = "list"
   const order = listNode.attrs.order ?? 1
   const spread = listNode.attrs.spread ?? false
   const setItemAttrs = (node: Node, attrs: Record<string, unknown>) =>
@@ -340,9 +339,8 @@ function replaceListRange(
     node.forEach((child) => items.push(child))
     return items
   }
-  const normalize = (name: string, items: Node[], ord: number): Node | null => {
+  const normalize = (name: string, items: Node[], ord: number, isOrd: boolean): Node | null => {
     if (items.length === 0) return null
-    const isOrd = name === "ordered_list"
     return schema.nodes[name].create(
       isOrd ? { order: ord, spread } : { spread },
       items.map((child, index) =>
@@ -367,9 +365,10 @@ function replaceListRange(
     targetName,
     midItems.map((child) => setItemAttrs(child, { checked: null })),
     order,
+    kind === "ordered",
   )
-  let before = normalize(origName, beforeItems, order)
-  let after = normalize(origName, afterItems, order)
+  let before = normalize(origName, beforeItems, order, isOrdered)
+  let after = normalize(origName, afterItems, order, isOrdered)
   let startPos = listPos
   let endPos = listPos + listNode.nodeSize
 
@@ -382,19 +381,19 @@ function replaceListRange(
   let prevAbsorbedSize = 0
   if (mid && !before && prev && prev.type.name === targetName && allow.mid(listPos - prev.nodeSize, prev.nodeSize)) {
     prevAbsorbedSize = prev.content.size
-    mid = normalize(targetName, [...itemsOf(prev), ...itemsOf(mid)], prev.attrs.order ?? 1)
+    mid = normalize(targetName, [...itemsOf(prev), ...itemsOf(mid)], prev.attrs.order ?? 1, kind === "ordered")
     startPos -= prev.nodeSize
   } else if (before && prev && prev.type.name === origName && allow.segment(listPos - prev.nodeSize, prev.nodeSize)) {
-    before = normalize(origName, [...itemsOf(prev), ...itemsOf(before)], prev.attrs.order ?? order)
+    before = normalize(origName, [...itemsOf(prev), ...itemsOf(before)], prev.attrs.order ?? order, isOrdered)
     startPos -= prev.nodeSize
   }
 
   // Same on the right side: `mid` may only swallow `next` when `after` is empty.
   if (mid && !after && next && next.type.name === targetName && allow.mid(endPos, next.nodeSize)) {
-    mid = normalize(targetName, [...itemsOf(mid), ...itemsOf(next)], mid.attrs.order ?? order)
+    mid = normalize(targetName, [...itemsOf(mid), ...itemsOf(next)], mid.attrs.order ?? order, kind === "ordered")
     endPos += next.nodeSize
   } else if (after && next && next.type.name === origName && allow.segment(endPos, next.nodeSize)) {
-    after = normalize(origName, [...itemsOf(after), ...itemsOf(next)], order)
+    after = normalize(origName, [...itemsOf(after), ...itemsOf(next)], order, isOrdered)
     endPos += next.nodeSize
   }
 

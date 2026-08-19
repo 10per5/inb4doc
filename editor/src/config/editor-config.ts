@@ -10,9 +10,6 @@ import { createEditor as prosekitCreateEditor, definePlugin, union } from "@pros
 import type { Extension } from "@prosekit/core";
 import type { EditorView } from "prosemirror-view";
 import type { Schema } from "prosemirror-model";
-import { history } from "prosemirror-history";
-import { dropCursor } from "prosemirror-dropcursor";
-import { gapCursor } from "prosemirror-gapcursor";
 
 import { createSchemaExtension } from "./editor-schema";
 import { createMarkdownBridge } from "./editor-markdown";
@@ -33,7 +30,6 @@ import { mathInlineInputRule, mathBlockInputRule } from "@/plugins/math";
 import { codeBlockUI } from "@/plugins/code-block-ui";
 import { videoView } from "@/plugins/video";
 import { fixedTableBlockView } from "@/plugins/table-block-view";
-import { fixedHeadingInputRule } from "@/plugins/heading-input-rule";
 import { createDirtyPlugin } from "@/plugins/dirty";
 import { createMentionPlugin } from "@/plugins/mention";
 import { createImagePastePlugin } from "@/plugins/image-paste";
@@ -114,11 +110,7 @@ export async function createEditor(
   const pdURL = proxyDomURLFor(host);
 
   const extensions: Extension[] = [
-    ...createSchemaExtension(),
-
-    definePlugin(history()),
-    definePlugin(dropCursor()),
-    definePlugin(gapCursor()),
+    createSchemaExtension(),
 
     definePlugin([
       createPlainPastePlugin(),
@@ -149,7 +141,6 @@ export async function createEditor(
       block,
       slash,
       shortcodeDecoration,
-      fixedHeadingInputRule,
       mathInlineInputRule,
       mathBlockInputRule,
     ]),
@@ -170,13 +161,13 @@ export async function createEditor(
   prosekitEditor.setContent(doc);
 
   configureDropIndicator();
+  configureBlockEdit();
 
   // Mount into the DOM
   prosekitEditor.mount(container);
 
   // Post-mount: wire up behaviors that need the live EditorView
   initHugoRefClicks(prosekitEditor.view);
-  configureBlockEdit(prosekitEditor.view);
 
   // Wrap in an EditorInstance that provides .action() for backward compat
   const instance: EditorInstance = {

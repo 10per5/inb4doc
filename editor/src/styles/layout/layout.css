@@ -42,19 +42,16 @@
 
 /* ── Main Content Area ─────────────────────────────────────────────── */
 
-#milkdown-editor {
+#inb4doc-editor {
   flex: 1;
+  position: relative;
 }
 
-#milkdown-editor .milkdown {
-  padding: var(--editor-padding-y) 0;
+#inb4doc-editor .ProseMirror {
+  padding: var(--editor-padding-y) var(--editor-padding-x);
 }
 
-#milkdown-editor .ProseMirror {
-  padding: 0 var(--editor-padding-x);
-}
-
-#milkdown-editor hr {
+#inb4doc-editor hr {
   border: none;
   margin-block: unset;
   background-color: color-mix(in srgb, black, transparent 80%);
@@ -71,7 +68,7 @@
   .app-toolbar,
   .book-leftpanel,
   .book-rightpanel,
-  .milkdown-block-handle,
+  .inb4doc-block-handle,
   .sidebar-provider-bar {
     display: none !important;
   }
@@ -81,7 +78,7 @@
     width: 100%;
   }
 
-  #milkdown-editor .ProseMirror {
+  #inb4doc-editor .ProseMirror {
     padding: 0;
   }
 }

@@ -116,7 +116,7 @@ export class ViewService {
   initialize(): void {
     registerEditorView(this.register, {
       sourceMode: () => this.editor.isSourceMode(),
-      milkdownEl: this.editor.milkdownTarget,
+      inb4docEl: this.editor.inb4docTarget,
       sourceEl: this.editor.sourceTarget,
       editorArea: this.editor.element as HTMLElement,
     });
@@ -138,7 +138,7 @@ export class ViewService {
 
   private setupNoFileView(): void {
     const editorArea = this.editor.element as HTMLElement;
-    const milkdownEl = this.editor.milkdownTarget;
+    const inb4docEl = this.editor.inb4docTarget;
     const sourceEl = this.editor.sourceTarget;
     const noFileEl = document.createElement("div");
     noFileEl.dataset.controller = "no-file";
@@ -149,7 +149,7 @@ export class ViewService {
     this.views.set("no-file", {
       activate: () => {
         this.editor.hideSkeleton();
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         const tree = treeStore.getTree();
         const isEmpty = treeStore.isEmpty();
@@ -171,7 +171,7 @@ export class ViewService {
 
   private setupDiskUsageView(): void {
     const editorArea = this.editor.element as HTMLElement;
-    const milkdownEl = this.editor.milkdownTarget;
+    const inb4docEl = this.editor.inb4docTarget;
     const sourceEl = this.editor.sourceTarget;
     const diskUsageEl = document.createElement("div");
     diskUsageEl.dataset.controller = "disk-usage";
@@ -180,7 +180,7 @@ export class ViewService {
 
     this.views.set("disk-usage", {
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         diskUsageEl.style.display = "";
         this.showDiskUsage();
@@ -193,7 +193,7 @@ export class ViewService {
 
   private setupDirIndexEmptyView(): void {
     const editorArea = this.editor.element as HTMLElement;
-    const milkdownEl = this.editor.milkdownTarget;
+    const inb4docEl = this.editor.inb4docTarget;
     const sourceEl = this.editor.sourceTarget;
     const dirIndexEmptyEl = document.createElement("div");
     dirIndexEmptyEl.dataset.controller = "dir-index-empty";
@@ -203,7 +203,7 @@ export class ViewService {
     this.views.set("dir-index-empty", {
       activate: () => {
         this.editor.hideSkeleton();
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         dirIndexEmptyEl.style.display = "";
         const ctrl =
@@ -221,7 +221,7 @@ export class ViewService {
 
   private setupMobileViews(): void {
     const editorArea = this.editor.element as HTMLElement;
-    const milkdownEl = this.editor.milkdownTarget;
+    const inb4docEl = this.editor.inb4docTarget;
     const sourceEl = this.editor.sourceTarget;
 
     // `navigation` — fullview that reuses the sidebar as its content. The
@@ -267,7 +267,7 @@ export class ViewService {
 
     const fullview = (el: HTMLElement): ViewHandlers => ({
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         el.style.display = "";
       },
@@ -279,7 +279,7 @@ export class ViewService {
     this.views.set("navigation", fullview(navigationEl));
     this.views.set("more", {
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         moreEl.style.display = "";
         const ctrl =
@@ -296,7 +296,7 @@ export class ViewService {
     this.views.set("prefs", fullview(prefsEl));
     this.views.set("images", {
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         imagesEl.style.display = "";
         const ctrl =
@@ -312,7 +312,7 @@ export class ViewService {
     });
     this.views.set("changes", {
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         changesEl.style.display = "";
         const ctrl =
@@ -338,7 +338,7 @@ export class ViewService {
   private ensureMetaScreenView(): void {
     if (this.views.has("meta")) return;
     const editorArea = this.editor.element as HTMLElement;
-    const milkdownEl = this.editor.milkdownTarget;
+    const inb4docEl = this.editor.inb4docTarget;
     const sourceEl = this.editor.sourceTarget;
     const metaEl = document.createElement("div");
     metaEl.dataset.controller = "meta-panel";
@@ -348,7 +348,7 @@ export class ViewService {
     editorArea.appendChild(metaEl);
     this.views.set("meta", {
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         metaEl.style.display = "";
       },
@@ -367,7 +367,7 @@ export class ViewService {
   private ensureNavigationScreenView(): void {
     if (this.views.has("navigation")) return;
     const editorArea = this.editor.element as HTMLElement;
-    const milkdownEl = this.editor.milkdownTarget;
+    const inb4docEl = this.editor.inb4docTarget;
     const sourceEl = this.editor.sourceTarget;
     const navigationEl = document.createElement("div");
     navigationEl.dataset.controller = "navigation";
@@ -376,7 +376,7 @@ export class ViewService {
     editorArea.appendChild(navigationEl);
     this.views.set("navigation", {
       activate: () => {
-        milkdownEl.style.display = "none";
+        inb4docEl.style.display = "none";
         sourceEl.style.display = "none";
         navigationEl.style.display = "";
       },

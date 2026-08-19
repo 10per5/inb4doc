@@ -1,4 +1,4 @@
-.milkdown-image-block {
+.inb4doc-image-block {
   position: relative;
   margin: 1rem 0;
   display: flex;
@@ -6,7 +6,7 @@
   align-items: center;
 }
 
-.milkdown-image-block .image-edit {
+.inb4doc-image-block .image-edit {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -18,24 +18,24 @@
   max-width: 480px;
 }
 
-.milkdown-image-block .image-edit .image-icon {
+.inb4doc-image-block .image-edit .image-icon {
   flex-shrink: 0;
 }
 
-.milkdown-image-block .image-edit .image-icon svg {
+.inb4doc-image-block .image-edit .image-icon svg {
   width: 24px;
   height: 24px;
   fill: var(--color-text-secondary);
 }
 
-.milkdown-image-block .image-edit .link-importer {
+.inb4doc-image-block .image-edit .link-importer {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.milkdown-image-block .image-edit .link-importer .link-input-area {
+.inb4doc-image-block .image-edit .link-importer .link-input-area {
   width: 100%;
   border: none;
   background: transparent;
@@ -45,7 +45,7 @@
   padding: 4px 0;
 }
 
-.milkdown-image-block .image-edit .link-importer .placeholder {
+.inb4doc-image-block .image-edit .link-importer .placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -53,11 +53,11 @@
   color: var(--color-text-secondary);
 }
 
-.milkdown-image-block .image-edit .link-importer .placeholder .hidden {
+.inb4doc-image-block .image-edit .link-importer .placeholder .hidden {
   display: none;
 }
 
-.milkdown-image-block .image-edit .link-importer .placeholder .uploader {
+.inb4doc-image-block .image-edit .link-importer .placeholder .uploader {
   cursor: pointer;
   padding: 2px 8px;
   border: 1px solid var(--color-border);
@@ -66,40 +66,40 @@
   background: var(--color-bg-primary);
 }
 
-.milkdown-image-block .image-edit .link-importer .placeholder .uploader:hover {
+.inb4doc-image-block .image-edit .link-importer .placeholder .uploader:hover {
   background: var(--color-bg-tertiary);
 }
 
-.milkdown-image-block .image-edit .link-importer .placeholder .text {
+.inb4doc-image-block .image-edit .link-importer .placeholder .text {
   cursor: pointer;
 }
 
-.milkdown-image-block .image-edit .link-importer.focus .link-input-area {
+.inb4doc-image-block .image-edit .link-importer.focus .link-input-area {
   border-bottom: 1px solid var(--color-accent);
 }
 
-.milkdown-image-block .image-edit .image-preview {
+.inb4doc-image-block .image-edit .image-preview {
   margin-top: 8px;
 }
 
-.milkdown-image-block .image-edit .image-preview img {
+.inb4doc-image-block .image-edit .image-preview img {
   max-width: 100%;
   max-height: 300px;
   border-radius: 4px;
 }
 
-.milkdown-image-block .image-edit .confirm {
+.inb4doc-image-block .image-edit .confirm {
   cursor: pointer;
   display: flex;
   align-items: center;
   padding: 4px;
 }
 
-.milkdown-image-block .image-edit .confirm:hover {
+.inb4doc-image-block .image-edit .confirm:hover {
   color: var(--color-accent);
 }
 
-.milkdown-image-block .image-wrapper {
+.inb4doc-image-block .image-wrapper {
   position: relative;
   display: inline-flex;
   flex-direction: column;
@@ -107,21 +107,21 @@
   max-width: 100%;
 }
 
-.milkdown-image-block .image-frame {
+.inb4doc-image-block .image-frame {
   position: relative;
   display: inline-block;
   line-height: 0;
   max-width: 100%;
 }
 
-.milkdown-image-block .image-frame img {
+.inb4doc-image-block .image-frame img {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
   display: block;
 }
 
-.milkdown-image-block .image-frame .operation {
+.inb4doc-image-block .image-frame .operation {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -132,11 +132,11 @@
   z-index: 5;
 }
 
-.milkdown-image-block:hover .image-frame .operation {
+.inb4doc-image-block:hover .image-frame .operation {
   opacity: 1;
 }
 
-.milkdown-image-block .image-frame .operation .operation-item {
+.inb4doc-image-block .image-frame .operation .operation-item {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,17 +148,17 @@
   cursor: pointer;
 }
 
-.milkdown-image-block .image-frame .operation .operation-item:hover {
+.inb4doc-image-block .image-frame .operation .operation-item:hover {
   background: var(--color-bg-tertiary);
 }
 
-.milkdown-image-block.selected .image-frame {
+.inb4doc-image-block.selected .image-frame {
   outline: 2px solid var(--color-accent);
   outline-offset: 4px;
   border-radius: 4px;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle {
+.inb4doc-image-block .image-frame .image-resize-handle {
   position: absolute;
   width: 10px;
   height: 10px;
@@ -171,64 +171,64 @@
   pointer-events: auto;
 }
 
-.milkdown-image-block:hover .image-frame .image-resize-handle,
-.milkdown-image-block.selected .image-frame .image-resize-handle {
+.inb4doc-image-block:hover .image-frame .image-resize-handle,
+.inb4doc-image-block.selected .image-frame .image-resize-handle {
   opacity: 1;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--nw {
+.inb4doc-image-block .image-frame .image-resize-handle--nw {
   top: -5px;
   left: -5px;
   cursor: nwse-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--n {
+.inb4doc-image-block .image-frame .image-resize-handle--n {
   top: -5px;
   left: 50%;
   transform: translateX(-50%);
   cursor: ns-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--ne {
+.inb4doc-image-block .image-frame .image-resize-handle--ne {
   top: -5px;
   right: -5px;
   cursor: nesw-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--e {
+.inb4doc-image-block .image-frame .image-resize-handle--e {
   right: -5px;
   top: 50%;
   transform: translateY(-50%);
   cursor: ew-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--se {
+.inb4doc-image-block .image-frame .image-resize-handle--se {
   bottom: -5px;
   right: -5px;
   cursor: nwse-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--s {
+.inb4doc-image-block .image-frame .image-resize-handle--s {
   bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
   cursor: ns-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--sw {
+.inb4doc-image-block .image-frame .image-resize-handle--sw {
   bottom: -5px;
   left: -5px;
   cursor: nesw-resize;
 }
 
-.milkdown-image-block .image-frame .image-resize-handle--w {
+.inb4doc-image-block .image-frame .image-resize-handle--w {
   left: -5px;
   top: 50%;
   transform: translateY(-50%);
   cursor: ew-resize;
 }
 
-.milkdown-image-block .caption-input {
+.inb4doc-image-block .caption-input {
   width: 100%;
   max-width: 480px;
   border: none;
@@ -242,25 +242,25 @@
   outline: none;
 }
 
-.milkdown-image-block .caption-input:focus {
+.inb4doc-image-block .caption-input:focus {
   border-color: var(--color-accent);
 }
 
-.milkdown-image-inline {
+.inb4doc-image-inline {
   display: inline-block;
   vertical-align: middle;
   line-height: 0;
   max-width: 100%;
 }
 
-.milkdown-image-inline .image-frame {
+.inb4doc-image-inline .image-frame {
   position: relative;
   display: inline-block;
   line-height: 0;
   max-width: 100%;
 }
 
-.milkdown-image-inline .image-frame img.image-inline {
+.inb4doc-image-inline .image-frame img.image-inline {
   display: inline-block;
   max-width: 100%;
   height: auto;
@@ -268,13 +268,13 @@
   vertical-align: bottom;
 }
 
-.milkdown-image-inline.selected .image-frame {
+.inb4doc-image-inline.selected .image-frame {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle {
+.inb4doc-image-inline .image-frame .image-resize-handle {
   position: absolute;
   width: 10px;
   height: 10px;
@@ -287,57 +287,57 @@
   pointer-events: auto;
 }
 
-.milkdown-image-inline.resizable:hover .image-frame .image-resize-handle,
-.milkdown-image-inline.resizable.selected .image-frame .image-resize-handle {
+.inb4doc-image-inline.resizable:hover .image-frame .image-resize-handle,
+.inb4doc-image-inline.resizable.selected .image-frame .image-resize-handle {
   opacity: 1;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--nw {
+.inb4doc-image-inline .image-frame .image-resize-handle--nw {
   top: -5px;
   left: -5px;
   cursor: nwse-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--n {
+.inb4doc-image-inline .image-frame .image-resize-handle--n {
   top: -5px;
   left: 50%;
   transform: translateX(-50%);
   cursor: ns-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--ne {
+.inb4doc-image-inline .image-frame .image-resize-handle--ne {
   top: -5px;
   right: -5px;
   cursor: nesw-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--e {
+.inb4doc-image-inline .image-frame .image-resize-handle--e {
   right: -5px;
   top: 50%;
   transform: translateY(-50%);
   cursor: ew-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--se {
+.inb4doc-image-inline .image-frame .image-resize-handle--se {
   bottom: -5px;
   right: -5px;
   cursor: nwse-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--s {
+.inb4doc-image-inline .image-frame .image-resize-handle--s {
   bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
   cursor: ns-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--sw {
+.inb4doc-image-inline .image-frame .image-resize-handle--sw {
   bottom: -5px;
   left: -5px;
   cursor: nesw-resize;
 }
 
-.milkdown-image-inline .image-frame .image-resize-handle--w {
+.inb4doc-image-inline .image-frame .image-resize-handle--w {
   left: -5px;
   top: 50%;
   transform: translateY(-50%);

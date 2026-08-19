@@ -68,7 +68,7 @@ class BlockHandleView {
   constructor(view: EditorView) {
     this.#view = view;
     const content = document.createElement("div");
-    content.className = "milkdown-block-handle";
+    content.className = "inb4doc-block-handle";
     content.innerHTML = `
       <button class="block-handle-add" title="Add paragraph below">${plus}</button>
       <button class="block-handle-drag" title="Drag to move">${menuScale}</button>
@@ -109,8 +109,8 @@ class BlockHandleView {
       $from.depth === 1 &&
       $from.parent.content.size === 0 &&
       $from.parent.type.name === "paragraph" &&
-      $from.node(1).type.name !== "table_cell" &&
-      $from.node(1).type.name !== "table_header";
+      $from.node(1).type.name !== "tableCell" &&
+      $from.node(1).type.name !== "tableHeaderCell";
 
     if (!isAtBlockStart) {
       this.#content.style.display = "none";
@@ -129,9 +129,9 @@ class BlockHandleView {
     }
 
     const domRect = el.getBoundingClientRect();
+    const parentRect = (this.#content.parentNode as HTMLElement)?.getBoundingClientRect();
     const style = window.getComputedStyle(el);
     const paddingTop = Number.parseInt(style.paddingTop, 10) || 10;
-    const paddingBottom = Number.parseInt(style.paddingBottom, 10) || 0;
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const w = window.innerWidth;
 
@@ -139,11 +139,11 @@ class BlockHandleView {
     this.#activeEl = el;
     this.#activeBlockStart = blockStart;
 
-    let left: number;
+    let vpLeft: number;
     if (w >= 1350) {
       const prose = document.querySelector("#editor-area .ProseMirror");
       const proseRect = prose?.getBoundingClientRect();
-      left = proseRect ? proseRect.left + Math.round(2 * rem) : domRect.left;
+      vpLeft = proseRect ? proseRect.left + Math.round(2 * rem) : domRect.left;
     } else if (w >= 800) {
       const navEl = document.querySelector(".book-leftpanel");
       const navRect = navEl?.getBoundingClientRect();
@@ -155,14 +155,15 @@ class BlockHandleView {
         const metaRect = metaEl?.getBoundingClientRect();
         if (metaRect && metaRect.width > 0) panelRight = metaRect.right;
       }
-      left = panelRight !== null
+      vpLeft = panelRight !== null
         ? panelRight + Math.round(4.25 * rem)
         : domRect.left;
     } else {
-      left = domRect.right + Math.round(1.25 * rem);
+      vpLeft = domRect.right + Math.round(1.25 * rem);
     }
 
-    const top = domRect.y + paddingTop;
+    const left = parentRect ? vpLeft - parentRect.left : vpLeft;
+    const top = domRect.y + paddingTop - (parentRect?.top ?? 0);
     this.#content.style.left = `${left}px`;
     this.#content.style.top = `${top}px`;
   };
@@ -219,8 +220,9 @@ class SlashView {
   constructor(view: EditorView) {
     this.view = view;
     this.content = document.createElement("div");
-    this.content.className = "milkdown-slash";
+    this.content.className = "inb4doc-slash";
     this.content.dataset.show = "false";
+    (view.dom.parentNode as Element)?.appendChild(this.content);
 
     this.content.addEventListener("pointerdown", (e) => {
       const item = (e.target as HTMLElement).closest(
@@ -378,8 +380,9 @@ class SlashView {
     const coords = this.view.coordsAtPos(selection.from);
     const parent = this.content.parentElement;
     if (parent) {
-      this.content.style.left = `${coords.left}px`;
-      this.content.style.top = `${coords.bottom + 4}px`;
+      const parentRect = parent.getBoundingClientRect();
+      this.content.style.left = `${coords.left - parentRect.left}px`;
+      this.content.style.top = `${coords.bottom - parentRect.top + 4}px`;
     }
   }
 
@@ -524,7 +527,7 @@ class SlashView {
 
 // ── Public API ──
 
-export function configureBlockEdit(view: EditorView) {
+export function configureBlockEdit() {
   const blockKey = "inb4doc-block";
   const slashKey = "inb4doc-slash";
 

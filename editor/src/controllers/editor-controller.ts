@@ -46,9 +46,9 @@ export interface OutlineItem {
 }
 
 export class EditorController extends Controller {
-  static targets = ["milkdown", "source", "loadLogo"];
+  static targets = ["inb4doc", "source", "loadLogo"];
 
-  declare readonly milkdownTarget: HTMLElement;
+  declare readonly inb4docTarget: HTMLElement;
   declare readonly sourceTarget: HTMLElement;
   declare readonly loadLogoTarget: HTMLElement;
 
@@ -109,14 +109,14 @@ export class EditorController extends Controller {
   showSkeleton(): void {
     const el = document.getElementById("editor-skeleton");
     el?.classList.remove("is-hidden");
-    this.milkdownTarget.style.visibility = "hidden";
+    this.inb4docTarget.style.visibility = "hidden";
   }
 
   hideSkeleton(): void {
     const el = document.getElementById("editor-skeleton");
     el?.classList.add("is-hidden");
     this.loadLogoTarget.classList.add("is-hidden");
-    this.milkdownTarget.style.visibility = "";
+    this.inb4docTarget.style.visibility = "";
   }
 
   // ── Editor lifecycle ──
@@ -128,7 +128,7 @@ export class EditorController extends Controller {
       return;
     }
 
-    const editorEl = this.milkdownTarget;
+    const editorEl = this.inb4docTarget;
 
     const host: EditorHost = {
       currentPathDir: () => this.currentPathDir(),
@@ -254,10 +254,10 @@ export class EditorController extends Controller {
     if (!this.editor) return this.sourceMode;
 
     if (this.sourceMode) {
-      hideSourceMode(this.sourceTarget, this.milkdownTarget);
+      hideSourceMode(this.sourceTarget, this.inb4docTarget);
       this.sourceMode = false;
     } else {
-      showSourceMode(this.sourceTarget, this.milkdownTarget, () =>
+      showSourceMode(this.sourceTarget, this.inb4docTarget, () =>
         getMarkdown(this.editor!)
       );
       const ta = this.sourceTarget.querySelector(
@@ -297,7 +297,7 @@ export class EditorController extends Controller {
 
   private exitSourceMode(): void {
     if (!this.sourceMode) return;
-    hideSourceMode(this.sourceTarget, this.milkdownTarget);
+    hideSourceMode(this.sourceTarget, this.inb4docTarget);
     this.sourceMode = false;
   }
 
@@ -431,7 +431,7 @@ export class EditorController extends Controller {
     this.lastSetContent.clear();
     if (editor) {
       editor.destroy();
-      this.milkdownTarget.replaceChildren();
+      this.inb4docTarget.replaceChildren();
     }
   }
 

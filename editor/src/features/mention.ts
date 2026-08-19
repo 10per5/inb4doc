@@ -14,7 +14,7 @@ export class MentionView {
   constructor(view: EditorView) {
     this.view = view
     this.content = document.createElement("div")
-    this.content.className = "milkdown-mention"
+    this.content.className = "inb4doc-mention"
     this.content.dataset.show = "false"
 
     this.content.addEventListener("mousedown", (e) => {

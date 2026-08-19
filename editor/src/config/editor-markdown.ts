@@ -12,7 +12,7 @@ import taskLists from "markdown-it-task-lists";
 import { ALERT_TYPES } from "./editor-schema";
 
 /**
- * Markdown <-> ProseMirror bridge.
+ * Markdown <-> ProseKit bridge.
  *
  * Parsing uses markdown-it (native GFM tables + strikethrough, linkify
  * autolinks, markdown-it-task-lists) via prosemirror-markdown's token
@@ -78,29 +78,37 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
   const tokens: Record<string, any> = {
     blockquote: { block: "blockquote" },
     paragraph: { block: "paragraph" },
-    list_item: { block: "list_item" },
+
+    // Lists: markdown-it emits bullet_list/ordered_list + list_item_open/close.
+    // ProseKit uses a single 'list' node with kind attr; children are direct
+    // blocks (no list_item wrapper). list_item tokens are handled by
+    // prosemirror-markdown automatically when block spec is set.
+    list_item: { block: "list" },
     bullet_list: {
-      block: "bullet_list",
-      getAttrs: (_: any, tokens: any, i: any) => ({ spread: !listIsTight(tokens, i) }),
-    },
-    ordered_list: {
-      block: "ordered_list",
-      getAttrs: (tok: any, tokens: any, i: any) => ({
-        order: +tok.attrGet("start") || 1,
-        spread: !listIsTight(tokens, i),
+      block: "list",
+      getAttrs: (_: any, tokens: any, i: any) => ({
+        kind: "bullet",
       }),
     },
+    ordered_list: {
+      block: "list",
+      getAttrs: (tok: any, tokens: any, i: any) => ({
+        kind: "ordered",
+        order: +tok.attrGet("start") || 1,
+      }),
+    },
+
     heading: {
       block: "heading",
       getAttrs: (tok: any) => ({ level: +tok.tag.slice(1) }),
     },
-    code_block: { block: "code_block", noCloseToken: true },
+    code_block: { block: "codeBlock", noCloseToken: true },
     fence: {
-      block: "code_block",
+      block: "codeBlock",
       getAttrs: (tok: any) => ({ language: tok.info || "" }),
       noCloseToken: true,
     },
-    hr: { node: "hr" },
+    hr: { node: "horizontalRule" },
     image: {
       node: "image",
       getAttrs: (tok: any) => ({
@@ -110,10 +118,10 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
           (tok.children && tok.children[0] && tok.children[0].content) || "",
       }),
     },
-    hardbreak: { node: "hardbreak" },
-    em: { mark: "emphasis" },
-    strong: { mark: "strong" },
-    s: { mark: "strike_through" },
+    hardbreak: { node: "hardBreak" },
+    em: { mark: "italic" },
+    strong: { mark: "bold" },
+    s: { mark: "strike" },
     link: {
       mark: "link",
       getAttrs: (tok: any) => ({
@@ -121,7 +129,7 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
         title: tok.attrGet("title") || null,
       }),
     },
-    code_inline: { mark: "inlineCode", noCloseToken: true },
+    code_inline: { mark: "code", noCloseToken: true },
     math_inline: {
       node: "math_inline",
       getAttrs: (tok: any) => ({ value: tok.content }),
@@ -155,13 +163,12 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
 
   // Override table token handlers (prosekit-markdown doesn't support raw
   // function specs, but the handler map is a plain object we can patch).
-  const TH = schema.nodes.table_header;
-  const TD = schema.nodes.table_cell;
-  const TR = schema.nodes.table_row;
+  const TH = schema.nodes.tableHeaderCell;
+  const TD = schema.nodes.tableCell;
+  const TR = schema.nodes.tableRow;
   const TB = schema.nodes.table;
 
   const handlers = (parser as any).tokenHandlers;
-  let inThead = false;
   Object.assign(handlers, {
     table_open(state: any) {
       state.openNode(TB);
@@ -169,18 +176,18 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
     table_close(state: any) {
       state.closeNode();
     },
-    thead_open() { inThead = true; },
-    thead_close() { inThead = false; },
+    thead_open: noOp,
+    thead_close: noOp,
     tbody_open: noOp,
     tbody_close: noOp,
     tr_open(state: any) {
       if (state.top().type.name === "table") {
-        state.openNode(inThead ? schema.nodes.table_header_row : TR);
+        state.openNode(TR);
       }
     },
     tr_close(state: any) {
       const top = state.top();
-      if (top.type.name === "table_row" || top.type.name === "table_header_row") state.closeNode();
+      if (top.type.name === "tableRow") state.closeNode();
     },
     th_open(state: any, tok: any) {
       state.openNode(TH, { alignment: alignmentOf(tok) });
@@ -297,12 +304,21 @@ function htmlInParagraph(node: ProseNode): string | null {
   return only.attrs.value;
 }
 
-/** Replace a list item's first checkbox-text with its `checked` attr. */
-function fixTaskItem(schema: Schema, node: ProseNode): ProseNode | null {
+/**
+ * Detect task list items in a `list` node: look for `<input>` checkbox in
+ * the first child paragraph and set kind/checked attrs accordingly.
+ *
+ * In ProseKit's flat-list model, list children are direct blocks (no
+ * list_item wrapper). Task detection happens on the first block child.
+ */
+function fixTaskListItems(schema: Schema, node: ProseNode): ProseNode | null {
+  if (node.type.name !== "list") return null;
   const first = node.firstChild;
   if (!first || first.type.name !== "paragraph") return null;
+
   const fixed = fixInline(schema, first);
   if (!fixed) return null;
+
   const checked = (() => {
     for (let i = 0; i < first.content.size; i++) {
       const c = first.child(i);
@@ -312,16 +328,22 @@ function fixTaskItem(schema: Schema, node: ProseNode): ProseNode | null {
     }
     return null;
   })();
-  const rest = fixed.filter((c) => !(c.type.name === "html" && TASK_CHECKBOX.test(c.attrs.value)));
+
+  if (checked === null) return null;
+
+  // Strip checkbox HTML from the paragraph content
+  const rest = fixed.filter(
+    (c) => !(c.type.name === "html" && TASK_CHECKBOX.test(c.attrs.value)),
+  );
   const newPara = first.type.create(first.attrs, rest);
+
+  // Rebuild children: replace first paragraph with fixed version
   const kids: ProseNode[] = [newPara];
   node.content.forEach((c, _o, i) => {
     if (i > 0) kids.push(c);
   });
-  return node.type.create(
-    { ...node.attrs, checked: checked ?? node.attrs.checked },
-    kids,
-  );
+
+  return node.type.create({ kind: "task", checked }, kids);
 }
 
 /** Convert a paragraph-wrapped `<video>` html atom into a video node. */
@@ -350,6 +372,18 @@ function fixBlockChildren(
       changed = true;
       i++;
       continue;
+    }
+
+    // Also catch paragraphs whose text content is literally `<br />`
+    // (from html_block tokens that markdown-it produces for standalone <br />)
+    if (node.type.name === "paragraph" && node.childCount === 1) {
+      const text = node.child(0).text;
+      if (text && BR_ONLY.test(text.trim())) {
+        out.push(schema.nodes.paragraph.create());
+        changed = true;
+        i++;
+        continue;
+      }
     }
 
     // <video ...>...</video>
@@ -416,6 +450,17 @@ function fixBlockChildren(
       continue;
     }
 
+    // list node: detect task items
+    if (node.type.name === "list") {
+      const fixed = fixTaskListItems(schema, node);
+      if (fixed) {
+        out.push(fixed);
+        changed = true;
+        i++;
+        continue;
+      }
+    }
+
     // recurse into block containers
     if (node.isBlock && !node.isLeaf && node.childCount > 0) {
       const kids = fixBlockChildren(schema, node.content.content);
@@ -467,22 +512,32 @@ export function fixUpDoc(schema: Schema, doc: ProseNode): ProseNode {
 
 // --- serializer -------------------------------------------------------------
 
-function renderList(
+function renderFlatList(
   state: MarkdownSerializerState,
   node: ProseNode,
   delim: string,
-  firstDelim: (index: number) => string,
+  firstDelim: (index: number, child: ProseNode) => string,
 ) {
   const anyState = state as any;
   if (anyState.closed && anyState.closed.type === node.type)
     anyState.flushClose(3);
   else if (anyState.inTightList) anyState.flushClose(1);
-  const isTight = node.attrs.spread !== true;
+
+  // In ProseKit's flat-list model, list children are direct blocks.
+  // "Tight" lists have paragraphs without wrapping; "loose" lists have
+  // paragraphs with blank lines between them. We detect tightness by
+  // checking if the first child is a paragraph with a single text node
+  // (tight) vs multiple blocks (loose).
+  const isTight =
+    node.childCount === 1 &&
+    node.firstChild?.type.name === "paragraph" &&
+    node.firstChild?.childCount === 1 &&
+    node.firstChild?.firstChild?.isText;
   const prevTight = anyState.inTightList;
   anyState.inTightList = isTight;
   node.forEach((child, _o, i) => {
     if (i && isTight) anyState.flushClose(1);
-    state.wrapBlock(delim, firstDelim(i), node, () =>
+    state.wrapBlock(delim, firstDelim(i, child), node, () =>
       state.render(child, node, i),
     );
   });
@@ -490,12 +545,26 @@ function renderList(
 }
 
 function renderTable(state: MarkdownSerializerState, node: ProseNode) {
-  const header = node.childCount > 0 ? node.child(0) : null;
+  // Find the first row that contains any header cells
+  let headerRow: ProseNode | null = null;
+  let headerRowIdx = -1;
+  node.forEach((row, _o, i) => {
+    if (headerRow) return;
+    row.forEach((cell) => {
+      if (cell.type.name === "tableHeaderCell" && !headerRow) {
+        headerRow = row;
+        headerRowIdx = i;
+      }
+    });
+  });
+
+  if (!headerRow) return;
+
   const align: string[] = [];
-  if (header) {
-    header.forEach((cell) => align.push(cell.attrs.alignment || "left"));
-  }
-  const ncols = header ? header.childCount : 0;
+  (headerRow as ProseNode).forEach((cell: ProseNode) =>
+    align.push(cell.attrs.alignment || "left"),
+  );
+  const ncols = (headerRow as ProseNode).childCount;
 
   const renderRow = (row: ProseNode): string => {
     const cells: string[] = [];
@@ -512,18 +581,18 @@ function renderTable(state: MarkdownSerializerState, node: ProseNode) {
     return "| " + cells.join(" | ") + " |";
   };
 
-  if (header) {
-    state.write(renderRow(header) + "\n");
-    const sep = align.map((a) =>
-      a === "center" ? ":---:" : a === "right" ? "---:" : "---",
-    );
-    state.write("| " + sep.join(" | ") + " |");
-    state.closeBlock(node);
-    node.forEach((child, _o, i) => {
-      if (i === 0) return;
-      state.write("\n" + renderRow(child));
-    });
-  }
+  state.write(renderRow(headerRow) + "\n");
+  const sep = align.map((a) =>
+    a === "center" ? ":---:" : a === "right" ? "---:" : "---",
+  );
+  state.write("| " + sep.join(" | ") + " |");
+  state.closeBlock(node);
+
+  // Body rows
+  node.forEach((row, _o, i) => {
+    if (i === headerRowIdx) return;
+    state.write("\n" + renderRow(row));
+  });
 }
 
 export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
@@ -532,7 +601,7 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
       blockquote(state, node) {
         state.wrapBlock("> ", null, node, () => state.renderContent(node));
       },
-      code_block(state, node) {
+      codeBlock(state, node) {
         const language = String(node.attrs.language || "").toLowerCase();
         if (language === "latex") {
           state.write("$$\n");
@@ -558,40 +627,42 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         state.renderInline(node, false);
         state.closeBlock(node);
       },
-      hr(state, node) {
+      horizontalRule(state, node) {
         state.write("---");
         state.closeBlock(node);
       },
-      bullet_list(state, node) {
-        renderList(state, node, "  ", () => "* ");
-      },
-      ordered_list(state, node) {
-        const start = node.attrs.order ?? 1;
-        const maxW = String(start + node.childCount - 1).length;
-        const space = state.repeat(" ", maxW + 2);
-        renderList(state, node, space, (i) => {
-          const nStr = String(start + i);
-          return state.repeat(" ", maxW - nStr.length) + nStr + ". ";
-        });
-      },
-      list_item(state, node) {
-        const checked = node.attrs.checked;
-        if (checked == null) {
-          state.renderContent(node);
-          return;
+      list(state, node) {
+        const kind = node.attrs.kind || "bullet";
+        if (kind === "ordered") {
+          const start = node.attrs.order ?? 1;
+          const maxW = String(start + node.childCount - 1).length;
+          const space = state.repeat(" ", maxW + 2);
+          renderFlatList(state, node, space, (i) => {
+            const nStr = String(start + i);
+            return state.repeat(" ", maxW - nStr.length) + nStr + ". ";
+          });
+        } else if (kind === "task") {
+          // Task lists: each direct block child is the content.
+          // Prefix with [x] or [ ] based on the list node's checked attr.
+          const checked = node.attrs.checked;
+          const anyState = state as any;
+          if (anyState.closed && anyState.closed.type === node.type)
+            anyState.flushClose(3);
+          else if (anyState.inTightList) anyState.flushClose(1);
+          const prevTight = anyState.inTightList;
+          anyState.inTightList = true;
+          node.forEach((child, _o, i) => {
+            if (i) anyState.flushClose(1);
+            const prefix = `[${checked ? "x" : " "}] `;
+            state.wrapBlock("  ", prefix, node, () =>
+              state.render(child, node, i),
+            );
+          });
+          anyState.inTightList = prevTight;
+        } else {
+          // bullet, toggle, and any other kind
+          renderFlatList(state, node, "  ", () => "* ");
         }
-        const first = node.firstChild;
-        const kids: ProseNode[] = [];
-        node.content.forEach((c, _o, i) => {
-          if (i > 0) kids.push(c);
-        });
-        if (first && first.type.name === "paragraph") {
-          state.write(`[${checked ? "x" : " "}] `);
-          state.renderInline(first, false);
-          state.closeBlock(node);
-          state.ensureNewLine();
-        }
-        kids.forEach((c, i) => state.render(c, node, i));
       },
       paragraph(state, node, parent, index) {
         if (node.content.size === 0) {
@@ -614,7 +685,7 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
           : "";
         state.write(`![${alt}](${src}${title})`);
       },
-      hard_break(state, node, parent, index) {
+      hardBreak(state, node, parent, index) {
         for (let i = index + 1; i < parent.childCount; i++)
           if (parent.child(i).type !== node.type) {
             state.write("\\\n");
@@ -685,18 +756,17 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         state.write(node.attrs.value);
       },
       table: renderTable,
-      table_row() {},
-      table_header_row() {},
-      table_cell(state, node) {
+      tableRow() {},
+      tableCell(state, node) {
         state.renderContent(node);
       },
-      table_header(state, node) {
+      tableHeaderCell(state, node) {
         state.renderContent(node);
       },
     },
     {
-      em: { open: "*", close: "*", mixable: true, expelEnclosingWhitespace: true },
-      strong: { open: "**", close: "**", mixable: true, expelEnclosingWhitespace: true },
+      italic: { open: "*", close: "*", mixable: true, expelEnclosingWhitespace: true },
+      bold: { open: "**", close: "**", mixable: true, expelEnclosingWhitespace: true },
       link: {
         open(state, mark, parent, index) {
           const isPlain =
@@ -722,7 +792,7 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         },
         mixable: true,
       },
-      inlineCode: {
+      code: {
         open(_state, _mark, parent, index) {
           let len = 0;
           const text = parent.child(index).text || "";
@@ -741,11 +811,11 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         },
         escape: false,
       },
-      strike_through: { open: "~~", close: "~~", mixable: true, expelEnclosingWhitespace: true },
+      strike: { open: "~~", close: "~~", mixable: true, expelEnclosingWhitespace: true },
     },
     {
       tightLists: false,
-      hardBreakNodeName: "hardbreak",
+      hardBreakNodeName: "hardBreak",
     } as any,
   );
   return serializer;

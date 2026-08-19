@@ -25,5 +25,5 @@ export function hideSourceMode(
   wysiwygEl: HTMLElement,
 ): void {
   sourceEl.style.display = "none";
-  wysiwygEl.style.display = "block";
+  wysiwygEl.style.display = "";
 }

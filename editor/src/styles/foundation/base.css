@@ -4,10 +4,10 @@
  * Applied first, overridable by component-specific files
  */
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html,
@@ -16,8 +16,7 @@ body {
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
 }
@@ -61,6 +60,24 @@ body {
   --color-btn-active-bg: #5e81ac;
   --color-btn-active-text: #edf8fd;
   --color-btn-active-hover-text: #a3be8c;
+}
+
+/* ProseKit theme hue — controls outline, selection, and border colors
+ * inside the editor (via --prosekit-outline-color etc. in typography.css).
+ * Set on .ProseMirror to override the default 250 from typography.css.
+ * 213 ≈ Nord "frost" blue (#5e81ac). */
+.ProseMirror {
+  --prosekit-hue: 213;
+}
+
+/* Override ProseKit's hardcoded #8cf node-selection outline to use Nord frost.
+ * The base style.css sets `outline: 2px solid #8cf` on .ProseMirror-selectednode. */
+.ProseMirror-focused {
+  outline: unset !important;
+}
+
+.ProseMirror-focused::after {
+  border-color: unset;
 }
 
 /* ── Dark Mode ──────────────────────────────────────────────────────── */

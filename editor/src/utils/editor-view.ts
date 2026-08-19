@@ -2,7 +2,7 @@ import type { ViewService, ViewType } from "@/services/view-service"
 
 export interface EditorViewOptions {
   sourceMode: () => boolean
-  milkdownEl: HTMLElement
+  inb4docEl: HTMLElement
   sourceEl: HTMLElement
   editorArea: HTMLElement
 }
@@ -13,16 +13,16 @@ export function registerEditorView(
 ) {
   registerFn("editor", {
     activate: () => {
-      opts.milkdownEl.style.display = ""
+      opts.inb4docEl.style.display = ""
       opts.sourceEl.style.display = opts.sourceMode() ? "" : "none"
     },
     deactivate: () => {
-      opts.milkdownEl.style.display = "none"
+      opts.inb4docEl.style.display = "none"
       opts.sourceEl.style.display = "none"
     },
     focus: () => {
-      const pm = opts.milkdownEl.querySelector<HTMLElement>(".ProseMirror");
-      (pm ?? opts.milkdownEl).focus();
+      const pm = opts.inb4docEl.querySelector<HTMLElement>(".ProseMirror");
+      (pm ?? opts.inb4docEl).focus();
     },
   })
 }

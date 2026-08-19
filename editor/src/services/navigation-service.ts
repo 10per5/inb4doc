@@ -105,10 +105,10 @@ export class NavigationService {
       }
 
       const sourceEl = this.editor.sourceTarget;
-      const editorEl = this.editor.milkdownTarget;
+      const editorEl = this.editor.inb4docTarget;
       if (sourceEl && editorEl) {
         sourceEl.style.display = "none";
-        editorEl.style.display = "block";
+        editorEl.style.display = "";
       }
 
       const ops = this.cache.getPendingOps();

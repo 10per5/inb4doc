@@ -19,7 +19,7 @@ function deleteAtListItemStart(
   if (!empty || $from.parentOffset !== 0) return false
   if ($from.parent.content.size === 0) return false
   const parentItem = $from.node(-1)
-  if (!parentItem || parentItem.type.name !== "list_item") return false
+  if (!parentItem || parentItem.type.name !== "list") return false
   if (dispatch) {
     dispatch(state.tr.delete($from.pos, $from.pos + 1).scrollIntoView())
   }
@@ -36,7 +36,7 @@ function moveBlock(
 
   let itemDepth = -1
   for (let d = $from.depth; d > 0; d--) {
-    if ($from.node(d).type.name === "list_item") {
+    if ($from.node(d).type.name === "list") {
       itemDepth = d
       break
     }
@@ -100,7 +100,7 @@ function headingToParagraph(
 // directly in the doc (nothing meaningful to cut).
 function findBlockStart($from: any): number | null {
   for (let d = $from.depth; d > 0; d--) {
-    if ($from.node(d).type.name === "list_item") {
+    if ($from.node(d).type.name === "list") {
       return $from.before(d)
     }
   }
@@ -120,7 +120,7 @@ function insertBlockBelow(
   const { $from } = state.selection
   let endPos: number | null = null
   for (let d = $from.depth; d > 0; d--) {
-    if ($from.node(d).type.name === "list_item") {
+    if ($from.node(d).type.name === "list") {
       endPos = $from.after(d)
       break
     }
@@ -170,10 +170,9 @@ function cutBlock(
   return true
 }
 
-// Milkdown registers the inline-code mark under `inlineCode` (the `code`
-// alias is absent from its schema), so resolve it defensively.
+// Milkdown registers the inline-code mark under `code`.
 function codeMark(state: any): any {
-  return state.schema.marks.inlineCode ?? state.schema.marks.code
+  return state.schema.marks.code
 }
 
 // ProseMirror keeps the code mark "stored" at a mark boundary with no
@@ -261,20 +260,20 @@ function endToBlockEnd(state: any, dispatch: any): boolean {
 
 export function createKeymap() {
   return keymap({
-    "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
-    "Mod-B": (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch),
-    "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.emphasis)(state, dispatch),
-    "Mod-I": (state, dispatch) => toggleMark(state.schema.marks.emphasis)(state, dispatch),
+    "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
+    "Mod-B": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
+    "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.italic)(state, dispatch),
+    "Mod-I": (state, dispatch) => toggleMark(state.schema.marks.italic)(state, dispatch),
     "Mod-`": (state, dispatch) => toggleMark(codeMark(state))(state, dispatch),
-    "Mod-Shift-s": (state, dispatch) => toggleMark(state.schema.marks.strike_through)(state, dispatch),
-    "Mod-Shift-x": (state, dispatch) => toggleMark(state.schema.marks.strike_through)(state, dispatch),
+    "Mod-Shift-s": (state, dispatch) => toggleMark(state.schema.marks.strike)(state, dispatch),
+    "Mod-Shift-x": (state, dispatch) => toggleMark(state.schema.marks.strike)(state, dispatch),
     "Mod-Alt-1": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 1 })(state, dispatch),
     "Mod-Alt-2": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 2 })(state, dispatch),
     "Mod-Alt-3": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 3 })(state, dispatch),
-    "Mod-Shift-7": (state, dispatch) => wrapInList(state.schema.nodes.ordered_list)(state, dispatch),
-    "Mod-Shift-8": (state, dispatch) => wrapInList(state.schema.nodes.bullet_list)(state, dispatch),
+    "Mod-Shift-7": (state, dispatch) => wrapInList(state.schema.nodes.list)(state, dispatch),
+    "Mod-Shift-8": (state, dispatch) => wrapInList(state.schema.nodes.list)(state, dispatch),
     "Mod-Shift--": (state, dispatch) => {
-      const hr = state.schema.nodes.hr.create()
+      const hr = state.schema.nodes.horizontalRule.create()
       const tr = state.tr.replaceSelectionWith(hr)
       if (dispatch) dispatch(tr.scrollIntoView())
       return true
@@ -291,7 +290,7 @@ export function createKeymap() {
     // Enter keeps working via the base keymap.
     "Enter": (state, dispatch) => {
       if (!isInsideTableCell(state.selection.$from)) return false
-      const hardbreak = state.schema.nodes.hardbreak
+      const hardbreak = state.schema.nodes.hardBreak
       if (!hardbreak) return false
       if (dispatch) {
         dispatch(state.tr.replaceSelectionWith(hardbreak.create()).scrollIntoView())
@@ -309,7 +308,7 @@ export function createKeymap() {
       if (isInsideTableCell(state.selection.$from)) return false
       let itemDepth = -1
       for (let d = state.selection.$from.depth; d > 0; d--) {
-        if (state.selection.$from.node(d).type.name === "list_item") {
+        if (state.selection.$from.node(d).type.name === "list") {
           itemDepth = d
           break
         }
@@ -317,7 +316,7 @@ export function createKeymap() {
       const canSink =
         itemDepth !== -1 && state.selection.$from.index(itemDepth - 1) > 0
       if (canSink) {
-        return sinkListItem(state.schema.nodes.list_item)(state, dispatch)
+        return sinkListItem(state.schema.nodes.list)(state, dispatch)
       }
       if (dispatch) dispatch(state.tr.insertText("\u00A0\u00A0\u00A0\u00A0"))
       return true

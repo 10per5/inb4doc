@@ -43,10 +43,10 @@ export function getTextState(state: EditorState): TextState {
   }
   const marks = state.schema.marks
   return {
-    bold: markActive(state, marks.strong),
-    italic: markActive(state, marks.emphasis),
-    strike: markActive(state, marks.strike_through),
-    code: markActive(state, marks.inlineCode),
+    bold: markActive(state, marks.bold),
+    italic: markActive(state, marks.italic),
+    strike: markActive(state, marks.strike),
+    code: markActive(state, marks.code),
     link: markActive(state, marks.link),
     heading,
   }

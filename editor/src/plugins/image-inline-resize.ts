@@ -11,7 +11,7 @@ function makeInlineImageNodeView(
 ): (node: any, view: any, getPos: () => number | undefined) => NodeView {
   return (initialNode, view, getPos) => {
     const wrapper = document.createElement("span");
-    wrapper.className = "milkdown-image-inline";
+    wrapper.className = "inb4doc-image-inline";
     wrapper.contentEditable = "false";
 
     const frame = document.createElement("span");
@@ -63,7 +63,7 @@ function makeInlineImageNodeView(
       const d = view.state.doc.resolve(pos);
       for (let i = d.depth; i > 0; i--) {
         const name = d.node(i).type.name;
-        if (name === "table_cell" || name === "table_header") return true;
+        if (name === "tableCell" || name === "tableHeaderCell") return true;
       }
       return false;
     };

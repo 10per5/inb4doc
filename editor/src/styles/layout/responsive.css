@@ -13,7 +13,7 @@
 
 @media (max-width: 767px) {
   /* Slash menu on mobile */
-  .milkdown-slash {
+  .inb4doc-slash {
     min-width: 200px;
     max-width: calc(100vw - 2rem);
     font-size: var(--font-size-small);
@@ -24,51 +24,51 @@
   }
 
   /* Block handles for touch */
-  .milkdown-block-handle {
+  .inb4doc-block-handle {
     gap: 4px;
   }
 
-  .milkdown-block-handle button {
+  .inb4doc-block-handle button {
     width: 44px; /* WCAG minimum touch target */
     height: 44px;
   }
 
-  .milkdown-block-handle button svg {
+  .inb4doc-block-handle button svg {
     width: 24px;
     height: 24px;
   }
 
-  .milkdown-block-handle.touch-active {
+  .inb4doc-block-handle.touch-active {
     opacity: 1;
     pointer-events: auto;
   }
 
   /* Link tooltips on mobile */
-  .milkdown-link-preview {
+  .inb4doc-link-preview {
     max-width: calc(100vw - 2rem);
   }
 
-  .milkdown-link-preview .link-preview .link-display {
+  .inb4doc-link-preview .link-preview .link-display {
     max-width: 180px;
   }
 
-  .milkdown-link-edit {
+  .inb4doc-link-edit {
     max-width: calc(100vw - 2rem);
   }
 
-  .milkdown-link-edit .link-edit .input-area {
+  .inb4doc-link-edit .link-edit .input-area {
     width: 150px;
   }
 
   /* Mention menu on mobile */
-  .milkdown-mention {
+  .inb4doc-mention {
     max-width: calc(100vw - 2rem);
     max-height: 200px;
     font-size: var(--font-size-small);
   }
 
   /* Editor typography on mobile */
-  #milkdown-editor .ProseMirror {
+  #inb4doc-editor .ProseMirror {
     font-size: var(--font-size-base);
   }
 
@@ -133,12 +133,12 @@
   .app-toolbar,
   .book-leftpanel,
   .book-rightpanel,
-  .milkdown-block-handle,
+  .inb4doc-block-handle,
   .sidebar-provider-bar {
     display: none !important;
   }
 
-  #milkdown-editor .ProseMirror {
+  #inb4doc-editor .ProseMirror {
     padding: 0;
   }
 }

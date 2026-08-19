@@ -15,15 +15,15 @@ class CommandService {
   }
 
   get toggleStrongCommand(): PMCommand {
-    return (state, dispatch) => toggleMark(state.schema.marks.strong)(state, dispatch)
+    return (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch)
   }
 
   get toggleEmphasisCommand(): PMCommand {
-    return (state, dispatch) => toggleMark(state.schema.marks.emphasis)(state, dispatch)
+    return (state, dispatch) => toggleMark(state.schema.marks.italic)(state, dispatch)
   }
 
   get toggleInlineCodeCommand(): PMCommand {
-    return (state, dispatch) => toggleMark(state.schema.marks.inlineCode)(state, dispatch)
+    return (state, dispatch) => toggleMark(state.schema.marks.code)(state, dispatch)
   }
 
   get wrapInHeadingCommand(): PMCommand {
@@ -35,7 +35,7 @@ class CommandService {
 
   get insertHrCommand(): PMCommand {
     return (state, dispatch) => {
-      const nodeType = state.schema.nodes.hr
+      const nodeType = state.schema.nodes.horizontalRule
       if (!nodeType) return false
       if (dispatch) {
         const tr = state.tr.replaceSelectionWith(nodeType.create())
@@ -46,7 +46,7 @@ class CommandService {
   }
 
   get sinkListItemCommand(): PMCommand {
-    return (state, dispatch) => liftListItem(state.schema.nodes.list_item)(state, dispatch)
+    return (state, dispatch) => liftListItem(state.schema.nodes.list)(state, dispatch)
   }
 
   get liftListItemCommand(): PMCommand {
@@ -66,7 +66,7 @@ class CommandService {
   }
 
   get toggleStrikethroughCommand(): PMCommand {
-    return (state, dispatch) => toggleMark(state.schema.marks.strike_through)(state, dispatch)
+    return (state, dispatch) => toggleMark(state.schema.marks.strike)(state, dispatch)
   }
 
   get addRowAfterCommand(): PMCommand {

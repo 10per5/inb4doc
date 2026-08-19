@@ -1,13 +1,14 @@
-import { defineMarkSpec, defineNodeSpec } from "@prosekit/core";
+import { defineNodeSpec, defineMarkSpec, union } from "@prosekit/core";
 import type { Extension } from "@prosekit/core";
-import { tableNodes } from "prosemirror-tables";
+import { defineBasicExtension } from "@prosekit/basic";
 
 /**
  * ProseKit schema for the inb4doc editor.
  *
- * Node/mark names and DOM mapping mirror the Milkdown commonmark + gfm
- * presets (plus the app's custom nodes) so that existing plugin code,
- * CSS selectors, and the markdown corpus keep working unchanged.
+ * Uses defineBasicExtension() as the foundation for all standard nodes/marks,
+ * then overrides specific specs and adds app-specific custom nodes.
+ * Node/mark names match ProseKit conventions (camelCase for nodes, short
+ * mark names).
  */
 
 const IMAGE_DATA_TYPE = "image-block";
@@ -30,46 +31,30 @@ export function defaultHeadingIdGenerator(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, "-");
 }
 
-const baseTableSpecs = tableNodes({
-  tableGroup: "block",
-  cellContent: "paragraph",
-  cellAttributes: {
-    alignment: {
-      default: "left",
-      getFromDOM: (dom) => dom.style.textAlign || "left",
-      setDOMAttr: (value: unknown, attrs: Record<string, unknown>) => {
-        attrs.style = `text-align: ${value || "left"}`;
-      },
-    },
-  },
-});
-
 /**
- * All node + mark schema extensions. Feed this (plus node views and prose
- * plugins) into `createEditor({ extension: [...] })`.
+ * All node + mark schema extensions. Uses defineBasicExtension() as the base
+ * (providing all standard nodes, marks, keymaps, commands, history, etc.),
+ * then overrides specs where our app needs different behavior, and adds
+ * custom app-specific nodes.
  */
-export function createSchemaExtension(): Extension[] {
-  return [
+export function createSchemaExtension(): Extension {
+  return union(
+    // Base: doc, text, paragraph, heading, list, blockquote, image,
+    // horizontalRule, hardBreak, table, codeBlock, bold, italic, underline,
+    // strike, code, link, baseKeymap, baseCommands, history, gapCursor,
+    // virtualSelection, modClickPrevention
+    defineBasicExtension(),
+
+    // --- Overrides ---
+
+    // Doc: accept alertBlock group in addition to block
     defineNodeSpec({
       name: "doc",
       topNode: true,
       content: "(block | alertBlock)+",
     }),
 
-    defineNodeSpec({
-      name: "text",
-      group: "inline",
-      inline: true,
-    }),
-
-    defineNodeSpec({
-      name: "paragraph",
-      content: "inline*",
-      group: "block",
-      parseDOM: [{ tag: "p" }],
-      toDOM: () => ["p", 0],
-    }),
-
+    // Heading: add id attribute for anchor links
     defineNodeSpec({
       name: "heading",
       content: "inline*",
@@ -93,199 +78,7 @@ export function createSchemaExtension(): Extension[] {
       ],
     }),
 
-    defineNodeSpec({
-      name: "blockquote",
-      content: "block+",
-      group: "block",
-      defining: true,
-      parseDOM: [{ tag: "blockquote" }],
-      toDOM: () => ["blockquote", 0],
-    }),
-
-    defineNodeSpec({
-      name: "code_block",
-      content: "text*",
-      group: "block",
-      marks: "",
-      defining: true,
-      code: true,
-      attrs: {
-        language: { default: "", validate: "string" },
-      },
-      parseDOM: [
-        {
-          tag: "pre",
-          preserveWhitespace: "full",
-          getAttrs: (dom: HTMLElement) => ({ language: dom.dataset.language }),
-        },
-      ],
-      toDOM: (node) => {
-        const language = node.attrs.language;
-        const languageAttrs =
-          language && language.length > 0
-            ? { "data-language": language }
-            : undefined;
-        return ["pre", languageAttrs, ["code", 0]];
-      },
-    }),
-
-    defineNodeSpec({
-      name: "bullet_list",
-      content: "listItem+",
-      group: "block",
-      attrs: {
-        spread: { default: false, validate: "boolean" },
-      },
-      parseDOM: [
-        {
-          tag: "ul",
-          getAttrs: (dom: HTMLElement) => ({
-            spread: dom.dataset.spread === "true",
-          }),
-        },
-      ],
-      toDOM: (node) => ["ul", { "data-spread": node.attrs.spread }, 0],
-    }),
-
-    defineNodeSpec({
-      name: "ordered_list",
-      content: "listItem+",
-      group: "block",
-      attrs: {
-        order: { default: 1, validate: "number" },
-        spread: { default: false, validate: "boolean" },
-      },
-      parseDOM: [
-        {
-          tag: "ol",
-          getAttrs: (dom: HTMLElement) => ({
-            spread: dom.dataset.spread === "true",
-            order: dom.hasAttribute("start")
-              ? Number(dom.getAttribute("start"))
-              : 1,
-          }),
-        },
-      ],
-      toDOM: (node) => [
-        "ol",
-        {
-          ...(node.attrs.order === 1 ? {} : { start: node.attrs.order }),
-          "data-spread": node.attrs.spread,
-        },
-        0,
-      ],
-    }),
-
-    defineNodeSpec({
-      name: "list_item",
-      group: "listItem",
-      content: "paragraph block*",
-      defining: true,
-      attrs: {
-        label: { default: "\u2022", validate: "string" },
-        listType: { default: "bullet", validate: "string" },
-        spread: { default: true, validate: "boolean" },
-        checked: { default: null, validate: "boolean|null" },
-      },
-      parseDOM: [
-        {
-          tag: 'li[data-item-type="task"]',
-          getAttrs: (dom: HTMLElement) => ({
-            label: dom.dataset.label,
-            listType: dom.dataset.listType,
-            spread: dom.dataset.spread === "true",
-            checked: dom.dataset.checked
-              ? dom.dataset.checked === "true"
-              : null,
-          }),
-        },
-        {
-          tag: "li",
-          getAttrs: (dom: HTMLElement) => ({
-            label: dom.dataset.label,
-            listType: dom.dataset.listType,
-            spread: dom.dataset.spread === "true",
-          }),
-        },
-      ],
-      toDOM: (node) => {
-        if (node.attrs.checked == null) {
-          return [
-            "li",
-            {
-              "data-label": node.attrs.label,
-              "data-list-type": node.attrs.listType,
-              "data-spread": node.attrs.spread,
-            },
-            0,
-          ];
-        }
-        return [
-          "li",
-          {
-            "data-item-type": "task",
-            "data-label": node.attrs.label,
-            "data-list-type": node.attrs.listType,
-            "data-spread": node.attrs.spread,
-            "data-checked": node.attrs.checked,
-          },
-          0,
-        ];
-      },
-    }),
-
-    defineNodeSpec({
-      name: "hardbreak",
-      inline: true,
-      group: "inline",
-      selectable: false,
-      attrs: {
-        isInline: { default: false, validate: "boolean" },
-      },
-      parseDOM: [
-        { tag: "br" },
-        {
-          tag: 'span[data-type="hardbreak"]',
-          getAttrs: () => ({ isInline: true }),
-        },
-      ],
-      toDOM: (node) =>
-        node.attrs.isInline
-          ? ["span", { "data-type": "hardbreak", "data-is-inline": true }, " "]
-          : ["br", { "data-type": "hardbreak", "data-is-inline": false }],
-      leafText: () => "\n",
-    }),
-
-    defineNodeSpec({
-      name: "hr",
-      group: "block",
-      parseDOM: [{ tag: "hr" }],
-      toDOM: () => ["hr"],
-    }),
-
-    defineNodeSpec({
-      name: "html",
-      atom: true,
-      inline: true,
-      group: "inline",
-      attrs: {
-        value: { default: "", validate: "string" },
-      },
-      parseDOM: [
-        {
-          tag: 'span[data-type="html"]',
-          getAttrs: (dom: HTMLElement) => ({
-            value: dom.dataset.value ?? "",
-          }),
-        },
-      ],
-      toDOM: (node) => [
-        "span",
-        { "data-type": "html", "data-value": node.attrs.value },
-        node.attrs.value,
-      ],
-    }),
-
+    // Image: keep as inline atom (ProseKit default is block atom)
     defineNodeSpec({
       name: "image",
       inline: true,
@@ -314,100 +107,114 @@ export function createSchemaExtension(): Extension[] {
       toDOM: (node) => ["img", { ...node.attrs }],
     }),
 
-    defineNodeSpec({
-      name: "table",
-      ...baseTableSpecs.table,
-      content: "table_header_row table_row+",
-      disableDropCursor: true,
+    // Link: keep title attribute (ProseKit default has target/rel instead)
+    defineMarkSpec({
+      name: "link",
+      attrs: {
+        href: { validate: "string" },
+        title: { default: null, validate: "string|null" },
+      },
+      parseDOM: [
+        {
+          tag: "a[href]",
+          getAttrs: (dom: HTMLElement) => ({
+            href: dom.getAttribute("href"),
+            title: dom.getAttribute("title"),
+          }),
+        },
+      ],
+      toDOM: (mark) => ["a", { ...mark.attrs }, 0],
     }),
 
+    // --- Custom app nodes ---
+
     defineNodeSpec({
-      name: "table_header_row",
-      content: "(table_header)*",
-      tableRole: "row",
-      group: "block",
-      disableDropCursor: true,
+      name: "alert",
+      group: "alertBlock",
+      content: "block+",
+      defining: true,
+      attrs: {
+        type: { default: "note", validate: "string" },
+      },
       parseDOM: [
-        { tag: "tr[data-is-header]" },
         {
-          tag: "tr",
+          tag: "blockquote.book-hint",
           getAttrs: (dom: HTMLElement) => {
-            if (dom instanceof HTMLElement) {
-              return dom.querySelector("th") ? {} : false;
+            for (const t of ALERT_TYPES) {
+              if (dom.classList.contains(t)) return { type: t };
             }
-            return false;
+            return { type: "note" };
           },
         },
       ],
-      toDOM: () => ["tr", { "data-is-header": true }, 0],
+      toDOM: (node) => [
+        "blockquote",
+        { class: `book-hint ${node.attrs.type}` },
+        0,
+      ],
     }),
 
     defineNodeSpec({
-      name: "table_row",
-      content: "(table_cell)*",
-      tableRole: "row",
-      group: "block",
-      disableDropCursor: true,
-      parseDOM: [{ tag: "tr" }],
-      toDOM: () => ["tr", 0],
-    }),
-
-    defineNodeSpec({
-      name: "table_header",
-      ...baseTableSpecs.table_header,
-      disableDropCursor: true,
-    }),
-
-    defineNodeSpec({
-      name: "table_cell",
-      ...baseTableSpecs.table_cell,
-      disableDropCursor: true,
-    }),
-
-    defineNodeSpec({
-      name: "image-block",
-      inline: false,
-      group: "block",
-      selectable: true,
-      draggable: true,
-      isolating: true,
+      name: "divCenter",
+      group: "alertBlock",
+      content: "block+",
+      defining: true,
       marks: "",
+      attrs: {},
+      parseDOM: [{ tag: "div[align=center]" }],
+      toDOM: () => ["div", { align: "center", "data-type": "div-center" }, 0],
+    }),
+
+    defineNodeSpec({
+      name: "hugoRef",
+      group: "inline",
+      inline: true,
       atom: true,
       attrs: {
-        src: { default: "", validate: "string" },
-        caption: { default: "", validate: "string" },
-        ratio: { default: 1, validate: "number" },
-        w: { default: 0, validate: "number" },
-        h: { default: 0, validate: "number" },
+        path: { default: "" },
+        title: { default: "" },
       },
       parseDOM: [
         {
-          tag: `img[data-type="${IMAGE_DATA_TYPE}"]`,
-          getAttrs: (dom: HTMLElement) => {
-            const num = (v: string | null): number => {
-              const n = Number(v ?? 0);
-              return Number.isNaN(n) || n <= 0 ? 0 : n;
-            };
-            return {
-              src: dom.getAttribute("src") || "",
-              caption: dom.getAttribute("caption") || "",
-              ratio: num(dom.getAttribute("ratio")) || 1,
-              w: num(dom.getAttribute("w")),
-              h: num(dom.getAttribute("h")),
-            };
-          },
+          tag: "span[data-hugo-ref]",
+          getAttrs: (dom: HTMLElement) => ({
+            path: dom.getAttribute("data-hugo-ref") || "",
+            title: dom.getAttribute("data-title") || "",
+          }),
         },
       ],
-      toDOM: (node) => {
-        const a = node.attrs;
-        const attrs: Record<string, string> = { "data-type": IMAGE_DATA_TYPE };
-        for (const key of ["src", "caption", "ratio", "w", "h"] as const) {
-          const v = a[key];
-          if (v !== undefined && v !== null && v !== "")
-            attrs[key] = String(v);
-        }
-        return ["img", attrs];
+      toDOM: (node) => [
+        "span",
+        {
+          "data-hugo-ref": node.attrs.path,
+          "data-title": node.attrs.title,
+          class: "hugo-ref-link",
+        },
+        node.attrs.title,
+      ],
+    }),
+
+    defineNodeSpec({
+      name: "html",
+      atom: true,
+      inline: true,
+      group: "inline",
+      attrs: {
+        value: { default: "", validate: "string" },
       },
+      parseDOM: [
+        {
+          tag: 'span[data-type="html"]',
+          getAttrs: (dom: HTMLElement) => ({
+            value: dom.dataset.value ?? "",
+          }),
+        },
+      ],
+      toDOM: (node) => [
+        "span",
+        { "data-type": "html", "data-value": node.attrs.value },
+        node.attrs.value,
+      ],
     }),
 
     defineNodeSpec({
@@ -515,149 +322,49 @@ export function createSchemaExtension(): Extension[] {
     }),
 
     defineNodeSpec({
-      name: "alert",
-      group: "alertBlock",
-      content: "block+",
-      defining: true,
+      name: "image-block",
+      inline: false,
+      group: "block",
+      selectable: true,
+      draggable: true,
+      isolating: true,
+      marks: "",
+      atom: true,
       attrs: {
-        type: { default: "note", validate: "string" },
+        src: { default: "", validate: "string" },
+        caption: { default: "", validate: "string" },
+        ratio: { default: 1, validate: "number" },
+        w: { default: 0, validate: "number" },
+        h: { default: 0, validate: "number" },
       },
       parseDOM: [
         {
-          tag: "blockquote.book-hint",
+          tag: `img[data-type="${IMAGE_DATA_TYPE}"]`,
           getAttrs: (dom: HTMLElement) => {
-            for (const t of ALERT_TYPES) {
-              if (dom.classList.contains(t)) return { type: t };
-            }
-            return { type: "note" };
+            const num = (v: string | null): number => {
+              const n = Number(v ?? 0);
+              return Number.isNaN(n) || n <= 0 ? 0 : n;
+            };
+            return {
+              src: dom.getAttribute("src") || "",
+              caption: dom.getAttribute("caption") || "",
+              ratio: num(dom.getAttribute("ratio")) || 1,
+              w: num(dom.getAttribute("w")),
+              h: num(dom.getAttribute("h")),
+            };
           },
         },
       ],
-      toDOM: (node) => [
-        "blockquote",
-        { class: `book-hint ${node.attrs.type}` },
-        0,
-      ],
-    }),
-
-    defineNodeSpec({
-      name: "divCenter",
-      group: "alertBlock",
-      content: "block+",
-      defining: true,
-      marks: "",
-      attrs: {},
-      parseDOM: [{ tag: "div[align=center]" }],
-      toDOM: () => ["div", { align: "center", "data-type": "div-center" }, 0],
-    }),
-
-    defineNodeSpec({
-      name: "hugoRef",
-      group: "inline",
-      inline: true,
-      atom: true,
-      attrs: {
-        path: { default: "" },
-        title: { default: "" },
+      toDOM: (node) => {
+        const a = node.attrs;
+        const attrs: Record<string, string> = { "data-type": IMAGE_DATA_TYPE };
+        for (const key of ["src", "caption", "ratio", "w", "h"] as const) {
+          const v = a[key];
+          if (v !== undefined && v !== null && v !== "")
+            attrs[key] = String(v);
+        }
+        return ["img", attrs];
       },
-      parseDOM: [
-        {
-          tag: "span[data-hugo-ref]",
-          getAttrs: (dom: HTMLElement) => ({
-            path: dom.getAttribute("data-hugo-ref") || "",
-            title: dom.getAttribute("data-title") || "",
-          }),
-        },
-      ],
-      toDOM: (node) => [
-        "span",
-        {
-          "data-hugo-ref": node.attrs.path,
-          "data-title": node.attrs.title,
-          class: "hugo-ref-link",
-        },
-        node.attrs.title,
-      ],
     }),
-
-    defineMarkSpec({
-      name: "strong",
-      attrs: {
-        marker: { default: "*", validate: "string" },
-      },
-      parseDOM: [
-        {
-          tag: "b",
-          getAttrs: (node: HTMLElement) =>
-            node.style.fontWeight !== "normal" && null,
-        },
-        { tag: "strong" },
-        {
-          style: "font-style",
-          getAttrs: (value: string) => (value === "bold") as false,
-        },
-        { style: "font-weight=400", clearMark: (m) => m.type.name === "strong" },
-        {
-          style: "font-weight",
-          getAttrs: (value: string) =>
-            /^(bold(er)?|[5-9]\d{2,})$/.test(value) && null,
-        },
-      ],
-      toDOM: () => ["strong", 0],
-    }),
-
-    defineMarkSpec({
-      name: "emphasis",
-      attrs: {
-        marker: { default: "*", validate: "string" },
-      },
-      parseDOM: [
-        { tag: "i" },
-        { tag: "em" },
-        {
-          style: "font-style",
-          getAttrs: (value: string) => (value === "italic") as false,
-        },
-      ],
-      toDOM: () => ["em", 0],
-    }),
-
-    defineMarkSpec({
-      name: "inlineCode",
-      priority: 100,
-      code: true,
-      parseDOM: [{ tag: "code" }],
-      toDOM: () => ["code", 0],
-    }),
-
-    defineMarkSpec({
-      name: "link",
-      attrs: {
-        href: { validate: "string" },
-        title: { default: null, validate: "string|null" },
-      },
-      parseDOM: [
-        {
-          tag: "a[href]",
-          getAttrs: (dom: HTMLElement) => ({
-            href: dom.getAttribute("href"),
-            title: dom.getAttribute("title"),
-          }),
-        },
-      ],
-      toDOM: (mark) => ["a", { ...mark.attrs }, 0],
-    }),
-
-    defineMarkSpec({
-      name: "strike_through",
-      parseDOM: [
-        { tag: "del" },
-        {
-          style: "text-decoration",
-          getAttrs: (value: string) => (value === "line-through") as false,
-        },
-      ],
-      toDOM: () => ["del", 0],
-    }),
-  ];
+  );
 }

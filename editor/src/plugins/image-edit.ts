@@ -53,7 +53,7 @@ function anchorPointFor(
     return { left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }
   }
   const wrapper = img.closest(
-    ".milkdown-image-block, .milkdown-image-inline",
+    ".inb4doc-image-block, .inb4doc-image-inline",
   ) as HTMLElement | null
   const wRect = wrapper?.getBoundingClientRect()
   if (wRect && (wRect.width > 0 || wRect.height > 0)) {

@@ -5,9 +5,9 @@ import { Plugin, PluginKey, TextSelection } from "prosemirror-state"
 // typing the opening backtick before an existing closing backtick consumes it
 // and marks the text between. The stock `inlineCodeInputRule` leaves the
 // trailing backtick inside the code mark. Mark type is
-// `schema.marks.inlineCode` (the `code` alias is absent in Milkdown).
+// `schema.marks.code`.
 function codeMarkType(state: any): any {
-  return state.schema.marks.inlineCode ?? state.schema.marks.code
+  return state.schema.marks.code
 }
 
 export function createInlineCodeInputPlugin() {

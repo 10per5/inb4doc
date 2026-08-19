@@ -490,7 +490,7 @@ export function getChunkMap(
   // Non-editor controllers hot-swap individually, dialogs included. The editor
   // controller is excluded: swapping it re-runs its lifecycle (disconnect →
   // new instance → ensureEditor → createEditor) on a container whose Milkdown
-  // DOM is still mounted, mounting a second .milkdown div. Keeping it out of
+  // DOM is still mounted, mounting a second .inb4doc div. Keeping it out of
   // the swap map preserves the live editor across SW activations. Re-enable
   // once EditorController.destroy() is safe to re-create.
   for (const { id } of controllers) {
