@@ -242,21 +242,20 @@ function insertTable(view: EditorView): void {
   const { $from } = state.selection;
   const pos = $from.before($from.depth);
   const { schema } = state;
-  const tableNode = schema.nodes.table;
-  const tableRow = schema.nodes.tableRow;
-  const tableCell = schema.nodes.tableCell;
-  const tableHeader = schema.nodes.tableHeaderCell;
-  const para = schema.nodes.paragraph;
+  const tableType = schema.nodes.table;
+  const tableRowType = schema.nodes.tableRow;
+  const tableCellType = schema.nodes.tableCell;
+  const tableHeaderType = schema.nodes.tableHeaderCell;
   const rows = [];
   for (let r = 0; r < 3; r++) {
     const cells = [];
     for (let c = 0; c < 3; c++) {
-      const cellType = r === 0 ? tableHeader : tableCell;
-      cells.push(cellType.create(null, para.create()));
+      const cellType = r === 0 ? tableHeaderType : tableCellType;
+      cells.push(cellType.createAndFill()!);
     }
-    rows.push(tableRow.create(null, ...cells));
+    rows.push(tableRowType.createAndFill(null, cells)!);
   }
-  const tbl = tableNode.create(null, ...rows);
+  const tbl = tableType.createAndFill(null, rows)!;
   dispatch(
     state.tr
       .replaceWith(pos, pos + $from.node($from.depth).nodeSize, tbl)

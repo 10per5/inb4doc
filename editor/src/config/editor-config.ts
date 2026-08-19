@@ -16,7 +16,7 @@ import { createMarkdownBridge } from "./editor-markdown";
 
 import { createImageResizeView } from "@/plugins/image-resize";
 import { createImageInlineResizeView } from "@/plugins/image-inline-resize";
-import { createKeymap, createCodeBlockMovePlugin } from "@/plugins/keyboard";
+import { createKeymap, createCodeBlockMovePlugin, setEditorView } from "@/plugins/keyboard";
 import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createTextStatePlugin } from "@/plugins/text-state";
 import { createHistoryContextPlugin } from "@/plugins/history-context";
@@ -111,6 +111,7 @@ export async function createEditor(
 
   const extensions: Extension[] = [
     createSchemaExtension(),
+    createKeymap(),
 
     definePlugin([
       createPlainPastePlugin(),
@@ -132,7 +133,6 @@ export async function createEditor(
       createEditorDragDropPlugin({
         uploadImage: (file: File) => imageService.uploadImage(file),
       }),
-      createKeymap(),
       createCodeBlockMovePlugin(),
       createBlockContextPlugin(),
       createTextStatePlugin(),
@@ -165,6 +165,9 @@ export async function createEditor(
 
   // Mount into the DOM
   prosekitEditor.mount(container);
+
+  // Store view reference for keymap handlers that need it (e.g. cutBlock)
+  setEditorView(prosekitEditor.view);
 
   // Post-mount: wire up behaviors that need the live EditorView
   initHugoRefClicks(prosekitEditor.view);

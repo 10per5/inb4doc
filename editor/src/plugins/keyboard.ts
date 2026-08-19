@@ -1,8 +1,8 @@
-import { keymap } from "prosemirror-keymap"
 import { undo, redo } from "prosemirror-history"
 import { TextSelection, NodeSelection, Plugin, PluginKey } from "prosemirror-state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
 import { wrapInList, sinkListItem } from "prosemirror-schema-list"
+import { defineKeymap } from "@prosekit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { isInsideTableCell } from "@/plugins/editor-drag-drop"
 
@@ -138,25 +138,30 @@ function insertBlockBelow(
 
 // Ctrl+X with no selection → cut the whole current block (a bullet point cuts
 // the item, a paragraph cuts the paragraph). ProseMirror has no Mod-x binding —
-// the browser only cuts a real DOM selection — so this selects the block as a
-// NodeSelection and lets prosemirror-view's own cut handler (serialize
+// the browser only cuts a real DOM selection — so we select the block as a
+// NodeSelection and let prosemirror-view's own cut handler (serialize
 // selection → clipboard, deleteSelection) do the rest with full markdown/html
 // fidelity. With a real selection the native path is left untouched.
+let _editorView: import("prosemirror-view").EditorView | null = null
+
+export function setEditorView(view: import("prosemirror-view").EditorView) {
+  _editorView = view
+}
+
 function cutBlock(
   state: any,
   dispatch: any,
-  view: { focus: () => void; nodeDOM: (pos: number) => Node | null } | undefined,
 ): boolean {
   const { $from, empty } = state.selection
   if (!empty) return false
   const pos = findBlockStart($from)
-  if (pos === null || !dispatch || !view) return false
+  if (pos === null || !dispatch || !_editorView) return false
 
   const tr = state.tr.setSelection(NodeSelection.create(state.doc, pos))
   dispatch(tr)
 
-  view.focus()
-  const dom = view.nodeDOM(pos)
+  _editorView.focus()
+  const dom = _editorView.nodeDOM(pos)
   if (dom) {
     const range = document.createRange()
     range.selectNodeContents(dom)
@@ -170,7 +175,7 @@ function cutBlock(
   return true
 }
 
-// Milkdown registers the inline-code mark under `code`.
+// ProseKit registers the inline-code mark under `code`.
 function codeMark(state: any): any {
   return state.schema.marks.code
 }
@@ -259,7 +264,7 @@ function endToBlockEnd(state: any, dispatch: any): boolean {
 }
 
 export function createKeymap() {
-  return keymap({
+  return defineKeymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
     "Mod-B": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
     "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.italic)(state, dispatch),
@@ -281,7 +286,7 @@ export function createKeymap() {
     "Mod-z": (state, dispatch) => undo(state, dispatch),
     "Mod-Z": (state, dispatch) => redo(state, dispatch),
     "Mod-y": (state, dispatch) => redo(state, dispatch),
-    "Mod-x": (state, dispatch, view) => cutBlock(state, dispatch, view),
+    "Mod-x": (state, dispatch) => cutBlock(state, dispatch),
     "Mod-Enter": (state, dispatch) => insertBlockBelow(state, dispatch),
     // A GFM table cell holds exactly one paragraph, so Enter can't split into a
     // second paragraph. The gfm preset binds plain Enter to `exitTable` (same as
