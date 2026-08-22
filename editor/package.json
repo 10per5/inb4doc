@@ -26,7 +26,6 @@
     "katex": "^0.17.0",
     "markdown-it": "^14",
     "markdown-it-task-lists": "^2.1.1",
-    "prism-code-editor": "^5.2.0",
     "prosemirror-commands": "^1.7.1",
     "prosemirror-dropcursor": "^1.8.3",
     "prosemirror-gapcursor": "^1.4.1",

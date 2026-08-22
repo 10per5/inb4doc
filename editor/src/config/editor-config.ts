@@ -8,6 +8,7 @@
 
 import { createEditor as prosekitCreateEditor, definePlugin, union } from "@prosekit/core";
 import type { Extension } from "@prosekit/core";
+import { defineCodeBlockShiki } from "@prosekit/extensions/code-block";
 import type { EditorView } from "prosemirror-view";
 import type { Schema } from "prosemirror-model";
 
@@ -112,6 +113,7 @@ export async function createEditor(
   const extensions: Extension[] = [
     createSchemaExtension(),
     createKeymap(),
+    defineCodeBlockShiki(),
 
     definePlugin([
       createPlainPastePlugin(),

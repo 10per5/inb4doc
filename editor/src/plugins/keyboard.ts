@@ -1,6 +1,6 @@
 import { undo, redo } from "prosemirror-history"
-import { TextSelection, NodeSelection, Plugin, PluginKey } from "prosemirror-state"
-import { toggleMark, setBlockType } from "prosemirror-commands"
+import { TextSelection, NodeSelection, Plugin, PluginKey, Selection } from "prosemirror-state"
+import { toggleMark, setBlockType, exitCode } from "prosemirror-commands"
 import { createToggleListCommand, createIndentListCommand } from "prosemirror-flat-list"
 import { defineKeymap } from "@prosekit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
@@ -263,6 +263,122 @@ function endToBlockEnd(state: any, dispatch: any): boolean {
   return true
 }
 
+// ── codeBlock key handling ───────────────────────────────────────────
+
+function isInsideCodeBlock($from: any): boolean {
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === "codeBlock") return true
+  }
+  return false
+}
+
+// Tab / Shift-Tab inside a code block: indent/dedent every line touched by the
+// selection by `tabSize` real spaces (NBSPs would leak into markdown output).
+// Lines are processed bottom-up so earlier positions stay valid.
+function codeIndent(
+  state: any,
+  dispatch: ((tr: any) => void) | undefined,
+  dir: -1 | 1,
+): boolean {
+  const { $from } = state.selection
+  if (!isInsideCodeBlock($from)) return false
+
+  const blockStart = $from.start()
+  const blockEnd = $from.end()
+  const selFrom = Math.min(state.selection.from, state.selection.to)
+  const selTo = Math.max(state.selection.from, state.selection.to)
+
+  // Absolute offsets of every line start in the block.
+  const text = state.doc.textBetween(blockStart, blockEnd, "\n")
+  const starts: number[] = [blockStart]
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\n") starts.push(blockStart + i + 1)
+  }
+
+  const tabSize = 2
+  let tr = state.tr
+  let changed = false
+  for (let i = starts.length - 1; i >= 0; i--) {
+    const lineStart = starts[i]
+    const lineEnd =
+      i + 1 < starts.length ? starts[i + 1] : blockEnd
+    const overlaps = selFrom <= lineEnd && selTo >= lineStart
+    if (!overlaps) continue
+
+    if (dir === 1) {
+      tr.insertText(" ".repeat(tabSize), lineStart, lineStart)
+      changed = true
+    } else {
+      const head = state.doc.textBetween(
+        lineStart,
+        Math.min(lineStart + tabSize, lineEnd),
+        "\n",
+      )
+      const spaces = head.match(/^ +$/)?.[0].length ?? 0
+      if (spaces > 0) {
+        tr.delete(lineStart, lineStart + spaces)
+        changed = true
+      }
+    }
+  }
+  if (!changed) return true
+  if (dispatch) {
+    const mappedFrom = tr.mapping.map(selFrom)
+    const mappedTo = tr.mapping.map(selTo)
+    tr.setSelection(TextSelection.create(tr.doc, mappedFrom, mappedTo))
+    dispatch(tr.scrollIntoView())
+  }
+  return true
+}
+
+// Backspace at position 0 of a single-line code block converts it to a
+// paragraph keeping the text — same UX the old prism-based node view had.
+// Multi-line blocks keep native join behavior.
+function backspaceCodeBlockToParagraph(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty || $from.parentOffset !== 0) return false
+  if ($from.parent.type.name !== "codeBlock") return false
+  if ($from.parent.textContent.includes("\n")) return false
+  return setBlockType(state.schema.nodes.paragraph)(state, dispatch)
+}
+
+// Vertical entry into a code block must be deterministic. PM's own
+// selectVertically only applies NodeSelections and otherwise lets the BROWSER
+// move the caret; browsers preserve the goal X-column, so leaving a wide
+// heading into a narrow monospace block clamps the caret to the line END
+// (or worse on multi-press). Take over at the boundary: place the caret at
+// the block start (Down) / block end (Up) whenever the text-only neighbor is
+// a code block. Non-code neighbors keep native behavior.
+function enterCodeBlockVertically(
+  state: any,
+  dispatch: any,
+  view: any,
+  dir: -1 | 1,
+): boolean {
+  const { empty, $to } = state.selection
+  if (!empty || !view || !($to.parent.inlineContent)) return false
+  if (state.selection instanceof NodeSelection) return false
+  if (!view.endOfTextblock(dir < 0 ? "up" : "down")) return false
+
+  let $edge: any
+  try {
+    $edge = state.doc.resolve(dir > 0 ? $to.after() : $to.before())
+  } catch {
+    return false
+  }
+  const next = Selection.findFrom($edge, dir, true) // text-only positions
+  if (!next || !(next instanceof TextSelection)) return false
+  if (!next.$head.parent.type.spec.code) return false
+
+  if (dispatch) {
+    dispatch(state.tr.setSelection(next).scrollIntoView())
+  }
+  return true
+}
+
 export function createKeymap() {
   return defineKeymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
@@ -287,7 +403,12 @@ export function createKeymap() {
     "Mod-Z": (state, dispatch) => redo(state, dispatch),
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-x": (state, dispatch) => cutBlock(state, dispatch),
-    "Mod-Enter": (state, dispatch) => insertBlockBelow(state, dispatch),
+    "Mod-Enter": (state, dispatch) => {
+      // Inside a code block Mod-Enter exits it (legacy prism-editor behavior);
+      // elsewhere it inserts an empty paragraph below the current block.
+      if (isInsideCodeBlock(state.selection.$from)) return exitCode(state, dispatch)
+      return insertBlockBelow(state, dispatch)
+    },
     // A GFM table cell holds exactly one paragraph, so Enter can't split into a
     // second paragraph. The gfm preset binds plain Enter to `exitTable` (same as
     // Ctrl+Enter) — too aggressive. Ours runs first, so consume Enter inside a
@@ -311,6 +432,10 @@ export function createKeymap() {
       // Inside a cell, Tab must fall through to the gfm table keymap's
       // next-cell navigation instead of being swallowed here.
       if (isInsideTableCell(state.selection.$from)) return false
+      // Inside a code block, Tab indents the touched lines with real spaces.
+      if (isInsideCodeBlock(state.selection.$from)) {
+        return codeIndent(state, dispatch, 1)
+      }
       let itemDepth = -1
       for (let d = state.selection.$from.depth; d > 0; d--) {
         if (state.selection.$from.node(d).type.name === "list") {
@@ -326,13 +451,26 @@ export function createKeymap() {
       if (dispatch) dispatch(state.tr.insertText("\u00A0\u00A0\u00A0\u00A0"))
       return true
     },
+    "Shift-Tab": (state, dispatch) => {
+      if (isInsideCodeBlock(state.selection.$from)) {
+        return codeIndent(state, dispatch, -1)
+      }
+      return false
+    },
+    "ArrowDown": (state, dispatch, view) =>
+      enterCodeBlockVertically(state, dispatch, view, 1),
+    "ArrowUp": (state, dispatch, view) =>
+      enterCodeBlockVertically(state, dispatch, view, -1),
     "Mod-ArrowUp": (state, dispatch) => moveBlock(state, dispatch, -1),
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
     "ArrowLeft": (state, dispatch) => enterInlineCodeFromLeft(state, dispatch),
     "ArrowRight": (state, dispatch) => exitInlineCode(state, dispatch),
     "Home": (state, dispatch) => homeToBlockStart(state, dispatch),
     "End": (state, dispatch) => endToBlockEnd(state, dispatch),
-    "Backspace": (state, dispatch) => headingToParagraph(state, dispatch),
+    "Backspace": (state, dispatch) => {
+      if (backspaceCodeBlockToParagraph(state, dispatch)) return true
+      return headingToParagraph(state, dispatch)
+    },
     "Delete": (state, dispatch) => {
       if (deleteAtListItemStart(state, dispatch)) return true
       return headingToParagraph(state, dispatch)

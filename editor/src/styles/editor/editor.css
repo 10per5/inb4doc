@@ -151,7 +151,7 @@
   }
 }
 
-/* ── Code Block UI (CodeMirror) ──────────────────────────────────── */
+/* ── Code Block UI ───────────────────────────────────────────────── */
 
 .code-block-wrapper {
   position: relative;
@@ -166,23 +166,68 @@
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
-.code-block-wrapper .cm-editor {
-  outline: none;
-}
-
-.code-block-wrapper .cm-editor .cm-scroller {
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
-  font-size: 0.82rem;
-  line-height: 1.6;
-}
-
-.code-block-wrapper .cm-editor .cm-gutters {
+/* Line-number gutter — sibling of the editable <pre>, kept outside the
+   contenteditable so numbers never enter selections or the clipboard. */
+.code-block-gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42px;
+  padding: 10px 0;
   border-right: 1px solid #3b4252;
   background: #282c34;
+  overflow: hidden;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
-.code-block-wrapper .cm-editor .cm-activeLineGutter {
-  background: transparent;
+.code-block-line-no {
+  flex: 0 0 auto;
+  padding-right: 10px;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono",
+    Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: calc(0.82rem * 1.6);
+  color: #616e88;
+}
+
+/* Editable source — native ProseMirror text content. */
+.code-block-content {
+  display: block;
+  margin: 0 0 0 42px;
+  padding: 10px 12px 10px 10px;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono",
+    Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 2;
+  overflow-x: auto;
+  outline: none;
+  color: var(--prosemirror-highlight, #d8dee9);
+  padding: 0 3rem !important;
+}
+
+.code-block-content:empty::before {
+  content: "\200B";
+}
+
+.code-block-content::selection,
+.code-block-content *::selection {
+  background: rgba(136, 192, 208, 0.3);
+}
+
+.code-block-wrapper.latex .code-block-gutter {
+  display: none;
+}
+
+.code-block-wrapper.latex .code-block-content {
+  margin-left: 0;
 }
 
 .code-block-overlay {
@@ -283,8 +328,8 @@
   margin: 0.5em 0;
 }
 
-.code-block-wrapper.latex .cm-gutters {
-  display: none;
+.code-block-wrapper.latex .code-block-preview {
+  border-top: 1px solid #3b4252;
 }
 
 .code-block-copy-btn {
@@ -298,7 +343,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.3s, border-color 0.3s;
+  transition:
+    background 0.3s,
+    border-color 0.3s;
 }
 
 .code-block-copy-btn svg {
@@ -316,13 +363,6 @@
 
 .code-block-copy-btn.copied svg {
   stroke: #a3be8c;
-}
-
-/* Override external `.table { display: table }` (e.g. Tailwind) that
-   breaks Prism's `<span class="token table ...">` into a block element. */
-.prism-code-editor .token.table,
-.prism-code-editor .token.table.class-name {
-  display: inline;
 }
 
 /* ── Link Editor ───────────────────────────────────────────────────── */
@@ -347,14 +387,14 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-  .inb4doc-link-edit .link-edit .input-area {
-    outline: none;
-    background: transparent;
-    width: 200px;
-    font-size: 14px;
-    color: var(--color-text-primary);
-    border: none;
-  }
+.inb4doc-link-edit .link-edit .input-area {
+  outline: none;
+  background: transparent;
+  width: 200px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  border: none;
+}
 
 .inb4doc-link-edit .link-edit .input-area:focus {
   border-color: var(--color-accent);
