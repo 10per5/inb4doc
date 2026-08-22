@@ -487,9 +487,8 @@ export default class extends Controller {
             : null;
 
     // The third dropdown slot is contextual: "Task list" when the block is NOT
-    // a task list (convert to task), and "Checked/Unchecked Task List" when it
-    // IS (toggles the CURRENT item's checked state — `checked` is the caret
-    // item, so the label names the action that will apply to it).
+    // a task list (convert to task), and "Check"/"Uncheck" when it IS a task
+    // list (toggles the current item's checked state).
     const taskSlot =
       this.element.querySelector<HTMLElement>(".toolbar-list-dropdown .toolbar-list-task");
     const isTask = context.type === ActiveBlockType.TaskList;
@@ -497,7 +496,7 @@ export default class extends Controller {
       if (isTask) {
         taskSlot.dataset.kind = "checked";
         taskSlot.textContent =
-          context.checked === true ? "Unchecked Task List" : "Checked Task List";
+          context.checked === true ? "Uncheck" : "Check";
       } else {
         taskSlot.dataset.kind = "task";
         taskSlot.textContent = "Task list";

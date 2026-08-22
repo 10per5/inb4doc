@@ -80,23 +80,12 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
     paragraph: { block: "paragraph" },
 
     // Lists: markdown-it emits bullet_list/ordered_list + list_item_open/close.
-    // ProseKit uses a single 'list' node with kind attr; children are direct
-    // blocks (no list_item wrapper). list_item tokens are handled by
-    // prosemirror-markdown automatically when block spec is set.
-    list_item: { block: "list" },
-    bullet_list: {
-      block: "list",
-      getAttrs: (_: any, tokens: any, i: any) => ({
-        kind: "bullet",
-      }),
-    },
-    ordered_list: {
-      block: "list",
-      getAttrs: (tok: any, tokens: any, i: any) => ({
-        kind: "ordered",
-        order: +tok.attrGet("start") || 1,
-      }),
-    },
+    // ProseKit uses a flat 'list' node with kind attr; each list item is its
+    // own list node (no list_item wrapper). We use ignore+override to track
+    // context and create individual list nodes per item.
+    list_item: { ignore: true },
+    bullet_list: { ignore: true },
+    ordered_list: { ignore: true },
 
     heading: {
       block: "heading",
@@ -203,6 +192,33 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
     },
     td_close(state: any) {
       state.closeNode();
+      state.closeNode();
+    },
+  });
+
+  // Override list token handlers: track list kind via stack, create individual
+  // list nodes per list_item (not per bullet_list/ordered_list).
+  const listKindStack: string[] = [];
+  const ListNode = schema.nodes.list;
+
+  Object.assign(handlers, {
+    bullet_list_open() {
+      listKindStack.push("bullet");
+    },
+    bullet_list_close() {
+      listKindStack.pop();
+    },
+    ordered_list_open() {
+      listKindStack.push("ordered");
+    },
+    ordered_list_close() {
+      listKindStack.pop();
+    },
+    list_item_open(state: any, tok: any) {
+      const kind = listKindStack[listKindStack.length - 1] || "bullet";
+      state.openNode(ListNode, { kind });
+    },
+    list_item_close(state: any) {
       state.closeNode();
     },
   });
@@ -348,11 +364,47 @@ function fixTaskListItems(schema: Schema, node: ProseNode): ProseNode | null {
 
 /** Convert a paragraph-wrapped `<video>` html atom into a video node. */
 function fixVideo(schema: Schema, node: ProseNode): ProseNode | null {
+  // Case 1: single html atom (e.g. <video ...></video> inlined in one token)
   const value = htmlInParagraph(node);
-  if (!value || !/^<video\b/i.test(value.trim())) return null;
-  if (!value.trim().endsWith("</video>") && !/\/>\s*$/.test(value.trim()))
-    return null;
-  return schema.nodes.video.create(parseVideoAttrs(value));
+  if (value && /^<video\b/i.test(value.trim())) {
+    if (
+      value.trim().endsWith("</video>") ||
+      /\/>\s*$/.test(value.trim())
+    ) {
+      return schema.nodes.video.create(parseVideoAttrs(value));
+    }
+  }
+
+  // Case 2: paragraph with multiple html children where the first starts with
+  // <video and the last ends with </video>. markdown-it splits the opening and
+  // closing tags into separate html_inline tokens.
+  if (node.type.name === "paragraph" && node.childCount >= 2) {
+    const first = node.firstChild;
+    const last = node.lastChild;
+    if (
+      first &&
+      first.type.name === "html" &&
+      last &&
+      last.type.name === "html"
+    ) {
+      const firstVal = String(first.attrs.value || "");
+      const lastVal = String(last.attrs.value || "");
+      if (
+        /^<video\b/i.test(firstVal.trim()) &&
+        (lastVal.trim().endsWith("</video>") || /\/>\s*$/.test(lastVal.trim()))
+      ) {
+        // Concatenate all html children to form the full video tag
+        const parts: string[] = [];
+        node.forEach((child) => {
+          if (child.type.name === "html") parts.push(String(child.attrs.value || ""));
+        });
+        const full = parts.join("");
+        return schema.nodes.video.create(parseVideoAttrs(full));
+      }
+    }
+  }
+
+  return null;
 }
 
 function fixBlockChildren(

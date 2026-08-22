@@ -1,7 +1,7 @@
 import { undo, redo } from "prosemirror-history"
 import { TextSelection, NodeSelection, Plugin, PluginKey } from "prosemirror-state"
 import { toggleMark, setBlockType } from "prosemirror-commands"
-import { wrapInList, sinkListItem } from "prosemirror-schema-list"
+import { createToggleListCommand, createIndentListCommand } from "prosemirror-flat-list"
 import { defineKeymap } from "@prosekit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { isInsideTableCell } from "@/plugins/editor-drag-drop"
@@ -275,8 +275,8 @@ export function createKeymap() {
     "Mod-Alt-1": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 1 })(state, dispatch),
     "Mod-Alt-2": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 2 })(state, dispatch),
     "Mod-Alt-3": (state, dispatch) => setBlockType(state.schema.nodes.heading, { level: 3 })(state, dispatch),
-    "Mod-Shift-7": (state, dispatch) => wrapInList(state.schema.nodes.list)(state, dispatch),
-    "Mod-Shift-8": (state, dispatch) => wrapInList(state.schema.nodes.list)(state, dispatch),
+    "Mod-Shift-7": createToggleListCommand({ kind: "bullet" }),
+    "Mod-Shift-8": createToggleListCommand({ kind: "ordered" }),
     "Mod-Shift--": (state, dispatch) => {
       const hr = state.schema.nodes.horizontalRule.create()
       const tr = state.tr.replaceSelectionWith(hr)
@@ -321,7 +321,7 @@ export function createKeymap() {
       const canSink =
         itemDepth !== -1 && state.selection.$from.index(itemDepth - 1) > 0
       if (canSink) {
-        return sinkListItem(state.schema.nodes.list)(state, dispatch)
+        return createIndentListCommand()(state, dispatch)
       }
       if (dispatch) dispatch(state.tr.insertText("\u00A0\u00A0\u00A0\u00A0"))
       return true

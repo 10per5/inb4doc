@@ -35,15 +35,15 @@ export function initEditorMutationService(getEditor: () => { action: (fn: (ctx: 
         case ToolbarCommand.Heading:
           commandService.wrapInHeadingCommand(state, dispatch); break
         case ToolbarCommand.Indent:
-          commandService.sinkListItemCommand(state, dispatch); break
+          commandService.indentListCommand(state, dispatch); break
         case ToolbarCommand.Unindent:
-          commandService.liftListItemCommand(state, dispatch); break
+          commandService.dedentListCommand(state, dispatch); break
         case ToolbarCommand.BulletList:
-          setListItemKind(view, {} as any, commandService, "bullet"); break
+          setListItemKind(view, "bullet"); break
         case ToolbarCommand.TaskList:
-          setListItemKind(view, {} as any, commandService, "task"); break
+          setListItemKind(view, "task"); break
         case ToolbarCommand.OrderedList:
-          setListItemKind(view, {} as any, commandService, "ordered"); break
+          setListItemKind(view, "ordered"); break
         case ToolbarCommand.MarkTask:
           setTaskChecked(view, true); break
         case ToolbarCommand.UnmarkTask:

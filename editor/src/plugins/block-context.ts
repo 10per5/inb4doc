@@ -32,11 +32,9 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
     // when the item is the first child of the list (startIndex == 0), so only
     // items at index > 0 can be indented further.
     const canSink = $from.index(d - 1) > 0
-    const checked = node.attrs.checked
-    if (typeof checked === "boolean") {
-      return { type: ActiveBlockType.TaskList, checked, canSink }
+    if (node.attrs.kind === "task") {
+      return { type: ActiveBlockType.TaskList, checked: !!node.attrs.checked, canSink }
     }
-    const parentName = $from.node(d - 1).type.name
     return {
       type:
         node.attrs.kind === "ordered"

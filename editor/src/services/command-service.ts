@@ -1,5 +1,5 @@
 import { toggleMark, wrapIn, setBlockType, lift } from "prosemirror-commands"
-import { wrapInList, liftListItem } from "prosemirror-schema-list"
+import { createToggleListCommand, createIndentListCommand, createDedentListCommand } from "prosemirror-flat-list"
 import { addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable, isInTable, selectedRect, selectionCell, CellSelection } from "prosemirror-tables"
 import type { EditorState, Transaction } from "prosemirror-state"
 
@@ -45,24 +45,36 @@ class CommandService {
     }
   }
 
-  get sinkListItemCommand(): PMCommand {
-    return (state, dispatch) => liftListItem(state.schema.nodes.list)(state, dispatch)
+  get indentListCommand(): PMCommand {
+    return createIndentListCommand()
   }
 
-  get liftListItemCommand(): PMCommand {
-    return lift
+  get dedentListCommand(): PMCommand {
+    return createDedentListCommand()
   }
 
-  get wrapInBulletListCommand(): PMCommand {
-    return (state, dispatch) => wrapInList(state.schema.nodes.bullet_list)(state, dispatch)
+  get toggleBulletListCommand(): PMCommand {
+    return createToggleListCommand({ kind: "bullet" })
   }
 
-  get wrapInOrderedListCommand(): PMCommand {
-    return (state, dispatch) => wrapInList(state.schema.nodes.ordered_list)(state, dispatch)
+  get toggleOrderedListCommand(): PMCommand {
+    return createToggleListCommand({ kind: "ordered" })
   }
 
   get wrapInBlockquoteCommand(): PMCommand {
-    return (state, dispatch) => wrapIn(state.schema.nodes.blockquote)(state, dispatch)
+    return (state, dispatch) => {
+      const blockquote = state.schema.nodes.blockquote
+      if (!blockquote) return false
+      // If already inside a blockquote, lift out of it (toggle off)
+      const $from = state.selection.$from
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type === blockquote) {
+          return lift(state, dispatch)
+        }
+      }
+      // Otherwise wrap in blockquote (toggle on)
+      return wrapIn(blockquote)(state, dispatch)
+    }
   }
 
   get toggleStrikethroughCommand(): PMCommand {

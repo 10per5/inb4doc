@@ -33,12 +33,26 @@ export function initLinkHandler(getView: () => EditorView | null) {
     if (!linkMark) return
 
     if (url) {
-      toggleMark(linkMark, { href: url })(curState, (tr) => {
-        const afterLink = tr.selection.to
-        tr.insert(afterLink, curState.schema.text(" "))
-        tr.setSelection(TextSelection.create(tr.doc, afterLink + 1))
+      const { empty } = curState.selection
+      if (empty) {
+        // No text selected: insert URL as linked text
+        const tr = curState.tr
+        const pos = tr.selection.from
+        const linkText = curState.schema.text(url, [linkMark.create({ href: url })])
+        tr.insertText(url, pos)
+        tr.addMark(pos, pos + url.length, linkMark.create({ href: url }))
+        tr.setSelection(TextSelection.create(tr.doc, pos + url.length))
+        tr.insert(pos + url.length, curState.schema.text(" "))
+        tr.setSelection(TextSelection.create(tr.doc, pos + url.length + 1))
         dispatch(tr.setStoredMarks([]))
-      })
+      } else {
+        toggleMark(linkMark, { href: url })(curState, (tr) => {
+          const afterLink = tr.selection.to
+          tr.insert(afterLink, curState.schema.text(" "))
+          tr.setSelection(TextSelection.create(tr.doc, afterLink + 1))
+          dispatch(tr.setStoredMarks([]))
+        })
+      }
     } else {
       const $head = curState.selection.$head
       const existingMark = $head.marks().find((m) => m.type === linkMark)

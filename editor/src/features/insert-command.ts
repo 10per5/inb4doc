@@ -10,9 +10,7 @@
 import { TextSelection } from "prosemirror-state"
 import type { EditorView } from "prosemirror-view"
 import { wrapIn, setBlockType } from "prosemirror-commands"
-import { wrapInList } from "prosemirror-schema-list"
 
-type PMCommand = (state: any, dispatch?: (tr: any) => void) => boolean
 import { SlashCommand, ProseNodeType, proseNodeTypeByName } from "@/config/enums";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { setListItemKind } from "@/utils/editor-mutator";
@@ -57,31 +55,18 @@ export function executeInsertCommand(
     return;
   }
 
-  const dispatch = (tr: import("prosemirror-state").Transaction) => view.dispatch(tr);
-  const listCommands: { call(key: string | PMCommand, ...args: unknown[]): boolean } = {
-    call(key: string, ..._args: unknown[]) {
-      if (key === "bullet") return wrapInList(schema.nodes.list)(view.state, dispatch);
-      if (key === "ordered") return wrapInList(schema.nodes.list)(view.state, dispatch);
-      return false;
-    },
-  };
-  const listService = {
-    wrapInBulletListCommand: wrapInList(schema.nodes.list) as PMCommand,
-    wrapInOrderedListCommand: wrapInList(schema.nodes.list) as PMCommand,
-  };
-
   if (cmd === SlashCommand.BulletList) {
-    setListItemKind(view, listCommands, listService, "bullet");
+    setListItemKind(view, "bullet");
     view.focus();
     return;
   }
   if (cmd === SlashCommand.OrderedList) {
-    setListItemKind(view, listCommands, listService, "ordered");
+    setListItemKind(view, "ordered");
     view.focus();
     return;
   }
   if (cmd === SlashCommand.TodoList) {
-    setListItemKind(view, listCommands, listService, "task");
+    setListItemKind(view, "task");
     view.focus();
     return;
   }
