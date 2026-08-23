@@ -27,7 +27,7 @@ import { shortcodeDecoration } from "@/plugins/shortcode";
 import { initHugoRefClicks } from "@/plugins/hugo-ref";
 import { configureBlockEdit, block, slash } from "@/features/block-edit";
 import { createMathExtension, mathBlockPreviewView } from "@/plugins/math";
-import { defineCodeBlockShiki } from "@prosekit/extensions/code-block";
+import { codeBlockHighlight } from "@/plugins/code-highlight";
 import { defineTableCommands, defineTableDropIndicator } from "@prosekit/extensions/table";
 import { codeBlockUI } from "@/plugins/code-block-ui";
 import { setupTableHandleUI } from "@/plugins/table-handle-ui";
@@ -116,7 +116,7 @@ export async function createEditor(
   const extensions: Extension[] = [
     createSchemaExtension(),
     createKeymap(),
-    defineCodeBlockShiki(),
+    codeBlockHighlight,
     createMathExtension(),
     ...(isMobileDock() ? [] : [defineTableCommands(), defineTableDropIndicator()]),
 

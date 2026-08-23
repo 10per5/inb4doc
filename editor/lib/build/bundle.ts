@@ -569,6 +569,15 @@ async function makeConfig(cwd: string, dev: boolean): Promise<any> {
         alias: {
           "@": resolve(cwd, "src"),
           "$/": resolve(cwd, "lib") + "/",
+          // @prosekit/basic -> extensions/code-block statically imports
+          // shiki/bundle/full (all ~200 grammars + themes + wasm). Farm's
+          // tree-shaking retains the module even though nothing calls
+          // defineCodeBlockShiki; stub the two bare "shiki" specifiers so the
+          // dead chain resolves to ~10 lines. Real highlighting uses
+          // shiki/core + per-language subpaths (@/plugins/code-highlight),
+          // which these exact-match aliases don't touch.
+          shiki: resolve(cwd, "src/shims/shiki.ts"),
+          "shiki/bundle/full": resolve(cwd, "src/shims/shiki.ts"),
         },
       },
       define: {

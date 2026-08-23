@@ -25,7 +25,7 @@ process.env.APP_VERSION ??= pkg.version
 const renderTemplates = process.argv.includes("--render-templates")
 const watch = process.argv.includes("--watch")
 
-if (!watch || !existsSync(join(root, "src", "eta", "icons.ts"))) buildIcons()
+buildIcons()
 const icons = await import("../src/eta/icons")
 process.env.NODE_ENV = watch ? "development" : "production"
 process.env.BUILD_MODE ??= "web-local"
