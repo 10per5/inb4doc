@@ -25,7 +25,7 @@ function normalizePlainText(text: string): string {
  * The clipboard plugin's `handlePaste` intercepts every paste first
  * and re-interprets plain text as Markdown.
  *
- * This plugin is prepended to the plugin chain (before the Milkdown clipboard
+ * This plugin is prepended to the plugin chain (before ProseKit's clipboard
  * plugin), so its `handlePaste` is consulted first. For the shift-paste
  * gesture only it rebuilds the pasted text through `__parseFromClipboard`
  * with `plainText=true`: literal text, line breaks as paragraphs (or raw text

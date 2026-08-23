@@ -1,7 +1,7 @@
 /**
  * scroll-to-text — DOM utilities for finding and highlighting text matches.
  *
- * Pure DOM — no Milkdown or ProseMirror imports.
+ * Pure DOM — no ProseMirror imports.
  * ProseMirror selection is handled by editor-controller.
  */
 
@@ -20,7 +20,7 @@ export interface TextMatch {
 /**
  * Compute the current viewport rect for a match. This is a separate helper so
  * the rect can be recomputed *after* scrolling (rect coords change as the
- * `.book-layout` container scrolls). Pure DOM, no Milkdown.
+ * `.book-layout` container scrolls). Pure DOM.
  */
 export function matchRect(match: TextMatch): DOMRect | null {
   if (match.element) {
@@ -56,7 +56,7 @@ export function matchRect(match: TextMatch): DOMRect | null {
   return rect
 }
 
-/** Find a text match in the ProseMirror DOM. Pure DOM, no Milkdown. */
+/** Find a text match in the ProseMirror DOM. Pure DOM. */
 export function findTextMatch(
   query: string,
   matchIndex?: number,
@@ -83,7 +83,7 @@ function getFirstTextNode(root: Node): Text | null {
   return walker.nextNode() ? (walker.currentNode as Text) : null
 }
 
-/** Find a heading in the ProseMirror DOM by level + exact text. Pure DOM, no Milkdown. */
+/** Find a heading in the ProseMirror DOM by level + exact text. Pure DOM. */
 export function findHeadingTarget(
   text: string,
   level: number,

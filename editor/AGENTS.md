@@ -10,35 +10,6 @@
 - **Stop early on rabbit holes.** During investigation, don't keep drilling into `node_modules` sources or tracing dependency internals hoping the answer surfaces. If a few targeted reads don't resolve it, stop and ask the user for input — many issues resolve faster with a web search (docs, issue trackers) or a fresh git clone than with local source spelunking.
 - **Verify CSS custom property names against the declarations before using them.** Color/semantic vars (`--color-*`, `--font-size-*`) are declared in `src/styles/foundation/base.css` (`:root` block, Nord theme; dark mode in the `:root[data-theme="dark"]` block). Layout/spacing vars (`--sidebar-width`, `--aside-width`, `--editor-padding-*`, visibility) live in `lib/style/layout.css`. Do not invent var names — e.g. `--color-danger` does not exist; the error/destructive color is `--color-error` (using a non-existent var silently falls back to the property's initial value, producing wrong colors with no build error). When in doubt, grep the declaration file for the exact name before writing `var(--...)`.
 
-## ProseKit Migration (completed Aug 2026)
-
-The editor was migrated from Milkdown to ProseKit (`@prosekit/basic` +
-`@prosekit/extensions`). Milkdown had architectural faults that leaked into
-app code as workarounds — most traced back to `@milkdown/components` mounting
-Vue apps **inside** ProseMirror node views, giving a second framework
-ownership of node-view DOM. ProseKit has no framework in node views and a
-smaller bundle. The migration removed the Vue dependency entirely.
-
-The following Milkdown workarounds were deleted during migration. If any
-residual references to these patterns remain in the code, they can be removed:
-
-1. **Vue apps mounted inside PM node views** — table views now use native
-   ProseMirror node views via `@prosekit/extensions` table extension.
-2. **`stopEvent` returning `true` for drag/drop** — native PM drag/drop
-   works correctly without workarounds.
-3. **Vue component `preventDefault()` on drag events** — removed.
-4. **`ignoreMutation` ignoring tbody mutations** — removed; PM reconciliation
-   works natively.
-5. **MDAST remark pipeline** — ProseKit uses the same remark/unified pipeline
-   for markdown parsing (this is a ProseKit feature, not a Milkdown fault),
-   but without the Vue framework overhead.
-6. **Drop indicator sibling overlay** — now uses `dropIndicatorConfig` with
-   `.inb4doc-drop-cursor` class (unchanged pattern, just renamed).
-7. **Plugin-state read-back gotcha** — general PM gotcha, not Milkdown-specific.
-
-On a ProseKit migration, most of these workarounds can likely be deleted and
-native behavior restored — but verify each fault's behavior first.
-
 ## Content State Invariants (metadata / content-loss regressions)
 
 File content is stored **body-only**; frontmatter lives separately (`Page.frontmatter`, pending edits carry a `frontmatterPatch`). Several subtle invariants prevent metadata/content loss when a page is re-opened, flushed, or shown in the pending-changes dialog. Breaking any of them resurfaces the "metadata shows as discarded" / "body cleared on re-open" regression.
@@ -244,8 +215,7 @@ When rendering popups, pickers, or floating UIs that must anchor to a ProseMirro
 ### Slash Menu (custom `SlashView`)
 
 The `/` slash menu is implemented as a custom ProseMirror plugin view in
-`src/features/block-edit.ts` (`SlashView` class). It is NOT based on
-`@milkdown/plugin-slash` — that was removed during the ProseKit migration.
+`src/features/block-edit.ts` (`SlashView` class).
 
 The slash menu mounts its DOM element to `#inb4doc-editor` (the
 `view.dom.parentNode`) in the constructor. Positioning uses

@@ -9,7 +9,7 @@
 import { Controller } from "@hotwired/stimulus";
 import type { EditorInstance } from "@/config/editor-config";
 import { createEditor, type EditorHost } from "@/config/editor-config";
-import { editorContext, getMarkdown, getView } from "@/services/editor-context-service";
+import { getMarkdown } from "@/config/editor-markdown";
 import { createMarkdownBridge } from "@/config/editor-markdown";
 import { TextSelection } from "prosemirror-state";
 import { EditorState } from "prosemirror-state";
@@ -91,7 +91,7 @@ export class EditorController extends Controller {
   setCurrentPath(path: string): void {
     const prev = this.currentPath;
     if (prev && prev !== path && this.editor) {
-      const view = getView(this.editor);
+      const view = this.editor.view;
       this.editorStates.set(prev, view.state);
       this.editorContents.set(prev, this.serializeDoc(view));
     }

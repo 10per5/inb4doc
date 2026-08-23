@@ -61,7 +61,7 @@ export class EditorSession {
       )
     }, PORT)
     await page.goto(`${BASE}/docs/${slug}`, { waitUntil: "load" })
-    await page.waitForSelector(opts.waitFor ?? ".milkdown-table-block", {
+    await page.waitForSelector(opts.waitFor ?? ".ProseMirror .tableWrapper", {
       timeout: 20000,
     })
     await page.waitForTimeout(1500) // app boot + controllers connect
@@ -72,10 +72,10 @@ export class EditorSession {
     await this.context.close()
   }
 
-  /** Bounding box of the nth `.milkdown-table-block`. */
+  /** Bounding box of the nth table (prosemirror-tables renders `.tableWrapper`). */
   async tableBox(index = 0) {
     return (await this.page
-      .locator(".milkdown-table-block")
+      .locator(".ProseMirror .tableWrapper")
       .nth(index)
       .boundingBox())!
   }

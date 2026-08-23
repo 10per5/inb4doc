@@ -149,9 +149,9 @@ Learned while debugging the code-block language picker (Aug 2026):
   `force: true` or dispatch synthetic events inside `evaluate` instead —
   and remember a real click first requires the overlay visible (focus /
   hover state), which is exactly what the bug usually is.
-- **`EditorSession.open` default wait selector is stale**
-  (`.milkdown-table-block`, Milkdown era) — always pass
-  `{ waitFor: ".ProseMirror" }` unless you actually test tables.
+- **`EditorSession.open` default wait selector is `.ProseMirror .tableWrapper`**
+  (table-ready boot) — pass `{ waitFor: ".ProseMirror" }` for docs without a
+  table, or any other selector you actually need.
 
 ## Salt vs. meat — pick the cheaper check first
 

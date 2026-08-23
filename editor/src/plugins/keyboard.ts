@@ -8,10 +8,10 @@ import { appEvents, AppEvent } from "@/stores/app-events"
 import { isInsideTableCell } from "@/plugins/editor-drag-drop"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
-// after Home), Milkdown binds both Backspace and Delete to `liftFirstListItem`
-// which runs joinBackward — so Delete removes the list structure instead of
-// deleting the next character. Our keymap plugin runs before Milkdown's
-// internal keymap, so intercept Delete here and delete the char forward.
+// after Home), the stock list keymap (prosemirror-flat-list) binds Delete to
+// its deleteCommand, which lifts the item out of the list instead of deleting
+// the next character. Our keymap runs before that internal keymap, so
+// intercept Delete here and delete the char forward.
 function deleteAtListItemStart(
   state: any,
   dispatch: any,
@@ -80,10 +80,9 @@ function moveBlock(
   return true
 }
 
-// Milkdown's DowngradeHeading keymap steps heading level down one `#` at a
-// time on Backspace/Delete at the line start (## → # → paragraph). Skip the
-// intermediate passes: convert straight to a paragraph so the next press
-// deletes the line.
+// ProseKit's heading extension unsets the heading on Backspace at the line
+// start (`backspaceUnsetHeading`); Delete has no such binding. Convert
+// straight to a paragraph on either key so the next press deletes the line.
 function headingToParagraph(
   state: any,
   dispatch: any,
@@ -641,7 +640,8 @@ export function createKeymap() {
         // of its parent list (startIndex == 0), so Tab indents when the item can
         // sink and otherwise inserts 4 non-breaking spaces. The edit-toolbar
         // increase button mirrors this: disabled when the item can't sink. This
-        // keymap runs before Milkdown's listItemKeymap, so Tab is taken.
+        // keymap runs before the stock list keymap (prosemirror-flat-list),
+        // so Tab is taken.
         const canSink = $from.index(itemDepth - 1) > 0
         if (canSink) {
           return createIndentListCommand()(state, dispatch)

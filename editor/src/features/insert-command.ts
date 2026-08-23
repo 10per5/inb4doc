@@ -3,8 +3,8 @@
  *
  * The block-insert commands that the `/` slash menu (SlashView), the desktop
  * block-handle "+", and the mobile FAB "+" all surface. Extraction point for the
- * logic that used to live inside SlashView.execute, so menu items (which have no
- * Milkdown ctx of their own) run the exact same commands as typing "/cmd".
+ * logic that used to live inside SlashView.execute, so menu items (which have
+ * no editor context of their own) run the exact same commands as typing "/cmd".
  */
 
 import { TextSelection } from "prosemirror-state"

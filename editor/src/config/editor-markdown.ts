@@ -10,6 +10,7 @@ import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 
 import { ALERT_TYPES } from "./editor-schema";
+import type { EditorInstance } from "./editor-config";
 
 /**
  * Markdown <-> ProseKit bridge.
@@ -979,4 +980,13 @@ export function createMarkdownBridge(schema: Schema): ParseState {
       return serializer.serialize(doc);
     },
   };
+}
+
+/** Serialize the given editor's current doc to normalized Markdown. */
+export function getMarkdown(editor: EditorInstance): string {
+  const view = editor.view;
+  return createMarkdownBridge(view.state.schema)
+    .serialize(view.state.doc)
+    .replace(/\r\n/g, "\n")
+    .replace(/\n+$/, "\n");
 }

@@ -9,7 +9,7 @@ work lands and refer to the matching one before writing or editing code.
 
 | Path | What it is | AGENTS.md |
 |---|---|---|
-| `editor/` | The WYSIWYG markdown editor — Bun + Milkdown (ProseMirror) + Stimulus + Eta. This is the app itself: `src/`, `templates/`, `lib/` (build), `public/` output. | ✅ `editor/AGENTS.md` — always read this first for editor work |
+| `editor/` | The WYSIWYG markdown editor — Bun + ProseKit (ProseMirror) + Stimulus + Eta. This is the app itself: `src/`, `templates/`, `lib/` (build), `public/` output. | ✅ `editor/AGENTS.md` — always read this first for editor work |
 | `content/` | The markdown wiki — plain `.md` files, the shared source of truth for the editor and the SSG. No build step; edits are just file writes. | — |
 | `hugo-view/` | SSG — Hugo + Book theme; renders `content/` into a static site (`hugo-view::build`). | — |
 | `gui/` | Native desktop shell — Saucer + Qt6 WebEngine wrapping the editor (`gui::build`). | — |

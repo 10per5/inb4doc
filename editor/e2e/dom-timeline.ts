@@ -55,7 +55,7 @@ export class DomTimeline {
     opts: DomTimelineOptions = {},
   ): Promise<DomTimeline> {
     const watch = opts.watch ?? [
-      ".milkdown-table-block",
+      ".ProseMirror .tableWrapper",
       ".video-wrapper",
       ".text-drag-ghost",
     ]

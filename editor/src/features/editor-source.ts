@@ -1,8 +1,8 @@
 /**
  * editor-source — DOM toggling for source mode.
  *
- * Pure DOM — no Milkdown or editorContext imports.
- * Milkdown operations (parse/serialize) are injected by the caller.
+ * Pure DOM — no editor imports.
+ * Editor operations (parse/serialize) are injected by the caller.
  */
 
 import { autoResize } from "@/utils/text"

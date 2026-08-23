@@ -3,7 +3,7 @@
  * with loading.css) so the skeleton hosts occupy their layout slots
  * before app.css / the JS bundle arrive. These rules remain the single
  * source for the page structure at runtime — do not re-declare them in
- * the bundle. Runtime-only behaviors (mobile drawers, print, Milkdown
+ * the bundle. Runtime-only behaviors (mobile drawers, print, editor
  * content, buttons) stay in src/styles/.
  */
 

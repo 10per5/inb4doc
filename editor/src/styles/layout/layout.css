@@ -2,7 +2,7 @@
  * The structural layout (grid, sidebar/toolbar/aside sizing, #editor-area)
  * lives in lib/style/layout.css — a build-time asset inlined into <head>
  * by lib/build.ts so skeletons fill their slots before app.css arrives.
- * This file keeps only runtime-only behaviors: mobile drawers, Milkdown
+ * This file keeps only runtime-only behaviors: mobile drawers, editor
  * content sizing, and print styles.
  */
 

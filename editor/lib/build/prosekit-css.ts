@@ -14,8 +14,6 @@ export interface ProsekitCssOptions {
  * as standalone files. Farm bundles CSS imported in JS into <style> tags inside
  * JS chunks — it does NOT emit separate .css files. These must exist as
  * real files on disk so the HTML <link> tags and the SW can cache them.
- *
- * Replaces the old processThemeNordAssets (Milkdown era).
  */
 export function processProsekitCss(opts: ProsekitCssOptions) {
   const { publicDir } = opts;

@@ -12,8 +12,8 @@ export interface DirtyPluginConfig {
  * Detects ProseMirror document changes for the active editor, serializes the
  * doc to Markdown, and emits `AppEvent.EditorChanged`.
  *
- * This plugin is intentionally thin: it only knows how to serialize (it has the
- * Milkdown `ctx`) and detect changes. All dirty-state bookkeeping, debouncing,
+ * This plugin is intentionally thin: it only knows how to serialize the doc
+ * to Markdown and detect changes. All dirty-state bookkeeping, debouncing,
  * persistence, and counter recomputation live in `DirtyTrackingService`, which
  * subscribes to `EditorChanged`.
  */

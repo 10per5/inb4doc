@@ -93,7 +93,7 @@ interface ControllerReg {
 const ENTRY_CHUNK_NAMES = new Set(["app.js", "__farm_runtime.js"]);
 
 // Stateful singleton pots. Re-running one of these re-initializes live state
-// (provider instances, stores, the desktop bridge, the Milkdown editor), so any
+// (provider instances, stores, the desktop bridge, the editor), so any
 // change that reaches them forces a full reload instead of a hot swap.
 const COLD_PREFIXES = [
   "stores-",
@@ -489,7 +489,7 @@ export function getChunkMap(
 
   // Non-editor controllers hot-swap individually, dialogs included. The editor
   // controller is excluded: swapping it re-runs its lifecycle (disconnect →
-  // new instance → ensureEditor → createEditor) on a container whose Milkdown
+  // new instance → ensureEditor → createEditor) on a container whose editor
   // DOM is still mounted, mounting a second .inb4doc div. Keeping it out of
   // the swap map preserves the live editor across SW activations. Re-enable
   // once EditorController.destroy() is safe to re-create.
@@ -514,7 +514,7 @@ function makeEnforceResources(
     // Stimulus + Eta + fflate are the only node_modules the eager shell needs
     // (fflate via utils/zip, used by shell_controller's export/load-as-zip).
     // Give them their own pot (all dependency-free leaves) so the node_imports
-    // pot — Milkdown / ProseKit / katex & friends — stays reachable ONLY via
+    // pot — ProseKit / katex & friends — stays reachable ONLY via
     // the lazy editor import and leaves the eager boot set (Part D thin shell).
     {
       name: "vendor",
