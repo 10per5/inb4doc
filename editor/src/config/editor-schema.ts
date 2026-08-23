@@ -107,6 +107,60 @@ export function createSchemaExtension(): Extension {
       toDOM: (node) => ["img", { ...node.attrs }],
     }),
 
+    // Table cells: replicate ProseKit's spec + an `alignment` attr so GFM
+    // column alignment (`| :---: |`) survives parse -> edit -> save. The
+    // upstream specs hardcode their attrs and take no options, so this is a
+    // full override mirroring prosemirror-tables' tableNodes() output.
+    ...(["tableCell", "tableHeaderCell"] as const).map((name) =>
+      defineNodeSpec({
+        name,
+        content: "block+",
+        tableRole: name === "tableCell" ? "cell" : "header_cell",
+        isolating: true,
+        attrs: {
+          colspan: { default: 1 },
+          rowspan: { default: 1 },
+          colwidth: { default: null },
+          alignment: { default: "left", validate: "string" },
+        },
+        parseDOM: [
+          {
+            tag: name === "tableCell" ? "td" : "th",
+            getAttrs: (dom: HTMLElement) => {
+              const widthsAttr = dom.getAttribute("data-colwidth");
+              const widths =
+                widthsAttr && /^\d+(,\d+)*$/.test(widthsAttr)
+                  ? widthsAttr.split(",").map((s) => Number(s))
+                  : null;
+              const colspan = Number(dom.getAttribute("colspan") || 1);
+              const align = dom.style?.textAlign;
+              return {
+                colspan,
+                rowspan: Number(dom.getAttribute("rowspan") || 1),
+                colwidth:
+                  widths && widths.length === colspan ? widths : null,
+                alignment:
+                  align === "center" || align === "right" ? align : "left",
+              };
+            },
+          },
+        ],
+        toDOM: (node) => {
+          const attrs: Record<string, string | number> = {};
+          if (node.attrs.colspan !== 1) attrs.colspan = node.attrs.colspan;
+          if (node.attrs.rowspan !== 1) attrs.rowspan = node.attrs.rowspan;
+          if (node.attrs.colwidth)
+            attrs["data-colwidth"] = (
+              node.attrs.colwidth as number[]
+            ).join(",");
+          const alignment = node.attrs.alignment || "left";
+          if (alignment !== "left")
+            attrs.style = `text-align: ${alignment};`;
+          return [name === "tableCell" ? "td" : "th", attrs, 0];
+        },
+      }),
+    ),
+
     // Link: keep title attribute (ProseKit default has target/rel instead)
     defineMarkSpec({
       name: "link",

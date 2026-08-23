@@ -348,9 +348,17 @@ function fixTaskListItems(schema: Schema, node: ProseNode): ProseNode | null {
   if (checked === null) return null;
 
   // Strip checkbox HTML from the paragraph content
-  const rest = fixed.filter(
+  let rest = fixed.filter(
     (c) => !(c.type.name === "html" && TASK_CHECKBOX.test(c.attrs.value)),
   );
+  // markdown-it-task-lists leaves the space after "] " in the text; drop it so
+  // serialization yields "- [ ] text", not "- [ ]  text".
+  if (rest[0]?.isText && /^ +/.test(rest[0].text ?? "")) {
+    const trimmed = rest[0].text!.replace(/^ +/, "");
+    rest = trimmed
+      ? [schema.text(trimmed, rest[0].marks), ...rest.slice(1)]
+      : rest.slice(1);
+  }
   const newPara = first.type.create(first.attrs, rest);
 
   // Rebuild children: replace first paragraph with fixed version
@@ -597,19 +605,28 @@ function renderFlatList(
 }
 
 function renderTable(state: MarkdownSerializerState, node: ProseNode) {
-  // Find the first row that contains any header cells
+  // Find the first row that contains any header cells. A table with no
+  // header cells at all (possible after deleting the header row in the
+  // editor) falls back to its first row — GFM has no headerless form, and
+  // returning early here would silently drop the whole table on save.
   let headerRow: ProseNode | null = null;
-  let headerRowIdx = -1;
+  let headerRowIdx = 0;
   node.forEach((row, _o, i) => {
     if (headerRow) return;
+    let hasHeader = false;
     row.forEach((cell) => {
-      if (cell.type.name === "tableHeaderCell" && !headerRow) {
-        headerRow = row;
-        headerRowIdx = i;
-      }
+      if (cell.type.name === "tableHeaderCell") hasHeader = true;
     });
+    if (hasHeader) {
+      headerRow = row;
+      headerRowIdx = i;
+    }
   });
 
+  if (!headerRow) {
+    headerRow = node.firstChild ?? null;
+    headerRowIdx = 0;
+  }
   if (!headerRow) return;
 
   const align: string[] = [];
@@ -633,18 +650,23 @@ function renderTable(state: MarkdownSerializerState, node: ProseNode) {
     return "| " + cells.join(" | ") + " |";
   };
 
-  state.write(renderRow(headerRow) + "\n");
+  // Emit the whole table as ONE block: header, separator, then every body
+  // row. A blank line anywhere inside would end the GFM table, so the old
+  // write()/closeBlock()-per-section approach corrupted tables on reload.
   const sep = align.map((a) =>
     a === "center" ? ":---:" : a === "right" ? "---:" : "---",
   );
-  state.write("| " + sep.join(" | ") + " |");
-  state.closeBlock(node);
-
-  // Body rows
+  const lines: string[] = [
+    renderRow(headerRow),
+    "| " + sep.join(" | ") + " |",
+  ];
   node.forEach((row, _o, i) => {
     if (i === headerRowIdx) return;
-    state.write("\n" + renderRow(row));
+    lines.push(renderRow(row));
   });
+
+  state.write(lines.join("\n"));
+  state.closeBlock(node);
 }
 
 export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
@@ -703,9 +725,11 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
           else if (anyState.inTightList) anyState.flushClose(1);
           const prevTight = anyState.inTightList;
           anyState.inTightList = true;
+          const prefix = `- [${checked ? "x" : " "}] `;
           node.forEach((child, _o, i) => {
             if (i) anyState.flushClose(1);
-            const prefix = `[${checked ? "x" : " "}] `;
+            // GFM task items need the list marker: "- [ ] text". A bare
+            // "[ ] text" line is not a task list and won't parse back.
             state.wrapBlock("  ", prefix, node, () =>
               state.render(child, node, i),
             );

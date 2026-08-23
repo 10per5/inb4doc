@@ -2,6 +2,7 @@ import { undo, redo } from "prosemirror-history"
 import { TextSelection, NodeSelection, Plugin, PluginKey, Selection } from "prosemirror-state"
 import { toggleMark, setBlockType, exitCode } from "prosemirror-commands"
 import { createToggleListCommand, createIndentListCommand } from "prosemirror-flat-list"
+import { addRow, goToNextCell, isInTable, selectedRect } from "prosemirror-tables"
 import { defineKeymap } from "@prosekit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { isInsideTableCell } from "@/plugins/editor-drag-drop"
@@ -156,6 +157,43 @@ function cutBlock(
   if (!empty) return false
   const pos = findBlockStart($from)
   if (pos === null || !dispatch || !_editorView) return false
+
+  const node = state.doc.nodeAt(pos)
+  if (!node) return false
+
+  // Tables must not go through the synthetic-DOM-selection path below: a
+  // browser Range cannot contain a <table> element whole, so selectNodeContents
+  // degrades to covering the cells' inline content and execCommand("cut")
+  // purges the cells while leaving an empty table shell. Serialize the slice
+  // with PM's own clipboard serializer and write the clipboard directly.
+  if (node.type.name === "table") {
+    const end = pos + node.nodeSize
+    const slice = state.doc.slice(pos, end)
+    const { dom, text } = (
+      _editorView as unknown as {
+        serializeForClipboard(slice: unknown): { dom: HTMLElement; text: string }
+      }
+    ).serializeForClipboard(slice)
+    try {
+      void navigator.clipboard
+        .write([
+          new ClipboardItem({
+            "text/html": new Blob([dom.innerHTML], { type: "text/html" }),
+            "text/plain": new Blob([text], { type: "text/plain" }),
+          }),
+        ])
+        .catch(() => {}) // clipboard denied — the deletion below still applies
+    } catch {
+      // ClipboardItem unavailable (older engines) — skip the copy, keep the cut.
+    }
+    const tr = state.tr.delete(pos, end)
+    if (tr.doc.childCount === 0) {
+      tr.insert(0, state.schema.nodes.paragraph.create())
+      tr.setSelection(TextSelection.near(tr.doc.resolve(0)))
+    }
+    dispatch(tr.scrollIntoView())
+    return true
+  }
 
   const tr = state.tr.setSelection(NodeSelection.create(state.doc, pos))
   dispatch(tr)
@@ -379,6 +417,138 @@ function enterCodeBlockVertically(
   return true
 }
 
+// Shift+Tab on the FIRST cell of a table has no previous cell to go to;
+// instead move the caret out of the table, to the block above it.
+function exitTableAbove(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from } = state.selection
+  let tableDepth = -1
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === "table") {
+      tableDepth = d
+      break
+    }
+  }
+  if (tableDepth === -1) return false
+  const edge = state.doc.resolve($from.before(tableDepth))
+  const prev = Selection.findFrom(edge, -1, true) // text-only position before the table
+  if (!prev || !(prev instanceof TextSelection)) return false
+  if (dispatch) dispatch(state.tr.setSelection(prev).scrollIntoView())
+  return true
+}
+
+// ── Ctrl+Numpad* / Ctrl+Numpad/ block cycling ────────────────────────
+// Kept off Tab/Shift+Tab so those stay pure indent/NBSP keys. Blocks and
+// table cells form one continuous cycle (see cycleBlockCommand).
+
+type BlockSpan = { name: string; leaf: boolean; start: number; end: number }
+
+function docBlockSpans(doc: any): BlockSpan[] {
+  const spans: BlockSpan[] = []
+  let pos = 0
+  doc.forEach((child: any) => {
+    spans.push({
+      name: child.type.name,
+      leaf: child.isLeaf,
+      start: pos,
+      end: pos + child.nodeSize,
+    })
+    pos += child.nodeSize
+  })
+  return spans
+}
+
+// A TextSelection inside the given block, biased to its END. Returns null
+// when the block offers no interior text position (empty/leaf blocks are
+// filtered out by the caller; the bounds check guards odd containers).
+function selectionAtSpanEnd(doc: any, span: BlockSpan): Selection | null {
+  const back = Selection.findFrom(doc.resolve(span.end), -1, true)
+  if (back && back.from >= span.start && back.to <= span.end) return back
+  const fwd = TextSelection.near(doc.resolve(span.start), 1)
+  return fwd.from >= span.start && fwd.to <= span.end ? fwd : null
+}
+
+// Entry point into a span biased by travel direction: forward enters at the
+// FIRST text position (table → first cell), backward at the LAST (→ last
+// cell). Bounds-checked so a scan past the span is rejected.
+function selectionAtSpanEntry(doc: any, span: BlockSpan, dir: -1 | 1): Selection | null {
+  const probe = doc.resolve(dir === 1 ? span.start : span.end)
+  const sel = Selection.findFrom(probe, dir, true)
+  if (sel && sel.from >= span.start && sel.to <= span.end) return sel
+  const near = TextSelection.near(probe, dir)
+  return near.from >= span.start && near.to <= span.end ? near : null
+}
+
+// Ctrl+Numpad* forward, Ctrl+Numpad/ backward. Blocks AND table cells are
+// one continuous cycle: moving toward a table enters its first (fwd) /
+// last (bwd) cell, further presses walk cell-by-cell (goToNextCell), and
+// leaving the far edge continues with the neighboring block. Past the
+// last block a new empty paragraph is appended below, mirroring the
+// table's last-cell add-row. Works from any caret position. The
+// keystroke is ALWAYS consumed, even when there is nowhere to go: the
+// unhandled browser/Qt fallback for Ctrl+/ is select-all (Qt WebEngine).
+function cycleBlockCommand(
+  dir: -1 | 1,
+): (state: any, dispatch: any) => boolean {
+  return (state, dispatch) => {
+    const { $from } = state.selection
+    if ($from.depth < 1) return true
+
+    // Already inside a table: exhaust cell navigation before hopping out.
+    let inTable = false
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === "table") {
+        inTable = true
+        break
+      }
+    }
+    if (inTable && goToNextCell(dir)(state, dispatch)) return true
+
+    const spans = docBlockSpans(state.doc)
+    // Inside a table this is the TABLE's index, so the neighbors found here
+    // are exactly the blocks surrounding it.
+    const idx = $from.index(0)
+
+    const pick = (): BlockSpan | null => {
+      for (let i = idx + dir; i >= 0 && i < spans.length; i += dir) {
+        if (!spans[i].leaf) return spans[i]
+      }
+      return null
+    }
+
+    const moveTo = (span: BlockSpan): boolean => {
+      const sel =
+        span.name === "table"
+          ? selectionAtSpanEntry(state.doc, span, dir)
+          : selectionAtSpanEnd(state.doc, span)
+      if (!sel) return false
+      dispatch(state.tr.setSelection(sel).scrollIntoView())
+      return true
+    }
+
+    if (dir === -1) {
+      const prev = pick()
+      if (prev) moveTo(prev)
+      return true
+    }
+
+    const next = pick()
+    if (next) {
+      moveTo(next)
+      return true
+    }
+    // Past the last block: append an empty paragraph below this one.
+    const tr = state.tr
+    const end = $from.after(1)
+    tr.insert(end, state.schema.nodes.paragraph.create())
+    tr.setSelection(TextSelection.near(tr.doc.resolve(end)))
+    if (dispatch) dispatch(tr.scrollIntoView())
+    return true
+  }
+}
+
 export function createKeymap() {
   return defineKeymap({
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
@@ -423,40 +593,72 @@ export function createKeymap() {
       }
       return true
     },
-    // Stock PM sinkListItem returns false when the item is the FIRST child of
-    // its parent list (startIndex == 0), so Tab indents when the item can sink
-    // and otherwise inserts 4 non-breaking spaces. The edit-toolbar increase
-    // button mirrors this: disabled when the item can't sink. This keymap runs
-    // before Milkdown's listItemKeymap, so Tab is taken.
+    // Tab: table cells navigate (last cell appends a row), code blocks
+    // indent lines, list items sink; everything else types 4 NBSPs.
+    // Block cycling deliberately lives on Mod-Numpad*/Mod-Numpad/.
     "Tab": (state, dispatch) => {
-      // Inside a cell, Tab must fall through to the gfm table keymap's
-      // next-cell navigation instead of being swallowed here.
-      if (isInsideTableCell(state.selection.$from)) return false
+      const { $from } = state.selection
+      // Nothing binds Tab for tables — not prosemirror-tables' tableEditing,
+      // not @prosekit/extensions (which is why prosekit.dev's demo doesn't do
+      // it either). Bind next-cell navigation here explicitly.
+      if (isInsideTableCell($from)) {
+        // Tab moves to the next cell; in the last cell of the table it appends
+        // a row below and focuses its first cell (standard editor behavior).
+        if (goToNextCell(1)(state, dispatch)) return true
+        if (!isInTable(state)) return false
+        if (dispatch) {
+          const rect = selectedRect(state)
+          const tr = addRow(state.tr, rect, rect.bottom)
+          let rowPos = rect.tableStart
+          for (let i = 0; i < rect.bottom; i++) {
+            rowPos += rect.table.child(i).nodeSize
+          }
+          tr.setSelection(TextSelection.near(tr.doc.resolve(rowPos + 1)))
+          dispatch(tr.scrollIntoView())
+        }
+        return true
+      }
       // Inside a code block, Tab indents the touched lines with real spaces.
-      if (isInsideCodeBlock(state.selection.$from)) {
+      if (isInsideCodeBlock($from)) {
         return codeIndent(state, dispatch, 1)
       }
       let itemDepth = -1
-      for (let d = state.selection.$from.depth; d > 0; d--) {
-        if (state.selection.$from.node(d).type.name === "list") {
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === "list") {
           itemDepth = d
           break
         }
       }
-      const canSink =
-        itemDepth !== -1 && state.selection.$from.index(itemDepth - 1) > 0
-      if (canSink) {
-        return createIndentListCommand()(state, dispatch)
+      if (itemDepth !== -1) {
+        // Stock PM sinkListItem returns false when the item is the FIRST child
+        // of its parent list (startIndex == 0), so Tab indents when the item can
+        // sink and otherwise inserts 4 non-breaking spaces. The edit-toolbar
+        // increase button mirrors this: disabled when the item can't sink. This
+        // keymap runs before Milkdown's listItemKeymap, so Tab is taken.
+        const canSink = $from.index(itemDepth - 1) > 0
+        if (canSink) {
+          return createIndentListCommand()(state, dispatch)
+        }
+        if (dispatch) dispatch(state.tr.insertText("\u00A0\u00A0\u00A0\u00A0"))
+        return true
       }
       if (dispatch) dispatch(state.tr.insertText("\u00A0\u00A0\u00A0\u00A0"))
       return true
     },
     "Shift-Tab": (state, dispatch) => {
-      if (isInsideCodeBlock(state.selection.$from)) {
+      const { $from } = state.selection
+      if (isInsideCodeBlock($from)) {
         return codeIndent(state, dispatch, -1)
+      }
+      if (isInsideTableCell($from)) {
+        if (goToNextCell(-1)(state, dispatch)) return true
+        return exitTableAbove(state, dispatch)
       }
       return false
     },
+    // Block cycling: Ctrl+Numpad* forward, Ctrl+Numpad/ backward.
+    "Mod-*": cycleBlockCommand(1),
+    "Mod-/": cycleBlockCommand(-1),
     "ArrowDown": (state, dispatch, view) =>
       enterCodeBlockVertically(state, dispatch, view, 1),
     "ArrowUp": (state, dispatch, view) =>
