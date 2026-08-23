@@ -28,7 +28,10 @@ import { initHugoRefClicks } from "@/plugins/hugo-ref";
 import { configureBlockEdit, block, slash } from "@/features/block-edit";
 import { createMathExtension, mathBlockPreviewView } from "@/plugins/math";
 import { defineCodeBlockShiki } from "@prosekit/extensions/code-block";
+import { defineTableCommands, defineTableDropIndicator } from "@prosekit/extensions/table";
 import { codeBlockUI } from "@/plugins/code-block-ui";
+import { setupTableHandleUI } from "@/plugins/table-handle-ui";
+import { setupBlockHandleUI } from "@/plugins/block-handle-ui";
 import { videoView } from "@/plugins/video";
 import { fixedTableBlockView } from "@/plugins/table-block-view";
 import { createDirtyPlugin } from "@/plugins/dirty";
@@ -115,6 +118,7 @@ export async function createEditor(
     createKeymap(),
     defineCodeBlockShiki(),
     createMathExtension(),
+    ...(isMobileDock() ? [] : [defineTableCommands(), defineTableDropIndicator()]),
 
     definePlugin([
       createPlainPastePlugin(),
@@ -174,6 +178,14 @@ export async function createEditor(
   // Post-mount: wire up behaviors that need the live EditorView
   initHugoRefClicks(prosekitEditor.view);
 
+  // Table row/column handles + prose block handle — desktop only
+  let disposeTableHandle: (() => void) | null = isMobileDock()
+    ? null
+    : setupTableHandleUI(prosekitEditor);
+  let disposeBlockHandle: (() => void) | null = isMobileDock()
+    ? null
+    : setupBlockHandleUI(prosekitEditor);
+
   // Wrap in an EditorInstance that provides .action() for backward compat
   const instance: EditorInstance = {
     get view() {
@@ -190,11 +202,23 @@ export async function createEditor(
     },
     mount() {
       prosekitEditor.mount(container);
+      disposeTableHandle?.();
+      disposeBlockHandle?.();
+      disposeTableHandle = isMobileDock() ? null : setupTableHandleUI(prosekitEditor);
+      disposeBlockHandle = isMobileDock() ? null : setupBlockHandleUI(prosekitEditor);
     },
     unmount() {
+      disposeTableHandle?.();
+      disposeTableHandle = null;
+      disposeBlockHandle?.();
+      disposeBlockHandle = null;
       prosekitEditor.unmount();
     },
     destroy() {
+      disposeTableHandle?.();
+      disposeTableHandle = null;
+      disposeBlockHandle?.();
+      disposeBlockHandle = null;
       prosekitEditor.unmount();
     },
   };

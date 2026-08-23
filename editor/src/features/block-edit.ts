@@ -531,7 +531,9 @@ export function configureBlockEdit() {
   const blockKey = "inb4doc-block";
   const slashKey = "inb4doc-slash";
 
-  if (!isMobileDock()) {
+  // Desktop uses the native @prosekit/web block handle (block-handle-ui.ts);
+  // this homegrown view stays registered for mobile/tablet builds only.
+  if (isMobileDock()) {
     blockViewFactories.set(blockKey, (v) => new BlockHandleView(v));
   }
 

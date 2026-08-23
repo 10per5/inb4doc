@@ -451,7 +451,7 @@ export function createEditorDragDropPlugin(config: EditorDragDropConfig = {}) {
         if (!target.closest(".ProseMirror-table-node")) return
         if (
           target.closest(
-            '.inb4doc-image-inline, .image-resize-handle, button, [data-role="col-drag-handle"], [data-role="row-drag-handle"]',
+            '.inb4doc-image-inline, .image-resize-handle, button, [data-role="col-drag-handle"], [data-role="row-drag-handle"], prosekit-block-handle-add, prosekit-block-handle-draggable',
           )
         )
           return
