@@ -57,15 +57,20 @@ export function setupBlockHandleUI(editor: Editor): () => void {
   let hovered: HoveredBlock | null = null;
   let menu: Menu | null = null;
   let menuMountEl: HTMLElement | null = null;
-  // Place the caret just below the hovered block so the shared insert flow
-  // (which resolves against the current selection) appends there.
+  // Insert an empty paragraph directly AFTER the hovered node and put the
+  // caret in it — never resolve a caret near/inside the hovered block (for
+  // tables etc. TextSelection.near escapes into the NEXT block). The shared
+  // insert flow treats a caret in an empty top-level paragraph as "transform
+  // in place", so the chosen block type appears exactly here.
   const selectBelowHovered = () => {
     if (!hovered) return;
     const view = editor.view;
     if (!view.hasFocus()) view.focus();
-    const insertPos = Math.min(hovered.pos + hovered.node.nodeSize, view.state.doc.content.size);
-    const tr = view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(insertPos)));
-    view.dispatch(tr);
+    const { state } = view;
+    const insertPos = Math.min(hovered.pos + hovered.node.nodeSize, state.doc.content.size);
+    const tr = state.tr.insert(insertPos, state.schema.nodes.paragraph.create());
+    tr.setSelection(TextSelection.near(tr.doc.resolve(insertPos + 1)));
+    view.dispatch(tr.scrollIntoView());
   };
 
   const wrapWithAnchor = (items: MenuItem[]): MenuItem[] =>
