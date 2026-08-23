@@ -136,6 +136,22 @@ function insertBlockBelow(
   return true
 }
 
+// Ctrl+Shift+Enter mirrors insertBlockBelow but inserts the empty paragraph
+// ABOVE the current block (same block unit: top-level node or list item).
+function insertBlockAbove(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from } = state.selection
+  const startPos = findBlockStart($from)
+  if (startPos === null) return false
+  const paragraph = state.schema.nodes.paragraph
+  const tr = state.tr.insert(startPos, paragraph.create())
+  tr.setSelection(TextSelection.near(tr.doc.resolve(startPos + 1)))
+  if (dispatch) dispatch(tr.scrollIntoView())
+  return true
+}
+
 // Ctrl+X with no selection → cut the whole current block (a bullet point cuts
 // the item, a paragraph cuts the paragraph). ProseMirror has no Mod-x binding —
 // the browser only cuts a real DOM selection — so we select the block as a
@@ -584,6 +600,10 @@ export function createKeymap() {
       // elsewhere it inserts an empty paragraph below the current block.
       if (isInsideCodeBlock(state.selection.$from)) return exitCode(state, dispatch)
       return insertBlockBelow(state, dispatch)
+    },
+    "Mod-Shift-Enter": (state, dispatch) => {
+      if (isInsideCodeBlock(state.selection.$from)) return exitCode(state, dispatch)
+      return insertBlockAbove(state, dispatch)
     },
     // A GFM table cell holds exactly one paragraph, so Enter can't split into a
     // second paragraph. The gfm preset binds plain Enter to `exitTable` (same as
