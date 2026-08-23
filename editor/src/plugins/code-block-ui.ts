@@ -1,9 +1,7 @@
 import { defineNodeView } from "@prosekit/core";
 import type { EditorView as PMEditorView } from "prosemirror-view";
 import type { Node } from "prosemirror-model";
-import { TextSelection } from "prosemirror-state";
 
-import { renderLatex } from "@/plugins/math";
 import { copy } from "@/eta/icons";
 
 // ---- Language registry ----
@@ -28,7 +26,6 @@ const LANGS: CodeLang[] = [
   { name: "YAML", alias: ["yml"], shikiId: "yaml" },
   { name: "TOML", alias: [], shikiId: "toml" },
   { name: "Markdown", alias: ["md"], shikiId: "markdown" },
-  { name: "LaTeX", alias: ["tex"], shikiId: "latex" },
   { name: "Rust", alias: ["rs"], shikiId: "rust" },
   { name: "Go", alias: ["golang"], shikiId: "go" },
   { name: "Java", alias: [], shikiId: "java" },
@@ -89,9 +86,15 @@ for (const lang of LANGS) {
   }
 }
 
+const shikiIdToName = new Map<string, string>();
+for (const lang of LANGS) {
+  shikiIdToName.set(lang.shikiId, lang.name);
+}
+
 function resolveLang(value: string): string {
   if (!value) return "";
-  return aliasToName.get(value.toLowerCase()) ?? value;
+  const lower = value.toLowerCase();
+  return aliasToName.get(lower) ?? shikiIdToName.get(lower) ?? value;
 }
 
 const nameToShikiId = new Map<string, string>();
@@ -104,59 +107,40 @@ export function toShikiId(canonical: string): string {
   return nameToShikiId.get(canonical) ?? canonical.toLowerCase();
 }
 
-// ---- Language picker ----
+// ---- Language picker (native select, per prosekit example) ----
+//
+// A native <select> needs no focus juggling, no positioning and no custom
+// keyboard handling — the browser owns all of it. Unknown languages stored
+// in markdown get a dynamic option so the select never lies about the value.
 
-class LanguagePicker {
-  dom: HTMLElement;
-  private input: HTMLInputElement;
-  private list: HTMLElement;
+class LanguageSelect {
+  dom: HTMLSelectElement;
   private currentValue = "";
-  private open = false;
   private onChange: (value: string) => void;
-
-  private displayOf(canonical: string): string {
-    const found = allLangs.find((l) => l.canonical === canonical);
-    return found?.display ?? canonical;
-  }
 
   constructor(onChange: (value: string) => void) {
     this.onChange = onChange;
 
-    this.dom = document.createElement("div");
-    this.dom.className = "code-block-lang-picker";
+    this.dom = document.createElement("select");
+    this.dom.className = "code-block-lang-select";
+    this.dom.setAttribute("aria-label", "Code block language");
+    this.dom.spellcheck = false;
 
-    this.input = document.createElement("input");
-    this.input.className = "code-block-lang-input";
-    this.input.placeholder = "Language…";
-    this.input.spellcheck = false;
-    this.input.addEventListener("focus", () => this.show());
-    this.input.addEventListener("input", () => {
-      this.filter(this.input.value);
-      if (!this.open) this.show();
-    });
-    // Keep PM's keymap away from picker keys; the input owns them.
-    this.input.addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      this.onKeydown(e);
-    });
-    this.input.addEventListener("blur", () => {
-      setTimeout(() => this.hide(), 150);
-    });
-    this.input.addEventListener("mousedown", (e) => e.stopPropagation());
-    this.input.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (this.open) this.hide();
-      else this.show();
-    });
+    const plain = document.createElement("option");
+    plain.value = "";
+    plain.textContent = "Plain Text";
+    this.dom.appendChild(plain);
+    for (const lang of allLangs) {
+      const opt = document.createElement("option");
+      opt.value = lang.canonical;
+      opt.textContent = lang.display;
+      this.dom.appendChild(opt);
+    }
 
-    this.list = document.createElement("div");
-    this.list.className = "code-block-lang-list";
-    this.list.addEventListener("mousedown", (e) => e.stopPropagation());
-
-    this.dom.appendChild(this.input);
-    this.dom.appendChild(this.list);
-
-    this.renderList("");
+    this.dom.addEventListener("change", () => {
+      this.currentValue = this.dom.value;
+      this.onChange(toShikiId(this.dom.value));
+    });
   }
 
   get value(): string {
@@ -165,114 +149,13 @@ class LanguagePicker {
 
   set value(v: string) {
     this.currentValue = v;
-    this.input.value = this.displayOf(v);
-  }
-
-  focusInput(): void {
-    this.input.focus();
-  }
-
-  private show() {
-    this.open = true;
-    this.list.classList.add("visible");
-    this.positionList();
-    this.filter(this.input.value);
-    window.addEventListener("scroll", this.positionList, true);
-    window.addEventListener("resize", this.positionList);
-  }
-
-  private hide() {
-    this.open = false;
-    this.list.classList.remove("visible");
-    window.removeEventListener("scroll", this.positionList, true);
-    window.removeEventListener("resize", this.positionList);
-  }
-
-  private positionList = () => {
-    const rect = this.input.getBoundingClientRect();
-    this.list.style.position = "fixed";
-    this.list.style.left = rect.left + "px";
-    this.list.style.top = rect.bottom + 4 + "px";
-    this.list.style.minWidth = Math.max(rect.width, 160) + "px";
-  };
-
-  private filter(query: string) {
-    this.renderList(query);
-  }
-
-  private renderList(query: string) {
-    const q = query.toLowerCase().trim();
-    let items: DisplayLang[] = allLangs;
-    if (q) {
-      items = allLangs.filter(
-        (l) =>
-          l.display.toLowerCase().includes(q) ||
-          l.canonical.toLowerCase().includes(q) ||
-          l.alias.some((a) => a.toLowerCase().includes(q)),
-      );
+    if (v && ![...this.dom.options].some((o) => o.value === v)) {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      this.dom.appendChild(opt);
     }
-    this.list.innerHTML = items
-      .map(
-        (l) =>
-          `<div class="code-block-lang-item${
-            l.canonical === this.currentValue ? " selected" : ""
-          }" data-lang="${l.canonical}">${l.display}${
-            l.alias.length
-              ? ' <span class="code-block-lang-alias">' +
-                l.alias.slice(0, 4).join(", ") +
-                "</span>"
-              : ""
-          }</div>`,
-      )
-      .join("");
-    for (const item of this.list.children) {
-      item.addEventListener("mousedown", (e) => e.preventDefault());
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const lang = (e.currentTarget as HTMLElement).dataset.lang!;
-        this.select(lang);
-      });
-    }
-  }
-
-  private select(name: string) {
-    this.currentValue = name;
-    this.input.value = this.displayOf(name);
-    this.hide();
-    this.onChange(name);
-  }
-
-  private onKeydown(e: KeyboardEvent) {
-    const items = this.list.querySelectorAll(".code-block-lang-item");
-    const focused = this.list.querySelector(".focused") as HTMLElement | null;
-    let idx = focused ? Array.from(items).indexOf(focused) : -1;
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        idx = Math.min(idx + 1, items.length - 1);
-        items[idx]?.classList.add("focused");
-        items[idx]?.scrollIntoView({ block: "nearest" });
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        idx = Math.max(idx - 1, 0);
-        items[idx]?.classList.add("focused");
-        items[idx]?.scrollIntoView({ block: "nearest" });
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (focused) {
-          const lang = focused.dataset.lang!;
-          this.select(lang);
-        }
-        break;
-      case "Escape":
-        e.preventDefault();
-        this.hide();
-        this.input.blur();
-        break;
-    }
+    this.dom.value = v;
   }
 }
 
@@ -281,8 +164,8 @@ class LanguagePicker {
 // The code block content is ordinary editable ProseMirror text living in
 // `contentDOM` (a <pre>). Arrow-key entry/exit across block boundaries is
 // native PM behavior — no nested editor, no selection syncing. The node view
-// only provides chrome: line-number gutter, language picker, copy button and
-// the LaTeX preview panel.
+// only provides chrome: line-number gutter, language picker and copy button.
+// (Block math is a dedicated `mathBlock` node — see src/plugins/math.ts.)
 
 class CodeBlockView {
   dom: HTMLElement;
@@ -293,9 +176,8 @@ class CodeBlockView {
   private getPos: () => number | undefined;
   private gutter: HTMLElement;
   private overlay: HTMLElement;
-  private langPicker: LanguagePicker;
+  private langSelect: LanguageSelect;
   private copyBtn: HTMLElement;
-  private previewPanel: HTMLElement;
   private languageName = "";
   private lineCount = -1;
 
@@ -319,17 +201,12 @@ class CodeBlockView {
     this.contentDOM.className = "code-block-content";
     this.contentDOM.spellcheck = false;
 
-    this.previewPanel = document.createElement("div");
-    this.previewPanel.className = "code-block-preview";
-
     this.overlay = document.createElement("div");
     this.overlay.className = "code-block-overlay";
+    this.overlay.setAttribute("contenteditable", "false");
 
-    this.langPicker = new LanguagePicker((name) => {
-      this.setLanguage(name);
-      this.focusContent();
-    });
-    this.langPicker.value = resolveLang(node.attrs.language ?? "");
+    this.langSelect = new LanguageSelect((name) => this.setLanguage(name));
+    this.langSelect.value = resolveLang(node.attrs.language ?? "");
 
     this.copyBtn = document.createElement("button");
     (this.copyBtn as HTMLButtonElement).type = "button";
@@ -343,16 +220,14 @@ class CodeBlockView {
     });
     this.copyBtn.tabIndex = -1;
 
-    this.overlay.appendChild(this.langPicker.dom);
+    this.overlay.appendChild(this.langSelect.dom);
     this.overlay.appendChild(this.copyBtn);
 
     this.dom.appendChild(this.gutter);
     this.dom.appendChild(this.contentDOM);
-    this.dom.appendChild(this.previewPanel);
     this.dom.appendChild(this.overlay);
 
     this.languageName = resolveLang(node.attrs.language ?? "");
-    this.refreshPreview();
     this.updateGutter();
   }
 
@@ -373,29 +248,6 @@ class CodeBlockView {
     this.gutter.replaceChildren(frag);
   }
 
-  private refreshPreview() {
-    const isLatex = this.languageName === "LaTeX";
-    this.dom.classList.toggle("latex", isLatex);
-    if (isLatex) {
-      this.previewPanel.innerHTML = renderLatex(this.node.textContent, true);
-      this.previewPanel.style.display = "block";
-    } else {
-      this.previewPanel.style.display = "none";
-    }
-  }
-
-  /** Place the PM caret at the end of this block's content and focus it. */
-  private focusContent() {
-    const pos = this.getPos();
-    if (typeof pos !== "number") return;
-    const $pos = this.pmView.state.doc.resolve(pos + this.node.nodeSize - 1);
-    const selection = TextSelection.near($pos, -1);
-    this.pmView.dispatch(
-      this.pmView.state.tr.setSelection(selection).scrollIntoView(),
-    );
-    this.pmView.focus();
-  }
-
   // ---- PM NodeView API ----
 
   update(node: Node) {
@@ -405,8 +257,7 @@ class CodeBlockView {
     const canonical = resolveLang(node.attrs.language ?? "");
     if (canonical !== this.languageName) {
       this.languageName = canonical;
-      this.langPicker.value = canonical;
-      this.refreshPreview();
+      this.langSelect.value = canonical;
     }
     this.updateGutter();
     return true;
@@ -420,6 +271,24 @@ class CodeBlockView {
   deselectNode() {
     this.dom.classList.remove("selected");
     this.overlay.classList.remove("visible");
+  }
+
+  // Chrome (gutter, language picker, copy button) must not
+  // leak events into ProseMirror: a bubbled mousedown from the picker list
+  // makes PM resolve a doc position under the cursor, steal focus from the
+  // picker input (blur → hide) and cancel the pick. Events targeting the
+  // editable contentDOM stay native.
+  stopEvent(event: Event): boolean {
+    const target = event.target as Element | null;
+    return !(target && this.contentDOM.contains(target));
+  }
+
+  ignoreMutation(mutation: {
+    type: string;
+    target: EventTarget | null;
+  }): boolean {
+    const target = mutation.target as Element | null;
+    return !target || !this.contentDOM.contains(target);
   }
 
   destroy() {}

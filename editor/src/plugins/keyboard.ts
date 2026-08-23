@@ -145,6 +145,10 @@ function insertBlockBelow(
 // fidelity. With a real selection the native path is left untouched.
 let _editorView: import("prosemirror-view").EditorView | null = null
 
+// Blocks whose node views render chrome around their editable content —
+// cut via PM's clipboard serializer, never the synthetic DOM selection.
+const CHROME_BLOCK_CUT_TYPES = new Set(["table", "codeBlock", "mathBlock"])
+
 export function setEditorView(view: import("prosemirror-view").EditorView) {
   _editorView = view
 }
@@ -161,12 +165,15 @@ function cutBlock(
   const node = state.doc.nodeAt(pos)
   if (!node) return false
 
-  // Tables must not go through the synthetic-DOM-selection path below: a
-  // browser Range cannot contain a <table> element whole, so selectNodeContents
-  // degrades to covering the cells' inline content and execCommand("cut")
-  // purges the cells while leaving an empty table shell. Serialize the slice
-  // with PM's own clipboard serializer and write the clipboard directly.
-  if (node.type.name === "table") {
+  // Blocks rendered by node views that carry non-editable chrome (a table's
+  // cells, the code block's gutter/picker, the math block's KaTeX preview)
+  // must not go through the synthetic-DOM-selection path below. Two failure
+  // modes: a browser Range cannot contain a <table> element whole, and PM's
+  // own cut handler refuses to run inside `spec.code` nodes (mathBlock,
+  // codeBlock) — so the browser natively cuts the raw DOM range including
+  // the view chrome, shredding it. Serialize the slice with PM's own
+  // clipboard serializer and write the clipboard directly instead.
+  if (CHROME_BLOCK_CUT_TYPES.has(node.type.name)) {
     const end = pos + node.nodeSize
     const slice = state.doc.slice(pos, end)
     const { dom, text } = (

@@ -66,6 +66,49 @@ function mathInlineRule(md: MarkdownIt) {
   });
 }
 
+/** `$$...$$` block math tokenizer (mirrors remark-math's block rule). */
+function mathBlockRule(md: MarkdownIt) {
+  md.block.ruler.before(
+    "fence",
+    "math_block",
+    (state: any, startLine: number, endLine: number, silent: boolean) => {
+      const startPos = state.bMarks[startLine] + state.tShift[startLine];
+      const maxPos = state.eMarks[startLine];
+      const openLine = state.src.slice(startPos, maxPos);
+      // Single-line form: $$ E=mc^2 $$
+      const oneLine = openLine.match(/^\$\$(.*?)(?<!\\)\$\$\s*$/);
+      if (!oneLine && !/^\$\$\s*$/.test(openLine)) return false;
+      if (silent) return true;
+
+      let content = "";
+      let closeLine = startLine;
+      if (oneLine) {
+        content = oneLine[1] ?? "";
+      } else {
+        let found = false;
+        for (let line = startLine + 1; line < endLine; line++) {
+          const s = state.bMarks[line] + state.tShift[line];
+          const e = state.eMarks[line];
+          const text = state.src.slice(s, e);
+          if (/^\$\$\s*$/.test(text)) {
+            found = true;
+            closeLine = line;
+            break;
+          }
+          content += (content ? "\n" : "") + text;
+        }
+        if (!found) return false;
+      }
+
+      const token = state.push("math_block", "math", 0);
+      token.content = content;
+      token.markup = "$$";
+      state.line = closeLine + 1;
+      return true;
+    },
+  );
+}
+
 function noOp() {}
 
 // --- parser -----------------------------------------------------------------
@@ -74,6 +117,7 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
   const md = MarkdownIt("default", { html: true, linkify: true });
   md.use(taskLists);
   mathInlineRule(md);
+  mathBlockRule(md);
 
   const tokens: Record<string, any> = {
     blockquote: { block: "blockquote" },
@@ -119,10 +163,8 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
       }),
     },
     code_inline: { mark: "code", noCloseToken: true },
-    math_inline: {
-      node: "math_inline",
-      getAttrs: (tok: any) => ({ value: tok.content }),
-    },
+    math_inline: { ignore: true },
+    math_block: { ignore: true },
 
     // Raw HTML -> `html` atom node (inline); block-level html tokens get
     // wrapped in a paragraph so the inline atom can be placed.
@@ -158,7 +200,36 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
   const TB = schema.nodes.table;
 
   const handlers = (parser as any).tokenHandlers;
+
+  // Math nodes hold their TeX source as plain text content (official
+  // prosemirror-math specs), so the token-content → text-node mapping is
+  // done with custom handlers.
+  const openMathBlock = (state: any, tok: any) => {
+    state.openNode(schema.nodes.mathBlock);
+    if (tok.content) state.addText(String(tok.content));
+    state.closeNode();
+  };
+  const fenceHandler = (state: any, tok: any) => {
+    const info = String(tok.info || "").trim();
+    const canon = info.toLowerCase();
+    if (canon === "math" || canon === "latex" || canon === "tex") {
+      openMathBlock(state, tok);
+      return;
+    }
+    state.openNode(schema.nodes.codeBlock, { language: info });
+    const text = String(tok.content).replace(/\n$/, "");
+    if (text) state.addText(text);
+    state.closeNode();
+  };
+
   Object.assign(handlers, {
+    math_inline(state: any, tok: any) {
+      state.openNode(schema.nodes.mathInline);
+      if (tok.content) state.addText(String(tok.content));
+      state.closeNode();
+    },
+    math_block: openMathBlock,
+    fence: fenceHandler,
     table_open(state: any) {
       state.openNode(TB);
     },
@@ -676,14 +747,7 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         state.wrapBlock("> ", null, node, () => state.renderContent(node));
       },
       codeBlock(state, node) {
-        const language = String(node.attrs.language || "").toLowerCase();
-        if (language === "latex") {
-          state.write("$$\n");
-          state.text(node.textContent, false);
-          state.write("\n$$");
-          state.closeBlock(node);
-          return;
-        }
+        const language = String(node.attrs.language || "");
         const backticks = node.textContent.match(/`{3,}/gm);
         const fence = backticks
           ? backticks.sort().slice(-1)[0] + "`"
@@ -825,8 +889,14 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         );
         state.closeBlock(node);
       },
-      math_inline(state, node) {
-        state.write("$" + node.attrs.value + "$");
+      mathInline(state, node) {
+        state.write("$" + node.textContent + "$");
+      },
+      mathBlock(state, node) {
+        state.write("$$\n");
+        state.text(node.textContent, false);
+        state.write("\n$$");
+        state.closeBlock(node);
       },
       html(state, node) {
         state.write(node.attrs.value);

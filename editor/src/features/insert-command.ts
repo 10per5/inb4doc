@@ -206,14 +206,12 @@ function convertToCodeBlock(view: EditorView): void {
 function convertToMathBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { $from } = state.selection;
-  const codeBlock = state.schema.nodes.codeBlock.create({
-    language: "LaTeX",
-  });
+  const mathBlock = state.schema.nodes.mathBlock.create();
   const pos = $from.before($from.depth);
   const tr = state.tr.replaceWith(
     pos,
     pos + $from.node($from.depth).nodeSize,
-    codeBlock,
+    mathBlock,
   );
   dispatch(
     tr

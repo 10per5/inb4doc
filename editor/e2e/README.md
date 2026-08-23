@@ -115,6 +115,44 @@ Classes:
   `matchingRules(sel, props)` walks every stylesheet and returns the rules
   whose selector matches, optionally filtered to declared properties.
 
+## Reaching the live PM view & node-view DOM architecture
+
+Learned while debugging the code-block language picker (Aug 2026):
+
+- **`.ProseMirror`'s own `pmViewDesc` will NOT get you the `EditorView`.**
+  The root element's desc is the doc's `NodeViewDesc`; walking `.parent`
+  still terminates on a `NodeViewDesc` that has no `.view` property
+  (verified at runtime). Don't burn time on the parent walk.
+- **Working route: any custom node-view element.** With constructor-style
+  registration (`@prosekit/core` `defineNodeView`), PM stores the instance as
+  the desc's `spec`, and our node-view classes keep their own view ref:
+
+  ```ts
+  const view = document
+    .querySelector(".code-block-wrapper")!
+    .pmViewDesc!.spec.pmView; // CodeBlockView instance → .pmView
+  ```
+
+  Same pattern works for any node view class that stores the view (image,
+  video, table). This gives you `view.dispatch`, `view.state`, etc. from
+  plain `page.evaluate`.
+- **Element churn masquerades as selector failure.** If locators time out
+  "waiting for" an element you can plainly see, suspect the element is being
+  destroyed/recreated continuously: tag it (`el.dataset.tag = "x"`), then
+  snapshot `querySelectorAll` every ~250 ms — fresh untagged elements each
+  snapshot ⇒ something is rebuilding the node views. `DomTimeline` (stable
+  per-element ids) or a body-wide MutationObserver records precise timing;
+  hooking `view.dispatch`/`updateState` via the route above names the driver.
+- **Playwright actionability vs. PM overlays:** `opacity: 0` still counts as
+  visible, but `pointer-events: none` fails the "receives events" check, so
+  `locator.click/hover` on chrome inside a hidden overlay stalls. Probe with
+  `force: true` or dispatch synthetic events inside `evaluate` instead —
+  and remember a real click first requires the overlay visible (focus /
+  hover state), which is exactly what the bug usually is.
+- **`EditorSession.open` default wait selector is stale**
+  (`.milkdown-table-block`, Milkdown era) — always pass
+  `{ waitFor: ".ProseMirror" }` unless you actually test tables.
+
 ## Salt vs. meat — pick the cheaper check first
 
 Reproducing a runtime behavior in a browser is **salt**: one Playwright run

@@ -1,4 +1,8 @@
-span[data-type="math_inline"] {
+/* Official prosemirror-math DOM: span.prosemirror-math-inline > code,
+   div.prosemirror-math-block > pre > code. The node views show the TeX
+   source when the cursor is inside and the KaTeX render otherwise. */
+
+.prosemirror-math-inline {
   display: inline-block;
   vertical-align: middle;
   padding: 0 2px;
@@ -7,10 +11,67 @@ span[data-type="math_inline"] {
   transition: background 0.15s;
 }
 
-span[data-type="math_inline"]:hover {
+.prosemirror-math-inline:hover {
   background: rgba(0, 0, 0, 0.05);
 }
 
-span[data-type="math_inline"] .katex {
+.prosemirror-math-inline .katex {
   font-size: 1.05em;
+}
+
+.prosemirror-math-block {
+  margin: 0.75em 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.04);
+  overflow-x: auto;
+}
+
+.prosemirror-math-block pre,
+.prosemirror-math-block code {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85rem;
+  white-space: pre;
+}
+
+.prosemirror-math-block .katex-display {
+  margin: 0.25em 0;
+}
+
+/* Custom mathBlock view: editable TeX source on top, persistent live
+   KaTeX preview below. */
+.math-block-wrapper {
+  margin: 0.75em 0;
+}
+
+.math-block-src {
+  margin: 0;
+  padding: 8px 12px 6px;
+  border-radius: 4px 4px 0 0;
+  background: rgba(0, 0, 0, 0.04);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  outline: none;
+}
+
+.math-block-preview {
+  padding: 10px 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0 0 4px 4px;
+  background: rgba(0, 0, 0, 0.04);
+  overflow-x: auto;
+}
+
+.math-block-preview .katex-display {
+  margin: 0;
+}
+
+.math-block-preview:empty {
+  display: none;
 }

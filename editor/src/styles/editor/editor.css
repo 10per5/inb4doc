@@ -222,14 +222,6 @@
   background: rgba(136, 192, 208, 0.3);
 }
 
-.code-block-wrapper.latex .code-block-gutter {
-  display: none;
-}
-
-.code-block-wrapper.latex .code-block-content {
-  margin-left: 0;
-}
-
 .code-block-overlay {
   position: absolute;
   top: 6px;
@@ -248,88 +240,39 @@
   pointer-events: auto;
 }
 
+/* While a chrome control inside the overlay has focus, keep the whole
+   overlay opaque and clickable. */
+.code-block-overlay:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .code-block-wrapper:hover .code-block-overlay {
   opacity: 1;
   pointer-events: auto;
 }
 
-.code-block-lang-picker {
-  position: relative;
-}
-
-.code-block-lang-input {
+.code-block-lang-select {
   background: rgba(40, 44, 52, 0.85);
   border: 1px solid #4c566a;
   border-radius: 4px;
   color: #d8dee9;
   font-size: 0.72rem;
   font-family: inherit;
-  padding: 2px 6px;
-  width: 90px;
+  padding: 2px 4px;
+  max-width: 150px;
+  cursor: pointer;
   outline: none;
   box-sizing: border-box;
 }
 
-.code-block-lang-input::placeholder {
-  color: #616e88;
-}
-
-.code-block-lang-input:focus {
+.code-block-lang-select:focus {
   border-color: #81a1c1;
 }
 
-.code-block-lang-list {
-  display: none;
-  max-height: 240px;
-  overflow-y: auto;
+.code-block-lang-select option {
   background: #2e3440;
-  border: 1px solid #4c566a;
-  border-radius: 4px;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.code-block-lang-list.visible {
-  display: block;
-}
-
-.code-block-lang-item {
-  padding: 3px 8px;
-  cursor: pointer;
-  font-size: 0.75rem;
   color: #d8dee9;
-}
-
-.code-block-lang-item:hover,
-.code-block-lang-item.focused {
-  background: #3b4252;
-}
-
-.code-block-lang-item.selected {
-  color: #88c0d0;
-  font-weight: 600;
-}
-
-.code-block-lang-alias {
-  color: #616e88;
-  font-size: 0.65rem;
-}
-
-.code-block-preview {
-  display: none;
-  padding: 14px 16px;
-  overflow-x: auto;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: #d8dee9;
-}
-
-.code-block-preview .katex-display {
-  margin: 0.5em 0;
-}
-
-.code-block-wrapper.latex .code-block-preview {
-  border-top: 1px solid #3b4252;
 }
 
 .code-block-copy-btn {

@@ -8,7 +8,6 @@
 
 import { createEditor as prosekitCreateEditor, definePlugin, union } from "@prosekit/core";
 import type { Extension } from "@prosekit/core";
-import { defineCodeBlockShiki } from "@prosekit/extensions/code-block";
 import type { EditorView } from "prosemirror-view";
 import type { Schema } from "prosemirror-model";
 
@@ -27,7 +26,8 @@ import { createInlineCodeInputPlugin } from "@/plugins/inline-code-input";
 import { shortcodeDecoration } from "@/plugins/shortcode";
 import { initHugoRefClicks } from "@/plugins/hugo-ref";
 import { configureBlockEdit, block, slash } from "@/features/block-edit";
-import { mathInlineInputRule, mathBlockInputRule } from "@/plugins/math";
+import { createMathExtension, mathBlockPreviewView } from "@/plugins/math";
+import { defineCodeBlockShiki } from "@prosekit/extensions/code-block";
 import { codeBlockUI } from "@/plugins/code-block-ui";
 import { videoView } from "@/plugins/video";
 import { fixedTableBlockView } from "@/plugins/table-block-view";
@@ -114,6 +114,7 @@ export async function createEditor(
     createSchemaExtension(),
     createKeymap(),
     defineCodeBlockShiki(),
+    createMathExtension(),
 
     definePlugin([
       createPlainPastePlugin(),
@@ -143,14 +144,13 @@ export async function createEditor(
       block,
       slash,
       shortcodeDecoration,
-      mathInlineInputRule,
-      mathBlockInputRule,
     ]),
 
     fixedTableBlockView,
     createImageResizeView(pdURL),
     createImageInlineResizeView(pdURL),
     codeBlockUI,
+    mathBlockPreviewView,
     videoView,
   ];
 

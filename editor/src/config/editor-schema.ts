@@ -12,7 +12,6 @@ import { defineBasicExtension } from "@prosekit/basic";
  */
 
 const IMAGE_DATA_TYPE = "image-block";
-const MATH_INLINE_ID = "math_inline";
 
 export const ALERT_TYPES = [
   "note",
@@ -269,32 +268,6 @@ export function createSchemaExtension(): Extension {
         { "data-type": "html", "data-value": node.attrs.value },
         node.attrs.value,
       ],
-    }),
-
-    defineNodeSpec({
-      name: MATH_INLINE_ID,
-      group: "inline",
-      inline: true,
-      draggable: true,
-      atom: true,
-      attrs: {
-        value: { default: "" },
-      },
-      parseDOM: [
-        {
-          tag: `span[data-type="${MATH_INLINE_ID}"]`,
-          getAttrs: (dom: HTMLElement) => ({
-            value: dom.dataset.value ?? "",
-          }),
-        },
-      ],
-      toDOM: (node) => {
-        const dom = document.createElement("span");
-        dom.dataset.type = MATH_INLINE_ID;
-        dom.dataset.value = node.attrs.value;
-        dom.textContent = node.attrs.value;
-        return dom;
-      },
     }),
 
     defineNodeSpec({
