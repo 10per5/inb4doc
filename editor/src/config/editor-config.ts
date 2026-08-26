@@ -28,6 +28,7 @@ import { initHugoRefClicks } from "@/plugins/hugo-ref";
 import { configureBlockEdit, block, slash } from "@/features/block-edit";
 import { createMathExtension, mathBlockPreviewView } from "@/plugins/math";
 import { codeBlockHighlight } from "@/plugins/code-highlight";
+import { createLinkAutolinkExtensions } from "@/plugins/link-autolink";
 import { defineTableCommands, defineTableDropIndicator } from "@prosekit/extensions/table";
 import { codeBlockUI } from "@/plugins/code-block-ui";
 import { setupTableHandleUI } from "@/plugins/table-handle-ui";
@@ -117,6 +118,7 @@ export async function createEditor(
     createSchemaExtension(),
     createKeymap(),
     codeBlockHighlight,
+    ...createLinkAutolinkExtensions(),
     createMathExtension(),
     ...(isMobileDock() ? [] : [defineTableCommands(), defineTableDropIndicator()]),
 

@@ -151,8 +151,12 @@ bun --bun tsc --noEmit # TypeScript check
 
 ## Supported Formatting in WYSIWYG
 
-- **CommonMark** — via `@prosekit/basic` (includes commonmark extension)
-- **GFM** — via `@prosekit/extensions` (tables, strikethrough, task lists, auto-links)
+- **CommonMark** — via `@prosekit/basic`
+- **GFM** — via `@prosekit/extensions` (tables, strikethrough, task lists)
+- **Autolinks — scheme-only, two layers** (upstream fuzzy autolinking is deliberately disabled):
+  - Parse-time: markdown-it runs with `linkify` OFF (`editor-markdown.ts`). Upstream linkify treats bare `name.tld` as a domain (`.md` is Moldova's ccTLD → "AGENTS.md" became a link).
+  - Editor-time: `src/plugins/link-autolink.ts` adds scheme-strict rules: URL + space (input rule, re-inserts the space itself — matching a rule skips PM's default insertion), URL + Enter (enter rule), and pasted URLs.
+  - Gotcha: `@prosekit/basic`'s `defineBasicExtension()` unions `defineLink()`, which silently includes ProseKit's fuzzy autolink rules despite its `.d.ts` type claiming spec+commands only. The app therefore uses `src/config/prosekit-basic.ts` — same composition, link contributes spec+commands only. Don't switch back to `defineBasicExtension()` without re-checking typing behavior of bare domains.
 - **Markdown alerts** (`> [!NOTE]`, `> [!WARNING]`, etc.) — custom `$remark` + `$nodeSchema` in `src/plugins/alert.ts`
   - Transforms MDAST blockquote nodes with `[!TYPE]` prefix into custom `alert` nodes
   - Renders as `<blockquote class="book-hint TYPE">` in the editor

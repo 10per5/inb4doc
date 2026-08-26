@@ -1,6 +1,6 @@
 import { defineNodeSpec, defineMarkSpec, union } from "@prosekit/core";
 import type { Extension } from "@prosekit/core";
-import { defineBasicExtension } from "@prosekit/basic";
+import { defineBasicExtension } from "@/config/prosekit-basic";
 
 /**
  * ProseKit schema for the inb4doc editor.

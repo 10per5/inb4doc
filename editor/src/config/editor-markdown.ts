@@ -15,8 +15,9 @@ import type { EditorInstance } from "./editor-config";
 /**
  * Markdown <-> ProseKit bridge.
  *
- * Parsing uses markdown-it (native GFM tables + strikethrough, linkify
- * autolinks, markdown-it-task-lists) via prosemirror-markdown's token
+  * Parsing uses markdown-it (native GFM tables + strikethrough, no linkify —
+  * autolinks are editor-level, see src/plugins/link-autolink.ts,
+  * markdown-it-task-lists) via prosemirror-markdown's token
  * handlers, plus a post-parse doc fixup that rebuilds the app's custom
  * nodes (video, div-center, alert, hugoRef, math, image-block, task
  * checkboxes). Serialization uses a MarkdownSerializer covering the same
@@ -115,7 +116,11 @@ function noOp() {}
 // --- parser -----------------------------------------------------------------
 
 export function createMarkdownParser(schema: Schema): MarkdownParser {
-  const md = MarkdownIt("default", { html: true, linkify: true });
+  // No parse-time linkify: autolinking happens at the editor level
+  // (src/plugins/link-autolink.ts). Parse-time linkify turned bare
+  // filenames like "AGENTS.md" into http://agents.md links (.md is a
+  // real ccTLD) and silently mutated loaded file semantics.
+  const md = MarkdownIt("default", { html: true });
   md.use(taskLists);
   mathInlineRule(md);
   mathBlockRule(md);
