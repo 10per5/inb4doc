@@ -27,7 +27,7 @@ import { shortcodeDecoration } from "@/plugins/shortcode";
 import { initHugoRefClicks } from "@/plugins/hugo-ref";
 import { configureBlockEdit, block, slash } from "@/features/block-edit";
 import { createMathExtension, mathBlockPreviewView } from "@/plugins/math";
-import { codeBlockHighlight } from "@/plugins/code-highlight";
+import { codeBlockHighlight, initCodeHighlight } from "@/plugins/code-highlight";
 import { createLinkAutolinkExtensions } from "@/plugins/link-autolink";
 import { defineTableCommands, defineTableDropIndicator } from "@prosekit/extensions/table";
 import { codeBlockUI } from "@/plugins/code-block-ui";
@@ -112,6 +112,7 @@ export async function createEditor(
   content: string,
   host: EditorHost,
 ): Promise<EditorInstance> {
+  await initCodeHighlight();
   const pdURL = proxyDomURLFor(host);
 
   const extensions: Extension[] = [

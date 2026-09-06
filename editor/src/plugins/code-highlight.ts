@@ -7,6 +7,7 @@ import {
   type HighlighterCore,
 } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
+import { normalizeLang } from "./code-block-ui";
 
 import bash from "@shikijs/langs/bash";
 import batch from "@shikijs/langs/batch";
@@ -159,7 +160,7 @@ const PLAIN_LANGS = new Set(["text", "plaintext", "txt", "plain"]);
 let highlighterPromise: Promise<HighlighterCore> | null = null;
 let parser: ReturnType<typeof createParser> | null = null;
 
-function ensureHighlighter(): Promise<HighlighterCore> {
+export function ensureHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighterCore({
       themes: [oneDarkPro],
@@ -170,20 +171,36 @@ function ensureHighlighter(): Promise<HighlighterCore> {
   return highlighterPromise;
 }
 
+export async function initCodeHighlight(): Promise<void> {
+  const highlighter = await ensureHighlighter();
+  parser ??= createParser(highlighter, { theme: "one-dark-pro" });
+}
+
+// Start loading highlighter immediately when module loads
+ensureHighlighter().then((highlighter) => {
+  parser ??= createParser(highlighter, { theme: "one-dark-pro" });
+});
+
 const shikiParser: Parser = (options) => {
   if (!parser) {
     return ensureHighlighter().then((highlighter) => {
       parser ??= createParser(highlighter, { theme: "one-dark-pro" });
     });
   }
-  const lang = options.language ?? "";
-  if (!lang || (!LOADED_LANGS.has(lang) && !PLAIN_LANGS.has(lang))) return [];
-  return parser(options);
+  let lang = options.language ?? "";
+  if (!lang || PLAIN_LANGS.has(lang)) {
+    lang = "text";
+  } else if (!LOADED_LANGS.has(lang)) {
+    const normalized = normalizeLang(lang);
+    lang = LOADED_LANGS.has(normalized) ? normalized : "text";
+  }
+  return parser({ ...options, language: lang });
 };
 
 export const codeBlockHighlight = definePlugin(
   createHighlightPlugin({
     parser: shikiParser,
     nodeTypes: ["codeBlock", "mathBlock"],
+    languageExtractor: (node) => normalizeLang(node.attrs.language ?? ""),
   }),
 );

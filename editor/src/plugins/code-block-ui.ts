@@ -107,6 +107,13 @@ export function toShikiId(canonical: string): string {
   return nameToShikiId.get(canonical) ?? canonical.toLowerCase();
 }
 
+/** Resolve any language string (alias, display name, canonical) to a Shiki grammar id. */
+export function normalizeLang(raw: string): string {
+  if (!raw) return "";
+  const canonical = resolveLang(raw);
+  return toShikiId(canonical);
+}
+
 // ---- Language picker (native select, per prosekit example) ----
 //
 // A native <select> needs no focus juggling, no positioning and no custom
