@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state"
+import { Plugin, PluginKey, type EditorState } from "prosemirror-state"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import {
   ActiveBlockType,
@@ -27,19 +27,17 @@ export function getActiveBlockContext(state: EditorState): ActiveBlockContext {
     if (node.type.name === "blockquote") {
       return { type: ActiveBlockType.Blockquote, checked: null, canSink: false }
     }
-    if (node.type.name !== "list_item") continue
+    if (node.type.name !== "list") continue
     // The item's index within its parent list (depth d-1). sinkListItem fails
     // when the item is the first child of the list (startIndex == 0), so only
     // items at index > 0 can be indented further.
     const canSink = $from.index(d - 1) > 0
-    const checked = node.attrs.checked
-    if (typeof checked === "boolean") {
-      return { type: ActiveBlockType.TaskList, checked, canSink }
+    if (node.attrs.kind === "task") {
+      return { type: ActiveBlockType.TaskList, checked: !!node.attrs.checked, canSink }
     }
-    const parentName = $from.node(d - 1).type.name
     return {
       type:
-        parentName === "ordered_list"
+        node.attrs.kind === "ordered"
           ? ActiveBlockType.OrderedList
           : ActiveBlockType.BulletList,
       checked: null,

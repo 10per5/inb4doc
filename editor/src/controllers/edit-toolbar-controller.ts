@@ -120,11 +120,11 @@ export default class EditToolbarController extends Controller {
     })
   }
 
-  // "+" FAB: toggle the shared add-block menu. Anchored at the button in both
-  // modes (in follow mode the strip is the block-anchored popover, so the
-  // button rect points at the caret's block) — never at the 0×0 #edit-toolbar
-  // fixed anchor, which can still sit at the origin (left:0/top:0) until the
-  // async editor-context import positions it.
+// "+" FAB: toggle the shared add-block menu. Anchored at the button in both
+// modes (in follow mode the strip IS the block-anchored popover, so the
+// button rect points at the caret's block) — never at the 0×0 #edit-toolbar
+// fixed anchor, which can still sit at the origin (left:0/top:0) before
+// positionPopover first positions it.
   openAddMenu(): void {
     if (!this.addMenu) return
     if (this.addMenu.isOpen) {
@@ -152,28 +152,25 @@ export default class EditToolbarController extends Controller {
       this.reanchorAddMenu(this.addBtnRect(), false)
       return
     }
-    const milk = this.editor()?.getEditor()
-    if (!milk) return
-    void import("@/services/editor-context-service").then(({ getView }) => {
-      if (!this.followMode) return
-      const view = getView(milk)
-      const { from } = view.state.selection
-      const cursor = view.coordsAtPos(from)
-      if (!cursor) return
-      const block = getBlockRectAt(view, from) ?? cursor
-      this.setInViewport(this.isBlockInView(block))
-      if (!this.inViewport || !this.viewIsEditor) return
-      applyPanelFlip(panel, {
-        anchor: block,
-        anchorCursor: cursor,
-        preferAbove: false,
-        positionAnchor: true,
-        measureDisplay: "flex",
-      })
-      // While the add-block menu is open the strip is hidden, so its "+"
-      // button has no rect — re-anchor the menu at the caret's block instead.
-      this.reanchorAddMenu(block, true)
+    const editor = this.editor()?.getEditor()
+    if (!editor) return
+    const view = editor.view
+    const { from } = view.state.selection
+    const cursor = view.coordsAtPos(from)
+    if (!cursor) return
+    const block = getBlockRectAt(view, from) ?? cursor
+    this.setInViewport(this.isBlockInView(block))
+    if (!this.inViewport || !this.viewIsEditor) return
+    applyPanelFlip(panel, {
+      anchor: block,
+      anchorCursor: cursor,
+      preferAbove: false,
+      positionAnchor: true,
+      measureDisplay: "flex",
     })
+    // While the add-block menu is open the strip is hidden, so its "+"
+    // button has no rect — re-anchor the menu at the caret's block instead.
+    this.reanchorAddMenu(block, true)
   }
 
   // Re-anchor the popover on every scroll; positionPopover also hides it once
@@ -275,8 +272,8 @@ export default class EditToolbarController extends Controller {
   // Anchor the add-block menu at the "+" button's rect. In follow mode the
   // strip IS the block-anchored popover, so the button rect is already where
   // the caret's block is; never fall back to the 0×0 #edit-toolbar fixed
-  // anchor, which can sit at left:0/top:0 until positionPopover's async
-  // editor-context import runs (that's what opened the menu at the top-left).
+  // anchor, which can sit at left:0/top:0 before positionPopover first runs
+  // (that's what opened the menu at the top-left).
   private addBtnRect(): FlipAnchorRect | null {
     const rect = this.addBtnTarget.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return null

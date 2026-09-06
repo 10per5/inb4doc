@@ -1,14 +1,14 @@
-import { $inputRule } from "@milkdown/utils";
-import { textblockTypeInputRule } from "prosemirror-inputrules";
-import { headingSchema } from "@milkdown/preset-commonmark";
+import { InputRule, inputRules } from "prosemirror-inputrules"
 
-export const fixedHeadingInputRule = $inputRule((ctx) => {
-  return textblockTypeInputRule(
-    /^(?<hashes>#+)\s$/,
-    headingSchema.type(ctx),
-    (match) => {
-      const x = match.groups?.hashes?.length || 0;
-      return { level: x };
-    },
-  );
-});
+export const fixedHeadingInputRule = inputRules({
+  rules: [
+    new InputRule(
+      /^(?<hashes>#+)\s$/,
+      (state, match) => {
+        const level = match.groups?.hashes?.length || 1
+        const heading = state.schema.nodes.heading.create({ level })
+        return state.tr.replaceWith(match.index!, match.index! + match[0].length, heading)
+      },
+    ),
+  ],
+})

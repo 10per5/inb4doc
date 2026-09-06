@@ -1,5 +1,5 @@
-import { Plugin, PluginKey, type EditorState } from "@milkdown/kit/prose/state"
-import type { MarkType } from "@milkdown/kit/prose/model"
+import { Plugin, PluginKey, type EditorState } from "prosemirror-state"
+import type { MarkType } from "prosemirror-model"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import type { TextState } from "@/config/enums/text-state"
 
@@ -43,10 +43,10 @@ export function getTextState(state: EditorState): TextState {
   }
   const marks = state.schema.marks
   return {
-    bold: markActive(state, marks.strong),
-    italic: markActive(state, marks.emphasis),
-    strike: markActive(state, marks.strike_through),
-    code: markActive(state, marks.inlineCode),
+    bold: markActive(state, marks.bold),
+    italic: markActive(state, marks.italic),
+    strike: markActive(state, marks.strike),
+    code: markActive(state, marks.code),
     link: markActive(state, marks.link),
     heading,
   }

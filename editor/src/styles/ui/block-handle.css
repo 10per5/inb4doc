@@ -1,4 +1,4 @@
-.milkdown-block-handle {
+.inb4doc-block-handle {
   position: absolute;
   display: flex;
   gap: 2px;
@@ -7,12 +7,12 @@
   transition: opacity 0.2s;
 }
 
-.milkdown-block-handle[data-show="false"] {
+.inb4doc-block-handle[data-show="false"] {
   opacity: 0;
   pointer-events: none;
 }
 
-.milkdown-block-handle button {
+.inb4doc-block-handle button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,18 +26,18 @@
   padding: 0;
 }
 
-.milkdown-block-handle button:hover {
+.inb4doc-block-handle button:hover {
   background: var(--color-bg-tertiary);
 }
 
-.milkdown-block-handle button svg {
+.inb4doc-block-handle button svg {
   width: 18px;
   height: 18px;
   fill: currentColor;
   display: block;
 }
 
-.milkdown-block-handle .block-handle-drag {
+.inb4doc-block-handle .block-handle-drag {
   cursor: grab;
 }
 
@@ -52,21 +52,21 @@
 }
 
 @media (max-width: 767px) {
-  .milkdown-block-handle {
+  .inb4doc-block-handle {
     gap: 4px;
   }
 
-  .milkdown-block-handle button {
+  .inb4doc-block-handle button {
     width: 44px;
     height: 44px;
   }
 
-  .milkdown-block-handle button svg {
+  .inb4doc-block-handle button svg {
     width: 24px;
     height: 24px;
   }
 
-  .milkdown-block-handle.touch-active {
+  .inb4doc-block-handle.touch-active {
     opacity: 1;
     pointer-events: auto;
   }

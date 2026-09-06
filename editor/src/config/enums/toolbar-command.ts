@@ -1,6 +1,6 @@
 /**
  * Toolbar formatting command identifiers used in data-cmd attributes
- * and dispatched to Milkdown editor commands.
+ * and dispatched to editor commands.
  */
 export const TOOLBAR_CMD_PREFIX = "tc-";
 

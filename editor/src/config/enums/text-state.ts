@@ -4,13 +4,13 @@
  * and consumed by the toolbar to reflect the current text state (h/b/i/s).
  */
 export interface TextState {
-  /** `strong` mark active at the selection. */
+  /** `bold` mark active at the selection. */
   bold: boolean
-  /** `emphasis` mark active at the selection. */
+  /** `italic` mark active at the selection. */
   italic: boolean
-  /** `strike_through` mark active at the selection. */
+  /** `strike` mark active at the selection. */
   strike: boolean
-  /** `inlineCode` mark active at the selection. */
+  /** `code` mark active at the selection. */
   code: boolean
   /** `link` mark active at the selection (caret inside a hyperlink). */
   link: boolean

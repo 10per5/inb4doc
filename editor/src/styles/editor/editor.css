@@ -4,12 +4,12 @@
  * Includes source editor and responsive adjustments
  */
 
-#milkdown-editor .ProseMirror {
+#inb4doc-editor .ProseMirror {
   font-size: var(--font-size-base);
 }
 
 @media (max-width: 767px) {
-  #milkdown-editor .ProseMirror {
+  #inb4doc-editor .ProseMirror {
     font-size: var(--font-size-base);
   }
 }
@@ -20,7 +20,7 @@
   background-color: rgba(220, 53, 69, 0.06);
 }
 
-#editor-area.pending-delete-tint #milkdown-editor .ProseMirror {
+#editor-area.pending-delete-tint #inb4doc-editor .ProseMirror {
   background-color: transparent;
 }
 
@@ -34,7 +34,7 @@
   background-color: rgba(13, 110, 253, 0.06);
 }
 
-#editor-area.pending-create-tint #milkdown-editor .ProseMirror {
+#editor-area.pending-create-tint #inb4doc-editor .ProseMirror {
   background-color: transparent;
 }
 
@@ -44,7 +44,7 @@
 
 /* ── Mention Menu ──────────────────────────────────────────────────── */
 
-.milkdown-mention {
+.inb4doc-mention {
   display: none;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
@@ -58,23 +58,23 @@
   position: absolute;
 }
 
-.milkdown-mention[data-show="true"] {
+.inb4doc-mention[data-show="true"] {
   display: block;
 }
 
-.milkdown-mention [data-page] {
+.inb4doc-mention [data-page] {
   padding: 0.4rem 0.8rem;
   cursor: pointer;
   border-radius: 3px;
   font-size: 0.85rem;
 }
 
-.milkdown-mention [data-page]:hover {
+.inb4doc-mention [data-page]:hover {
   background: var(--color-bg-tertiary);
 }
 
 @media (max-width: 767px) {
-  .milkdown-mention {
+  .inb4doc-mention {
     max-width: calc(100vw - 2rem);
     max-height: 200px;
     font-size: var(--font-size-small);
@@ -83,16 +83,16 @@
 
 /* ── Link Tooltip ──────────────────────────────────────────────────── */
 
-.milkdown-link-preview {
+.inb4doc-link-preview {
   position: absolute;
   z-index: 200;
 }
 
-.milkdown-link-preview[data-show="false"] {
+.inb4doc-link-preview[data-show="false"] {
   display: none;
 }
 
-.milkdown-link-preview .link-preview {
+.inb4doc-link-preview .link-preview {
   height: 32px;
   display: flex;
   align-items: center;
@@ -103,30 +103,30 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.milkdown-link-preview .link-preview .milkdown-icon {
+.inb4doc-link-preview .link-preview .inb4doc-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.milkdown-link-preview .link-preview .milkdown-icon svg {
+.inb4doc-link-preview .link-preview .inb4doc-icon svg {
   width: 18px;
   height: 18px;
   fill: var(--color-text-secondary);
   display: block;
 }
 
-.milkdown-link-preview .link-preview .button {
+.inb4doc-link-preview .link-preview .button {
   border-radius: 4px;
   padding: 3px;
   cursor: pointer;
 }
 
-.milkdown-link-preview .link-preview .button:hover {
+.inb4doc-link-preview .link-preview .button:hover {
   background: var(--color-bg-tertiary);
 }
 
-.milkdown-link-preview .link-preview .link-display {
+.inb4doc-link-preview .link-preview .link-display {
   color: var(--color-accent);
   text-decoration: none;
   font-size: 14px;
@@ -137,21 +137,21 @@
   white-space: nowrap;
 }
 
-.milkdown-link-preview .link-preview .link-display:hover {
+.inb4doc-link-preview .link-preview .link-display:hover {
   text-decoration: underline;
 }
 
 @media (max-width: 767px) {
-  .milkdown-link-preview {
+  .inb4doc-link-preview {
     max-width: calc(100vw - 2rem);
   }
 
-  .milkdown-link-preview .link-preview .link-display {
+  .inb4doc-link-preview .link-preview .link-display {
     max-width: 180px;
   }
 }
 
-/* ── Code Block UI (CodeMirror) ──────────────────────────────────── */
+/* ── Code Block UI ───────────────────────────────────────────────── */
 
 .code-block-wrapper {
   position: relative;
@@ -166,23 +166,60 @@
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
-.code-block-wrapper .cm-editor {
-  outline: none;
-}
-
-.code-block-wrapper .cm-editor .cm-scroller {
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
-  font-size: 0.82rem;
-  line-height: 1.6;
-}
-
-.code-block-wrapper .cm-editor .cm-gutters {
+/* Line-number gutter — sibling of the editable <pre>, kept outside the
+   contenteditable so numbers never enter selections or the clipboard. */
+.code-block-gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42px;
+  padding: 10px 0;
   border-right: 1px solid #3b4252;
   background: #282c34;
+  overflow: hidden;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
-.code-block-wrapper .cm-editor .cm-activeLineGutter {
-  background: transparent;
+.code-block-line-no {
+  flex: 0 0 auto;
+  padding-right: 10px;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono",
+    Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: calc(0.82rem * 1.6);
+  color: #616e88;
+}
+
+/* Editable source — native ProseMirror text content. */
+.code-block-content {
+  display: block;
+  margin: 0 0 0 42px;
+  padding: 10px 12px 10px 10px;
+  font-family:
+    "SF Mono", "Fira Code", "Fira Mono", "JetBrains Mono", "DejaVu Sans Mono",
+    Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 2;
+  overflow-x: auto;
+  outline: none;
+  color: var(--prosemirror-highlight, #d8dee9);
+  padding: 0 3rem !important;
+}
+
+.code-block-content:empty::before {
+  content: "\200B";
+}
+
+.code-block-content::selection,
+.code-block-content *::selection {
+  background: rgba(136, 192, 208, 0.3);
 }
 
 .code-block-overlay {
@@ -203,88 +240,39 @@
   pointer-events: auto;
 }
 
+/* While a chrome control inside the overlay has focus, keep the whole
+   overlay opaque and clickable. */
+.code-block-overlay:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .code-block-wrapper:hover .code-block-overlay {
   opacity: 1;
   pointer-events: auto;
 }
 
-.code-block-lang-picker {
-  position: relative;
-}
-
-.code-block-lang-input {
+.code-block-lang-select {
   background: rgba(40, 44, 52, 0.85);
   border: 1px solid #4c566a;
   border-radius: 4px;
   color: #d8dee9;
   font-size: 0.72rem;
   font-family: inherit;
-  padding: 2px 6px;
-  width: 90px;
+  padding: 2px 4px;
+  max-width: 150px;
+  cursor: pointer;
   outline: none;
   box-sizing: border-box;
 }
 
-.code-block-lang-input::placeholder {
-  color: #616e88;
-}
-
-.code-block-lang-input:focus {
+.code-block-lang-select:focus {
   border-color: #81a1c1;
 }
 
-.code-block-lang-list {
-  display: none;
-  max-height: 240px;
-  overflow-y: auto;
+.code-block-lang-select option {
   background: #2e3440;
-  border: 1px solid #4c566a;
-  border-radius: 4px;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.code-block-lang-list.visible {
-  display: block;
-}
-
-.code-block-lang-item {
-  padding: 3px 8px;
-  cursor: pointer;
-  font-size: 0.75rem;
   color: #d8dee9;
-}
-
-.code-block-lang-item:hover,
-.code-block-lang-item.focused {
-  background: #3b4252;
-}
-
-.code-block-lang-item.selected {
-  color: #88c0d0;
-  font-weight: 600;
-}
-
-.code-block-lang-alias {
-  color: #616e88;
-  font-size: 0.65rem;
-}
-
-.code-block-preview {
-  display: none;
-  padding: 14px 16px;
-  overflow-x: auto;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: #d8dee9;
-}
-
-.code-block-preview .katex-display {
-  margin: 0.5em 0;
-}
-
-.code-block-wrapper.latex .cm-gutters {
-  display: none;
 }
 
 .code-block-copy-btn {
@@ -298,7 +286,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.3s, border-color 0.3s;
+  transition:
+    background 0.3s,
+    border-color 0.3s;
 }
 
 .code-block-copy-btn svg {
@@ -318,25 +308,18 @@
   stroke: #a3be8c;
 }
 
-/* Override external `.table { display: table }` (e.g. Tailwind) that
-   breaks Prism's `<span class="token table ...">` into a block element. */
-.prism-code-editor .token.table,
-.prism-code-editor .token.table.class-name {
-  display: inline;
-}
-
 /* ── Link Editor ───────────────────────────────────────────────────── */
 
-.milkdown-link-edit {
+.inb4doc-link-edit {
   position: absolute;
   z-index: 200;
 }
 
-.milkdown-link-edit[data-show="false"] {
+.inb4doc-link-edit[data-show="false"] {
   display: none;
 }
 
-.milkdown-link-edit .link-edit {
+.inb4doc-link-edit .link-edit {
   height: 32px;
   display: flex;
   align-items: center;
@@ -347,37 +330,37 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-  .milkdown-link-edit .link-edit .input-area {
-    outline: none;
-    background: transparent;
-    width: 200px;
-    font-size: 14px;
-    color: var(--color-text-primary);
-    border: none;
-  }
+.inb4doc-link-edit .link-edit .input-area {
+  outline: none;
+  background: transparent;
+  width: 200px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  border: none;
+}
 
-.milkdown-link-edit .link-edit .input-area:focus {
+.inb4doc-link-edit .link-edit .input-area:focus {
   border-color: var(--color-accent);
 }
 
-.milkdown-link-edit .link-edit .button {
+.inb4doc-link-edit .link-edit .button {
   border-radius: 4px;
   padding: 3px;
   line-height: 24px;
   cursor: pointer;
 }
 
-.milkdown-link-edit .link-edit .button:hover {
+.inb4doc-link-edit .link-edit .button:hover {
   background: var(--color-bg-tertiary);
 }
 
-.milkdown-link-edit .link-edit .milkdown-icon {
+.inb4doc-link-edit .link-edit .inb4doc-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.milkdown-link-edit .link-edit .milkdown-icon svg {
+.inb4doc-link-edit .link-edit .inb4doc-icon svg {
   width: 18px;
   height: 18px;
   fill: var(--color-text-secondary);
@@ -385,24 +368,24 @@
 }
 
 @media (max-width: 767px) {
-  .milkdown-link-edit {
+  .inb4doc-link-edit {
     max-width: calc(100vw - 2rem);
   }
 
-  .milkdown-link-edit .link-edit .input-area {
+  .inb4doc-link-edit .link-edit .input-area {
     width: 150px;
   }
 }
 
 /* ── Icon (shared) ─────────────────────────────────────────────────── */
 
-.milkdown-icon {
+.inb4doc-icon {
   display: inline-flex;
   align-items: center;
   cursor: pointer;
 }
 
-.milkdown-icon svg {
+.inb4doc-icon svg {
   width: 18px;
   height: 18px;
   fill: currentColor;

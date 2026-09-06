@@ -5,7 +5,7 @@
 // popover share one implementation. The classes are defined in
 // src/styles/ui/menu.css.
 
-import type { EditorView } from "@milkdown/kit/prose/view"
+import type { EditorView } from "prosemirror-view"
 
 export type FlipAnchorRect = Pick<DOMRect, "left" | "top" | "bottom" | "right">
 

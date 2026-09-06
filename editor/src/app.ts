@@ -61,7 +61,7 @@ const app = new Application();
 
 // Part D two-stage entry. app.ts must never statically import the single-stage
 // registration glue (its registerControllers pulls controllers/lazy → editor →
-// node_imports, which would keep every @milkdown/* in the eager boot set). The
+// node_imports, which would keep every @prosekit/* in the eager boot set). The
 // eager graph ends at controllers/core; the editor + dialog controllers are
 // always reached through a dynamic import. The glue itself is generated per
 // build mode (templates/partials/register.eta → src/eta/register.ts): non-thin
@@ -76,7 +76,7 @@ const app = new Application();
 // editor outlet wires up once the lazy chunk arrives.
 //
 // Invariants for the split: core controller modules must not VALUE-import
-// editor-controller, any dialog controller, or @milkdown/* (type-only imports
+// editor-controller, any dialog controller, or @prosekit/* (type-only imports
 // are erased); interactive dialog opening goes through dynamic imports in the
 // handlers.
 const registry = new ModuleRegistry(app);

@@ -9,7 +9,9 @@ import "./layout/responsive.css"
 /* ── Editor ─────────────────────────────────────────────────────── */
 import "./editor/editor.css"
 import "./editor/math.css"
-import "./editor/milkdown.css"
+import "./editor/editor-components.css"
+import "./editor/table-handle.css"
+import "./editor/block-handle.css"
 import "./editor/source-editor.css"
 import "./content/dnd.css"
 

@@ -21,7 +21,7 @@ import type { ControllerRegistration } from "./core"
 
 // Part D two-stage entry: these controllers live behind a dynamic import
 // (registered after app.start()). The editor is only reachable through it, so
-// editor-config + all @milkdown/* (node_imports) leave the eager boot set and
+// editor-config + all @prosekit/* (node_imports) leave the eager boot set and
 // the thin shell can download them on first run instead of shipping them.
 // Registering after start is safe: Stimulus's scope observer already recorded
 // the data-controller scopes for the initial DOM, so connect() fires the

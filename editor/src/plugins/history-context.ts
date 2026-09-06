@@ -1,5 +1,5 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
-import { undoDepth, redoDepth } from "@milkdown/kit/prose/history"
+import { Plugin, PluginKey } from "prosemirror-state"
+import { undoDepth, redoDepth } from "prosemirror-history"
 import { appEvents, AppEvent } from "@/stores/app-events"
 
 /**

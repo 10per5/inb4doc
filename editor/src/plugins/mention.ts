@@ -1,14 +1,8 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
-import type { Ctx } from "@milkdown/kit/ctx"
-import { MentionView } from "@/features/mention"
+import { Plugin, PluginKey } from "prosemirror-state"
 
-export function createMentionPlugin(ctx: Ctx, setMentionView: (mv: MentionView | null) => void) {
+export function createMentionPlugin(_ctx?: unknown, setMentionView?: (mv: null) => void) {
+  setMentionView?.(null)
   return new Plugin({
     key: new PluginKey("inb4doc-mention"),
-    view: (v) => {
-      const mv = new MentionView(v, ctx)
-      setMentionView(mv)
-      return mv
-    },
   })
 }

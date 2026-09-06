@@ -31,7 +31,7 @@ export class ToolbarStore {
 
   constructor(config: ToolbarConfig) {
     this.toolbar = document.getElementById("app-toolbar")
-    this.editorEl = document.getElementById("milkdown-editor")
+    this.editorEl = document.getElementById("inb4doc-editor")
     this.autoHidePref = !config.stickyToolbar
   }
 

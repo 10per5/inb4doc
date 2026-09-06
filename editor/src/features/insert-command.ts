@@ -3,45 +3,29 @@
  *
  * The block-insert commands that the `/` slash menu (SlashView), the desktop
  * block-handle "+", and the mobile FAB "+" all surface. Extraction point for the
- * logic that used to live inside SlashView.execute, so menu items (which have no
- * Milkdown ctx of their own) run the exact same commands as typing "/cmd".
+ * logic that used to live inside SlashView.execute, so menu items (which have
+ * no editor context of their own) run the exact same commands as typing "/cmd".
  */
 
-import type { Ctx } from "@milkdown/kit/ctx";
-import { editorViewCtx, commandsCtx } from "@milkdown/kit/core";
-import { TextSelection } from "@milkdown/kit/prose/state";
-import type { EditorView } from "@milkdown/kit/prose/view";
-import {
-  paragraphSchema,
-  wrapInHeadingCommand,
-  wrapInBulletListCommand,
-  wrapInOrderedListCommand,
-  wrapInBlockquoteCommand,
-} from "@milkdown/kit/preset/commonmark";
-import { createTable } from "@milkdown/kit/preset/gfm";
+import { TextSelection } from "prosemirror-state"
+import type { EditorView } from "prosemirror-view"
+import { wrapIn, setBlockType } from "prosemirror-commands"
+
 import { SlashCommand, ProseNodeType, proseNodeTypeByName } from "@/config/enums";
 import { defaultVideoAttrs } from "@/plugins/video";
 import { setListItemKind } from "@/utils/editor-mutator";
 import { openImageDialog } from "@/controllers/dialog/image-dialog.type";
 
 export interface InsertCommandOptions {
-  /**
-   * Add the block BELOW the caret's current top-level block (the "+" model)
-   * instead of converting the caret's block in place (the "/cmd" model). A
-   * fresh empty paragraph is inserted after the current block and the caret
-   * moves into it; when the caret already sits in an empty top-level paragraph
-   * that step is skipped so it is converted directly.
-   */
   appendBelow?: boolean;
 }
 
 export function executeInsertCommand(
-  ctx: Ctx,
+  view: EditorView,
   cmd: SlashCommand,
   level?: number,
   opts?: InsertCommandOptions,
 ): void {
-  const view = ctx.get(editorViewCtx);
   view.focus();
   let { state } = view;
   let { $from } = state.selection;
@@ -71,41 +55,30 @@ export function executeInsertCommand(
     return;
   }
 
-  // List kinds run through the same in-place conversion the topbar / quickbar
-  // use (setListItemKind in utils/editor-mutator.ts), which retypes the covered
-  // items and keeps every sibling. The hand-rolled block surgery below used to
-  // intercept these first and replaced the WHOLE enclosing list with a single
-  // empty item / blockquote, dropping all other items.
-  const commands = ctx.get(commandsCtx);
-  const listService = { wrapInBulletListCommand, wrapInOrderedListCommand };
   if (cmd === SlashCommand.BulletList) {
-    setListItemKind(view, commands, listService, "bullet");
+    setListItemKind(view, "bullet");
     view.focus();
     return;
   }
   if (cmd === SlashCommand.OrderedList) {
-    setListItemKind(view, commands, listService, "ordered");
+    setListItemKind(view, "ordered");
     view.focus();
     return;
   }
   if (cmd === SlashCommand.TodoList) {
-    setListItemKind(view, commands, listService, "task");
+    setListItemKind(view, "task");
     view.focus();
     return;
   }
 
-  // Empty block nested in a list / blockquote / heading → convert that block
-  // in place (same special cases the slash menu handles). Kept BEFORE the
-  // ThematicBreak check so a divider picked inside an empty list item behaves
-  // exactly as it does from the "/" menu.
   if ($from.parent.content.size === 0) {
     let parentType: ProseNodeType | null = null;
     let parentDepth = 0;
     for (let d = $from.depth; d > 0; d--) {
       const node = $from.node(d);
       if (
-        node.type === schema.nodes.bullet_list ||
-        node.type === schema.nodes.ordered_list ||
+        node.type === schema.nodes.list ||
+        node.type === schema.nodes.list ||
         node.type === schema.nodes.blockquote
       ) {
         parentType = proseNodeTypeByName.get(node.type.name) ?? null;
@@ -125,16 +98,17 @@ export function executeInsertCommand(
     return;
   }
 
-  if (cmd === SlashCommand.Heading) commands.call(wrapInHeadingCommand.key, level);
-  else if (cmd === SlashCommand.Blockquote)
-    commands.call(wrapInBlockquoteCommand.key);
-  else if (cmd === SlashCommand.CodeBlock) convertToCodeBlock(view);
+  if (cmd === SlashCommand.Heading) {
+    setBlockType(schema.nodes.heading, { level })(view.state, (tr) => view.dispatch(tr));
+  } else if (cmd === SlashCommand.Blockquote) {
+    wrapIn(schema.nodes.blockquote)(view.state, (tr) => view.dispatch(tr));
+  } else if (cmd === SlashCommand.CodeBlock) convertToCodeBlock(view);
   else if (cmd === SlashCommand.MathBlock) convertToMathBlock(view);
-  else if (cmd === SlashCommand.Table) insertTable(ctx, view);
+  else if (cmd === SlashCommand.Table) insertTable(view);
   view.focus();
 }
 
-// ── Helpers (hoisted from the slash menu; behavior preserved) ──
+// ── Helpers ──
 
 function replaceBlock(
   view: EditorView,
@@ -172,10 +146,6 @@ function replaceBlock(
     return;
   }
 
-  // Blockquote / code / math / table picked while the caret sits in an empty
-  // block inside a list or blockquote: replace the enclosing block with an
-  // empty blockquote (the pre-existing slash-menu behavior). List kinds never
-  // reach here — they are handled by setListItemKind above.
   const pos =
     isHeading || parentType
       ? $from.before(parentType ? parentDepth : $from.depth)
@@ -190,17 +160,12 @@ function replaceBlock(
   dispatch(state.tr.replaceWith(pos, pos + block.nodeSize, newBlock));
 }
 
-/**
- * Insert the block AFTER the caret's current block (used by the slash menu when
- * a divider is picked inside an empty list/blockquote/heading item). Kept
- * faithful to the original SlashView.insertBelow.
- */
 function insertBelow(view: EditorView): void {
   const { state, dispatch } = view;
   const { schema } = state;
   const { $from } = state.selection;
   const afterPos = $from.after($from.depth);
-  const hr = schema.nodes.hr.create();
+  const hr = schema.nodes.horizontalRule.create();
   const para = schema.nodes.paragraph.create();
   const tr = state.tr.insert(afterPos, hr).insert(afterPos + 2, para);
   dispatch(tr.setSelection(TextSelection.create(tr.doc, afterPos + 3)));
@@ -213,7 +178,7 @@ function insertDivider(view: EditorView): void {
 
   const pos = $from.before($from.depth);
   const blockSize = $from.node($from.depth).nodeSize;
-  const hr = schema.nodes.hr.create();
+  const hr = schema.nodes.horizontalRule.create();
   const para = schema.nodes.paragraph.create();
   const tr = state.tr.replaceWith(pos, pos + blockSize, [hr, para]);
   dispatch(
@@ -224,7 +189,7 @@ function insertDivider(view: EditorView): void {
 function convertToCodeBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { $from } = state.selection;
-  const codeBlock = state.schema.nodes.code_block.create({ language: "" });
+  const codeBlock = state.schema.nodes.codeBlock.create({ language: "" });
   const pos = $from.before($from.depth);
   const tr = state.tr.replaceWith(
     pos,
@@ -241,14 +206,12 @@ function convertToCodeBlock(view: EditorView): void {
 function convertToMathBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { $from } = state.selection;
-  const codeBlock = state.schema.nodes.code_block.create({
-    language: "LaTeX",
-  });
+  const mathBlock = state.schema.nodes.mathBlock.create();
   const pos = $from.before($from.depth);
   const tr = state.tr.replaceWith(
     pos,
     pos + $from.node($from.depth).nodeSize,
-    codeBlock,
+    mathBlock,
   );
   dispatch(
     tr
@@ -257,11 +220,25 @@ function convertToMathBlock(view: EditorView): void {
   );
 }
 
-function insertTable(ctx: Ctx, view: EditorView): void {
+function insertTable(view: EditorView): void {
   const { state, dispatch } = view;
   const { $from } = state.selection;
   const pos = $from.before($from.depth);
-  const tbl = createTable(ctx, 3, 3);
+  const { schema } = state;
+  const tableType = schema.nodes.table;
+  const tableRowType = schema.nodes.tableRow;
+  const tableCellType = schema.nodes.tableCell;
+  const tableHeaderType = schema.nodes.tableHeaderCell;
+  const rows = [];
+  for (let r = 0; r < 3; r++) {
+    const cells = [];
+    for (let c = 0; c < 3; c++) {
+      const cellType = r === 0 ? tableHeaderType : tableCellType;
+      cells.push(cellType.createAndFill()!);
+    }
+    rows.push(tableRowType.createAndFill(null, cells)!);
+  }
+  const tbl = tableType.createAndFill(null, rows)!;
   dispatch(
     state.tr
       .replaceWith(pos, pos + $from.node($from.depth).nodeSize, tbl)
@@ -269,11 +246,6 @@ function insertTable(ctx: Ctx, view: EditorView): void {
   );
 }
 
-/**
- * Replace the caret's current block with an empty image block + paragraph, then
- * open the image dialog so the user picks a URL/upload, mirroring the slash
- * menu's Image command. The block is filled in once the dialog resolves.
- */
 function insertImageBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { schema } = state;
@@ -311,11 +283,6 @@ function insertImageBlock(view: EditorView): void {
   });
 }
 
-/**
- * Replace the caret's current block with an empty video node + paragraph, then
- * dispatch the same `inb4doc:edit-video` event the video node emits on click so
- * the existing video dialog opens.
- */
 function insertVideoBlock(view: EditorView): void {
   const { state, dispatch } = view;
   const { schema } = state;

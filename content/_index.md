@@ -19,7 +19,7 @@ A two-layer wiki: edit markdown in a live WYSIWYG editor. Connect multiple provi
 
 - [Build](/docs/build) — build process, artifacts, cross-machine install
 
-- [Editor](/docs/editor) — Milkdown, Hotwired, flush-based writes, bundle size
+- [Editor](/docs/editor) — ProseKit, Hotwired, flush-based writes, bundle size
 
 - [Endpoints](/docs/endpoints) — API reference, how to add new routes, future server decoupling
 

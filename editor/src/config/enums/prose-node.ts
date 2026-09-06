@@ -5,8 +5,7 @@
 export enum ProseNodeType {
   Paragraph,
   Heading,
-  BulletList,
-  OrderedList,
+  List,
   Blockquote,
   Table,
 }
@@ -14,8 +13,7 @@ export enum ProseNodeType {
 export const proseNodeTypeByName = new Map<string, ProseNodeType>([
   ["paragraph", ProseNodeType.Paragraph],
   ["heading", ProseNodeType.Heading],
-  ["bullet_list", ProseNodeType.BulletList],
-  ["ordered_list", ProseNodeType.OrderedList],
+  ["list", ProseNodeType.List],
   ["blockquote", ProseNodeType.Blockquote],
   ["table", ProseNodeType.Table],
 ]);

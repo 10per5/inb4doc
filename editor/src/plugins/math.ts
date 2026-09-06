@@ -1,21 +1,14 @@
+import { defineNodeView, union } from "@prosekit/core";
 import {
-  $nodeSchema,
-  $remark,
-  $inputRule,
-  $command,
-} from "@milkdown/kit/utils";
-import { nodeRule } from "@milkdown/kit/prose";
-import { textblockTypeInputRule } from "@milkdown/kit/prose/inputrules";
-import { NodeSelection, TextSelection } from "@milkdown/kit/prose/state";
-import { findNodeInSelection } from "@milkdown/kit/prose";
-import { codeBlockSchema } from "@milkdown/kit/preset/commonmark";
-import remarkMath from "remark-math";
-import { visit } from "unist-util-visit";
-import type { Node } from "@milkdown/kit/prose/model";
-import type { Plugin } from "@milkdown/kit/prose/state";
+  defineMathBlockEnterRule,
+  defineMathBlockSpec,
+  defineMathInline,
+  defineMathPlugin,
+} from "@prosekit/extensions/math";
+import type { Command } from "prosemirror-state";
+import { TextSelection } from "prosemirror-state";
+import type { Node } from "prosemirror-model";
 import katex from "katex";
-
-const mathInlineId = "math_inline";
 
 export function renderLatex(content: string, displayMode = false) {
   try {
@@ -28,128 +21,130 @@ export function renderLatex(content: string, displayMode = false) {
   }
 }
 
-export const remarkMathPlugin = $remark("remarkMath", () => remarkMath);
-
-export const remarkMathBlockPlugin = $remark("remarkMathBlock", () => {
-  return () => (tree: any) => {
-    (visit as any)(tree, "math", (node: any, index: number, parent: any) => {
-      if (parent && typeof index === "number") {
-        parent.children.splice(index, 1, {
-          type: "code",
-          lang: "LaTeX",
-          value: node.value,
-        });
-      }
-    });
-  };
-});
-
-export const mathInlineSchema = $nodeSchema(mathInlineId, () => ({
-  group: "inline",
-  inline: true,
-  draggable: true,
-  atom: true,
-  attrs: {
-    value: { default: "" },
-  },
-  parseDOM: [
-    {
-      tag: `span[data-type="${mathInlineId}"]`,
-      getAttrs: (dom) => ({
-        value: (dom as HTMLElement).dataset.value ?? "",
-      }),
-    },
-  ],
-  toDOM: (node) => {
-    const code: string = node.attrs.value;
-    const dom = document.createElement("span");
-    dom.dataset.type = mathInlineId;
-    dom.dataset.value = code;
-    katex.render(code, dom, { throwOnError: false });
-    return dom;
-  },
-  parseMarkdown: {
-    match: (astNode) => astNode.type === "inlineMath",
-    runner: (state, astNode, proseType) => {
-      state.addNode(proseType, { value: astNode.value as string });
-    },
-  },
-  toMarkdown: {
-    match: (node) => node.type.name === mathInlineId,
-    runner: (state, node) => {
-      state.addNode("inlineMath", undefined, node.attrs.value);
-    },
-  },
-}));
-
-export const blockLatexSchema = codeBlockSchema.extendSchema((prev) => {
-  return (ctx) => {
-    const baseSchema = prev(ctx);
-    return {
-      ...baseSchema,
-      toMarkdown: {
-        match: baseSchema.toMarkdown.match,
-        runner: (state, node) => {
-          const language = node.attrs.language ?? "";
-          if (language.toLowerCase() === "latex") {
-            state.addNode(
-              "math",
-              undefined,
-              node.content.firstChild?.text || "",
-            );
-          } else {
-            return baseSchema.toMarkdown.runner(state, node);
-          }
-        },
+/**
+ * Official prosekit math extension pieces: the `mathBlock`/`mathInline`
+ * node specs, their input rules (`$...$` inline, `$$` + Enter on an empty
+ * line for a block) and the cursor plugin. The stock block VIEW is omitted
+ * — it toggles source-vs-rendered, but we want both at once, so
+ * `mathBlockPreviewView` below is the sole mathBlock view.
+ */
+export function createMathExtension() {
+  return union(
+    defineMathBlockSpec(),
+    defineMathInline({
+      render(text: string, element: HTMLElement) {
+        element.innerHTML = renderLatex(text, false);
       },
-    };
-  };
-});
+    }),
+    defineMathBlockEnterRule(),
+    defineMathPlugin(),
+  );
+}
 
-export const mathInlineInputRule = $inputRule((ctx) =>
-  nodeRule(/(?:\$)([^$]+)(?:\$)$/, mathInlineSchema.type(ctx), {
-    getAttr: (match) => ({ value: match[1] ?? "" }),
-  }),
-);
+/** Toggle the selection / word into an inline math node, or unwrap it. */
+export const toggleMathInlineCommand: Command = (state, dispatch) => {
+  const mathInlineType = state.schema.nodes.mathInline;
+  if (!mathInlineType) return false;
 
-export const mathBlockInputRule = $inputRule((ctx) =>
-  textblockTypeInputRule(/^\$\$[\s\n]$/, codeBlockSchema.type(ctx), () => ({
-    language: "LaTeX",
-  })),
-);
-
-export const toggleLatexCommand = $command("ToggleLatex", (ctx) => {
-  return () => (state, dispatch) => {
-    const { hasNode: hasLatex, pos: latexPos, target: latexNode } =
-      findNodeInSelection(state, mathInlineSchema.type(ctx));
-
-    const { selection, doc, tr } = state;
-    if (!hasLatex) {
-      const text = doc.textBetween(selection.from, selection.to);
-      const _tr = tr.replaceSelectionWith(
-        mathInlineSchema.type(ctx).create({ value: text }),
-      );
-      if (dispatch) {
-        dispatch(
-          _tr.setSelection(NodeSelection.create(_tr.doc, selection.from)),
-        );
-      }
-      return true;
-    }
-
-    const { from, to } = selection;
-    if (!latexNode || latexPos < 0) return false;
-
-    let _tr = tr.delete(latexPos, latexPos + 1);
-    const content = (latexNode as Node).attrs.value;
-    _tr = _tr.insertText(content, latexPos);
+  const { $from } = state.selection;
+  const nodeBefore = $from.nodeBefore;
+  if (nodeBefore && nodeBefore.type === mathInlineType) {
+    const pos = $from.pos - nodeBefore.nodeSize;
     if (dispatch) {
-      dispatch(
-        _tr.setSelection(
-          TextSelection.create(_tr.doc, from, to + content.length - 1),
-        ),
-      );
+      let tr = state.tr.delete(pos, pos + nodeBefore.nodeSize);
+      tr = tr.insertText(nodeBefore.textContent, pos);
+      dispatch(tr);
     }
     return true;
-  };
+  }
+
+  const { selection } = state;
+  const text = state.doc.textBetween(selection.from, selection.to);
+  if (dispatch) {
+    const node = mathInlineType.create(
+      null,
+      text ? [state.schema.text(text)] : undefined,
+    );
+    const tr = state.tr.replaceSelectionWith(node);
+    tr.setSelection(
+      TextSelection.near(tr.doc.resolve(selection.from + node.nodeSize)),
+    );
+    dispatch(tr);
+  }
+  return true;
+};
+
+// ---- mathBlock node view with persistent live preview ----
+//
+// The stock prosemirror-math block view shows EITHER the TeX source (cursor
+// inside) OR the rendered math (cursor outside). We want both at once —
+// editable source on top, KaTeX preview below that re-renders on every
+// keystroke — so we override the view while keeping the official spec and
+// input rules. Chrome/preview events are kept away from ProseMirror with the
+// same stopEvent/ignoreMutation pattern as the code-block node view.
+
+class MathBlockPreviewView {
+  dom: HTMLElement;
+  contentDOM: HTMLElement;
+
+  private node: Node;
+  private preview: HTMLElement;
+  private lastRendered: string | null = null;
+
+  constructor(node: Node) {
+    this.node = node;
+
+    this.dom = document.createElement("div");
+    this.dom.className = "math-block-wrapper";
+
+    this.contentDOM = document.createElement("pre");
+    this.contentDOM.className = "math-block-src";
+    this.contentDOM.spellcheck = false;
+
+    this.preview = document.createElement("div");
+    this.preview.className = "math-block-preview";
+    this.preview.setAttribute("contenteditable", "false");
+
+    this.dom.appendChild(this.contentDOM);
+    this.dom.appendChild(this.preview);
+
+    this.renderPreview();
+  }
+
+  private renderPreview() {
+    const text = this.node.textContent;
+    if (text === this.lastRendered) return;
+    this.lastRendered = text;
+    this.preview.innerHTML = renderLatex(text, true);
+  }
+
+  update(node: Node) {
+    if (node.type !== this.node.type) return false;
+    this.node = node;
+    this.renderPreview();
+    return true;
+  }
+
+  stopEvent(event: Event): boolean {
+    const target = event.target as Element | null;
+    return !(target && this.contentDOM.contains(target));
+  }
+
+  ignoreMutation(mutation: {
+    type: string;
+    target: EventTarget | null;
+  }): boolean {
+    const target = mutation.target as Element | null;
+    return !target || !this.contentDOM.contains(target);
+  }
+
+  destroy() {}
+}
+
+/**
+ * Registered after `defineMath()` so it overrides the stock mathBlock view.
+ */
+export const mathBlockPreviewView = defineNodeView({
+  name: "mathBlock",
+  constructor: (node) => new MathBlockPreviewView(node),
 });

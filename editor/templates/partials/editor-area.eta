@@ -1,5 +1,5 @@
 <div id="editor-area" data-controller="editor" data-shell-target="editorArea">
   <img class="il-load-logo" data-editor-target="loadLogo" src="<%= it.ASSET_BASE %>inb4doc-256.png" alt="inb4doc" width="256" height="256" />
   <%~ include('skeleton-editor', it) %>
-  <div id="milkdown-editor" data-editor-target="milkdown"></div>
+  <div id="inb4doc-editor" data-editor-target="inb4doc"></div>
 </div>

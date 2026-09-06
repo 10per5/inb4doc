@@ -1,6 +1,6 @@
-import { Plugin, PluginKey } from "@milkdown/kit/prose/state"
-import type { ResolvedPos } from "@milkdown/kit/prose/model"
-import type { EditorView } from "@milkdown/kit/prose/view"
+import { Plugin, PluginKey } from "prosemirror-state"
+import type { ResolvedPos } from "prosemirror-model"
+import type { EditorView } from "prosemirror-view"
 
 export interface ImagePasteConfig {
   uploadImage: (file: File) => Promise<string>
@@ -9,7 +9,7 @@ export interface ImagePasteConfig {
 function isInsideTableCell($pos: ResolvedPos): boolean {
   for (let d = $pos.depth; d > 0; d--) {
     const name = $pos.node(d).type.name
-    if (name === "table_cell" || name === "table_header") return true
+    if (name === "tableCell" || name === "tableHeaderCell") return true
   }
   return false
 }

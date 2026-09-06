@@ -1,4 +1,4 @@
-import type { EditorView } from "@milkdown/kit/prose/view"
+import type { EditorView } from "prosemirror-view"
 import { openDialog } from "@/services/dialog-service"
 
 export function openHugoRefDialog(view: EditorView, pos: number) {

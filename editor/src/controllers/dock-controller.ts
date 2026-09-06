@@ -111,10 +111,9 @@ export default class DockController extends Controller {
       this.insertMenu?.setAnchorRect(null)
       return
     }
-    const milk = this.editor()?.getEditor()
-    if (!milk) return
-    const { getView } = await import("@/services/editor-context-service")
-    const view = getView(milk)
+    const editor = this.editor()?.getEditor()
+    if (!editor) return
+    const view = editor.view
     const { from } = view.state.selection
     const block = getBlockRectAt(view, from) ?? view.coordsAtPos(from)
     if (!block) return

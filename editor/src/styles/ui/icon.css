@@ -1,10 +1,10 @@
-.milkdown-icon {
+.inb4doc-icon {
   display: inline-flex;
   align-items: center;
   cursor: pointer;
 }
 
-.milkdown-icon svg {
+.inb4doc-icon svg {
   width: 18px;
   height: 18px;
   fill: currentColor;

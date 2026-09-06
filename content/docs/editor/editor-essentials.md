@@ -5,13 +5,13 @@ weight: 20
 
 # Editor
 
-The editor is a Milkdown v7 WYSIWYG interface loaded inside the native GUI window. All content API calls go through the `app://` scheme handler (in-process, no HTTP server — see [GUI](/docs/gui)).
+The editor is a ProseKit WYSIWYG interface loaded inside the native GUI window. All content API calls go through the `app://` scheme handler (in-process, no HTTP server — see [GUI](/docs/gui)).
 
-## Milkdown
+## ProseKit
 
-[Milkdown](https://milkdown.dev) (v7, 11k+ stars) is the core editor. It's built on ProseMirror + Remark and works with markdown natively — no HTML→MD→HTML roundtrip. Both WYSIWYG and raw markdown source modes are available via toggle.
+[ProseKit](https://prosekit.dev) is the core editor. It's built on ProseMirror and works with markdown natively — no HTML→MD→HTML roundtrip. Both WYSIWYG and raw markdown source modes are available via toggle.
 
-inb4doc's plugin surface is intentionally small, but Milkdown and ProseMirror have a large [plugin ecosystem](https://github.com/artemnistuley/awesome-prosemirror) — individual maintainers or forks can implement custom behavior through ProseMirror plugins or Milkdown prosemirror plugins.
+inb4doc's plugin surface is intentionally small, but ProseMirror has a large [plugin ecosystem](https://github.com/artemnistuley/awesome-prosemirror) — individual maintainers or forks can implement custom behavior through ProseMirror plugins or ProseKit extensions.
 
 ## Hotwired (Turbo + Stimulus)
 
