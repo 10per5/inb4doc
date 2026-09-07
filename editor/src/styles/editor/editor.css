@@ -8,6 +8,35 @@
   font-size: var(--font-size-base);
 }
 
+/* ── ProseMirror Links ─────────────────────────────────────────────── */
+
+.ProseMirror a {
+  color: var(--color-accent);
+  text-decoration: none;
+  padding: 1px 4px;
+  margin: 0 -2px;
+  border-radius: 4px;
+  border-bottom: 2px solid var(--color-accent);
+  background: transparent;
+  transition: all 0.15s ease;
+  word-break: break-all;
+}
+
+.ProseMirror a:hover {
+  color: var(--color-accent-hover);
+  border-bottom-color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+}
+
+.ProseMirror a:visited {
+  color: var(--color-accent);
+}
+
+.ProseMirror a:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 @media (max-width: 767px) {
   #inb4doc-editor .ProseMirror {
     font-size: var(--font-size-base);

@@ -88,10 +88,19 @@
   align-items: center;
   gap: 0.15rem;
   padding: 0.25rem 0.5rem;
-  color: #5e81ac;
+  color: var(--color-accent);
   text-decoration: none;
   font-size: 0.9rem;
   line-height: 1.3;
+  transition: color 0.15s ease;
+}
+
+.sidebar-inner .nav-link:hover {
+  color: var(--color-accent-hover);
+}
+
+.sidebar-inner .nav-link:visited {
+  color: var(--color-accent);
 }
 
 .sidebar-inner .nav-link.active {
@@ -105,6 +114,10 @@
   font-weight: 700;
   color: var(--color-text-secondary);
   padding: 0.25rem;
+}
+
+.sidebar-inner .nav-link.nav-link-home:hover {
+  color: var(--color-accent);
 }
 
 /* ── Section Titles ────────────────────────────────────────────────── */

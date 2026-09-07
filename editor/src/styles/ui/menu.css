@@ -174,3 +174,39 @@
   opacity: 1;
   color: var(--color-accent);
 }
+
+/* ── Link & URL Styling in Menus ───────────────────────────────────── */
+
+/* Reset browser default link styling in menus to match page style */
+.toolbar-menu a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.toolbar-menu a:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.toolbar-menu a:visited {
+  color: inherit;
+}
+
+/* Sublabel paths/URLs - modern monospace styling */
+.toolbar-menu .menu-item-sublabel {
+  margin-left: auto;
+  padding-left: 16px;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.01em;
+  opacity: 0.9;
+  border-left: 2px solid var(--color-border);
+  padding-left: 8px;
+  margin-left: 8px;
+}
