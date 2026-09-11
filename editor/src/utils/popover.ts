@@ -136,7 +136,8 @@ export function applyPanelFlip(panel: HTMLElement, opts: PanelFlipOptions): void
 // block boundaries. Horizontal edges are pinned to the editor container
 // (.ProseMirror) so the popover aligns with the editor's content column; only
 // the vertical edges come from the block itself.
-const BLOCK_SELECTOR = "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td"
+const BLOCK_SELECTOR =
+  "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, .inb4doc-image-block"
 
 export function getBlockRectAt(view: EditorView, pos: number): FlipAnchorRect | null {
   let el: HTMLElement | null = null
