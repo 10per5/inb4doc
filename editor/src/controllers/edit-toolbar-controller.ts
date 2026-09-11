@@ -4,7 +4,7 @@ import { ToolbarCommand } from "@/config/enums"
 import { ActiveBlockType, type ActiveBlockContext } from "@/config/enums/block-context"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
-import { Menu } from "@/components/ui/menu"
+import { NavMenu } from "@/components/ui/nav-menu"
 import { menuRegistry } from "@/config/menu-definitions"
 import { trackKeyboardOffset, isMobileViewport, isTabletViewport, isMobileOrTabletUA } from "@/utils/mobile"
 import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/popover"
@@ -46,18 +46,18 @@ export default class EditToolbarController extends Controller {
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
   private canUndo = false
-  private addMenu: Menu | null = null
+  private addMenu: NavMenu | null = null
   private addMenuOpen = false
 
   connect(): void {
     this.element.innerHTML = renderEditToolbar({ icons: icons as Record<string, string> })
     this.addGroupTarget.hidden = false
-    this.addMenu = new Menu({
+    this.addMenu = new NavMenu({
       mountEl: this.fabMenuTarget,
       triggerEl: this.addBtnTarget,
-      label: "Add",
       items: () => menuRegistry.get("add-block")!,
       panelClass: "edit-toolbar-fab-menu",
+      title: "Add block",
       onOpen: () => this.setAddMenuOpen(true),
       onClose: () => this.setAddMenuOpen(false),
     })
@@ -131,7 +131,7 @@ export default class EditToolbarController extends Controller {
       this.addMenu.close()
       return
     }
-    this.addMenu.setAnchorRect(this.addMenuAnchorRect(), this.followMode)
+    this.addMenu.setAnchorRect(this.addBtnRect(), this.followMode)
     this.addMenu.openAndFocusFirst()
   }
 
@@ -149,7 +149,7 @@ export default class EditToolbarController extends Controller {
       this.setInViewport(true)
       // The "+" button may be hidden while the add-block menu is open (the
       // strip hides then); its rect is only meaningful when visible.
-      this.reanchorAddMenu(this.addMenuAnchorRect(), false)
+      this.reanchorAddMenu(this.addBtnRect(), false)
       return
     }
     const editor = this.editor()?.getEditor()
@@ -269,30 +269,25 @@ export default class EditToolbarController extends Controller {
     this.updateVisibility()
   }
 
-  // Anchor the add-block menu at the "+" button's rect. In follow mode the
-  // strip IS the block-anchored popover, so the button rect is already where
-  // the caret's block is; never fall back to the 0×0 #edit-toolbar fixed
-  // anchor, which can sit at left:0/top:0 before positionPopover first runs
-  // (that's what opened the menu at the top-left).
+  // Anchor the add-block menu at the "+" button's rect, so it spawns above the
+  // invoker like a normal dropdown (applyPanelFlip opens upward when the button
+  // sits near the bottom of the screen). In follow mode the strip IS the
+  // block-anchored popover, so the button rect is already where the caret's
+  // block is. Never fall back to the 0×0 #edit-toolbar fixed anchor, which can
+  // sit at left:0/top:0 before positionPopover first runs (that's what opened
+  // the menu at the top-left).
   private addBtnRect(): FlipAnchorRect | null {
     const rect = this.addBtnTarget.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return null
     return { left: rect.left, top: rect.top, bottom: rect.bottom, right: rect.right }
   }
 
-  // Where the add-block menu anchors. Follow mode keeps the FAB/caret-block
-  // rect. Docked mode on a phone/tablet: the "+" FAB sits at the bottom-right,
-  // and the menu right-aligns to it — so its submenus (which open to the right)
-  // spill off the right edge. Anchor instead at the LEFT edge of the viewport
-  // (keeping the FAB's vertical span, so it still opens above the dock) so the
-  // nested options stay fully on screen.
+  // Where the add-block menu anchors — always the "+" button (or, while open in
+  // follow mode, the caret's block, re-applied by positionPopover). The drill-
+  // down NavMenu is a single column, so it no longer needs the old left-edge
+  // override the flyout submenus required.
   private addMenuAnchorRect(): FlipAnchorRect | null {
-    if (this.followMode) return this.addBtnRect()
-    const fab = this.addBtnRect()
-    const isTouch =
-      isMobileViewport() || isTabletViewport() || isMobileOrTabletUA()
-    if (!isTouch || !fab) return fab
-    return { left: 8, top: fab.top, bottom: fab.bottom, right: 8 }
+    return this.addBtnRect()
   }
 
   // While the add-block menu is open the strip hides, so the "+" button has no
