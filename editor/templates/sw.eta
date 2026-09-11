@@ -57,6 +57,14 @@ self.addEventListener("install", (event) => {
   // "waiting" forever in production, SW_ACTIVATED never fires, and the old SW
   // keeps serving stale app.js/chunks from its cache on every reload.
   self.skipWaiting()
+  // Dev: assets are network-first and the dev server always serves fresh
+  // builds, so precaching the IMPORTANT set here is pointless. Worse, it can
+  // wedge the SW — if a precache fetch fails while the dev server is mid-rebuild
+  // (a 404/HTML for a not-yet-built chunk), install never completes and the
+  // previous sw.js keeps controlling every reload, so a fixed sw.js never goes
+  // live. Skip the precache in dev so a regenerated sw.js always takes over on
+  // the next navigation.
+  if (IS_DEV) return
   event.waitUntil(
     (async () => {
       // Chunk URLs precached by the last completed install. Content-hashed
