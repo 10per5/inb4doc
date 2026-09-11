@@ -37,6 +37,7 @@ export interface NativeBridgeSurface {
   pickDirectory?: BridgeFn
   setContentRoot?: BridgeFn
   getContentRoot?: BridgeFn
+  getInitialState?: BridgeFn
   setProvider?: BridgeFn
   getTree?: BridgeFn
   readFile?: BridgeFn
@@ -63,6 +64,7 @@ export const NATIVE_BRIDGE_METHODS = [
   "pickDirectory",
   "setContentRoot",
   "getContentRoot",
+  "getInitialState",
   "setProvider",
   "getTree",
   "readFile",

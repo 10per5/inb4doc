@@ -51,6 +51,13 @@ struct config
     bool debug = false;             ///< --debug
     bool use_app_scheme = false;    ///< true when --editor-root was given
 
+    /// Single-document open: a CLI-launched `.md` file. `initial_path` is the
+    /// file relative to `root()` (`.md` stripped); `single_document` requests
+    /// the editor start in single-document (navtree-hidden) mode. Both empty /
+    /// false for a directory (navigator) open.
+    std::string initial_path;
+    bool single_document = false;
+
     /// Mutable content root (runtime reselection). Always set in local mode.
     std::shared_ptr<content_root_state> root_state;
 

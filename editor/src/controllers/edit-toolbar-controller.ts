@@ -131,7 +131,7 @@ export default class EditToolbarController extends Controller {
       this.addMenu.close()
       return
     }
-    this.addMenu.setAnchorRect(this.addBtnRect(), this.followMode)
+    this.addMenu.setAnchorRect(this.addMenuAnchorRect(), this.followMode)
     this.addMenu.openAndFocusFirst()
   }
 
@@ -149,7 +149,7 @@ export default class EditToolbarController extends Controller {
       this.setInViewport(true)
       // The "+" button may be hidden while the add-block menu is open (the
       // strip hides then); its rect is only meaningful when visible.
-      this.reanchorAddMenu(this.addBtnRect(), false)
+      this.reanchorAddMenu(this.addMenuAnchorRect(), false)
       return
     }
     const editor = this.editor()?.getEditor()
@@ -214,9 +214,9 @@ export default class EditToolbarController extends Controller {
     const inTable = context.type === ActiveBlockType.Table
     this.listGroupTarget.hidden = !inList
     this.tableGroupTarget.hidden = !inTable
-    // The "+" FAB-in-quick-menu hides while the focused block has its own
-    // contextual actions (list/table).
-    this.addGroupTarget.hidden = inList || inTable
+    // The "+" FAB stays visible in every block context (including list/table)
+    // so the add-block menu is always reachable from the strip.
+    this.addGroupTarget.hidden = false
     // Indent controls: always shown for a list item; increase indent is
     // disabled when the item can't sink (first child of its parent list).
     this.setVisible("tc-8", inList)
@@ -278,6 +278,21 @@ export default class EditToolbarController extends Controller {
     const rect = this.addBtnTarget.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return null
     return { left: rect.left, top: rect.top, bottom: rect.bottom, right: rect.right }
+  }
+
+  // Where the add-block menu anchors. Follow mode keeps the FAB/caret-block
+  // rect. Docked mode on a phone/tablet: the "+" FAB sits at the bottom-right,
+  // and the menu right-aligns to it — so its submenus (which open to the right)
+  // spill off the right edge. Anchor instead at the LEFT edge of the viewport
+  // (keeping the FAB's vertical span, so it still opens above the dock) so the
+  // nested options stay fully on screen.
+  private addMenuAnchorRect(): FlipAnchorRect | null {
+    if (this.followMode) return this.addBtnRect()
+    const fab = this.addBtnRect()
+    const isTouch =
+      isMobileViewport() || isTabletViewport() || isMobileOrTabletUA()
+    if (!isTouch || !fab) return fab
+    return { left: 8, top: fab.top, bottom: fab.bottom, right: 8 }
   }
 
   // While the add-block menu is open the strip hides, so the "+" button has no

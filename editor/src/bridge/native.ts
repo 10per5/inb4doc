@@ -68,6 +68,33 @@ export async function getContentRoot(): Promise<ProjectRootInfo | null> {
 }
 
 /**
+ * Boot-time open instruction from the native host. When the desktop CLI is
+ * launched against a single `.md` file, the host sets `path` (relative to the
+ * content root, `.md` stripped) and `single: true` so the editor opens that
+ * document directly in single-document mode instead of the navigator home.
+ * Returns empty values when no single-document open was requested.
+ */
+export async function getInitialState(): Promise<{ path: string; single: boolean }> {
+  const exposed = (window as any).saucer?.exposed as NativeBridgeSurface | undefined
+  const caller = exposed?.getInitialState
+  if (typeof caller !== "function") return { path: "", single: false }
+  let raw: string
+  try {
+    raw = await caller()
+  } catch {
+    return { path: "", single: false }
+  }
+  try {
+    const env = JSON.parse(raw) as BridgeEnvelope
+    if (!env.ok) return { path: "", single: false }
+    const data = env.data as { path?: string; single?: boolean } | undefined
+    return { path: data?.path ?? "", single: !!data?.single }
+  } catch {
+    return { path: "", single: false }
+  }
+}
+
+/**
  * Tell the native host which provider is active so its FS ops root at the
  * right tree. Mobile-only: Android WebView needs this (Saf → built-in docs,
  * Fs → picked tree); the desktop host has no such op. No-op in every other

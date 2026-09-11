@@ -42,6 +42,10 @@ export class LayoutService {
   private state: LayoutState;
   private keyboardOffset = 0;
   private stopKeyboardTrack: (() => void) | null = null;
+  // Single-document mode: a CLI-launched individual file. The navtree (left
+  // panel) stays hidden so only the document shows; the meta panel is left to
+  // the user. Persists across width-bracket changes below.
+  private singleDocument = false;
 
   private constructor() {
     this.state = (g.__inb4docLayoutState ??= bootDefaults(this.currentWidth()));
@@ -59,7 +63,7 @@ export class LayoutService {
     const widthMq = window.matchMedia("(min-width: 1200px)");
     widthMq.addEventListener("change", () => {
       const defs = bootDefaults(this.currentWidth());
-      this.state.leftPanel = defs.leftPanel;
+      this.state.leftPanel = this.singleDocument ? false : defs.leftPanel;
       this.state.rightPanel = defs.rightPanel;
       this.apply();
     });
@@ -135,6 +139,15 @@ export class LayoutService {
 
   toggleLeftPanel(): void {
     this.setLeftPanel(!this.state.leftPanel);
+  }
+
+  /** Enter/leave single-document mode (CLI-opened individual file). Hides the
+   * navtree and keeps it hidden across width changes until toggled off. */
+  setSingleDocument(on: boolean): void {
+    if (this.singleDocument === on) return;
+    this.singleDocument = on;
+    if (on) this.state.leftPanel = false;
+    this.apply();
   }
 
   toggleRightPanel(): void {
