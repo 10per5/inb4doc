@@ -356,12 +356,6 @@ export function registerSW(registry: ModuleRegistry): void {
       // build whose chunks were pruned server-side (interrupted update). Reload
       // once so the current app.js + chunk map take over.
       forceReload("stale chunk: " + data.url)
-    } else if (data.type === "SW_FETCH_FAILED") {
-      // A non-IMPORTANT js/css chunk could not be fetched at all in dev
-      // (both network attempts failed — e.g. a dev-server hiccup or a chunk
-      // not yet built). The SW only posts this in dev, so reload to recover
-      // instead of wedging on a failed dynamic import.
-      forceReload("fetch failed: " + data.url)
     } else if (data.type === "SW_INSTALL_PROGRESS") {
       appEvents.emit(AppEvent.SWInstallProgress, { loaded: data.loaded, total: data.total, done: data.done })
     } else if (data.type === "SW_ACTIVATED") {

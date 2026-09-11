@@ -209,18 +209,6 @@ function notifyStaleAsset(url) {
   });
 }
 
-// A non-IMPORTANT js/css chunk could not be fetched at all (both network
-// attempts failed — e.g. a dev-server hiccup or a chunk not yet built). In dev
-// the page can recover by reloading; prod falls back to the cache/504 path and
-// relies on the stale-404 path instead, so only dev posts this.
-function notifyFetchFailed(url) {
-  self.clients.matchAll({ includeUncontrolled: true }).then((clients) => {
-    for (const c of clients) {
-      c.postMessage({ type: "SW_FETCH_FAILED", url });
-    }
-  });
-}
-
 // A fallback response when neither the network nor the cache can satisfy the
 // request. Everything here is guarded so event.respondWith() can never reject:
 // a rejected respondWith aborts the caller's fetch (a dynamic import mid-swap)
@@ -261,18 +249,10 @@ self.addEventListener("fetch", (event) => {
           } catch {
             const cached = await caches.match(key);
             if (cached) return cached;
-            // One retry — a dev-server restart drops the first connection, and
-            // the second attempt usually lands. Guarded so a second failure
-            // falls through to the graceful fallback instead of rejecting.
-            const retried = await fetch(event.request).catch(() => null);
-            if (retried) return retried;
-            // Both attempts failed. For a non-IMPORTANT js/css chunk in dev this
-            // is usually transient (server still bundling / first connection
-            // dropped), so ask the page to reload and recover instead of wedging
-            // on a failed dynamic import.
-            if (IS_DEV && !IMPORTANT_PATHS.has(url.pathname) && /\.(js|css)(?:\?|$)/.test(url.pathname)) {
-              notifyFetchFailed(event.request.url);
-            }
+            // Network failed and nothing is cached — fall through to the graceful
+            // 504 returned below. Never reject: a rejected respondWith wedges the
+            // caller's dynamic import with a browser "unexpected error" instead of
+            // a failure the page can handle.
           }
         } else {
           const cached = await caches.match(key);
