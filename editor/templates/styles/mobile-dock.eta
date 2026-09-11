@@ -92,6 +92,28 @@
   font-size: 0.85rem;
 }
 
+/* Bigger touch targets for the topbar dropdown triggers and their items on
+ * touch devices, so taps land on the intended control instead of a neighbour. */
+.mobile-layout .book-layout .app-toolbar .toolbar-menu-trigger,
+.mobile-layout .book-layout .app-toolbar .toolbar-heading-btn,
+.mobile-layout .book-layout .app-toolbar .toolbar-list-btn {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-layout .book-layout .app-toolbar .toolbar-menu .menu-item,
+.mobile-layout .book-layout .app-toolbar .toolbar-heading-dropdown button,
+.mobile-layout .book-layout .app-toolbar .toolbar-list-dropdown button,
+.mobile-layout .book-layout .app-toolbar .toolbar-overflow-dropdown button {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
+
 .mobile-layout .book-layout .toolbar-section {
   margin-bottom: 0;
   gap: 0.25rem;
@@ -132,6 +154,28 @@
 .book-layout .app-toolbar button {
   padding: 0 0.35rem;
   font-size: 0.85rem;
+}
+
+/* Bigger touch targets for the topbar dropdown triggers and their items on
+ * touch devices, so taps land on the intended control instead of a neighbour. */
+.book-layout .app-toolbar .toolbar-menu-trigger,
+.book-layout .app-toolbar .toolbar-heading-btn,
+.book-layout .app-toolbar .toolbar-list-btn {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.book-layout .app-toolbar .toolbar-menu .menu-item,
+.book-layout .app-toolbar .toolbar-heading-dropdown button,
+.book-layout .app-toolbar .toolbar-list-dropdown button,
+.book-layout .app-toolbar .toolbar-overflow-dropdown button {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
 }
 
 .book-layout .toolbar-section {
