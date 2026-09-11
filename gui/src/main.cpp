@@ -123,17 +123,56 @@ static std::optional<config> resolve_config(const parsed_args &args)
     auto content_root = args.content_root;
     if (!content_root.empty())
     {
-        if (!fs::exists(content_root) || !fs::is_directory(content_root))
+        std::error_code ec;
+        const bool is_file = fs::is_regular_file(content_root, ec);
+        ec = {};
+        const bool is_dir = fs::is_directory(content_root, ec);
+
+        if (is_file)
+        {
+            // Single-document open: the file's parent dir is the content root,
+            // and the file itself (relative, .md stripped) is the initial path.
+            // The editor opens it directly in single-document mode.
+            auto file = fs::canonical(content_root, ec);
+            if (ec)
+            {
+                std::cerr << "error: cannot resolve '" << content_root << "'\n";
+                return std::nullopt;
+            }
+            auto name = file.filename().string();
+            if (name.size() < 4 || !name.ends_with(".md"))
+            {
+                std::cerr << "error: file '" << content_root
+                          << "' is not a markdown (.md) file\n";
+                return std::nullopt;
+            }
+            cfg.initial_path = name.substr(0, name.size() - 3);
+            cfg.single_document = true;
+            auto dir = fs::canonical(file.parent_path(), ec);
+            if (ec)
+            {
+                std::cerr << "error: cannot resolve parent of '" << content_root
+                          << "'\n";
+                return std::nullopt;
+            }
+            cfg.root_state->set(dir.string());
+            cfg.settings->content_root = dir.string();
+            cfg.settings->save(data_dir);
+        }
+        else if (is_dir)
+        {
+            auto canonical = fs::canonical(content_root).string();
+            cfg.root_state->set(canonical);
+            // Persist the CLI choice so a bare `inb4doc` launch reuses it.
+            cfg.settings->content_root = canonical;
+            cfg.settings->save(data_dir);
+        }
+        else
         {
             std::cerr << "error: --content-root '" << content_root
-                      << "' is not a valid directory\n";
+                      << "' is not a valid file or directory\n";
             return std::nullopt;
         }
-        auto canonical = fs::canonical(content_root).string();
-        cfg.root_state->set(canonical);
-        // Persist the CLI choice so a bare `inb4doc` launch reuses it.
-        cfg.settings->content_root = canonical;
-        cfg.settings->save(data_dir);
     }
     else
     {

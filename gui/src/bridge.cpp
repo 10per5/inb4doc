@@ -349,6 +349,18 @@ void register_bridge(saucer::smartview &wv, const std::shared_ptr<config> &cfg)
         return data_json(out.str());
     });
 
+    // Boot-time open instruction for a CLI-launched single file: the document
+    // path relative to the content root (`.md` stripped) and whether to start
+    // in single-document (navtree-hidden) mode. Empty when launched against a
+    // directory (navigator mode).
+    wv.expose("getInitialState", [cfg]() -> std::string
+    {
+        std::ostringstream out;
+        out << "{\"path\":\"" << json_escape(cfg->initial_path)
+            << "\",\"single\":" << (cfg->single_document ? "true" : "false") << "}";
+        return data_json(out.str());
+    });
+
     // ── Part C.1 W3 updater storage bridge ──
     //
     // The fetch updater (editor/src/services/updater.ts) downloads the live

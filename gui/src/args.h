@@ -11,7 +11,7 @@ struct parsed_args
     std::size_t port = 3000;      ///< --port (remote editor, default 3000)
     std::size_t live_port = 5000; ///< --live-port
     std::string editor_root;      ///< --editor-root (local app:// mode)
-    std::string content_root;     ///< --content-root
+    std::string content_root;     ///< content-root (positional): a directory, or a .md file to open directly
     std::string favicon;          ///< --favicon
     bool disable_gpu = false;     ///< --disable-gpu
     bool no_ignore = false;       ///< --no-ignore

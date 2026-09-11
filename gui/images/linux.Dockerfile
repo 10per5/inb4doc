@@ -8,7 +8,7 @@
 #   docker cp tmp:/build/bin/inb4doc-gui ./bin/
 #   docker rm tmp
 
-FROM debian:trixie-20260623-slim AS builder
+FROM debian:trixie-20260824-slim AS builder
 
 ARG SAUCER_BUILD_TYPE=Release
 

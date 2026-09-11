@@ -28,6 +28,8 @@ import { prefsStore } from "@/stores/preferences-store";
 import { getCurrentPath, replacePath } from "@/utils/url";
 import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
+import { hasFunc, AppFunc } from "$/build/build-mode";
+import { getInitialState } from "@/bridge/native";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { changesScreenStore } from "@/stores/changes-screen-store";
@@ -86,6 +88,19 @@ export default class extends Controller {
     // Apply the boot layout preset (focused by default) so the View-menu panel
     // toggles are in effect from first paint.
     LayoutService.getInstance()
+
+    // GuiDesktop: the CLI may have launched against a single .md file. If so,
+    // open that document directly (path is relative to the content root, .md
+    // stripped) and start in single-document mode (navtree hidden).
+    if (hasFunc(AppFunc.MountProvider)) {
+      try {
+        const init = await getInitialState();
+        if (init.path) this.initialPath = init.path;
+        if (init.single) LayoutService.getInstance().setSingleDocument(true);
+      } catch {
+        // No single-document launch — fall back to the home/navigator view.
+      }
+    }
 
     this.editor.setCurrentPath(this.initialPath)
     this.cache.setCurrentPath(this.initialPath)

@@ -16,7 +16,8 @@ parsed_args parse_args(int argc, char **argv)
                    "Serve frontend from <path>/public/ via app:// scheme "
                    "(mutually exclusive with --host/--port)");
     app.add_option("content-root", args.content_root,
-                   "Content root path (first positional arg)");
+                   "Content directory, or a single .md file to open directly "
+                   "(first positional arg)");
     app.add_option("--live-port", args.live_port,
                    "Live preview server port (default: 5000)");
     app.add_option("--favicon", args.favicon, "Window icon path");
