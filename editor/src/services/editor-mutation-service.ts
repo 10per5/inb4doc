@@ -33,7 +33,7 @@ export function initEditorMutationService(getEditor: () => { action: (fn: (ctx: 
         case ToolbarCommand.Hr:
           commandService.insertHrCommand(state, dispatch); break
         case ToolbarCommand.Heading:
-          commandService.wrapInHeadingCommand(state, dispatch); break
+          commandService.wrapInHeadingCommand(level ?? 1)(state, dispatch); break
         case ToolbarCommand.Indent:
           commandService.indentListCommand(state, dispatch); break
         case ToolbarCommand.Unindent:

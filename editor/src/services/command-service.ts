@@ -26,10 +26,10 @@ class CommandService {
     return (state, dispatch) => toggleMark(state.schema.marks.code)(state, dispatch)
   }
 
-  get wrapInHeadingCommand(): PMCommand {
+  wrapInHeadingCommand(level: number): PMCommand {
     return (state, dispatch) => {
       const nodeType = state.schema.nodes.heading
-      return nodeType ? setBlockType(nodeType)(state, dispatch) : false
+      return nodeType ? setBlockType(nodeType, { level })(state, dispatch) : false
     }
   }
 
