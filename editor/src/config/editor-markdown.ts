@@ -674,9 +674,15 @@ function renderFlatList(
   anyState.inTightList = isTight;
   node.forEach((child, _o, i) => {
     if (i && isTight) anyState.flushClose(1);
-    state.wrapBlock(delim, firstDelim(i, child), node, () =>
-      state.render(child, node, i),
-    );
+    if (child.type.name === "list") {
+      // Nested list: indent it but let it emit its own markers, otherwise the
+      // parent's bullet/number prefix is duplicated and nesting collapses.
+      state.wrapBlock(delim, "", node, () => state.render(child, node, i));
+    } else {
+      state.wrapBlock(delim, firstDelim(i, child), node, () =>
+        state.render(child, node, i),
+      );
+    }
   });
   anyState.inTightList = prevTight;
 }
@@ -798,11 +804,20 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
           const prefix = `- [${checked ? "x" : " "}] `;
           node.forEach((child, _o, i) => {
             if (i) anyState.flushClose(1);
-            // GFM task items need the list marker: "- [ ] text". A bare
-            // "[ ] text" line is not a task list and won't parse back.
-            state.wrapBlock("  ", prefix, node, () =>
-              state.render(child, node, i),
-            );
+            if (child.type.name === "list") {
+              // A nested list is a sub-list: indent it, but let it emit its
+              // own "- [ ] " markers. Wrapping it in our prefix would double
+              // the marker and collapse the nesting on reload.
+              state.wrapBlock("  ", "", node, () =>
+                state.render(child, node, i),
+              );
+            } else {
+              // GFM task items need the list marker: "- [ ] text". A bare
+              // "[ ] text" line is not a task list and won't parse back.
+              state.wrapBlock("  ", prefix, node, () =>
+                state.render(child, node, i),
+              );
+            }
           });
           anyState.inTightList = prevTight;
         } else {

@@ -283,23 +283,53 @@ function enterInlineCodeFromLeft(
   return true
 }
 
-// Home/End to a block edge that touches inline code: move the caret there and
-// clear the stored mark so typing before/after the span is plain.
-function homeToBlockStart(state: any, dispatch: any): boolean {
-  const { $from, empty } = state.selection
-  if (!empty) return false
-  const codeType = codeMark(state)
-  if (!codeType) return false
-  const start = $from.start()
-  if ($from.pos === start) return false
-  if (!state.doc.rangeHasMark(start, start + 1, codeType)) return false
+// Staged Home: 1st press → start of the current visual line, 2nd press →
+// start of the paragraph (block), 3rd press → start of the document. A
+// non-empty selection collapses to the block start.
+function visualLineStart(view: any, pos: number): number | null {
+  if (!view) return null
+  const coords = view.coordsAtPos(pos)
+  if (!coords) return null
+  const dom = view.dom as HTMLElement
+  const rect = dom.getBoundingClientRect()
+  const at = view.posAtCoords({ left: rect.left + 1, top: coords.top + 1 })
+  if (!at) return null
+  return at.pos
+}
+
+function homeStaged(state: any, dispatch: any, view: any): boolean {
+  const { empty, $from } = state.selection as any
+  if (!empty) {
+    if (dispatch) {
+      const tr = state.tr.setSelection(
+        TextSelection.create(state.doc, $from.start()),
+      )
+      dispatch(tr.scrollIntoView())
+    }
+    return true
+  }
+  const blockStart = $from.start()
+  const lineStart = visualLineStart(view, $from.pos)
+  const pos = $from.pos
+  let target: number
+  if (lineStart !== null && pos !== lineStart) {
+    target = lineStart
+  } else if (pos !== blockStart) {
+    target = blockStart
+  } else {
+    target = 0
+  }
   if (dispatch) {
-    dispatch(
-      state.tr
-        .setSelection(TextSelection.create(state.doc, start))
-        .setStoredMarks([])
-        .scrollIntoView(),
-    )
+    const tr = state.tr.setSelection(TextSelection.create(state.doc, target))
+    const codeType = state.schema.marks.code
+    if (
+      codeType &&
+      target === blockStart &&
+      state.doc.rangeHasMark(blockStart, blockStart + 1, codeType)
+    ) {
+      tr.setStoredMarks([])
+    }
+    dispatch(tr.scrollIntoView())
   }
   return true
 }
@@ -330,6 +360,25 @@ function isInsideCodeBlock($from: any): boolean {
     if ($from.node(d).type.name === "codeBlock") return true
   }
   return false
+}
+
+// Force the editor's scroll containers to an edge. The app shell scrolls in
+// `.book-layout`, and the editor content may live in its own scrollable
+// ancestor; reset both so Ctrl+Home/Ctrl+End reach absolute top/bottom (the
+// caret-only move leaves the outer scroll position untouched otherwise).
+function scrollContainersTo(view: any, toTop: boolean): void {
+  const targets = new Set<HTMLElement>()
+  const layout = document.querySelector<HTMLElement>(".book-layout")
+  if (layout) targets.add(layout)
+  let el: HTMLElement | null = (view?.dom as HTMLElement) ?? null
+  while (el && el !== document.body) {
+    if (el.scrollHeight > el.clientHeight + 1) targets.add(el)
+    el = el.parentElement
+  }
+  for (const t of targets) {
+    t.scrollTop = toTop ? 0 : t.scrollHeight
+    t.scrollLeft = 0
+  }
 }
 
 // Tab / Shift-Tab inside a code block: indent/dedent every line touched by the
@@ -694,8 +743,31 @@ export function createKeymap() {
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
     "ArrowLeft": (state, dispatch) => enterInlineCodeFromLeft(state, dispatch),
     "ArrowRight": (state, dispatch) => exitInlineCode(state, dispatch),
-    "Home": (state, dispatch) => homeToBlockStart(state, dispatch),
+    "Home": (state, dispatch, view) => homeStaged(state, dispatch, view),
     "End": (state, dispatch) => endToBlockEnd(state, dispatch),
+    "Mod-Home": (state, dispatch, view) => {
+      if (dispatch) {
+        dispatch(
+          state.tr
+            .setSelection(Selection.near(state.doc.resolve(0)))
+            .scrollIntoView(),
+        )
+      }
+      scrollContainersTo(view, true)
+      return true
+    },
+    "Mod-End": (state, dispatch, view) => {
+      const end = state.doc.content.size
+      if (dispatch) {
+        dispatch(
+          state.tr
+            .setSelection(Selection.near(state.doc.resolve(end)))
+            .scrollIntoView(),
+        )
+      }
+      scrollContainersTo(view, false)
+      return true
+    },
     "Backspace": (state, dispatch) => {
       if (backspaceCodeBlockToParagraph(state, dispatch)) return true
       return headingToParagraph(state, dispatch)

@@ -42,6 +42,21 @@ function findCaseInsensitiveFile(tree: TreeIndex, parentDir: string, slug: strin
   return null
 }
 
+// Same as above, but for an existing DIRECTORY with the same name. Creating a
+// file whose name collides with a folder is illegal (the filesystem can't hold
+// both), so the create flow rejects it up front, like a real OS.
+function findCaseInsensitiveDir(tree: TreeIndex, parentDir: string, slug: string): string | null {
+  const lowerSlug = slug.toLowerCase()
+  const entries = tree.children.get(parentDir) ?? []
+  for (const entry of entries) {
+    if (!entry.isDir) continue
+    if (entry.name.toLowerCase() === lowerSlug) {
+      return entry.name
+    }
+  }
+  return null
+}
+
 export async function createNewItem(
   cacheService: FileSyncService,
   pagePath: string,
@@ -74,6 +89,18 @@ export async function createNewItem(
   if (result.asDirectory) {
     const dirPath = parentDir ? `${parentDir}/${slug}` : slug
     const indexPath = `${dirPath}/${HOME_PATH}`
+
+    // Block a directory whose name already matches an existing folder
+    // (case-insensitive) — duplicate folder names are illegal.
+    const existingDir = findCaseInsensitiveDir(treeStore.getTree(), parentDir, slug)
+    if (existingDir) {
+      showNotification(
+        `A folder named "${existingDir}" already exists. Pick a different name.`,
+        { title: "Name conflict", type: "warning" },
+      )
+      return
+    }
+
     if (await cacheService.pathExists(indexPath)) {
       showNotification(`"${indexPath}" already exists.`, { title: "Duplicate", type: "warning" })
       return
@@ -143,6 +170,18 @@ export async function createNewItem(
     const fullPath = parentDir ? `${parentDir}/${slug}` : slug
     if (await cacheService.pathExists(fullPath)) {
       showNotification(`"${fullPath}" already exists.`, { title: "Duplicate", type: "warning" })
+      return
+    }
+
+    // A file cannot share a name with an existing folder (the underlying
+    // filesystem can't hold both); reject up front with a clear message
+    // instead of failing to save later.
+    const existingDir = findCaseInsensitiveDir(treeStore.getTree(), parentDir, slug)
+    if (existingDir) {
+      showNotification(
+        `A folder named "${existingDir}" already exists. A file can't share that name — pick a different name.`,
+        { title: "Name conflict", type: "warning" },
+      )
       return
     }
     const fmData: MetaPanelData = { title: result.name, weight: nextFolderWeight(parentDir) }

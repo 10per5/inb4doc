@@ -116,6 +116,11 @@ export async function createEditor(
   const pdURL = proxyDomURLFor(host);
 
   const extensions: Extension[] = [
+    // Registered before createSchemaExtension() so this custom backtick handler
+    // wins the handleTextInput race over defineCode()'s stock input rule
+    // (which leaves the caret INSIDE the code span). It must run first so the
+    // closing backtick exits the inline code and lands the caret outside.
+    definePlugin([createInlineCodeInputPlugin()]),
     createSchemaExtension(),
     createKeymap(),
     codeBlockHighlight,
@@ -125,7 +130,6 @@ export async function createEditor(
 
     definePlugin([
       createPlainPastePlugin(),
-      createInlineCodeInputPlugin(),
       createUrlPastePlugin(),
       createDirtyPlugin({
         getLastSetContent: (path) => host.stateCache.getLastSet(path),
