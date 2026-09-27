@@ -12,6 +12,8 @@ import { HugoRefDialogController } from "./dialog/hugoref-dialog-controller"
 import { ImportZipDialogController } from "./dialog/import-zip-dialog-controller"
 import { ExternalChangeDialogController } from "./dialog/external-change-dialog-controller"
 import { ProviderDialogController } from "./dialog/provider-dialog-controller"
+import { ShareSendDialogController } from "./dialog/share-send-dialog-controller"
+import { ShareOpenDialogController } from "./dialog/share-open-dialog-controller"
 
 import PrefsController from "./prefs-controller"
 import ImageManagerController from "./image-manager-controller"
@@ -41,6 +43,8 @@ const lazyRegistrations: ControllerRegistration[] = [
   { name: "changes", controller: ChangesController },
   { name: "external-change-dialog", controller: ExternalChangeDialogController },
   { name: "provider-dialog", controller: ProviderDialogController },
+  { name: "share-send-dialog", controller: ShareSendDialogController },
+  { name: "share-open-dialog", controller: ShareOpenDialogController },
 ]
 
 export function registerLazyControllers(app: Application): void {

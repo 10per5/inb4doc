@@ -1,0 +1,31 @@
+<div class="inb4doc-dialog-box" onclick="event.stopPropagation()">
+  <h3>Share document</h3>
+  <p>Create an <code>inb4doc://</code> link to send. Recipients open it to import the note.</p>
+
+  <div class="inb4doc-dialog-check">
+    <input type="radio" name="send-mode" id="send-raw" value="raw" checked
+      data-action="change->share-send-dialog#onModeChange">
+    <label for="send-raw">Plain (no encryption)</label>
+  </div>
+  <div class="inb4doc-dialog-check">
+    <input type="radio" name="send-mode" id="send-enc" value="encrypted"
+      data-action="change->share-send-dialog#onModeChange">
+    <label for="send-enc">Encrypted (passphrase)</label>
+  </div>
+
+  <div data-share-pw hidden>
+    <label for="send-pw-input">Passphrase</label>
+    <input id="send-pw-input" type="password" placeholder="Enter a passphrase"
+      data-action="input->share-send-dialog#onPassInput keydown->share-send-dialog#keydown">
+  </div>
+
+  <label for="send-output">Share link</label>
+  <textarea id="send-output" data-share-output readonly rows="3"></textarea>
+
+  <div class="inb4doc-hint" data-share-status></div>
+
+  <div class="inb4doc-dialog-actions">
+    <button class="inb4doc-dialog-cancel" data-action="click->share-send-dialog#cancel">Close</button>
+    <button class="inb4doc-dialog-confirm" data-action="click->share-send-dialog#copy">Copy link</button>
+  </div>
+</div>

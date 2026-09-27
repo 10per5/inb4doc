@@ -1,0 +1,25 @@
+<div class="inb4doc-dialog-box" onclick="event.stopPropagation()">
+  <h3>Open shared document</h3>
+  <p>Paste an <code>inb4doc://</code> link (or use Paste) to import a note into the current vault.</p>
+
+  <label for="open-uri">Shared link</label>
+  <textarea id="open-uri" data-open-uri rows="3" placeholder="inb4doc://1/doc/…"
+    data-action="input->share-open-dialog#onUriInput keydown->share-open-dialog#keydown"></textarea>
+
+  <div class="inb4doc-dialog-actions" style="justify-content:flex-start;margin-bottom:0.5rem">
+    <button type="button" data-action="click->share-open-dialog#paste">Paste from clipboard</button>
+  </div>
+
+  <div data-open-pw-wrap hidden>
+    <label for="open-pw">Passphrase</label>
+    <input id="open-pw" type="password" data-open-pw
+      data-action="input->share-open-dialog#onPassInput keydown->share-open-dialog#keydown">
+  </div>
+
+  <div class="inb4doc-hint" data-open-status></div>
+
+  <div class="inb4doc-dialog-actions">
+    <button class="inb4doc-dialog-cancel" data-action="click->share-open-dialog#cancel">Close</button>
+    <button class="inb4doc-dialog-confirm" data-action="click->share-open-dialog#open">Open</button>
+  </div>
+</div>

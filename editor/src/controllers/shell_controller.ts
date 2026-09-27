@@ -145,6 +145,25 @@ export default class extends Controller {
       appEvents.on(AppEvent.SaveRequested, () => {
         exportToZip().then(() => this.nav.loadSidebar())
       }),
+      appEvents.on(AppEvent.ShareSendRequested, () => {
+        const content = this.editor.getCurrentContent()
+        const title = this.nav.getCurrentPath()?.split("/").pop()?.replace(/-/g, " ")
+        void import("@/services/share-service").then(({ openShareSendDialog }) =>
+          openShareSendDialog(content, title),
+        )
+      }),
+      appEvents.on(AppEvent.ShareOpenRequested, () => {
+        void import("@/services/share-service").then(({ openShareOpenDialog }) =>
+          openShareOpenDialog(),
+        )
+      }),
+      appEvents.on(AppEvent.OpenSharedDocRequested, ({ path, content }) => {
+        this.cache.createDraft(path, content)
+        this.view.switchTo("editor")
+        appEvents.emit(AppEvent.Navigate, { path })
+        this.nav.loadSidebar()
+        dirtyTrackingService.recompute()
+      }),
       appEvents.on(AppEvent.LoadRequested, () => this.handleLoadZip()),
       appEvents.on(AppEvent.SidebarToggle, () => this.uiService.toggleSidebar()),
       appEvents.on(AppEvent.ProviderChangeRequested, () => this.nav.changeProvider()),
@@ -160,9 +179,6 @@ export default class extends Controller {
         this.cache.createDraft(HOME_PATH, NEW_PAGE_BODY)
         this.view.switchTo("editor")
         appEvents.emit(AppEvent.Navigate, { path: HOME_PATH })
-      }),
-      appEvents.on(AppEvent.CreateDraftRequested, ({ path, content }) => {
-        this.cache.createDraft(path, content)
       }),
       appEvents.on(AppEvent.DirIndexActivated, ({ path }) => {
         const template = isRootPath(path)

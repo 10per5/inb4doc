@@ -187,6 +187,55 @@
   min-height: 1.2rem;
 }
 
+/* ── Share Dialog (Share / Open tabs) ─────────────────────────────── */
+
+.inb4doc-share-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.inb4doc-share-tabs button {
+  flex: 1;
+  padding: 0.45rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+.inb4doc-share-tabs button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.inb4doc-dialog-box textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+.inb4doc-dialog-box textarea[readonly] {
+  background: var(--color-bg-secondary);
+}
+.inb4doc-dialog-box textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+.inb4doc-dialog-box code {
+  background: var(--color-bg-secondary);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
 /* ── Link Dialog ───────────────────────────────────────────────────── */
 
 .inb4doc-link-box {

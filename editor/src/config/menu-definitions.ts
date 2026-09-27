@@ -9,6 +9,8 @@ import { SlashCommand, LayoutWidth } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
 import {
   mediaImage,
+  shareIos,
+  packageIcon,
   floppyDisk,
   folder,
   folderOpen,
@@ -87,18 +89,46 @@ menuRegistry.register("file", (): MenuItem[] => {
     },
     { type: MenuType.Separator },
     {
-      type: MenuType.Item,
-      id: "save",
-      icon: floppyDisk,
-      label: "Save as Zip",
-      onClick: () => appEvents.emit(AppEvent.SaveRequested),
+      type: MenuType.Submenu,
+      id: "share",
+      icon: shareIos,
+      label: "Share",
+      items: [
+        {
+          type: MenuType.Item,
+          id: "share-send",
+          label: "Send",
+          onClick: () => appEvents.emit(AppEvent.ShareSendRequested),
+        },
+        {
+          type: MenuType.Item,
+          id: "share-open",
+          label: "Open",
+          onClick: () => appEvents.emit(AppEvent.ShareOpenRequested),
+        },
+      ],
     },
     {
-      type: MenuType.Item,
-      id: "load",
-      icon: folder,
-      label: "Load from Zip",
-      onClick: () => appEvents.emit(AppEvent.LoadRequested),
+      type: MenuType.Submenu,
+      id: "compress",
+      icon: packageIcon,
+      label: "Compress",
+      items: [
+        {
+          type: MenuType.Item,
+          id: "save-zip",
+          icon: floppyDisk,
+          label: "Save (as zip)",
+          onClick: () => appEvents.emit(AppEvent.SaveRequested),
+        },
+        {
+          type: MenuType.Item,
+          id: "load-zip",
+          icon: folder,
+          label: "Load",
+          onClick: () => appEvents.emit(AppEvent.LoadRequested),
+        },
+      ],
     },
   ];
 });
