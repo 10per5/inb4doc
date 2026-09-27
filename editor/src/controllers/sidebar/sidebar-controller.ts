@@ -64,6 +64,7 @@ export default class extends Controller {
   private allPaths: string[] = [];
   private unsubs: (() => void)[] = [];
   private itemByPath = new Map<string, HTMLElement>();
+  private activePath = "";
   private prevDirty = new Set<string>();
   private hideEmptyFolders = false;
 
@@ -86,16 +87,33 @@ export default class extends Controller {
         this.load();
       }),
       appEvents.on(AppEvent.SidebarActive, ({ path }) => {
-        this.setActive(path);
+        this.activePath = path
+        this.setActive(path)
       }),
       appEvents.on(AppEvent.SidebarCancel, () => {
         if (this.selectionMode) this.exitSelection();
       }),
       appEvents.on(AppEvent.SidebarScrollToCurrent, () => {
-        const path = getCurrentPath();
-        if (!path) return;
-        const el = this.itemByPath.get(path);
-        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+        let el = this.itemByPath.get(this.activePath);
+        // When the open file is a directory's _index page, focus the directory
+        // section in the explorer instead of the _index leaf item.
+        if (this.activePath.endsWith("/_index")) {
+          const dirPath = this.activePath.slice(0, -"/_index".length);
+          const section = this.innerTarget.querySelector<HTMLElement>(
+            `.nav-section[data-nav-path="${CSS.escape(dirPath)}"]`,
+          );
+          if (section) el = section;
+        }
+        if (!el) return;
+        const scroller = el.closest<HTMLElement>(".sidebar-inner") ?? el.closest<HTMLElement>(".book-leftpanel");
+        if (scroller) {
+          const sr = el.getBoundingClientRect();
+          const cr = scroller.getBoundingClientRect();
+          const target = sr.top - cr.top + scroller.scrollTop - (scroller.clientHeight - el.clientHeight) / 2;
+          scroller.scrollTop = Math.max(0, target);
+        } else {
+          el.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
       })
     );
   }

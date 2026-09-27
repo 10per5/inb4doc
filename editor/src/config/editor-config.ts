@@ -41,6 +41,7 @@ import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
+import { createSelectionPlugin } from "@/plugins/selection";
 import {
   createEditorDragDropPlugin,
   configureDropIndicator,
@@ -149,6 +150,7 @@ export async function createEditor(
       }),
       createCodeBlockMovePlugin(),
       createBlockContextPlugin(),
+      createSelectionPlugin(),
       createTextStatePlugin(),
       createHistoryContextPlugin(),
       ...(isMobileDock() ? [createCaretScrollPlugin()] : []),

@@ -62,6 +62,35 @@
   line-height: 1.6;
 }
 
+/* ── Status Bar ────────────────────────────────────────────────────── */
+
+.editor-statusbar {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 16px;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+  user-select: none;
+}
+
+.editor-statusbar__path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-layout .editor-statusbar {
+  display: none;
+}
+
 /* ── Print Styles ──────────────────────────────────────────────────── */
 
 @media print {

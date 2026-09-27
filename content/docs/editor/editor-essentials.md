@@ -19,7 +19,9 @@ Navigation and interaction use [Hotwired](https://hotwired.dev):
 
 * **Turbo Drive** — SPA-like navigation without client-side routing
 
+
 * **Turbo Frames** — Inline editing without hand-coded fetch calls
+
 
 * **Stimulus** — Tiny controllers for editor mount/unmount, mode toggle, save buffer, flush
 
@@ -39,7 +41,9 @@ Triggered by typing `/` or via the **+** button in the toolbar.
 
 * Available on all viewports
 
+
 * Inserts blocks (headings, lists, code, images, etc.)
+
 
 * **Mobile**: menu adapts to screen width, larger touch targets, positioned to avoid keyboard overlap
 
@@ -49,7 +53,9 @@ Triggered by typing `@` in the editor.
 
 * Available on all viewports
 
+
 * Searches and links to other pages in the project
+
 
 * **Mobile**: menu height limited to avoid keyboard overlap
 
@@ -57,6 +63,8 @@ Triggered by typing `@` in the editor.
 
 * [Superdoc](https://github.com/superdoc-dev/superdoc) — a modern collaborative DOCX editor. Too heavy for this project ([5.79 MB build](https://sizepanic.com/package/superdoc), [113 MB deps](https://pkg-size.dev/superdoc)), but a nice option if full Office-style editing is needed.
 
+
 * [Quill](https://github.com/slab/quill) — a modern rich text editor built for compatibility and extensibility. A lighter-weight alternative if a simpler WYSIWYG is acceptable.
+
 
 * [Tiptap](https://tiptap.dev/) — a headless, customizable editor framework built on ProseMirror, well suited for custom editing experiences.

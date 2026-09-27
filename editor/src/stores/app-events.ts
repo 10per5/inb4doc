@@ -33,6 +33,7 @@ export enum AppEvent {
 
   // Dirty / sync
   EditorChanged = "editor-changed",
+  EditorSelectionChanged = "editor-selection-changed",
   OutlineChanged = "outline-changed",
   DirtyChanged = "dirty-changed",
   DirtyClicked = "dirty-clicked",
@@ -149,6 +150,7 @@ export interface AppEventPayloads {
   [AppEvent.SourceApplyRequested]:  { path: string; content: string }
   [AppEvent.BlockContextChanged]:   { context: ActiveBlockContext }
   [AppEvent.TextStateChanged]:      TextState
+  [AppEvent.EditorSelectionChanged]: { from: number; to: number }
   [AppEvent.HistoryChanged]:         { canUndo: boolean; canRedo: boolean }
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
   [AppEvent.InsertBlockCommand]:    { command: SlashCommand; level?: number }
