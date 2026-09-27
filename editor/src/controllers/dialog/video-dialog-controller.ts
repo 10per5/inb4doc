@@ -27,6 +27,7 @@ export class VideoDialogController extends BaseDialogController {
 
   connect() {
     this.element.innerHTML = renderVideoDialog(this.payloadValue)
+    this.focusInput(`#${CSS.escape(this.payloadValue.inputId)}`, { raf: true })
   }
 
   keydown(e: KeyboardEvent) {

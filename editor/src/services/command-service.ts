@@ -29,7 +29,14 @@ class CommandService {
   wrapInHeadingCommand(level: number): PMCommand {
     return (state, dispatch) => {
       const nodeType = state.schema.nodes.heading
-      return nodeType ? setBlockType(nodeType, { level })(state, dispatch) : false
+      if (!nodeType) return false
+      const { $from } = state.selection
+      const block = $from.node($from.depth)
+      // Toggle off: re-clicking the same heading level reverts to paragraph.
+      if (block.type === nodeType && block.attrs.level === level) {
+        return setBlockType(state.schema.nodes.paragraph)(state, dispatch)
+      }
+      return setBlockType(nodeType, { level })(state, dispatch)
     }
   }
 

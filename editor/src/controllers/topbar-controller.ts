@@ -771,19 +771,32 @@ export default class extends Controller {
 
   /**
    * Clone the overflowed buttons into the "…" dropdown. Clones keep their
-   * data-cmd / data-action so Stimulus dispatches the same commands; the
-   * compound heading/list wraps and separators are dropped (their dropdowns
-   * must stay anchored in the visible toolbar).
+   * data-cmd / data-action so Stimulus dispatches the same commands. The
+   * compound heading/list wraps can't be moved wholesale (their dropdowns must
+   * stay anchored in the visible toolbar), so instead we promote their inner
+   * dropdown actions (H1–H3, bullet/ordered/task/check/clear) into the "…"
+   * menu — otherwise a narrow tablet width would drop the whole list dropdown
+   * and the Task list option would vanish with no way to reach it.
    */
   private renderOverflowItems(overflowed: HTMLElement[]): void {
     const dropdown = this.overflowDropdownTarget;
     dropdown.innerHTML = "";
     for (const el of overflowed) {
+      if (el.classList.contains("toolbar-sep")) continue;
       if (
-        el.classList.contains("toolbar-sep") ||
         el.classList.contains("toolbar-heading-wrap") ||
         el.classList.contains("toolbar-list-wrap")
       ) {
+        const inner = el.querySelector<HTMLElement>(
+          ".toolbar-heading-dropdown, .toolbar-list-dropdown",
+        );
+        if (inner) {
+          for (const item of Array.from(inner.children)) {
+            const clone = item.cloneNode(true) as HTMLElement;
+            clone.hidden = false;
+            dropdown.appendChild(clone);
+          }
+        }
         continue;
       }
       const clone = el.cloneNode(true) as HTMLElement;

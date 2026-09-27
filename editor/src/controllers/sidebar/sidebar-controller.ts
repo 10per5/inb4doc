@@ -90,6 +90,12 @@ export default class extends Controller {
       }),
       appEvents.on(AppEvent.SidebarCancel, () => {
         if (this.selectionMode) this.exitSelection();
+      }),
+      appEvents.on(AppEvent.SidebarScrollToCurrent, () => {
+        const path = getCurrentPath();
+        if (!path) return;
+        const el = this.itemByPath.get(path);
+        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
       })
     );
   }

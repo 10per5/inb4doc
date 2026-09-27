@@ -1,9 +1,27 @@
 import { Plugin, PluginKey } from "prosemirror-state"
 import type { ResolvedPos } from "prosemirror-model"
 import type { EditorView } from "prosemirror-view"
+import { imageService } from "@/services/image-service"
 
 export interface ImagePasteConfig {
   uploadImage: (file: File) => Promise<string>
+}
+
+const PENDING_PREFIX = "pending-image:"
+
+function findImageInSelection(view: EditorView): File | undefined {
+  const { from, to } = view.state.selection
+  let file: File | undefined
+  view.state.doc.nodesBetween(from, to, (node) => {
+    if (file) return false
+    if (node.type.name !== "image" && node.type.name !== "image-block") return
+    const src: string | undefined = node.attrs.src
+    if (typeof src === "string" && src.startsWith(PENDING_PREFIX)) {
+      const id = src.slice(PENDING_PREFIX.length)
+      file = imageService.getImageFile(id)
+    }
+  })
+  return file
 }
 
 function isInsideTableCell($pos: ResolvedPos): boolean {
@@ -78,6 +96,35 @@ export function createImagePastePlugin(config: ImagePasteConfig) {
           }
         }
         return false
+      },
+      // Copy/cut a selection that contains an image: also place the real image
+      // bytes on the clipboard (as `image/*`) so the image can be pasted into
+      // another editor or external app — not just a text/markdown reference.
+      // We don't preventDefault, so ProseMirror still writes the usual
+      // text/html + text/plain for same-app paste. Only pending (in-session)
+      // images have their bytes synchronously available here; committed images
+      // fall back to the default reference copy.
+      handleDOMEvents: {
+        copy: (view, event) => {
+          const file = findImageInSelection(view)
+          if (file) {
+            const item = new File([file], file.name || "image", {
+              type: file.type || "image/png",
+            })
+            event.clipboardData?.items.add(item)
+          }
+          return false
+        },
+        cut: (view, event) => {
+          const file = findImageInSelection(view)
+          if (file) {
+            const item = new File([file], file.name || "image", {
+              type: file.type || "image/png",
+            })
+            event.clipboardData?.items.add(item)
+          }
+          return false
+        },
       },
     },
   })

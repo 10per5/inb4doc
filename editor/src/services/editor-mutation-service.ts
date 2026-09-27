@@ -1,7 +1,16 @@
 import type { EditorView } from "prosemirror-view"
+import type { EditorState } from "prosemirror-state"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { ToolbarCommand } from "@/config/enums"
 import { clearListItems, setListItemKind, setTaskChecked, toggleTaskChecked } from "@/utils/editor-mutator"
+
+function selectionInsideList(state: EditorState): boolean {
+  const { $from } = state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === "list") return true
+  }
+  return false
+}
 
 export function initEditorMutationService(getEditor: () => { action: (fn: (ctx: any) => void) => any } | null) {
   const unsubToolbar = appEvents.on(AppEvent.ToolbarCommandExec, async ({ command, level }) => {
@@ -32,8 +41,13 @@ export function initEditorMutationService(getEditor: () => { action: (fn: (ctx: 
           commandService.toggleInlineCodeCommand(state, dispatch); break
         case ToolbarCommand.Hr:
           commandService.insertHrCommand(state, dispatch); break
-        case ToolbarCommand.Heading:
-          commandService.wrapInHeadingCommand(level ?? 1)(state, dispatch); break
+        case ToolbarCommand.Heading: {
+          // A heading isn't a valid child of a list item — lift the current
+          // item out of the list first, then apply the heading.
+          if (selectionInsideList(state)) clearListItems(view)
+          commandService.wrapInHeadingCommand(level ?? 1)(view.state, view.dispatch)
+          break
+        }
         case ToolbarCommand.Indent:
           commandService.indentListCommand(state, dispatch); break
         case ToolbarCommand.Unindent:

@@ -817,6 +817,16 @@ const globalKeyBindings: ReadonlyArray<{
     matches: (e) => e.key === "Escape",
     handler: () => appEvents.emit(AppEvent.SidebarCancel),
   },
+  {
+    matches: (e) =>
+      (e.key === "e" || e.key === "E") &&
+      (e.ctrlKey || e.metaKey) &&
+      e.shiftKey,
+    handler: (e) => {
+      e.preventDefault()
+      appEvents.emit(AppEvent.SidebarScrollToCurrent)
+    },
+  },
 ]
 
 function dispatchGlobalKey(event: KeyboardEvent): void {

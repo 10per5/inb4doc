@@ -80,6 +80,14 @@ export default class EditToolbarController extends Controller {
         this.setDisabled("tc-20", !canRedo)
         this.updateVisibility()
       }),
+      // Follow mode (tablet/phone, OSK open): the anchored block grows as the
+      // user types, so its rect shifts downward. BlockContextChanged is deduped
+      // per block, so typing inside one paragraph never re-emits — reposition
+      // on every doc change so the popover tracks the (taller) block and stays
+      // below it instead of floating above the text.
+      appEvents.on(AppEvent.EditorChanged, () => {
+        if (this.followMode) this.positionPopover()
+      }),
     )
     // On-screen keyboard open → follow mode (the caret sits just above the
     // keys, so the strip would be hidden behind them). Visual-viewport
