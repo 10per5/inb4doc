@@ -13,6 +13,7 @@
 #include <iostream>
 #include <optional>
 #include <memory>
+#include <cstdlib>
 #if defined(__linux__)
 #include <QClipboard>
 #include <QGuiApplication>
@@ -106,6 +107,32 @@ static void toast(saucer::smartview &wv, const std::string &msg)
     static_cast<saucer::webview &>(wv).execute(js.c_str());
 }
 
+// Open `url` in the OS-default browser / handler. Used for genuinely external
+// navigations (http(s)/file) so the webview itself never leaves the app://
+// origin. URLs are shell-quote-escaped to avoid metacharacter injection.
+static void open_in_browser(const std::string &url)
+{
+    if (url.empty())
+        return;
+
+    std::string safe;
+    for (char c : url)
+    {
+        if (c == '\'')
+            safe += "'\\''";
+        else
+            safe += c;
+    }
+
+#if defined(__linux__)
+    std::system(("xdg-open '" + safe + "' >/dev/null 2>&1 &").c_str());
+#elif defined(__APPLE__)
+    std::system(("open '" + safe + "' >/dev/null 2>&1 &").c_str());
+#elif defined(_WIN32)
+    std::system(("cmd /c start \"\" \"" + url + "\"").c_str());
+#endif
+}
+
 // inb4.config.toml is the gui settings file (key = value) in the data-dir root.
 // Keys: zoom (applied on boot, written on quit) and content_root (the last
 // project dir from File → Open Project…). Parsed once into config.settings
@@ -113,7 +140,7 @@ static void toast(saucer::smartview &wv, const std::string &msg)
 static bool is_allowed(const saucer::url &url)
 {
     return security::check(security::parse_url(url.string()))
-           != security::verdict::block;
+           == security::verdict::allow;
 }
 
 int run_app(config cfg)
@@ -234,8 +261,8 @@ int run_app(config cfg)
 
                     if (safe->debug)
                         std::println(std::cerr, "  [debug]   -> block (external)\n");
-                    toast(wv, "This website is external, open it in your "
-                              "navigator\n" + url_str);
+                    open_in_browser(url_str);
+                    toast(wv, "Opening in your browser:\n" + url_str);
                     return saucer::policy::block;
                 }
             );
@@ -315,8 +342,10 @@ int run_app(config cfg)
                 if (is_allowed(*parsed))
                     wv.set_url(url);
                 else
-                    toast(wv, "This website is external, open it in your "
-                              "navigator\n" + url);
+                {
+                    open_in_browser(url);
+                    toast(wv, "Opening in your browser:\n" + url);
+                }
             });
 
             wv.expose("log", [](const std::string &msg)

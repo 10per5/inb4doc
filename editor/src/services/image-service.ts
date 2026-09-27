@@ -200,6 +200,17 @@ class ImageService {
     return undefined
   }
 
+  /** Synchronous access to a pending image's original `File` bytes (if the
+   *  image is still pending). Used by the copy/cut handler to put the real
+   *  image data on the clipboard so it can be pasted into another editor. */
+  getImageFile(id: string): File | undefined {
+    for (const list of this.pendingByDir.values()) {
+      const found = list.find(p => p.id === id)
+      if (found?.file) return found.file
+    }
+    return undefined
+  }
+
   async removePending(id: string): Promise<boolean> {
     for (const [dir, list] of this.pendingByDir) {
       const idx = list.findIndex(p => p.id === id)

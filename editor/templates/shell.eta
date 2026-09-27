@@ -39,6 +39,11 @@
               <%~ include('partials/editor-area', it) %>
             </div>
           </div>
+          <footer class="editor-statusbar" data-controller="statusbar">
+            <span data-statusbar-target="path" class="editor-statusbar__path"></span>
+            <span data-statusbar-target="dirty" class="pending-badge pending-badge-unsaved" hidden>unsaved</span>
+            <span data-statusbar-target="stats" class="editor-statusbar__stats" hidden></span>
+          </footer>
         </div>
         <% if (!it.dockReplacesChrome) { %>
         <aside class="book-rightpanel" id="meta-panel-mount" data-controller="meta-panel" data-meta-panel-editor-outlet="#editor-area">

@@ -46,6 +46,10 @@ export class LayoutService {
   // panel) stays hidden so only the document shows; the meta panel is left to
   // the user. Persists across width-bracket changes below.
   private singleDocument = false;
+  // Once the user manually toggles the sidebar, orientation changes stop
+  // auto-adjusting it — we only ever set the *default* per orientation, never
+  // override an explicit choice.
+  private userToggledLeft = false;
 
   private constructor() {
     this.state = (g.__inb4docLayoutState ??= bootDefaults(this.currentWidth()));
@@ -76,6 +80,27 @@ export class LayoutService {
       if (this.currentWidth() !== prev) this.apply();
       document.documentElement.style.setProperty("--kb-offset", `${offset}px`);
     });
+    // Tablet: sidebar visibility follows orientation by default — portrait
+    // hides it, landscape shows it — but only until the user manually toggles
+    // it (see `userToggledLeft`). `apply()` emits `LayoutChanged` so the View
+    // menu's toggle state refreshes automatically.
+    const orientationMq = window.matchMedia("(orientation: portrait)");
+    orientationMq.addEventListener("change", () => this.applyOrientationDefault());
+    this.applyOrientationDefault();
+  }
+
+  /** Tablet-only: set the left-panel *default* from orientation without ever
+   * overriding an explicit user toggle. portrait → hidden, landscape → shown. */
+  private applyOrientationDefault(): void {
+    if (this.singleDocument) return;
+    if (this.currentWidth() !== LayoutWidth.Tablet) return;
+    if (this.userToggledLeft) return;
+    const portrait = window.matchMedia("(orientation: portrait)").matches;
+    const wantLeft = !portrait;
+    if (this.state.leftPanel !== wantLeft) {
+      this.state.leftPanel = wantLeft;
+      this.apply();
+    }
   }
 
   static getInstance(): LayoutService {
@@ -138,6 +163,7 @@ export class LayoutService {
   }
 
   toggleLeftPanel(): void {
+    this.userToggledLeft = true;
     this.setLeftPanel(!this.state.leftPanel);
   }
 
@@ -151,6 +177,7 @@ export class LayoutService {
   }
 
   toggleRightPanel(): void {
+    this.userToggledLeft = true;
     this.setRightPanel(!this.state.rightPanel);
   }
 

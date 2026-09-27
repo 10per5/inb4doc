@@ -12,19 +12,11 @@ export interface ToolbarConfig {
 export class ToolbarStore {
   /** Don't auto-hide while scrolled this close to the top. */
   private static readonly HIDE_BELOW = 100
-  /**
-   * Dead-zone margin for visibility flips. Scroll position can jitter by
-   * several px around the scroll anchor while content height settles (e.g.
-   * after a source-mode apply/cancel re-render); without this margin the
-   * `hidden` class flips on every reversal and the 0.46s opacity transition
-   * reads as visible flicker. Keep it larger than the observed jitter.
-   */
-  private static readonly MARGIN = 64
 
   private toolbar: HTMLElement | null
   private editorEl: HTMLElement | null
   private hidden = false
-  private flipScrollY = 0
+  private lastScrollY = 0
   private autoHidePref: boolean
   private onScroll: (() => void) | null = null
   private showOnFocus: (() => void) | null = null
@@ -73,13 +65,16 @@ export class ToolbarStore {
       const layoutEl = document.querySelector(".book-layout")
       const sy = layoutEl?.scrollTop ?? 0
 
-      if (this.hidden) {
-        if (sy <= this.flipScrollY - ToolbarStore.MARGIN) {
-          this.setHidden(false)
-        }
-      } else if (sy > ToolbarStore.HIDE_BELOW && sy >= this.flipScrollY + ToolbarStore.MARGIN) {
+      // Direction-based: hide only after scrolling down past the top band, and
+      // show again on ANY upward scroll. The old threshold required scrolling
+      // up by a fixed margin from the hide point, which was unreachable on
+      // short documents (or near the bottom) — so the bar could never re-show.
+      if (sy > ToolbarStore.HIDE_BELOW && sy > this.lastScrollY) {
         this.setHidden(true)
+      } else if (sy < this.lastScrollY) {
+        this.setHidden(false)
       }
+      this.lastScrollY = sy
     }
   }
 
@@ -96,7 +91,7 @@ export class ToolbarStore {
 
     this.hidden = hidden
     const layoutEl = document.querySelector(".book-layout")
-    this.flipScrollY = layoutEl?.scrollTop ?? 0
+    this.lastScrollY = layoutEl?.scrollTop ?? 0
     this.toolbar?.classList.toggle("hidden", hidden)
   }
 }

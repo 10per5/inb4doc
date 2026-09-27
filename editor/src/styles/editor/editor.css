@@ -6,6 +6,7 @@
 
 #inb4doc-editor .ProseMirror {
   font-size: var(--font-size-base);
+  caret-color: var(--color-caret);
 }
 
 /* ── ProseMirror Links ─────────────────────────────────────────────── */

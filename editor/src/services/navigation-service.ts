@@ -166,8 +166,6 @@ export class NavigationService {
       this.navCleanup?.();
       this.navCleanup = setupNavListeners((path: string) => this.navigate(path));
 
-      const pages = Array.from(mergedTree.paths);
-      this.editor.getMentionView()?.setPages(pages, {});
       appEvents.emit(AppEvent.SidebarReload);
     } catch (error) {
       console.error("Failed to load sidebar:", error);

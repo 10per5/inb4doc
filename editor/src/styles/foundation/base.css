@@ -52,6 +52,9 @@ body {
   --color-error: #bf616a;
   --color-info: #5e81ac;
 
+  /* Editor text caret — high-contrast against both themes. */
+  --color-caret: #5e81ac;
+
   /* Toggle / icon button states */
   --color-btn-bg: #edf8fd;
   --color-btn-text: #4c566a;
@@ -93,6 +96,7 @@ body {
   --color-accent: #81a1c1;
   --color-accent-hover: #88c0d0;
   --color-accent-soft: rgba(129, 161, 193, 0.2);
+  --color-caret: #88c0d0;
 
   --color-btn-bg: #434c5e;
   --color-btn-text: #d8dee9;

@@ -62,3 +62,42 @@
 .slash-label {
   color: var(--color-text-primary);
 }
+
+.inb4doc-mention {
+  position: absolute;
+  z-index: 100;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  min-width: 220px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.inb4doc-mention[data-show="false"] {
+  display: none;
+}
+
+.inb4doc-mention[data-show="true"] {
+  display: block;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-item:hover,
+.mention-item:focus {
+  background: var(--color-bg-tertiary);
+}

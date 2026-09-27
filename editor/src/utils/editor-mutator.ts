@@ -129,6 +129,20 @@ export function setListItemKind(
   const { $from, $to } = state.selection
 
   if (kind === "bullet" || kind === "ordered") {
+    // If already inside a list of the SAME kind, re-selecting it should clear
+    // the list (like ExitList), not flip the marker style (* <-> -).
+    let itemDepth = -1
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === "list") {
+        itemDepth = d
+        break
+      }
+    }
+    const currentList = itemDepth === -1 ? null : $from.node(itemDepth)
+    if (currentList && currentList.attrs.kind === kind) {
+      clearListItems(view)
+      return
+    }
     createToggleListCommand({ kind })(state, dispatch)
     return
   }

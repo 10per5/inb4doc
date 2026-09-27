@@ -15,6 +15,7 @@ import DockController from "./dock-controller"
 import NavigationController from "./navigation-controller"
 import MoreController from "./more-controller"
 import EditToolbarController from "./edit-toolbar-controller"
+import StatusBarController from "./statusbar-controller"
 
 export interface ControllerRegistration {
   name: string
@@ -38,6 +39,7 @@ const coreRegistrations: ControllerRegistration[] = [
   // mobile via the dock, tablet/desktop via View → Screens → Navigation.
   { name: "navigation", controller: NavigationController },
   { name: "update", controller: UpdateController },
+  { name: "statusbar", controller: StatusBarController },
 ]
 
 export function registerCoreControllers(app: Application): void {

@@ -41,6 +41,7 @@ import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
 import { createUrlPastePlugin } from "@/plugins/url-paste";
 import { createImageEditPlugin } from "@/plugins/image-edit";
+import { createSelectionPlugin } from "@/plugins/selection";
 import {
   createEditorDragDropPlugin,
   configureDropIndicator,
@@ -116,6 +117,11 @@ export async function createEditor(
   const pdURL = proxyDomURLFor(host);
 
   const extensions: Extension[] = [
+    // Registered before createSchemaExtension() so this custom backtick handler
+    // wins the handleTextInput race over defineCode()'s stock input rule
+    // (which leaves the caret INSIDE the code span). It must run first so the
+    // closing backtick exits the inline code and lands the caret outside.
+    definePlugin([createInlineCodeInputPlugin()]),
     createSchemaExtension(),
     createKeymap(),
     codeBlockHighlight,
@@ -125,7 +131,6 @@ export async function createEditor(
 
     definePlugin([
       createPlainPastePlugin(),
-      createInlineCodeInputPlugin(),
       createUrlPastePlugin(),
       createDirtyPlugin({
         getLastSetContent: (path) => host.stateCache.getLastSet(path),
@@ -145,6 +150,7 @@ export async function createEditor(
       }),
       createCodeBlockMovePlugin(),
       createBlockContextPlugin(),
+      createSelectionPlugin(),
       createTextStatePlugin(),
       createHistoryContextPlugin(),
       ...(isMobileDock() ? [createCaretScrollPlugin()] : []),

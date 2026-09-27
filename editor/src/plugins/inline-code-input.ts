@@ -59,12 +59,18 @@ export function createInlineCodeInputPlugin() {
 
         const lastTick = textBefore.lastIndexOf("`")
         if (lastTick !== -1 && textBefore.length - 1 - lastTick > 0) {
+          // The opening backtick must be isolated — a backtick directly before
+          // it means we're mid-code-fence (```), not inline code, so leave the
+          // keystroke to the code-block input rule.
+          if (lastTick > 0 && textBefore[lastTick - 1] === "`") return false
           const contentLength = textBefore.length - 1 - lastTick
           return convertClosing(view, parentStart + lastTick, contentLength, codeType)
         }
 
         const nextTick = textAfter.indexOf("`")
         if (nextTick === -1 || nextTick === 0) return false
+        // Likewise, a backtick right after the closing one is a fence, not inline.
+        if (textAfter[nextTick + 1] === "`") return false
         return convertOpening(view, from, nextTick, codeType)
       },
     },

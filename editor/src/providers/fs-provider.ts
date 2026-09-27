@@ -304,7 +304,10 @@ export class FileSystemProvider implements ContentProvider {
     await writable.close();
     const blobUrl = URL.createObjectURL(file);
     this.imageUrlCache.set(`${dir}/${relPath}`, blobUrl);
-    return `/${dir}/${relPath}`;
+    // Return a doc-relative path (images are stored under <docdir>/image/),
+    // not a root-absolute one — the markdown link must resolve relative to the
+    // referencing document, otherwise saved docs get dangling /dir/image/… links.
+    return relPath;
   }
 
   resolveImageUrl(url: string): string | undefined {

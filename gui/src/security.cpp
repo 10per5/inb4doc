@@ -114,6 +114,12 @@ verdict check(const url_parts &url)
     if (url.scheme == "app")
         return verdict::allow;
 
+    // file:// is never loaded inside the webview — hand it to the OS
+    // (opens the file in its default app, or is a no-op for drops the
+    // editor already intercepts).
+    if (url.scheme == "file")
+        return verdict::prompt;
+
     if (url.host.empty())
         return verdict::allow;
 

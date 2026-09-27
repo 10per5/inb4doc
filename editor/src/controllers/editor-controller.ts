@@ -129,7 +129,6 @@ export class EditorController extends Controller {
     }
 
     const editorEl = this.inb4docTarget;
-
     const host: EditorHost = {
       currentPathDir: () => this.currentPathDir(),
       currentPath: this.currentPath,
@@ -151,6 +150,7 @@ export class EditorController extends Controller {
       this.serializeDoc(this.editor.view)
     );
     appEvents.emit(AppEvent.OutlineChanged);
+    this.scrollEditorToTop();
   }
 
   // ── Content loading ──
@@ -437,6 +437,25 @@ export class EditorController extends Controller {
 
   // ── Private ──
 
+  // Reset the editor's scroll containers to the top when a document is opened
+  // or navigated to, so navigation/app-open lands on the document start rather
+  // than carrying over the previous page's scroll position.
+  private scrollEditorToTop(): void {
+    const view = this.editor?.view;
+    const targets = new Set<HTMLElement>();
+    const layout = document.querySelector<HTMLElement>(".book-layout");
+    if (layout) targets.add(layout);
+    let el: HTMLElement | null = (view?.dom as HTMLElement) ?? null;
+    while (el && el !== document.body) {
+      if (el.scrollHeight > el.clientHeight + 1) targets.add(el);
+      el = el.parentElement;
+    }
+    for (const t of targets) {
+      t.scrollTop = 0;
+      t.scrollLeft = 0;
+    }
+  }
+
   private updateEditorContent(content: string): void {
     if (!this.editor) return;
 
@@ -464,6 +483,7 @@ export class EditorController extends Controller {
         this.editorStates.set(this.currentPath, newState);
         this.editorContents.set(this.currentPath, content);
       });
+      this.scrollEditorToTop();
     }
     appEvents.emit(AppEvent.OutlineChanged);
   }
