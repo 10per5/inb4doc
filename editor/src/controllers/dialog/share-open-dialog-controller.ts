@@ -14,13 +14,21 @@ function slugify(s: string): string {
 
 export class ShareOpenDialogController extends BaseDialogController {
   static values = { payload: Object }
-  declare payloadValue: Record<string, unknown>
+  declare payloadValue: { uri?: string }
 
   private uri = ""
   private pw = ""
+  private integrityAck = false
 
   connect() {
     this.element.innerHTML = renderShareOpenDialog(this.payloadValue)
+    const initial = typeof this.payloadValue.uri === "string" ? this.payloadValue.uri : ""
+    if (initial) {
+      this.uri = initial
+      const ta = this.element.querySelector<HTMLTextAreaElement>("[data-open-uri]")
+      if (ta) ta.value = initial
+      this.syncPwVisibility()
+    }
   }
 
   onEnter() {
@@ -29,6 +37,7 @@ export class ShareOpenDialogController extends BaseDialogController {
 
   onUriInput(e: Event) {
     this.uri = (e.target as HTMLTextAreaElement).value
+    this.integrityAck = false
     this.syncPwVisibility()
   }
 
@@ -43,6 +52,7 @@ export class ShareOpenDialogController extends BaseDialogController {
       this.uri = text.trim()
       if (ta) {
         ta.value = this.uri
+        this.integrityAck = false
         this.syncPwVisibility()
       }
     } catch {
@@ -80,10 +90,21 @@ export class ShareOpenDialogController extends BaseDialogController {
       return
     }
     let decoded: string
+    let mismatch = false
     try {
-      decoded = await decodeInb4doc(this.uri, { pw: this.pw })
+      decoded = await decodeInb4doc(this.uri, {
+        pw: this.pw,
+        onIntegrity: (m) => {
+          mismatch = m
+        },
+      })
     } catch (err) {
       this.setStatus("Could not open link: " + (err as Error).message)
+      return
+    }
+    if (mismatch && !this.integrityAck) {
+      this.integrityAck = true
+      this.setStatus("⚠ Integrity check failed (corrupted or tampered). Click Open again to import anyway.")
       return
     }
     const titleMatch = decoded.match(/^#\s+(.+)$/m)

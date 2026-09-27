@@ -22,6 +22,8 @@
   <label for="send-output">Share link</label>
   <textarea id="send-output" data-share-output readonly rows="3"></textarea>
 
+  <div class="inb4doc-warn" data-share-warn hidden></div>
+
   <div class="inb4doc-hint" data-share-status></div>
 
   <div class="inb4doc-dialog-actions">

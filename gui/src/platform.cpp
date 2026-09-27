@@ -160,3 +160,17 @@ std::string pick_directory(const std::string &initial_dir)
     return {};
 #endif
 }
+
+std::string share_socket_path()
+{
+    const char *runtime = std::getenv("XDG_RUNTIME_DIR");
+    std::string base;
+    if (runtime && *runtime)
+        base = runtime;
+    else
+    {
+        const char *tmp = std::getenv("TMPDIR");
+        base = (tmp && *tmp) ? tmp : "/tmp";
+    }
+    return base + "/inb4doc-share.sock";
+}

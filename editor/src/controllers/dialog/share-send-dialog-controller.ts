@@ -9,6 +9,9 @@ export class ShareSendDialogController extends BaseDialogController {
   private mode: "raw" | "encrypted" = "raw"
   private pw = ""
 
+  // Chat-app inline-link length heuristic (spec §10). Tunable; open question #2.
+  private static readonly LINK_LENGTH_WARN = 2000
+
   connect() {
     this.element.innerHTML = renderShareSendDialog(this.payloadValue)
     void this.generate()
@@ -47,10 +50,24 @@ export class ShareSendDialogController extends BaseDialogController {
         pw: this.mode === "encrypted" ? this.pw : undefined,
         title: this.payloadValue.title,
       })
-      this.setStatus("")
+      this.setLengthWarning(out.value.length)
+      if (out.value.length <= ShareSendDialogController.LINK_LENGTH_WARN) this.setStatus("")
     } catch (err) {
       out.value = ""
+      this.setLengthWarning(0)
       this.setStatus("Failed to generate link: " + (err as Error).message)
+    }
+  }
+
+  private setLengthWarning(len: number) {
+    const el = this.element.querySelector<HTMLElement>("[data-share-warn]")
+    if (!el) return
+    if (len > ShareSendDialogController.LINK_LENGTH_WARN) {
+      el.hidden = false
+      el.textContent = `⚠ Link is ${len} chars — may exceed chat-app limits (Discord ~2 KB). Large docs need the server option.`
+    } else {
+      el.hidden = true
+      el.textContent = ""
     }
   }
 

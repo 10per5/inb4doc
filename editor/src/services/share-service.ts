@@ -9,6 +9,6 @@ export function openShareSendDialog(content: string, title?: string): void {
   openDialog("share-send-dialog", { content, title } satisfies ShareSendPayload)
 }
 
-export function openShareOpenDialog(): void {
-  openDialog("share-open-dialog", {})
+export function openShareOpenDialog(initialUri?: string): void {
+  openDialog("share-open-dialog", { uri: initialUri ?? "" })
 }

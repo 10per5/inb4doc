@@ -187,28 +187,13 @@
   min-height: 1.2rem;
 }
 
-/* ── Share Dialog (Share / Open tabs) ─────────────────────────────── */
+.inb4doc-warn {
+  font-size: 0.82rem;
+  color: var(--color-warning);
+  margin-top: 0.4rem;
+  line-height: 1.35;
+}
 
-.inb4doc-share-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-.inb4doc-share-tabs button {
-  flex: 1;
-  padding: 0.45rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-}
-.inb4doc-share-tabs button.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #fff;
-}
 .inb4doc-dialog-box textarea {
   width: 100%;
   box-sizing: border-box;

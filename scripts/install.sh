@@ -260,22 +260,51 @@ install_desktop() {
     if [ -n "$EDITOR_ROOT" ]; then
         exec_line="$exec_line --content-root \"$EDITOR_ROOT\""
     fi
+    # %u forwards a single URI (inb4doc:// link, or a .md path) to the binary;
+    # gui/src/args.cpp distinguishes a scheme URI from a file path.
+    exec_line="$exec_line %u"
 
-    {
-        echo "[Desktop Entry]"
-        echo "Type=Application"
-        echo "Name=inb4doc"
-        echo "Comment=Local-first Markdown editor"
-        echo "Exec=$exec_line"
-        echo "Icon=$PREFIX/icon.png"
-        echo "Terminal=false"
-        echo "Categories=Office;"
-    } >"$DESKTOP_FILE"
+    # Prefer the prewritten desktop entry in the repo (next to this script);
+    # fall back to the one shipped inside the downloaded payload if absent.
+    local script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local src_desktop=""
+    [ -f "$script_dir/inb4doc.desktop" ] && src_desktop="$script_dir/inb4doc.desktop"
+    [ -z "$src_desktop" ] && [ -f "$PAYLOAD_BIN/inb4doc.desktop" ] && src_desktop="$PAYLOAD_BIN/inb4doc.desktop"
+
+    if [ -n "$src_desktop" ]; then
+        sed -e "s|/opt/inb4doc|$PREFIX|g" "$src_desktop" >"$DESKTOP_FILE"
+        if [ -n "$EDITOR_ROOT" ]; then
+            sed -i "s|^Exec=.*|Exec=$exec_line|" "$DESKTOP_FILE"
+        fi
+    else
+        {
+            echo "[Desktop Entry]"
+            echo "Type=Application"
+            echo "Name=inb4doc"
+            echo "Comment=Local-first Markdown editor"
+            echo "Exec=$exec_line"
+            echo "Icon=$PREFIX/icon.png"
+            echo "Terminal=false"
+            echo "Categories=Office;"
+            echo "MimeType=text/markdown;x-scheme-handler/inb4doc;"
+        } >"$DESKTOP_FILE"
+    fi
 
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$DATA_HOME/applications" >/dev/null 2>&1 || true
     fi
+
+    # Claim the inb4doc:// scheme so links open in the app (spec §7.1).
+    if command -v xdg-settings >/dev/null 2>&1; then
+        xdg-settings set default-url-scheme-handler inb4doc "${DESKTOP_FILE##*/}" \
+            >/dev/null 2>&1 || true
+    fi
+    if command -v gio >/dev/null 2>&1; then
+        gio mime x-scheme-handler/inb4doc "${DESKTOP_FILE##*/}" >/dev/null 2>&1 || true
+    fi
+
     echo "Installed desktop entry: $DESKTOP_FILE"
+    echo "Registered x-scheme-handler/inb4doc (inb4doc:// links open here)."
 }
 
 # --- uninstall ----------------------------------------------------------------

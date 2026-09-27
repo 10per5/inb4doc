@@ -68,6 +68,17 @@ export default class extends Controller {
 
   connect() {
     this.initialPath = this.data.get("path") || getCurrentPath()
+
+    // Runtime deep-link entry point for the desktop shell's single-instance IPC
+    // (gui/src/app.cpp): when a second launch forwards an inb4doc:// URI, the
+    // GUI evaluates window.__inb4docOpenExternal(uri) into the live editor.
+    ;(window as unknown as Record<string, unknown>).__inb4docOpenExternal = (
+      uri: string,
+    ) => {
+      void import("@/services/share-service").then(({ openShareOpenDialog }) =>
+        openShareOpenDialog(uri),
+      )
+    }
   }
 
   editorOutletConnected(outlet: EditorController) {
@@ -253,6 +264,38 @@ export default class extends Controller {
     await this.nav.loadSidebar()
     this.editor.hideSkeleton()
     dirtyTrackingService.recompute()
+    this.checkInitialShareUri()
+  }
+
+  /**
+   * Deep-link bootstrap (spec §8): if the app was launched with an
+   * `inb4doc://` URI, open the import dialog prefilled with it.
+   *
+   * Sources, in priority order:
+   *  - `window.__INB4DOC_OPEN_URI__`: set by the GUI shell (gui/src/args.cpp)
+   *    before the editor bundle loads, carrying a `inb4doc://` argv/intent.
+   *  - `location.hash` (`#inb4doc://…`) — web/PWA fallback (spec §7.3).
+   *  - `?inb4doc=…` query param.
+   */
+  private checkInitialShareUri(): void {
+    const candidate = this.detectInitialShareUri()
+    if (!candidate) return
+    void import("@/services/share-service").then(({ openShareOpenDialog }) =>
+      openShareOpenDialog(candidate),
+    )
+  }
+
+  private detectInitialShareUri(): string | null {
+    const w = window as unknown as { __INB4DOC_OPEN_URI__?: string }
+    if (typeof w.__INB4DOC_OPEN_URI__ === "string" && w.__INB4DOC_OPEN_URI__.startsWith("inb4doc://")) {
+      return w.__INB4DOC_OPEN_URI__
+    }
+    const hash = location.hash.replace(/^#/, "")
+    const hashMatch = hash.match(/inb4doc:\/\/[^\s]+/)
+    if (hashMatch) return hashMatch[0]
+    const q = new URLSearchParams(location.search).get("inb4doc")
+    if (q) return "inb4doc://" + q
+    return null
   }
 
   disconnect() {

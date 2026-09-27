@@ -29,3 +29,9 @@ std::string default_browser_data_dir();
 /// Show a native directory picker (File → Open Project…). Returns the chosen
 /// canonical path, or empty when the user cancels. Blocks on the UI thread.
 std::string pick_directory(const std::string &initial_dir = {});
+
+/// Filesystem path of the single-instance IPC socket (AF_UNIX). The first
+/// inb4doc process listens here; later launches connect and forward a deep
+/// link (or a focus request) instead of opening a second window. Lives under
+/// $XDG_RUNTIME_DIR when available, else $TMPDIR/$TMP.
+std::string share_socket_path();

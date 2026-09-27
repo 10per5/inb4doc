@@ -18,6 +18,8 @@
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QShortcut>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <saucer/modules/stable/qt.hpp>
 #elif defined(_WIN32)
 #include <saucer/modules/stable/webview2.hpp>
@@ -105,6 +107,26 @@ static void toast(saucer::smartview &wv, const std::string &msg)
     }
     auto js = "window.inb4docUI.showToast('" + escaped + "')";
     static_cast<saucer::webview &>(wv).execute(js.c_str());
+}
+
+// Escape a string for embedding inside a single-quoted JS literal.
+static std::string js_escape(const std::string &s)
+{
+    std::string out;
+    for (char c : s)
+    {
+        if (c == '\'')
+            out += "\\'";
+        else if (c == '\\')
+            out += "\\\\";
+        else if (c == '\n')
+            out += "\\n";
+        else if (c == '\r')
+            out += "\\r";
+        else
+            out += c;
+    }
+    return out;
 }
 
 // Open `url` in the OS-default browser / handler. Used for genuinely external
@@ -441,6 +463,55 @@ int run_app(config cfg)
 
             wv.set_url(safe->editor_url);
             window->show();
+
+            // -- single-instance IPC: receive deep links from later launches --
+            // A second `inb4doc-gui inb4doc://…` (e.g. a Firefox click while
+            // this instance is open) connects here and forwards the URI, which
+            // we push into the live editor. `FOCUS` just raises the window.
+#if defined(__linux__)
+            {
+                auto *share_server =
+                    new QLocalServer(window->native<true>().window);
+                QObject::connect(
+                    share_server, &QLocalServer::newConnection,
+                    [safe, &wv, window, share_server]()
+                    {
+                        auto *client = share_server->nextPendingConnection();
+                        if (!client)
+                            return;
+                        QObject::connect(
+                            client, &QLocalSocket::readyRead,
+                            [safe, &wv, window, client]()
+                            {
+                                const auto data = client->readAll();
+                                std::string msg(
+                                    data.constData(),
+                                    static_cast<std::size_t>(data.size()));
+                                if (msg.rfind("OPEN ", 0) == 0)
+                                {
+                                    std::string uri = msg.substr(5);
+                                    while (!uri.empty() && (uri.back() == '\n' ||
+                                                            uri.back() == '\r'))
+                                        uri.pop_back();
+                                    auto js = "window.__inb4docOpenExternal('" +
+                                              js_escape(uri) + "')";
+                                    static_cast<saucer::webview &>(wv).execute(
+                                        js.c_str());
+                                    window->show();
+                                }
+                                else
+                                {
+                                    window->show();
+                                }
+                                client->close();
+                                client->deleteLater();
+                            });
+                    });
+                const auto path = QString::fromStdString(share_socket_path());
+                share_server->removeServer(path);
+                share_server->listen(path);
+            }
+#endif
 
             co_await app->finish();
 

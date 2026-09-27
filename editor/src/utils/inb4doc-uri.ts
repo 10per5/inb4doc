@@ -165,7 +165,7 @@ export function parseInb4doc(uri: string): ParsedInb4doc {
  */
 export async function decodeInb4doc(
   uri: string,
-  opts: { pw?: string } = {},
+  opts: { pw?: string; onIntegrity?: (mismatch: boolean) => void } = {},
 ): Promise<string> {
   const parsed = parseInb4doc(uri)
   const bytes = base64urlToBytes(parsed.payload)
@@ -188,9 +188,11 @@ export async function decodeInb4doc(
   const text = new TextDecoder().decode(inflated)
   if (parsed.hash) {
     const actual = await sha256Hex(new TextEncoder().encode(text))
-    if (actual !== parsed.hash) {
+    const mismatch = actual !== parsed.hash
+    if (mismatch) {
       console.warn("inb4doc: integrity hash mismatch (corrupted or tampered)")
     }
+    opts.onIntegrity?.(mismatch)
   }
   return text
 }

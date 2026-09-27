@@ -10,6 +10,10 @@
 #include <optional>
 #include <regex>
 #include <sstream>
+#include <cstring>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 namespace fs = std::filesystem;
 
 static bool mode_ambiguous(const parsed_args &args)
@@ -194,12 +198,46 @@ static std::optional<config> resolve_config(const parsed_args &args)
     cfg.editor_url = "app://_/";
     cfg.use_app_scheme = true;
 
+    // Deep-link bootstrap: Firefox / the desktop handler can launch the app
+    // with an `inb4doc://…` URI. Append it as a URL fragment so the editor's
+    // existing `location.hash` detection (docs/inb4doc-uri.md §8) opens it.
+    cfg.open_uri = args.open_uri;
+    if (!args.open_uri.empty())
+        cfg.editor_url += "#" + args.open_uri;
+
     return cfg;
 }
 
 int main(int argc, char **argv)
 {
     auto args = parse_args(argc, argv);
+
+    // Single-instance: if another inb4doc is already running, hand it the deep
+    // link (or a focus request) over the AF_UNIX socket and don't launch a
+    // second window. The probe is raw POSIX so it runs before Saucer/Qt spin
+    // up — there's no QApplication yet.
+    {
+        auto sock = share_socket_path();
+        int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+        if (fd >= 0)
+        {
+            struct sockaddr_un addr{};
+            addr.sun_family = AF_UNIX;
+            std::strncpy(addr.sun_path, sock.c_str(),
+                         sizeof(addr.sun_path) - 1);
+            if (::connect(fd, reinterpret_cast<struct sockaddr *>(&addr),
+                          sizeof(addr)) == 0)
+            {
+                std::string msg = args.open_uri.empty()
+                    ? std::string("FOCUS\n")
+                    : "OPEN " + args.open_uri + "\n";
+                ::send(fd, msg.data(), static_cast<size_t>(msg.size()), 0);
+                ::close(fd);
+                return 0;
+            }
+            ::close(fd);
+        }
+    }
 
     auto cfg = resolve_config(args);
     if (!cfg)
