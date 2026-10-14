@@ -67,6 +67,9 @@ export class ImageDialogController extends BaseDialogController {
     imageService.uploadImage(file).then((url) => {
       this.urlTarget.value = url
       this.save()
+    }).catch((e: unknown) => {
+      const message = e instanceof Error ? e.message : "Upload failed"
+      showToast(message, { type: "danger" })
     })
   }
 

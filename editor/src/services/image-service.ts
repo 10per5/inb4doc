@@ -2,7 +2,7 @@ import { Image } from "@/entities/Image"
 import type { ImageEntry } from "@/providers/provider"
 import { getProvider } from "@/stores/provider-store"
 import { prefsStore } from "@/stores/preferences-store"
-import { readFileAsBase64 } from "@/utils/file"
+import { isImageFile, isVideoFile, readFileAsBase64 } from "@/utils/file"
 
 const DB_NAME = "inb4doc-pending-images"
 const STORE_NAME = "images"
@@ -107,6 +107,17 @@ class ImageService {
   }
 
   async uploadImage(file: File): Promise<string> {
+    // Reject videos (and other non-image files) up front so they never enter
+    // the pending-image cache and never surface the confusing upload-failure
+    // error. The user gets a clear message instead.
+    if (isVideoFile(file)) {
+      throw new Error(
+        "Video uploads aren't supported yet — insert a video with a link/URL instead."
+      )
+    }
+    if (!isImageFile(file)) {
+      throw new Error("Only image files can be uploaded.")
+    }
     if (this.isBase64Mode()) {
       return readFileAsBase64(file)
     }
