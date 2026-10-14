@@ -1,6 +1,7 @@
 import { defineNodeView } from "@prosekit/core"
 import type { NodeView } from "prosemirror-view"
 import { editPencil } from "@/eta/icons"
+import { getVideoEmbedUrl } from "@/utils/video-url"
 
 export interface VideoAttrs {
   src: string
@@ -104,6 +105,18 @@ export const videoView = defineNodeView({
     video.style.maxHeight = "400px"
     video.draggable = true
 
+    const iframe = document.createElement("iframe")
+    iframe.className = "video-iframe"
+    iframe.style.width = "100%"
+    iframe.style.aspectRatio = "16 / 9"
+    iframe.style.border = "0"
+    iframe.allow =
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    iframe.allowFullscreen = true
+    iframe.style.display = "none"
+
+    let lastIframeSrc = ""
+
     function sync(node: any) {
       const a = node.attrs
       video.poster = a.poster || ""
@@ -114,6 +127,23 @@ export const videoView = defineNodeView({
       video.playsInline = a.playsinline
       if (a.width) video.style.width = a.width + (String(a.width).match(/^\d+$/) ? "px" : "")
       if (a.height) video.style.maxHeight = a.height + (String(a.height).match(/^\d+$/) ? "px" : "")
+
+      const embed = getVideoEmbedUrl(a.src)
+      if (embed) {
+        // Hosted video (YouTube/Vimeo): render an iframe embed — a bare
+        // <video> element can't play these URLs.
+        if (embed !== lastIframeSrc) {
+          iframe.src = embed
+          lastIframeSrc = embed
+        }
+        video.style.display = "none"
+        iframe.style.display = ""
+        placeholder.style.display = "none"
+        return
+      }
+
+      // Direct media file: render a <video> element.
+      lastIframeSrc = ""
       while (video.firstChild) video.removeChild(video.firstChild)
       if (a.src) {
         const source = document.createElement("source")
@@ -121,6 +151,7 @@ export const videoView = defineNodeView({
         video.appendChild(source)
       }
       video.style.display = a.src ? "" : "none"
+      iframe.style.display = "none"
       placeholder.style.display = a.src ? "none" : ""
     }
 
@@ -128,6 +159,7 @@ export const videoView = defineNodeView({
 
     wrapper.appendChild(placeholder)
     wrapper.appendChild(video)
+    wrapper.appendChild(iframe)
     wrapper.appendChild(editBtn)
 
     return {

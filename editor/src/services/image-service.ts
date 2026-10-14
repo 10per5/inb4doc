@@ -129,14 +129,11 @@ class ImageService {
   }
 
   /**
-   * Upload every pending image, independently. A failed upload is collected
-   * (record kept, so it can be retried or discarded) and never aborts the
-   * whole save — the page still writes, with whatever images succeeded.
-   *
-   * Records are NOT removed here: they are kept until the doc write that
-   * references them succeeds (`confirmCommitted`). If the write fails, the
-   * pending→real URL mapping survives for the next save instead of being lost
-   * (which would orphan-delete the freshly uploaded file).
+   * Upload every pending image, independently. A failed upload is collected in
+   * `failed` (so the caller can surface an error) and removed from the cache —
+   * a `pi-N` pending entry that failed to upload must not linger in the image
+   * picker or resurface after a reload. The page still writes with whatever
+   * images succeeded.
    */
   async commitAllPendingImages(): Promise<ImageCommitResult> {
     const provider = getProvider()
@@ -147,6 +144,7 @@ class ImageService {
     const urlMap = new Map<string, string>()
     const committedIds: string[] = []
     const failed: ImageCommitFailure[] = []
+    const failedIds: string[] = []
     for (const dir of this.getAllPendingDirs()) {
       const list = this.pendingByDir.get(dir) || []
       for (const img of list) {
@@ -156,6 +154,7 @@ class ImageService {
             name: img.id,
             error: new Error("Image file is no longer available"),
           })
+          failedIds.push(img.id)
           continue
         }
         try {
@@ -165,8 +164,13 @@ class ImageService {
         } catch (e) {
           const error = e instanceof Error ? e : new Error(String(e))
           failed.push({ id: img.id, name: img.id, error })
+          failedIds.push(img.id)
         }
       }
+    }
+    // Drop failed uploads from the cache so a dead `pi-N` doesn't stick around.
+    for (const id of failedIds) {
+      await this.removePending(id)
     }
     return { urlMap, committedIds, failed }
   }
@@ -234,6 +238,31 @@ class ImageService {
       }
       this.pendingByDir.delete(dir)
     }
+  }
+
+  /**
+   * Drop every cached image — both in-memory maps (`pendingByDir`/`knownByDir`)
+   * and the persisted IndexedDB pending-image records. Used when the active
+   * content root changes (File → Open Project…): the old root's pending and
+   * committed images must not leak into the new directory. A plain `clear()` of
+   * the maps alone would leave the IndexedDB records, which `restoreFromStorage`
+   * would rehydrate on the next app boot.
+   */
+  async clearAll(): Promise<void> {
+    for (const list of this.pendingByDir.values()) {
+      for (const img of list) img.revokeBlobUrl()
+    }
+    this.pendingByDir.clear()
+    this.knownByDir.clear()
+    try {
+      const db = await openDB()
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite")
+        tx.objectStore(STORE_NAME).clear()
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      })
+    } catch {}
   }
 
   async remapDir(oldDir: string, newDir: string): Promise<void> {

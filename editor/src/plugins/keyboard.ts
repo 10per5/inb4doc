@@ -235,6 +235,45 @@ function cutBlock(
   return true
 }
 
+// Ctrl+C with no selection → copy the whole current block (a bullet point
+// copies the item, a paragraph copies the paragraph) to the clipboard without
+// deleting it. Mirrors `cutBlock` (Mod-x) but issues a copy instead of a cut so
+// the caret and document are left untouched. With a real selection the native
+// copy path is left untouched.
+function copyBlock(
+  state: any,
+  _dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty || !_editorView) return false
+  const pos = findBlockStart($from)
+  if (pos === null) return false
+  const node = state.doc.nodeAt(pos)
+  if (!node) return false
+
+  const end = pos + node.nodeSize
+  const slice = state.doc.slice(pos, end)
+  const { dom, text } = (
+    _editorView as unknown as {
+      serializeForClipboard(slice: unknown): { dom: HTMLElement; text: string }
+    }
+  ).serializeForClipboard(slice)
+  try {
+    void navigator.clipboard
+      .write([
+        new ClipboardItem({
+          "text/html": new Blob([dom.innerHTML], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        }),
+      ])
+      .catch(() => {}) // clipboard denied — nothing to do
+  } catch {
+    // ClipboardItem unavailable (older engines) — leave the native copy to run.
+    return false
+  }
+  return true
+}
+
 // ProseKit registers the inline-code mark under `code`.
 function codeMark(state: any): any {
   return state.schema.marks.code
@@ -644,6 +683,7 @@ export function createKeymap() {
     "Mod-Z": (state, dispatch) => redo(state, dispatch),
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-x": (state, dispatch) => cutBlock(state, dispatch),
+    "Mod-c": (state, dispatch) => copyBlock(state, dispatch),
     "Mod-Enter": (state, dispatch) => {
       // Inside a code block Mod-Enter exits it (legacy prism-editor behavior);
       // elsewhere it inserts an empty paragraph below the current block.

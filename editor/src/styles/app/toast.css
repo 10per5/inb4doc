@@ -1,17 +1,15 @@
 /* ── Toast (components/notification/toast.ts) ──────────────────────
  *
- * Base #prdc-toast is the legacy top-center sheet used by showToast().
- * #prdc-toast.prdc-toast-progress is the bottom-right update-loader:
- * top: auto + explicit static height avoid the top/bottom stretch that
- * made a fixed element fill the viewport ("100vh loader" bug).
+ * Base .prdc-toast is the shared visual style for every toast variant.
+ * #prdc-toast is the legacy singleton fix position used by the
+ * action/progress toasts (they carry the id and are centered by CSS).
+ * #prdc-toast-stack holds the stacked transient toasts (showToast):
+ * each card is centered by the flex container, not by its own translateX,
+ * so swipe/dismiss math differs from the singleton (toast.ts isInStack()).
  */
 
-#prdc-toast {
-  position: fixed;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100000;
+.prdc-toast {
+  position: relative;
   background: #2e3440;
   color: #eceff4;
   padding: 0.75rem 1.25rem;
@@ -22,6 +20,38 @@
   text-align: center;
   max-width: min(90vw, 500px);
   animation: prdc-toast-in 0.2s ease-out;
+}
+
+/* The legacy singleton fix position for action/progress toasts (id #prdc-toast). */
+#prdc-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+}
+
+/* Strip the singleton's fixed/centered transform for cards living in the stack. */
+#prdc-toast-stack .prdc-toast {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+
+/* Stacking container for transient toasts. */
+#prdc-toast-stack {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: min(90vw, 500px);
 }
 
 #prdc-toast.prdc-toast-progress {
@@ -48,6 +78,23 @@
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* The stacked card entrance drops the -50% centering (the flex container
+ * centers it); reuse the same ease-out fade. */
+#prdc-toast-stack .prdc-toast {
+  animation: prdc-toast-stack-in 0.2s ease-out;
+}
+
+@keyframes prdc-toast-stack-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -95,8 +142,14 @@
   height: auto;
 }
 
+/* The stack on mobile sits just below the topbar too. */
+#prdc-toast-stack.prdc-toast-stack--mobile {
+  top: calc(48px + 0.5rem);
+}
+
 /* Transient-only layout: flex row, phantom touch, right-edge dismiss handle.
- * The action/progress toasts keep their own block layouts. */
+ * The action/progress toasts keep their own block layouts. Singleton variant
+ * (carries id #prdc-toast). */
 #prdc-toast.prdc-toast--mobile:not(.prdc-toast-action):not(.prdc-toast-progress) {
   display: flex;
   align-items: center;
@@ -105,13 +158,24 @@
   pointer-events: none;
 }
 
-#prdc-toast.prdc-toast--mobile .prdc-toast-msg {
+/* Stacked transient variant (lives in #prdc-toast-stack, centered by it). */
+#prdc-toast-stack .prdc-toast.prdc-toast--mobile {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+  max-width: min(88vw, 420px);
+  pointer-events: none;
+}
+
+#prdc-toast.prdc-toast--mobile .prdc-toast-msg,
+#prdc-toast-stack .prdc-toast.prdc-toast--mobile .prdc-toast-msg {
   flex: 1;
   text-align: center;
   padding-right: 0.25rem;
 }
 
-#prdc-toast.prdc-toast--mobile .prdc-toast-dismiss {
+#prdc-toast.prdc-toast--mobile .prdc-toast-dismiss,
+#prdc-toast-stack .prdc-toast.prdc-toast--mobile .prdc-toast-dismiss {
   pointer-events: auto;
   flex-shrink: 0;
   display: flex;
@@ -128,4 +192,29 @@
   font: 600 0.9rem/1 system-ui, sans-serif;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Renewal glow (toast.ts renewToast): re-adding .prdc-toast-renew on an alive
+ * toast of the same type flashes a border + glow ring — a "refreshed" cue for
+ * repeated same-type toasts instead of a new sliding card. Pseudo-element so it
+ * never collides with the card's own entrance animation. Amber reads on the
+ * colored cards and on both light and dark page backgrounds. */
+.prdc-toast.prdc-toast-renew::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 209, 102, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.55), 0 0 16px rgba(255, 209, 102, 0.6);
+  animation: prdc-toast-glow 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes prdc-toast-glow {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }

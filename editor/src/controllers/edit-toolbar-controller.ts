@@ -17,9 +17,11 @@ import type { EditorController } from "@/controllers/editor-controller"
  *   in, so the actions stay next to where you type. The `.is-follow-mode`
  *   class on #edit-toolbar switches the CSS; this controller positions the
  *   0×0 fixed anchor via applyPanelFlip and hides the popover once the block
- *   scrolls out of the viewport — or once it has nothing useful to offer
- *   (undo disabled AND no contextual list/table actions; a lone enabled redo
- *   does not count, e.g. right after pressing undo).
+ *   scrolls out of the viewport — or once it has nothing useful to offer. A
+ *   popover is "useful" when there is a history action (undo OR redo — a lone
+ *   redo keeps it visible so you can redo after an undo) or contextual list/
+ *   table actions. When nothing is useful (no undo AND no redo AND no list/
+ *   table) the popover must NOT follow the cursor.
  * Undo/redo are always shown in both modes (disabled when the open file has
  * no history); the list/table groups appear contextually inside the bar.
  * A "+" FAB button on the strip opens the shared add-block menu in every mode
@@ -46,6 +48,7 @@ export default class EditToolbarController extends Controller {
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
   private canUndo = false
+  private canRedo = false
   private addMenu: NavMenu | null = null
   private addMenuOpen = false
 
@@ -76,6 +79,7 @@ export default class EditToolbarController extends Controller {
       }),
       appEvents.on(AppEvent.HistoryChanged, ({ canUndo, canRedo }) => {
         this.canUndo = canUndo
+        this.canRedo = canRedo
         this.setDisabled("tc-19", !canUndo)
         this.setDisabled("tc-20", !canRedo)
         this.updateVisibility()
@@ -244,15 +248,19 @@ export default class EditToolbarController extends Controller {
   }
 
   // Follow-mode popover visibility rule: follow only while the anchored block
-  // is still on screen AND the popover has something useful — an enabled undo
-  // or contextual list/table actions (or the "+" add-block button). A lone
-  // enabled redo (the post-undo state) never triggers the popover.
+  // is still on screen AND the popover has something useful. "Useful" means a
+  // history action (undo OR redo — a lone redo, e.g. right after pressing undo,
+  // keeps the popover so you can redo) or contextual list/table actions. The
+  // "+" add-block FAB is deliberately excluded: it is always present, so
+  // counting it would make the popover follow even when nothing else is useful
+  // (an empty paragraph with no history). When there is nothing useful the
+  // popover must NOT follow the cursor.
   private hasUsableActions(): boolean {
     return (
       this.canUndo ||
+      this.canRedo ||
       !this.listGroupTarget.hidden ||
-      !this.tableGroupTarget.hidden ||
-      !this.addGroupTarget.hidden
+      !this.tableGroupTarget.hidden
     )
   }
 
