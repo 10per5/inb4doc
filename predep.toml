@@ -73,6 +73,7 @@ artifacts = [
     { source = "root://gui/bin/inb4doc-gui", dest = "inb4doc-gui", binary = true },
     { source = "root://images/inb4doc-32.png", dest = "icon.png" },
     { source = "root://editor/dist", dest = "editor" },
+    { source = "root://scripts/inb4doc.desktop", dest = "inb4doc.desktop" },
 ]
 
 [install]
@@ -83,4 +84,5 @@ artifacts = [
   { source = "root://images/inb4doc-32.png", dest = "icon.png" },
   { source = "root://editor/dist/", dest = "editor", chown_user = true },
   { source = "root://content", dest = "content", chown_user = true },
+  { source = "root://scripts/inb4doc.desktop", dest = "xdg-apps://inb4doc.desktop", desktop_database = true, scheme_handler = "inb4doc" },
 ]

@@ -1,4 +1,4 @@
-local qt_libs = { "Qt6Widgets", "Qt6WebChannel", "Qt6WebEngineWidgets", "Qt6Gui", "Qt6Core", "Qt6WebEngineCore" }
+local qt_libs = { "Qt6Widgets", "Qt6WebChannel", "Qt6WebEngineWidgets", "Qt6Gui", "Qt6Core", "Qt6WebEngineCore", "Qt6Network" }
 local saucer_dir = os.getenv("SAUCER_DIR") or "vendor/saucer"
 
 workspace("inb4doc-gui")
@@ -15,7 +15,7 @@ files({ "src/**.cpp" })
 filter("system:linux")
 includedirs({ "vendor" })
 includedirs({ saucer_dir .. "/include" })
-local qt_inc = os.outputof("pkg-config --cflags-only-I Qt6Core Qt6Gui Qt6Widgets Qt6WebEngineCore Qt6WebEngineWidgets 2>/dev/null")
+	local qt_inc = os.outputof("pkg-config --cflags-only-I Qt6Core Qt6Gui Qt6Widgets Qt6WebEngineCore Qt6WebEngineWidgets Qt6Network 2>/dev/null")
 if qt_inc and qt_inc ~= "" then
 	for dir in qt_inc:gmatch("%-I([^%s]+)") do
 		includedirs({ dir })

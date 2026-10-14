@@ -40,6 +40,9 @@ export enum AppEvent {
   SingleDiscardRequested = "single-discard-requested",
   FlushComplete = "flush-complete",
   SaveRequested = "save-requested",
+  ShareSendRequested = "share-send-requested",
+  ShareOpenRequested = "share-open-requested",
+  OpenSharedDocRequested = "open-shared-doc-requested",
   SaveCurrentFile = "save-current-file",
   FlushAll = "flush-all",
   LoadRequested = "load-requested",
@@ -61,7 +64,6 @@ export enum AppEvent {
   StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
   CreateFirstPage = "create-first-page",
-  CreateDraftRequested = "create-draft-requested",
   ProjectEmpty = "project-empty",
   NoFileView = "no-file-view",
   DirIndexEmpty = "dir-index-empty",
@@ -118,6 +120,9 @@ export interface AppEventPayloads {
   [AppEvent.SingleDiscardRequested]:{ path: string }
   [AppEvent.FlushComplete]:         void
   [AppEvent.SaveRequested]:         void
+  [AppEvent.ShareSendRequested]: void
+  [AppEvent.ShareOpenRequested]: void
+  [AppEvent.OpenSharedDocRequested]: { path: string; content: string }
   [AppEvent.SaveCurrentFile]:       void
   [AppEvent.FlushAll]:              void
   [AppEvent.LoadRequested]:         void
@@ -136,7 +141,6 @@ export interface AppEventPayloads {
   [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void
   [AppEvent.CreateFirstPage]:       void
-  [AppEvent.CreateDraftRequested]: { path: string; content: string }
   [AppEvent.ProjectEmpty]:          void
   [AppEvent.NoFileView]:           { lastPath?: string }
   [AppEvent.DirIndexEmpty]:        { path: string }

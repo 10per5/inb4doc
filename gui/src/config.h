@@ -41,6 +41,7 @@ struct config
 {
     std::string editor_url;         ///< URL the webview loads first
     std::string live_url;           ///< Live-preview server base URL
+    std::string open_uri;           ///< inb4doc:// deep link from a Firefox / desktop-handler launch
     std::string editor_root;        ///< Path to editor frontend (has public/)
     std::string favicon;            ///< Optional window icon path
     std::size_t live_port = 5000;   ///< Port for live preview server

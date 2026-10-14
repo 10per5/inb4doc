@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=inb4doc
+Comment=Local-first Markdown editor
+Exec=/opt/inb4doc/inb4doc-gui %u
+Icon=/opt/inb4doc/icon.png
+Terminal=false
+Categories=Office;
+MimeType=text/markdown;x-scheme-handler/inb4doc;

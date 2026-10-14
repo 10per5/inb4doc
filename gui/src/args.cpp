@@ -6,6 +6,28 @@ parsed_args parse_args(int argc, char **argv)
 {
     parsed_args args;
 
+    // Firefox / the desktop handler pass an `inb4doc://…` deep link as `%u`,
+    // i.e. a bare positional argument. Pull those out before handing argv to
+    // CLI11 so they aren't mistaken for a content-root file/dir (and don't
+    // trip the "not a .md file" validation).
+    std::vector<std::string> filtered;
+    filtered.reserve(static_cast<std::size_t>(argc));
+    for (int i = 0; i < argc; ++i)
+    {
+        std::string a = argv[i];
+        if (a.rfind("inb4doc://", 0) == 0)
+        {
+            args.open_uri = a;
+            continue;
+        }
+        filtered.push_back(std::move(a));
+    }
+
+    std::vector<char *> argv2;
+    argv2.reserve(filtered.size());
+    for (auto &s : filtered)
+        argv2.push_back(s.data());
+
     CLI::App app("inb4doc - desktop GUI for the editor");
 
     app.add_option("--host", args.host,
@@ -33,7 +55,7 @@ parsed_args parse_args(int argc, char **argv)
 
     try
     {
-        app.parse(argc, argv);
+        app.parse(static_cast<int>(argv2.size()), argv2.data());
     }
     catch (const CLI::ParseError &e)
     {
