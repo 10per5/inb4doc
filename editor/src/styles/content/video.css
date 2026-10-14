@@ -21,6 +21,14 @@
   outline: none;
 }
 
+.video-wrapper iframe.video-iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  outline: none;
+}
+
 .video-placeholder {
   display: flex;
   align-items: center;

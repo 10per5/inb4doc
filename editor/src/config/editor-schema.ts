@@ -1,6 +1,7 @@
 import { defineNodeSpec, defineMarkSpec, union } from "@prosekit/core";
 import type { Extension } from "@prosekit/core";
 import { defineBasicExtension } from "@/config/prosekit-basic";
+import { getVideoEmbedUrl } from "@/utils/video-url";
 
 /**
  * ProseKit schema for the inb4doc editor.
@@ -310,6 +311,23 @@ export function createSchemaExtension(): Extension {
           },
         },
         {
+          tag: "iframe",
+          getAttrs: (dom: HTMLElement) => {
+            const el = dom as HTMLIFrameElement;
+            return {
+              src: el.getAttribute("src") || "",
+              poster: el.getAttribute("poster") || "",
+              controls: el.hasAttribute("controls"),
+              loop: el.hasAttribute("loop"),
+              muted: el.hasAttribute("muted"),
+              autoplay: el.hasAttribute("autoplay"),
+              playsinline: el.hasAttribute("playsinline"),
+              width: el.getAttribute("width") || "",
+              height: el.getAttribute("height") || "",
+            };
+          },
+        },
+        {
           tag: "video",
           getAttrs: (dom: HTMLElement) => {
             const el = dom as HTMLVideoElement;
@@ -330,6 +348,26 @@ export function createSchemaExtension(): Extension {
       ],
       toDOM: (node) => {
         const a = node.attrs;
+        const embed = getVideoEmbedUrl(a.src);
+        if (embed) {
+          // Hosted video (YouTube/Vimeo): emit an iframe embed so HTML export
+          // and clipboard round-trips stay playable.
+          const iframeAttrs: Record<string, string> = {
+            src: embed,
+            class: "video-iframe",
+            allow:
+              "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+            allowfullscreen: "",
+            frameborder: "0",
+          };
+          if (a.width) iframeAttrs.width = a.width;
+          if (a.height) iframeAttrs.height = a.height;
+          return [
+            "div",
+            { class: "video-wrapper", "data-type": "video" },
+            ["iframe", iframeAttrs],
+          ];
+        }
         const videoAttrs: Record<string, string> = {};
         if (a.poster) videoAttrs.poster = a.poster;
         if (a.width) videoAttrs.width = a.width;

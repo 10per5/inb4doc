@@ -31,22 +31,61 @@ const TOAST_BG_MOBILE: Record<ToastType, string> = {
 // scoped to the toast lifetime, not a global keyboard binding (keyboard.ts owns
 // those).
 const gestureCleanup = new WeakMap<HTMLElement, () => void>();
+const dismissTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+
+// Stacking container for transient toasts. Each toast is a child card; the
+// container centers them and lays them out in a vertical column. The
+// action/progress toasts (showActionToast / showProgressToast) are singletons
+// appended to <body> directly and clear this stack when they appear.
+let stackEl: HTMLElement | null = null;
+
+function getStack(): HTMLElement {
+  if (!stackEl) {
+    stackEl = document.getElementById("prdc-toast-stack") as HTMLElement | null;
+    if (!stackEl) {
+      stackEl = document.createElement("div");
+      stackEl.id = "prdc-toast-stack";
+      document.body.appendChild(stackEl);
+    }
+  }
+  return stackEl;
+}
+
+function isInStack(toast: HTMLElement): boolean {
+  return toast.parentElement?.id === "prdc-toast-stack";
+}
+
+// Remove every transient toast (used by the singleton action/progress toasts
+// that must not coexist with a stack, and by removeCurrentToast()).
+function removeAllToasts(): void {
+  const s = getStack();
+  s.querySelectorAll<HTMLElement>(".prdc-toast").forEach((el) => {
+    gestureCleanup.get(el)?.();
+    gestureCleanup.delete(el);
+    const t = dismissTimers.get(el);
+    if (t) clearTimeout(t);
+    dismissTimers.delete(el);
+    el.remove();
+  });
+}
 
 function removeCurrentToast(): void {
-  const old = document.getElementById("prdc-toast");
-  if (!old) return;
-  gestureCleanup.get(old)?.();
-  gestureCleanup.delete(old);
-  old.remove();
+  removeAllToasts();
 }
 
 // Slide the toast out (offsetX = travel direction in px) then remove it.
 function dismiss(toast: HTMLElement, offsetX: number): void {
-  if (!toast.isConnected) return;
+  if (!toast.isConnected || toast.dataset.dismissing === "1") return;
   gestureCleanup.get(toast)?.();
   gestureCleanup.delete(toast);
+  const t = dismissTimers.get(toast);
+  if (t) clearTimeout(t);
+  dismissTimers.delete(toast);
+  toast.dataset.dismissing = "1";
   toast.style.transition = "transform 0.18s ease, opacity 0.18s ease";
-  toast.style.transform = `translateX(calc(-50% + ${offsetX}px))`;
+  toast.style.transform = isInStack(toast)
+    ? `translateX(${offsetX}px)`
+    : `translateX(calc(-50% + ${offsetX}px))`;
   toast.style.opacity = "0";
   setTimeout(() => {
     if (toast.isConnected) toast.remove();
@@ -92,7 +131,9 @@ function attachSwipeDismiss(toast: HTMLElement): void {
       e.preventDefault();
     }
     dx = x;
-    toast.style.transform = `translateX(calc(-50% + ${x}px))`;
+    toast.style.transform = isInStack(toast)
+      ? `translateX(${x}px)`
+      : `translateX(calc(-50% + ${x}px))`;
     toast.style.opacity = String(Math.max(0.3, 1 - Math.abs(x) / 240));
   };
 
@@ -105,7 +146,7 @@ function attachSwipeDismiss(toast: HTMLElement): void {
       dismiss(toast, dx > 0 ? 160 : -160);
     } else {
       toast.style.transition = "transform 0.15s ease, opacity 0.15s ease";
-      toast.style.transform = "translateX(-50%)";
+      toast.style.transform = "";
       toast.style.opacity = "";
       setTimeout(() => {
         toast.style.transition = "";
@@ -126,17 +167,63 @@ function attachSwipeDismiss(toast: HTMLElement): void {
   });
 }
 
+// Update a still-alive toast in place (same data-toast-type): swap the message
+// and tint, restart the auto-dismiss countdown, and flash the glow ring so a
+// repeated same-type toast reads as "refreshed" rather than a new card.
+function renewToast(
+  toast: HTMLElement,
+  msg: string,
+  type: ToastType,
+  mobile: boolean,
+  duration: number,
+): void {
+  if (mobile) {
+    const msgEl = toast.querySelector(".prdc-toast-msg");
+    if (msgEl) msgEl.textContent = msg;
+  } else {
+    toast.textContent = msg;
+  }
+  toast.style.background = mobile ? TOAST_BG_MOBILE[type] : TOAST_BG[type];
+
+  const prev = dismissTimers.get(toast);
+  if (prev) clearTimeout(prev);
+  dismissTimers.delete(toast);
+  if (duration > 0) {
+    const t = setTimeout(() => {
+      if (toast.isConnected) dismiss(toast, 0);
+    }, duration);
+    dismissTimers.set(toast, t);
+  }
+
+  // Re-trigger the glow pulse (remove class → reflow → re-add so repeated
+  // renewals each flash the ring).
+  toast.classList.remove("prdc-toast-renew");
+  void toast.offsetWidth;
+  toast.classList.add("prdc-toast-renew");
+}
+
 export function showToast(msg: string, opts?: ToastOptions) {
   const mobile = isMobileDock();
   const duration = opts?.duration ?? (mobile ? MOBILE_DURATION : DEFAULT_DURATION);
   const type = opts?.type ?? "danger";
 
-  removeCurrentToast();
+  const stack = getStack();
+  stack.classList.toggle("prdc-toast-stack--mobile", mobile);
+
+  // A toast of the same type that is still alive (not mid-dismiss) is renewed
+  // in place instead of stacking a duplicate. Different types always stack.
+  const alive = stack.querySelector<HTMLElement>(
+    `.prdc-toast[data-toast-type="${type}"]:not([data-dismissing="1"])`,
+  );
+  if (alive) {
+    renewToast(alive, msg, type, mobile, duration);
+    return;
+  }
 
   const toast = document.createElement("div");
-  toast.id = "prdc-toast";
+  toast.className = "prdc-toast" + (mobile ? " prdc-toast--mobile" : "");
+  toast.dataset.toastType = type;
   if (mobile) {
-    toast.className = "prdc-toast prdc-toast--mobile";
     toast.style.background = TOAST_BG_MOBILE[type];
 
     const msgEl = document.createElement("span");
@@ -157,12 +244,13 @@ export function showToast(msg: string, opts?: ToastOptions) {
     toast.style.background = TOAST_BG[type];
     toast.textContent = msg;
   }
-  document.body.appendChild(toast);
+  stack.appendChild(toast);
 
   if (duration > 0) {
-    setTimeout(() => {
+    const t = setTimeout(() => {
       if (toast.isConnected) dismiss(toast, 0);
     }, duration);
+    dismissTimers.set(toast, t);
   }
 }
 

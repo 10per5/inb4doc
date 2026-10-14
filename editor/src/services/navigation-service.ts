@@ -15,6 +15,7 @@ import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
 import type { FileSyncService } from "@/services/file-sync-service";
+import { imageService } from "@/services/image-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { pickProjectDirectory } from "@/bridge/native";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
@@ -209,6 +210,11 @@ export class NavigationService {
       dirtyTrackingService.flush();
       pagesStore.clearAll();
       this.cache.clearPendingOps();
+      // Drop the image cache so the old root's pending/committed images don't
+      // leak into the newly opened directory (ImageService keys both maps by
+      // relative dir, so entries from the previous root would otherwise
+      // resurface under the same relative paths).
+      await imageService.clearAll();
 
       await provider.setRoot(targetPath);
       recentProjectsStore.add(targetPath);
