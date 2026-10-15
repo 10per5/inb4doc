@@ -157,12 +157,46 @@ export function setupBlockHandleUI(editor: Editor): () => void {
   // text column is narrower than the handle — e.g. at high browser zoom,
   // where the CSS viewport shrinks — it covers the explorer (.book-leftpanel)
   // or, on tablet, the meta panel (.book-rightpanel). Hide the handle in
-  // that case and let the slash/quick menu serve as the fallback (same
-  // visibility-gating idea as the dock edit-toolbar). Measured on the next
-  // animation frame: the positioner's inline transform is applied in a
-  // microtask after the hover-state store change that emitted stateChange.
+  // that case and let the slash/quick menu serve as the fallback. Track
+  // narrowness at layout level (resize + layout changes) and also measure on
+  // hover for accuracy; expose a body-level flag so CSS can reveal the quick
+  // bar (#edit-toolbar) on all builds.
   const PANEL_GAP = 4;
+  const HANDLE_EST_WIDTH = 46; // matches ProseKit handle popup width
   let overlapFrame: number | null = null;
+  let narrow = false;
+
+  const setNarrow = (v: boolean) => {
+    if (narrow === v) return;
+    narrow = v;
+    document.documentElement.classList.toggle("block-handle-narrow", v);
+  };
+
+  const computeNarrow = (): boolean => {
+    const viewDom = editor.view.dom as HTMLElement | null;
+    if (!viewDom) return false;
+    const rect = viewDom.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    const vw = document.documentElement.clientWidth;
+    const padLeft = parseFloat(getComputedStyle(viewDom).paddingLeft) || 0;
+    const blockLeft = rect.left + padLeft;
+    const handleLeft = blockLeft - 6 - HANDLE_EST_WIDTH;
+    const handleRight = blockLeft - 6;
+    for (const selector of [".book-leftpanel", ".book-rightpanel"]) {
+      const panel = document.querySelector(selector) as HTMLElement | null;
+      if (!panel) continue;
+      const pr = panel.getBoundingClientRect();
+      if (pr.width === 0 || pr.right <= 0 || pr.left >= vw) continue;
+      if (handleLeft < pr.right + PANEL_GAP && handleRight > pr.left - PANEL_GAP) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const refreshNarrow = () => {
+    setNarrow(computeNarrow());
+  };
 
   const clearPanelOverlap = () => {
     if (overlapFrame !== null) {
@@ -208,11 +242,25 @@ export function setupBlockHandleUI(editor: Editor): () => void {
       return;
     }
     if (overlapFrame !== null) cancelAnimationFrame(overlapFrame);
-    overlapFrame = requestAnimationFrame(updatePanelOverlap);
+    overlapFrame = requestAnimationFrame(() => {
+      updatePanelOverlap();
+      refreshNarrow();
+    });
+  });
+
+  // Layout-level narrowness tracking
+  const ro = new ResizeObserver(refreshNarrow);
+  ro.observe(document.documentElement);
+  ro.observe(editor.view.dom as HTMLElement);
+  let unsubLayout: (() => void) | undefined;
+  void import("@/stores/app-events").then(({ appEvents, AppEvent }) => {
+    unsubLayout = appEvents.on(AppEvent.LayoutChanged, refreshNarrow);
   });
 
   return () => {
     if (overlapFrame !== null) cancelAnimationFrame(overlapFrame);
+    ro.disconnect();
+    unsubLayout?.();
     menu?.destroy();
     menu = null;
     menuMountEl?.remove();

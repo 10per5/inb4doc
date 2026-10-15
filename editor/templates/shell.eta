@@ -6,12 +6,14 @@
     <%~ include('partials/head-meta', it) %>
 <% if (it.webAdaptive) { %>
     <script>
-      // Web-local responsive-web: pick mobile/desktop chrome before first paint.
-      // Decided by viewport WIDTH only — an iPad in landscape (>=768px) gets the
-      // desktop toolbar. Must mirror isMobileViewport() in lib/build/build-mode.ts.
+      // Pick mobile/desktop chrome before first paint. For web builds this is
+      // viewport-driven (an iPad in landscape (>=768px) gets the desktop
+      // toolbar). For GuiDesktop the markup ships with desktop chrome, so force
+      // desktop-layout unless explicitly mobile — desktop app rarely runs <768.
       (function () {
-        var mobile = window.matchMedia("(max-width: 767px)").matches;
-        document.documentElement.classList.add(mobile ? "mobile-layout" : "desktop-layout");
+        var isMobile =
+          <%= it.BUILD_MODE === "gui-desktop" ? "false" : "window.matchMedia(\"(max-width: 767px)\").matches" %>;
+        document.documentElement.classList.add(isMobile ? "mobile-layout" : "desktop-layout");
       })();
     </script>
 <% } %>

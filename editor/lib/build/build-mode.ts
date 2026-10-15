@@ -69,7 +69,10 @@ export const SUPPORTED_MODES: Record<AppFunc, number> = {
   // Build-time hasFlag(MobileDock) still covers the web modes so the markup
   // ships; runtime consumers call isMobileDock() explicitly.
   [AppFunc.MobileDock]:
-    BuildMode.GuiMobile | BuildMode.WebLocal | BuildMode.WebRemote,
+    BuildMode.GuiMobile |
+    BuildMode.WebLocal |
+    BuildMode.WebRemote |
+    BuildMode.GuiDesktop,
   // Build-time-only packaging flag: ship the complete local bundle (no thin
   // shell, empty UPDATE_BASE) so the build never fetches remotely. Default-on
   // for web-local (`bun dev` serves a full self-contained bundle and updates
