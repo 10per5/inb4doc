@@ -25,11 +25,13 @@ import { exportToZip, pickAndParseZip } from "@/utils/zip";
 import type { ZipEntry, ZipFileEntry } from "@/utils/zip";
 import { showNotification } from "@/components/notification/notification";
 import { prefsStore } from "@/stores/preferences-store";
+import { recentProjectsStore } from "@/stores/recent-projects-store";
+import { ProviderType } from "@/providers/index";
 import { getCurrentPath, replacePath } from "@/utils/url";
 import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
 import { hasFunc, AppFunc } from "$/build/build-mode";
-import { getInitialState } from "@/bridge/native";
+import { getInitialState, getContentRoot } from "@/bridge/native";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { changesScreenStore } from "@/stores/changes-screen-store";
@@ -153,6 +155,23 @@ export default class extends Controller {
         this.cache.handleDirtyClick();
       }),
       appEvents.on(AppEvent.SingleDiscardRequested, ({ path }) => this.cache.discardFileChanges(path)),
+      appEvents.on(AppEvent.NewFileRequested, () => {
+        // File → New…: create a sibling of the open document (same directory),
+        // falling back to the content root. Reuses the sidebar create flow so
+        // naming, slug validation and conflict handling stay in one place.
+        const current = this.nav.getCurrentPath()
+        const parentDir = current.includes("/")
+          ? current.substring(0, current.lastIndexOf("/"))
+          : ""
+        appEvents.emit(AppEvent.SidebarNewItemRequested, { parentPath: parentDir, isFolder: false })
+      }),
+      appEvents.on(AppEvent.FormatDocumentRequested, () => {
+        dirtyTrackingService.formatDocument(
+          this.nav.getCurrentPath(),
+          this.editor.getCurrentContent(),
+        )
+      }),
+      appEvents.on(AppEvent.DirtyChanged, () => this.refreshFormatSuggestion()),
       appEvents.on(AppEvent.SaveRequested, () => {
         exportToZip().then(() => this.nav.loadSidebar())
       }),
@@ -238,6 +257,22 @@ export default class extends Controller {
   private async loadBackground() {
     await waitProviderReady()
 
+    // Record the boot content root in Recent Projects so a dir opened via the
+    // GUI CLI (or restored as the persisted last project) shows up there just
+    // like an in-app File → Open Project… does — those never call
+    // recentProjectsStore.add() themselves. Web modes have a server-owned root,
+    // so gate on ProjectPicker (GuiDesktop | GuiMobile). GuiMobile's Saf
+    // provider roots at the app's built-in docs tree, which is the default when
+    // no project has been picked — never a user-opened project — so skip it.
+    if (hasFunc(AppFunc.ProjectPicker) && getProvider().name !== ProviderType.Saf) {
+      try {
+        const root = await getContentRoot()
+        if (root?.path) recentProjectsStore.add(root.path, root.name)
+      } catch {
+        // Host without the getContentRoot op — nothing to record.
+      }
+    }
+
     const { path: startPath, isNew } = await this.resolveInitialPath()
     this.initialPath = startPath
     this.editor.setCurrentPath(startPath)
@@ -265,6 +300,16 @@ export default class extends Controller {
     this.editor.hideSkeleton()
     dirtyTrackingService.recompute()
     this.checkInitialShareUri()
+  }
+
+  // #6: keep the File → Format document item's enabled state in sync.
+  // DirtyChanged fires after every recompute (load, navigate, edit, discard),
+  // so it's the single signal covering every case where formattability changes.
+  private refreshFormatSuggestion(): void {
+    appEvents.emit(AppEvent.FormatSuggestionChanged, {
+      path: this.nav.getCurrentPath(),
+      formattable: this.editor.isFormattable(),
+    })
   }
 
   /**

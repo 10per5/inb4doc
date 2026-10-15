@@ -316,9 +316,34 @@ export class EditorController extends Controller {
     return this.serializeDoc(this.editor.view);
   }
 
+  /**
+   * True when the file currently in the editor could be tidied by a
+   * whole-file format: its canonical serialization differs from the on-disk
+   * baseline, and the user hasn't already started editing it (no pending
+   * Create/Edit op) or opened source mode. Used to gate the File → Format
+   * document affordance. Never queues an op — this is a read-only probe.
+   */
+  isFormattable(): boolean {
+    if (!this.editor || this.sourceMode) return false;
+    const path = this.currentPath;
+    const baseline = pagesStore.get(path)?.bodyState.baseline;
+    if (baseline === undefined) return false;
+    const hasPendingDocOp = pendingOpsStore.load().some(
+      (o) =>
+        (o.type === PendingOpType.Create || o.type === PendingOpType.Edit) &&
+        o.path === path
+    );
+    if (hasPendingDocOp) return false;
+    return this.getCurrentContent() !== baseline;
+  }
+
   private serializeDoc(view: any): string {
-    const bridge = createMarkdownBridge(view.state.schema);
-    return bridge.serialize(view.state.doc)
+    return this.serializeState(view.state);
+  }
+
+  private serializeState(state: EditorState): string {
+    const bridge = createMarkdownBridge(state.schema);
+    return bridge.serialize(state.doc)
       .replace(/\r\n/g, "\n")
       .replace(/\n+$/, "\n");
   }
@@ -462,10 +487,12 @@ export class EditorController extends Controller {
     const cached = this.editorStates.get(this.currentPath);
     const cachedContent = this.editorContents.get(this.currentPath);
     if (cached && cachedContent !== undefined && cachedContent === content) {
-      const page = pagesStore.get(this.currentPath);
-      const persistedBody =
-        page?.bodyState.body ?? page?.bodyState.baseline ?? "";
-      this.lastSetContent.set(this.currentPath, persistedBody);
+      // Restoring a cached doc must not read as a format change: prime the
+      // dirty plugin with the CANONICAL serialization of the restored doc,
+      // not the raw persisted body. A non-canonical file would otherwise diff
+      // (serialize(doc) !== raw body) on this update and re-queue itself as a
+      // whole-file "formatted" Edit op (same priming as ensureEditor below).
+      this.lastSetContent.set(this.currentPath, this.serializeState(cached));
       this.editor.action(({ view }) => {
         view.updateState(cached);
       });

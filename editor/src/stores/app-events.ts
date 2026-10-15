@@ -46,6 +46,9 @@ export enum AppEvent {
   SaveCurrentFile = "save-current-file",
   FlushAll = "flush-all",
   LoadRequested = "load-requested",
+  NewFileRequested = "new-file-requested",
+  FormatSuggestionChanged = "format-suggestion-changed",
+  FormatDocumentRequested = "format-document-requested",
 
   // View / provider
   ViewChanged = "view-changed",
@@ -126,6 +129,9 @@ export interface AppEventPayloads {
   [AppEvent.SaveCurrentFile]:       void
   [AppEvent.FlushAll]:              void
   [AppEvent.LoadRequested]:         void
+  [AppEvent.NewFileRequested]:      void
+  [AppEvent.FormatSuggestionChanged]: { path: string; formattable: boolean }
+  [AppEvent.FormatDocumentRequested]: void
 
   [AppEvent.ViewChanged]:           { view: ViewType }
   [AppEvent.ProviderChanged]:       { type: ProviderType; icon: string; label: string }

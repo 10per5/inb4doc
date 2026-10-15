@@ -131,6 +131,36 @@ export class DirtyTrackingService {
     this.recomputeAndEmit();
   }
 
+  /**
+   * Whole-file format: queue a single intentional Edit (or refresh the pending
+   * Create) carrying the canonical serialization of the current doc. Unlike the
+   * per-keystroke path this runs immediately (no debounce); it is explicitly
+   * user-initiated, so it must never be confused with the open-time auto-format
+   * this feature replaced. `md` is the editor's canonical serialization.
+   */
+  formatDocument(path: string, md: string): void {
+    if (!this.pendingOps) return;
+    const page = pagesStore.getOrCreate(path);
+    page.bodyState.setBody(md);
+
+    const createOp = this.pendingOps.findCreate(path);
+    if (createOp) {
+      const full = page.reconstructContent() ?? md;
+      this.pendingOps.queueCreate(path, full);
+    } else {
+      const editOp = this.pendingOps.findEdit(path);
+      const baseline = page.bodyState.baseline;
+      if (editOp) {
+        editOp.patch = md;
+      } else if (baseline !== undefined && md !== baseline) {
+        this.pendingOps.queueEdit(path, md);
+      }
+    }
+    pendingOpsStore.save(this.pendingOps.all);
+    this.recomputeAndEmit();
+    appEvents.emit(AppEvent.FormatSuggestionChanged, { path, formattable: false });
+  }
+
   flush(): void {
     if (!this.pendingOps) return;
     for (const [path, timer] of this.bodyTimers) {
