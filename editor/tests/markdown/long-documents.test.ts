@@ -83,17 +83,6 @@ const contentFiles = existsSync(contentRoot)
   ? collectMarkdownFiles(contentRoot)
   : [];
 
-/**
- * Real pages whose text does not survive a single normalize pass today, with
- * the reason. They are still asserted to be a fixed point (the corruption does
- * not accumulate), but the first-pass loss is tracked as a `todo` rather than
- * a hard failure. Remove an entry once its loss is fixed.
- */
-const KNOWN_LOSSY_PAGES: Record<string, string> = {
-  "docs/ssg/endpoints.md":
-    "contains `**`code`**` (bold wrapping inline code); the serializer emits the code span outermost, turning the `**` into literal text",
-};
-
 describe("real content pages", () => {
   if (contentFiles.length === 0) {
     test.todo(`no markdown pages found under ${contentRoot}`, () => {});
@@ -109,16 +98,9 @@ describe("real content pages", () => {
       expect(roundtrip(once)).toBe(once);
     });
 
-    if (label in KNOWN_LOSSY_PAGES) {
-      test.todo(
-        `"${label}" loses no text — ${KNOWN_LOSSY_PAGES[label]}`,
-        () => {},
-      );
-    } else {
-      test(`"${label}" loses no text`, () => {
-        const body = stripFrontmatter(readFileSync(file, "utf8"));
-        expect(parse(roundtrip(body)).textContent).toBe(parse(body).textContent);
-      });
-    }
+    test(`"${label}" loses no text`, () => {
+      const body = stripFrontmatter(readFileSync(file, "utf8"));
+      expect(parse(roundtrip(body)).textContent).toBe(parse(body).textContent);
+    });
   }
 });

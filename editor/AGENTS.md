@@ -152,8 +152,8 @@ the markdown `parse`/`serialize` bridge plus `roundtrip()` — the same code pat
 the app uses to load and save files, so tests exercise production behavior.
 
 - `tests/fixtures/markdown.ts` — the fixture catalog (`MARKDOWN_FIXTURES`,
-  `UNICODE_FIXTURES`, `KNOWN_UNSTABLE_FIXTURES`). Add new block/inline syntax
-  here and the round-trip suites pick it up.
+  `UNICODE_FIXTURES`). Add new block/inline syntax here and the round-trip
+  suites pick it up.
 - `tests/markdown/roundtrip.test.ts` — fixed-point + text-fidelity invariants.
 - `tests/markdown/empty-blocks.test.ts` — empty paragraphs serialize to
   `<br />` (and parse back to empty paragraphs).
@@ -178,6 +178,25 @@ directory `main`, i.e. the CJS build). Do not re-add them. Farm ignores tsconfig
 Run `bun --bun tsc --noEmit` after touching tests; `tests` is in the tsconfig
 `include`, so the suites are type-checked too. Note Bun's `test.todo` *types*
 require a callback — pass a no-op (`test.todo("…", () => {})`).
+
+**Mark rank is serialization-significant.** prosemirror-markdown renders a mark
+whose serializer spec has `escape: false` (our `code` mark) as the innermost
+span only when it is **last** in `node.marks` — i.e. it must have the **highest
+schema rank**. Ranks follow the order mark specs land in the schema, and ProseKit
+produces them in the *reverse* of the order listed in `defineBasicExtension`
+(`src/config/prosekit-basic.ts`), which is why `defineCode()` is listed first
+there. If `code`'s rank drops below `bold`/`italic`, `**`code`**` regresses to
+the literal text `` `**code**` `` and both marks are lost. A test in
+`tests/markdown/roundtrip.test.ts` asserts `code` has the highest rank — keep it
+green before reordering marks.
+
+**Lists are flat, one `list` node per item.** `createMarkdownParser` opens a
+`list` node for each `list_item` (there is no separate list container), so the
+serializer must emit the item marker (`* ` / `1. `) for the item's **first**
+block only — later blocks are indented continuations of the same item. Getting
+this wrong makes a multi-paragraph item re-parse as several sibling items and the
+document churns on every save. Each item also carries its own `order` attr (set
+by the parser) so `5.`/`6.` survive a round-trip.
 
 ### Build Mode and AppFunc
 

@@ -54,6 +54,17 @@ export const MARKDOWN_FIXTURES: Record<string, string> = {
     "- [x] done with [a link](https://example.com)",
   ].join("\n"),
 
+  // A "loose" list item that contains a continued paragraph. The continued
+  // block must be indented under the same item, otherwise it re-parses as a
+  // new sibling item and the document churns on every save.
+  looseListWithParagraphs: [
+    "- first item",
+    "",
+    "  continued paragraph",
+    "",
+    "- second item",
+  ].join("\n"),
+
   // --- Quotes & alerts ---
   blockquote: ["> quoted line", ">", "> second paragraph in quote"].join("\n"),
 
@@ -85,6 +96,17 @@ export const MARKDOWN_FIXTURES: Record<string, string> = {
     "```",
     "````",
   ].join("\n"),
+
+  // --- Code (inline) ---
+  inlineCode: "Use `foo()` here.",
+
+  // A code span whose content itself contains a backtick needs a longer
+  // delimiter (``…``). The serializer must widen the fence rather than emit a
+  // single backtick that would terminate the span early and drop the backtick.
+  inlineCodeWithBacktick: "Use `foo()` and ``a`b`` here.",
+
+  inlineCodeWithMarks:
+    "Some **`GET /content/<path>`** and *`x`* and ~~`y`~~ inline.",
 
   // --- Rules, breaks ---
   horizontalRule: ["above", "", "---", "", "below"].join("\n"),
@@ -203,30 +225,6 @@ export const UNICODE_FIXTURES: Record<string, string> = {
   astralPlane: "𝕬𝖇𝖈 𝓕𝓻𝓪𝓬𝓽𝓾𝓻 𝑥𝑦𝑧",
   subSuperScript: "H₂O and x² + y³",
   mixedParagraph: "Wait… Café ☕ costs €5 — really? 日本語 yeah! 🎉",
-};
-
-/**
- * Fixtures that are *known* not to be stable / lossless today, kept here so
- * the behavior is pinned and obvious. Prefer fixing the serializer over adding
- * to this list. See `tests/markdown/roundtrip.test.ts`.
- */
-export const KNOWN_UNSTABLE_FIXTURES: Record<string, { md: string; note: string }> = {
-  // A "loose" list (items separated by blank lines, with a continued
-  // paragraph) gains an extra blank line on the second normalize pass. Text is
-  // preserved (formatting churn only).
-  looseListWithParagraphs: {
-    md: ["- first item", "", "  continued paragraph", "", "- second item"].join(
-      "\n",
-    ),
-    note: "loose list item spacing is not a fixed point (text preserved)",
-  },
-  // Inline code whose content itself contains a backtick. The serializer emits
-  // single-backtick delimiters around content that needs double backticks, so
-  // the delimiter is misread on the next parse and the backtick is lost.
-  inlineCodeWithBacktick: {
-    md: "Use `foo()` and ``a`b`` here.",
-    note: "inline code containing a backtick loses the backtick on reparse",
-  },
 };
 
 /**
