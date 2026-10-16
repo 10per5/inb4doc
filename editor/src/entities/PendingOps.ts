@@ -14,7 +14,7 @@ export type PendingOp =
   | { type: PendingOpType.Delete; path: string }
   | { type: PendingOpType.Rename; from: string; to: string; content?: string }
   | { type: PendingOpType.Move; from: string; to: string; content?: string }
-  | { type: PendingOpType.Edit; path: string; patch: string; frontmatterPatch?: Record<string, string | number | undefined>; serverTime?: number }
+  | { type: PendingOpType.Edit; path: string; patch: string; frontmatterPatch?: Record<string, string | number | undefined>; serverTime?: number; baseCanonical?: string; fullFormat?: boolean }
 
 function opId(op: PendingOp): string {
   return "path" in op ? op.path : op.from
@@ -115,10 +115,19 @@ export class PendingOps {
     this.ops.set(from, { type: PendingOpType.Move, from, to, ...(content ? { content } : {}) })
   }
 
-  queueEdit(path: string, patch: string, frontmatterPatch?: Record<string, string | number | undefined>, serverTime?: number): void {
+  queueEdit(
+    path: string,
+    patch: string,
+    frontmatterPatch?: Record<string, string | number | undefined>,
+    serverTime?: number,
+    baseCanonical?: string,
+    fullFormat?: boolean
+  ): void {
     const op: PendingOp & { type: PendingOpType.Edit } = { type: PendingOpType.Edit, path, patch }
     if (frontmatterPatch) op.frontmatterPatch = frontmatterPatch
     if (serverTime !== undefined) op.serverTime = serverTime
+    if (baseCanonical !== undefined) op.baseCanonical = baseCanonical
+    if (fullFormat !== undefined) op.fullFormat = fullFormat
     this.ops.set(path, op)
   }
 

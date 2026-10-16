@@ -825,9 +825,15 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
           renderFlatList(state, node, "  ", () => "* ");
         }
       },
-      paragraph(state, node, parent, index) {
+      paragraph(state, node, parent) {
         if (node.content.size === 0) {
-          if (parent && index < parent.childCount - 1) {
+          // Preserve an empty paragraph as an explicit `<br />` line whenever
+          // it is not the sole block. This covers blank lines between blocks
+          // AND a trailing empty block the user created with Enter at the end
+          // of the document — the latter MUST produce a real body change so
+          // the file registers as dirty. A document that is just one empty
+          // paragraph still serializes to "" so an empty file round-trips.
+          if (parent && parent.childCount > 1) {
             state.write("<br />");
             state.closeBlock(node);
             return;

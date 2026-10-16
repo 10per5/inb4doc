@@ -23,6 +23,7 @@ import { showSourceMode, hideSourceMode } from "@/features/editor-source";
 import renderSourceEditor from "@/eta/views/controller/source-editor";
 import { getProvider } from "@/stores/provider-store";
 import { stripFrontmatter } from "@/utils/frontmatter";
+import { merge3 } from "@/utils/merge3";
 import { imageService } from "@/services/image-service";
 import {
   resolveConflict,
@@ -43,6 +44,17 @@ export interface OutlineItem {
   level: number;
   text: string;
   pos: number;
+}
+
+/**
+ * Trailing-newline-insensitive body comparison.
+ *
+ * The markdown serializer emits no trailing newline, while on-disk bodies and
+ * the merge output retain whichever trailing newline the file had. Comparing
+ * raw bytes would therefore treat a canonical file as "unformatted".
+ */
+function sameBody(a: string, b: string): boolean {
+  return a.replace(/\n+$/, "") === b.replace(/\n+$/, "");
 }
 
 export class EditorController extends Controller {
@@ -317,24 +329,49 @@ export class EditorController extends Controller {
   }
 
   /**
-   * True when the file currently in the editor could be tidied by a
-   * whole-file format: its canonical serialization differs from the on-disk
-   * baseline, and the user hasn't already started editing it (no pending
-   * Create/Edit op) or opened source mode. Used to gate the File → Format
-   * document affordance. Never queues an op — this is a read-only probe.
+   * True when the file currently in the editor still has unformatted regions,
+   * i.e. a normal (merge-preserving) save would leave raw formatting behind.
+   * This stays true while the user edits untouched sections — the affordance
+   * is gated on "the file could be tidied", not on "no pending edits". Used to
+   * drive the File → Format document item. Never queues an op (read-only probe).
    */
   isFormattable(): boolean {
     if (!this.editor || this.sourceMode) return false;
     const path = this.currentPath;
     const baseline = pagesStore.get(path)?.bodyState.baseline;
     if (baseline === undefined) return false;
-    const hasPendingDocOp = pendingOpsStore.load().some(
-      (o) =>
-        (o.type === PendingOpType.Create || o.type === PendingOpType.Edit) &&
-        o.path === path
-    );
-    if (hasPendingDocOp) return false;
-    return this.getCurrentContent() !== baseline;
+
+    // A whole-file format already requested? Then there is nothing left to do.
+    const editOp = pendingOpsStore.load().find(
+      (o) => o.type === PendingOpType.Edit && o.path === path
+    ) as { fullFormat?: boolean } | undefined;
+    if (editOp?.fullFormat) return false;
+
+    const c0 = this.canonicalize(baseline);
+    // The raw on-disk body is already canonical: nothing to tidy. Compare
+    // ignoring trailing newlines — the serializer never emits one, while an
+    // on-disk body (and the merge output) keeps the file's original newline,
+    // so a raw byte comparison would report every loaded file as formattable.
+    if (sameBody(baseline, c0)) return false;
+    // Otherwise a normal (merge-preserving) save keeps the raw formatting of
+    // untouched regions; the file is formattable iff that merged body still
+    // differs from the fully canonical serialization.
+    const canonical = this.getCurrentContent();
+    return !sameBody(merge3(baseline, c0, canonical).merged, canonical);
+  }
+
+  /**
+   * Canonical Markdown for arbitrary body text (parse + serialize) using the
+   * editor's schema. Used as the 3-way-merge ancestor (C0) so per-section
+   * saves can preserve the raw on-disk formatting of untouched blocks.
+   */
+  canonicalize(md: string): string {
+    if (!this.editor) return md;
+    const bridge = createMarkdownBridge(this.editor.schema);
+    return bridge
+      .serialize(bridge.parse(md))
+      .replace(/\r\n/g, "\n")
+      .replace(/\n+$/, "\n");
   }
 
   private serializeDoc(view: any): string {

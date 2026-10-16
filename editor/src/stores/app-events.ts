@@ -116,7 +116,7 @@ export interface AppEventPayloads {
   [AppEvent.SidebarCancel]:         void
   [AppEvent.SidebarScrollToCurrent]: void
 
-  [AppEvent.EditorChanged]:         { path: string; md: string }
+  [AppEvent.EditorChanged]:         { path: string; md: string; baseCanonical?: string }
   [AppEvent.OutlineChanged]:        void
   [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
   [AppEvent.DirtyClicked]:          void

@@ -120,6 +120,10 @@ export default class extends Controller {
     this.nav.setCurrentPath(this.initialPath)
 
     dirtyTrackingService.setPathResolver(() => this.nav.getCurrentPath())
+    dirtyTrackingService.setCanonicalBaselineResolver((p) => {
+      const baseline = pagesStore.get(p)?.bodyState.baseline
+      return baseline === undefined ? undefined : this.editor.canonicalize(baseline)
+    })
     dirtyTrackingService.start()
 
     this.unsubs.push(
@@ -172,6 +176,9 @@ export default class extends Controller {
         )
       }),
       appEvents.on(AppEvent.DirtyChanged, () => this.refreshFormatSuggestion()),
+      // Content set / reload also changes formattability (e.g. opening a
+      // non-canonical file with no pending edits yet).
+      appEvents.on(AppEvent.OutlineChanged, () => this.refreshFormatSuggestion()),
       appEvents.on(AppEvent.SaveRequested, () => {
         exportToZip().then(() => this.nav.loadSidebar())
       }),
