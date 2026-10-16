@@ -8,7 +8,10 @@
     "build": "bun lib/build.ts",
     "build:watch": "bun lib/build.ts --watch",
     "serve": "bun lib/serve.ts",
-    "e2e:serve": "PORT=32600 bun lib/serve.ts"
+    "e2e:serve": "PORT=32600 bun lib/serve.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {
     "@farmfe/core": "^1.7.11",

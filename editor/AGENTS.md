@@ -6,7 +6,7 @@
 - **Never create postinstall/patch scripts** that modify node_modules at install time.
 - **No raw global (document/window) event bindings outside `src/plugins/keyboard.ts`.** All global key handling is a static list in `src/plugins/keyboard.ts` (the `globalKeyBindings` array), which owns the single document-level `keydown` listener. Its handlers emit app events (e.g. Escape → `AppEvent.SidebarCancel`); controllers subscribe to those events instead of registering their own document listeners. Editor keybindings live in the ProseKit keymap (`createKeymap`) in the same file. Do NOT call `document.addEventListener` in controllers, services, or other plugins.
 - **Do not run Playwright/E2E browser tests unless the user explicitly asks.** Verify changes with `bun --bun tsc --noEmit` and static reasoning; leave E2E repro scripts out of the repo (keep them in `/tmp/opencode/` only if asked).
-- **Verify once, then stop.** `bun --bun tsc --noEmit` (and a build when CSS/Eta changed) is the whole verification step — do not re-grep built artifacts or re-inspect output files to confirm a fact you already confirmed. If the primary check passes, ask the user to verify the behavior rather than running further checks.
+- **Verify once, then stop.** `bun --bun tsc --noEmit`, `bun test` (for logic-level changes), and a build when CSS/Eta changed are the whole verification step — do not re-grep built artifacts or re-inspect output files to confirm a fact you already confirmed. If the primary checks pass, ask the user to verify the behavior rather than running further checks.
 - **Stop early on rabbit holes.** During investigation, don't keep drilling into `node_modules` sources or tracing dependency internals hoping the answer surfaces. If a few targeted reads don't resolve it, stop and ask the user for input — many issues resolve faster with a web search (docs, issue trackers) or a fresh git clone than with local source spelunking.
 - **Verify CSS custom property names against the declarations before using them.** Color/semantic vars (`--color-*`, `--font-size-*`) are declared in `src/styles/foundation/base.css` (`:root` block, Nord theme; dark mode in the `:root[data-theme="dark"]` block). Layout/spacing vars (`--sidebar-width`, `--aside-width`, `--editor-padding-*`, visibility) live in `lib/style/layout.css`. Do not invent var names — e.g. `--color-danger` does not exist; the error/destructive color is `--color-error` (using a non-existent var silently falls back to the property's initial value, producing wrong colors with no build error). When in doubt, grep the declaration file for the exact name before writing `var(--...)`.
 
@@ -136,11 +136,48 @@ There is no full-screen loading overlay. `shell.eta` renders skeleton placeholde
 bun lib/build.ts     # Full build: Eta render → CSS → Farm bundle → SW + KaTeX assets
 bun lib/dev.ts       # Dev server: Farm watch build + static serve + eta recompile
 bun --bun tsc --noEmit # TypeScript check
+bun test             # Unit tests (Bun's built-in runner)
 ```
 
 **Never run `bun lib/dev.ts` and `bun lib/build.ts` concurrently in the same repo.** The developer runs `bun dev` concurrently most of the time, so stale-chunk symptoms are usually caused by that, not by the build itself. Both write `public/assets/sw-assets.js` and `public/assets/manifest.json`, and the dev watch server regenerates them from its own (incremental, stale-accumulating) chunk graph — a production build run alongside a dev server gets clobbered with stale chunk entries. The symptom is old chunk filenames (e.g. a deleted controller's `changes-dialog-*.js`) lingering in the manifest's `AFFECTED_BY` / `COLD_ON_CHANGE` maps (the runtime `chunkMap` stays clean, so lazy loading still works). If a `manifest.json` / `sw-assets.js` check turns up stale names, first stop the dev server, then delete `node_modules/.farm` (Farm's persistent cache is the other source of stale resources) and rebuild once. Don't chase the stale map entries as a code bug — verify the runtime `chunkMap` and the actual chunk files instead.
 
 **CSS cascade order (same-specificity rules):** `src/styles/index.ts` imports `../eta/styles/conditions.css` LAST (it is compiled from `templates/styles/*.eta` by `lib/build/styles.ts` and claimed into the styles chunk by `lib/build/bundle.ts` `SRC_DOMAIN_RULES`). So every `templates/styles/*.eta` rule — mobile-dock.eta included — cascades after every `src/styles/` rule and deliberately overrides them. Consequence: a single-class modifier at equal specificity LOSES to a base rule living in the later stylesheet no matter where the modifier is defined (e.g. `.toolbar-menu--up` used to lose to mobile-dock.eta's `.edit-toolbar { top: 100% }`). When a modifier class must override a parent's base rule, scope it under the parent class so it wins by specificity, not cascade order: `.toolbar-menu.toolbar-menu--up, .edit-toolbar.toolbar-menu--up { top: auto; bottom: calc(100% + 12px) }`. Keep flip/utility styles in CSS as scoped modifiers — don't switch to inline styles just because a later stylesheet wins the tie.
+
+### Unit tests
+
+Logic-level tests live in `tests/` and run on **Bun's built-in test runner**
+(`bun test`, no extra deps). `tests/helpers/markdown.ts` builds the real editor
+schema (via `union(createSchemaExtension(), createMathExtension())`) and exposes
+the markdown `parse`/`serialize` bridge plus `roundtrip()` — the same code path
+the app uses to load and save files, so tests exercise production behavior.
+
+- `tests/fixtures/markdown.ts` — the fixture catalog (`MARKDOWN_FIXTURES`,
+  `UNICODE_FIXTURES`, `KNOWN_UNSTABLE_FIXTURES`). Add new block/inline syntax
+  here and the round-trip suites pick it up.
+- `tests/markdown/roundtrip.test.ts` — fixed-point + text-fidelity invariants.
+- `tests/markdown/empty-blocks.test.ts` — empty paragraphs serialize to
+  `<br />` (and parse back to empty paragraphs).
+- `tests/markdown/dynamic-elements.test.ts` — exact serialization of schema
+  nodes (alerts, video, image-block, math, divCenter, hugoRef, tables, …).
+- `tests/markdown/unicode.test.ts` — exact glyph/unicode/spacing preservation.
+- `tests/markdown/long-documents.test.ts` — long synthesized docs + every real
+  page under `content/` (frontmatter stripped).
+- `tests/utils/merge3.test.ts` — the per-section formatting merge (only
+  `.merged` is consumed by callers, so `conflicts` is informational).
+
+**`bun test` MUST run under Bun's runtime, not `tsc`/Farm.** Under Bun, bare
+`prosemirror-model` must resolve to its **ESM** build so that `orderedmap` is a
+single module instance. The `OrderedMap` CJS and ESM builds are different
+classes, and `prosemirror-model`'s CJS build does `OrderedMap.from(map)` which
+silently mangles the schema (`Schema is missing its top node type ('doc')`) when
+the two instances differ. For this reason `tsconfig.json` deliberately does
+**not** map `prosemirror-*` under `paths` (those entries force Bun to resolve the
+directory `main`, i.e. the CJS build). Do not re-add them. Farm ignores tsconfig
+`paths`, so the browser bundle is unaffected either way.
+
+Run `bun --bun tsc --noEmit` after touching tests; `tests` is in the tsconfig
+`include`, so the suites are type-checked too. Note Bun's `test.todo` *types*
+require a callback — pass a no-op (`test.todo("…", () => {})`).
 
 ### Build Mode and AppFunc
 
