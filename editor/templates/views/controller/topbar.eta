@@ -85,9 +85,10 @@
   <div class="toolbar-section toolbar-section-right">
     <div class="dirty-counter" role="button" tabindex="0" data-topbar-target="dirtyCounter" data-action="click->topbar#dirtyClicked"></div>
     <% if (it.mobileDock) { %>
-    <div class="toolbar-relative toolbar-file-actions" data-menu-name="share-compress" data-menu-label="Save"></div>
+    <button type="button" class="btn btn-icon toolbar-save-btn" data-menu-trigger="share-compress" title="Save / share / export" aria-label="Save, share and export" aria-haspopup="true"><%~ it.icons.floppyDisk %></button>
+    <span class="toolbar-relative toolbar-file-actions" data-menu-mount="share-compress"></span>
     <% } else { %>
-    <button class="btn btn-accent flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" disabled><%~ it.icons.sort %></button>
+    <button class="btn btn-accent flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" title="Save pending changes" aria-label="Save pending changes" disabled><%~ it.icons.floppyDisk %></button>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.OpenPrefs] %>" title="Preferences"><%~ it.icons.settings %></button>
     <% } %>
   </div>

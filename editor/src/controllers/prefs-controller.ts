@@ -46,7 +46,10 @@ export default class PrefsController extends BaseDialogController {
   declare readonly hasSectionValue: boolean
   declare readonly paneTargets: HTMLElement[]
   declare readonly tabTargets: HTMLElement[]
-  declare readonly hasPaneTargets: boolean
+  // Stimulus names the plural-presence getter SINGULAR: target "pane" gives
+  // `paneTargets` (all) but `hasPaneTarget` (presence) — there is no
+  // `hasPaneTargets`, and reading it yields `undefined`, silently skipping work.
+  declare readonly hasPaneTarget: boolean
   declare readonly hasLangChipsTarget: boolean
   declare readonly langChipsTarget: HTMLElement
 
@@ -84,7 +87,7 @@ export default class PrefsController extends BaseDialogController {
     const target = event.currentTarget as HTMLElement
     const section = parsePrefsSection(target.dataset.section ?? "")
     if (section === null) return
-    if (!this.hasPaneTargets) return
+    if (!this.hasPaneTarget) return
     for (const el of this.paneTargets) {
       el.hidden = el.dataset.section !== `${PREFS_SECTION_PREFIX}${section}`
     }

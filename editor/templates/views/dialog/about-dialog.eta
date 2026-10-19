@@ -6,8 +6,10 @@
   <div class="prefs-body">
     <div class="about-hero">
       <span class="about-logo"><%~ it.icons.bookStack %></span>
-      <p class="about-tagline">A WYSIWYG markdown wiki for the <code>inb4doc</code> project.</p>
-      <% if (it.version) { %><p class="about-version">Version <%= it.version %></p><% } %>
+      <span class="about-hero-text">
+        <p class="about-tagline">A WYSIWYG markdown wiki for the <code>inb4doc</code> project.</p>
+        <% if (it.version) { %><p class="about-version">Version <%= it.version %></p><% } %>
+      </span>
     </div>
     <div class="about-links">
       <% for (const link of it.links) { %>

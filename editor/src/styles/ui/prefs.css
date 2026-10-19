@@ -273,16 +273,23 @@
 /* ── About window ──────────────────────────────────────────────────── */
 
 .about-dialog {
-  width: min(420px, 92vw);
+  width: min(560px, 92vw);
 }
+
+/* Row 1: logo + wordmark + version side by side. */
 .about-hero {
-  padding: 1.25rem;
-  text-align: center;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.25rem 1.25rem 0.75rem;
+  text-align: left;
 }
 .about-logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   width: 3rem;
   height: 3rem;
   border-radius: 10px;
@@ -293,9 +300,15 @@
   width: 1.6rem;
   height: 1.6rem;
 }
+.about-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
 .about-tagline,
 .about-version {
-  margin: 0.75rem 0 0;
+  margin: 0;
   font-size: var(--font-size-small);
   color: var(--color-text-tertiary);
 }
@@ -305,17 +318,21 @@
   border-radius: 3px;
 }
 
+/* Row 2: one link per column, so neither card has to compete for width. */
 .about-links {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 0.75rem;
   padding: 0 1.25rem 0.5rem;
 }
 .about-link {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.7rem 0.85rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   color: var(--color-text-primary);
@@ -327,13 +344,13 @@
   color: var(--color-accent);
 }
 .about-link-icon svg {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 1.4rem;
+  height: 1.4rem;
 }
 .about-link-text {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  gap: 0.15rem;
   min-width: 0;
 }
 .about-link-title {
@@ -343,10 +360,21 @@
 .about-link-sub {
   font-size: var(--font-size-small);
   color: var(--color-text-tertiary);
+  overflow-wrap: anywhere;
+}
+.about-link-arrow {
+  margin-top: auto;
+  align-self: flex-end;
 }
 .about-link-arrow svg {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+@media (max-width: 480px) {
+  .about-links {
+    flex-direction: column;
+  }
 }
 
 /* Modern marker highlight: the link sits inside an underline that sweeps up

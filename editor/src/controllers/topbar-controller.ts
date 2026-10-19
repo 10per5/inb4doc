@@ -161,6 +161,37 @@ export default class extends Controller {
       this.menus.push(menu);
       if (mnemonic) this.menusByMnemonic.set(mnemonic, menu);
     }
+    this.createOwnTriggerMenus();
+  }
+
+  // Menus that supply their own trigger markup (`data-menu-mount` + a paired
+  // `[data-menu-trigger]`). Used by the mobile Save button: it has to be an
+  // icon-only control, and Menu's generated trigger always renders a text
+  // label plus a chevron — wide enough to push itself off narrow phones.
+  // The trigger must live OUTSIDE the mount: Menu replaces the mount's
+  // innerHTML with its panel, so a trigger nested in it would be destroyed
+  // the moment the panel is built.
+  private createOwnTriggerMenus() {
+    const mounts = this.element.querySelectorAll<HTMLElement>("[data-menu-mount]");
+    for (const mount of mounts) {
+      const name = mount.dataset.menuMount!;
+      const trigger = this.element.querySelector<HTMLElement>(
+        `[data-menu-trigger="${name}"]`,
+      );
+      if (!trigger || !menuRegistry.get(name)) continue;
+      const menu = new Menu({
+        mountEl: mount,
+        triggerEl: trigger,
+        label: name,
+        title: name,
+        items: () => menuRegistry.get(name)!,
+      });
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.toggle();
+      });
+      this.menus.push(menu);
+    }
   }
 
   private onKeyDown = (e: KeyboardEvent) => {

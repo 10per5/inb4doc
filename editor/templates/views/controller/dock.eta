@@ -3,7 +3,7 @@
     <span class="dock-icon"><%~ it.icons.bookStack %></span>
     <span class="dock-label">Files</span>
   </button>
-  <button type="button" class="dock-item dock-item--fab" role="tab" data-dock-target="item" data-dock-item="editor" data-action="dock#activate" aria-label="Editor" title="Editor">
+  <button type="button" class="dock-item dock-item--editor" role="tab" data-dock-target="item" data-dock-item="editor" data-action="dock#activate" aria-label="Editor" title="Editor">
     <span class="dock-icon dock-icon--pencil"><%~ it.icons.editPencil %></span>
     <span class="dock-label">Editor</span>
   </button>

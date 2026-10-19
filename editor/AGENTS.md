@@ -80,6 +80,17 @@ await app.start();
 
 `app.register()` immediately connects controllers if matching DOM elements exist. `app.start()` starts the MutationObserver for future DOM changes.
 
+### Stimulus presence getters are SINGULAR
+
+`static targets = ["pane"]` generates `paneTarget`, `paneTargets`, **and
+`hasPaneTarget`** — NOT `hasPaneTargets`. The plural form does not exist, and
+because the getter is missing TypeScript never complains if you also declared it
+with `declare readonly hasPaneTargets: boolean`; the property is simply
+`undefined` at runtime, so a guard like `if (!this.hasPaneTargets) return`
+silently skips the work with no error anywhere. Use `has<Name>Target` (singular
+target name) for presence, always. (This cost a debugging session when the
+preferences tab rail looked fine but did nothing on click.)
+
 ### TypeScript `declare` for Stimulus Targets/Values
 
 With `target: "ESNext"` (or `useDefineForClassFields: true`), TypeScript compiles `foo!: HTMLElement` to `this.foo = undefined` in the constructor, which **shadows** the Stimulus prototype getter that queries the DOM. Always use `declare` for Stimulus-managed properties:
@@ -449,6 +460,10 @@ dialog and the mobile per-section screens can never drift apart.
 - Desktop: `AppEvent.PrefsOpened` → `openPrefsDialog(section)` renders all four
   panes in one centered dialog; `PrefsController.switchTab` toggles `[hidden]`
   and `is-active` — no re-render (that would drop focus).
+- A menu may own its own trigger via `[data-menu-mount]` + `[data-menu-trigger]`
+  (see `TopbarController.createOwnTriggerMenus`). The trigger must be a SIBLING
+  of the mount, never a child: `Menu.build()` replaces the mount's `innerHTML`
+  with the panel and would delete a nested trigger.
 - Mobile: the `prefs` fullview first renders a menu of sections; picking one
   pushes that section's screen (`PrefsController.openSectionValue`). Leaving the
   view resets it to the menu (see `watchViewChanges()`).
@@ -460,10 +475,20 @@ dialog and the mobile per-section screens can never drift apart.
 
 ## Mobile dock — three tabs, no FAB menu
 
-`#dock` renders three plain tabs: Files / Editor / More
-(`DockController`). The middle tab used to double as an "add block" FAB; that
-duplicated the edit-toolbar's "+", so insert-block now lives only in the
-edit-toolbar's "+" menu. Do not reintroduce a dock insert menu.
+`#dock` renders three **identical** tabs: Files / Editor / More
+(`DockController`), styled by `.dock-item` with no special case for the middle
+one. The middle tab used to be a raised circular `.dock-item--fab` that doubled
+as an "add block" trigger; that duplicated the edit-toolbar's "+", so both the
+FAB chrome and its insert menu are gone. Do not reintroduce either.
+
+## Sidebar chrome
+
+The sidebar carries no provider/storage chrome — no provider bar, no backend
+switch, no live-version link. Anything about *where content lives* belongs in
+**Preferences ▸ Storage** (backend + Change…), and project links belong in the
+**About** window. The only sidebar toolbar control is the full-width **Filters**
+button (`AppEvent.PrefsOpened` → Navigation section); it shows the active
+filters as a chip so a scoped/emptied tree never looks like missing content.
 
 ## Edit toolbar ordering and placement
 
@@ -477,9 +502,13 @@ connect). Placement is a preference (`followCaretToolbar`, Editor section):
 when off the strip stays pinned to the bottom even while the OSK is up; when on
 it becomes the block-anchored popover (`is-follow-mode`).
 
-Save/flush placement per surface: **desktop keeps it in the topbar** (the old
-arrow button, unchanged); **mobile puts it in the edit toolbar**, because the
-mobile topbar slot now hosts the Share/Compress dropdown instead.
+Save/flush placement per surface: **desktop keeps it in the topbar** (the disk
+icon now; it used to be a nonsense "sort" arrow); **mobile puts it in the edit
+toolbar**, because the mobile topbar slot now hosts the icon-only Save ▾
+Share/Compress dropdown. That dropdown's trigger is 32px and lives outside the
+menu mount, and its panel + every nested submenu are right-aligned in the mobile
+conditions CSS — a text "Save ▾" trigger or a left-aligned panel pushed past the
+right margin on a 390px phone.
 
 **While the add-block menu is open the bar must not reposition.** Pressing "+"
 closes the OSK, which re-enters `positionPopover()` with `followMode` already

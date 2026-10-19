@@ -28,7 +28,6 @@ import { PrefsSection } from "@/config/enums/prefs-section";
 import { treeStore } from "@/stores/tree-store";
 import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps } from "@/entities/PendingOps";
-import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { getCurrentPath } from "@/utils/url";
 import { HOME_PATH } from "@/utils/hugo-compat";
 
@@ -38,7 +37,6 @@ export default class extends Controller {
     "search",
     "searchWrapper",
     "newPageBtn",
-    "providerLabel",
     "filtersBtn",
     "filterSummary",
     "deleteSelectedBtn",
@@ -49,7 +47,6 @@ export default class extends Controller {
   declare readonly searchTarget: HTMLInputElement;
   declare readonly searchWrapperTarget: HTMLElement;
   declare readonly newPageBtnTarget: HTMLElement;
-  declare readonly providerLabelTarget: HTMLElement;
   declare readonly filtersBtnTarget: HTMLElement;
   declare readonly filterSummaryTarget: HTMLElement;
   declare readonly deleteSelectedBtnTarget: HTMLButtonElement;
@@ -177,15 +174,9 @@ export default class extends Controller {
     this.rawTree = rawTree;
     this.tree = mergedTree;
 
-    const provider = getProvider();
-    const pdi = getProviderDisplayInfo(provider.name);
     const current = getCurrentPath();
 
     const treeEmpty = mergedTree.paths.size === 0;
-
-    this.providerLabelTarget.innerHTML = `<span class="provider-icon">${
-      pdi.icon ?? ""
-    }</span><span class="provider-desc">${pdi.label ?? "No provider"}</span>`;
 
     if (treeEmpty) {
       this.searchWrapperTarget.style.display = "none";

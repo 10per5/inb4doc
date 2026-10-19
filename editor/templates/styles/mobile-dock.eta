@@ -161,6 +161,29 @@
   left: auto;
   right: 0;
 }
+
+/* Save dropdown (right section): the panel would otherwise start at its
+ * trigger's left edge and run off the right margin, and its grouped submenus
+ * open even further right. Anchor the panel (and the shared --right flip) to
+ * the mount's right edge and let every nested level grow leftward instead.
+ * The trigger is icon-only on purpose — a "Save ▾" label was wide enough to
+ * push the whole row past the viewport on a 390px phone. */
+.book-layout .app-toolbar .toolbar-section-right .toolbar-menu,
+.book-layout .app-toolbar .toolbar-section-right .toolbar-menu.toolbar-menu--right {
+  left: auto;
+  right: 0;
+}
+
+.book-layout .app-toolbar .toolbar-section-right .toolbar-menu .menu-item-submenu .menu-submenu {
+  left: auto;
+  right: 100%;
+}
+
+.book-layout .app-toolbar .toolbar-save-btn {
+  min-width: 32px;
+  padding: 0 0.2rem;
+}
+
 <% } else { %>
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
  * Fixed (not sticky) so it stays at the top of the visible area even when the
@@ -270,17 +293,8 @@
 }
 
 /* On-screen keyboard (mobile): when the visual viewport shrinks, DockController
- * sets --kb-offset on #dock and toggles .kb-open. The FAB relocates to the
- * bottom-right corner, above the keyboard. position:fixed pulls it out of the
- * dock flex row (Files/More then split the bar, which is keyboard-covered
- * anyway). The edit-toolbar switches to follow mode (see below). */
-#dock.kb-open .dock-item--fab {
-  position: fixed;
-  right: 16px;
-  bottom: calc(var(--kb-offset) + env(safe-area-inset-bottom, 0) + 12px);
-  transform: none;
-  margin: 0;
-}
+ * sets --kb-offset on #dock and toggles .kb-open. The three tabs keep sharing
+ * the bar evenly; the edit-toolbar switches to follow mode (see below). */
 
 /* MobileShrink layout (keyboard open): the on-screen keyboard pans the visual
  * viewport to keep the caret visible, which can carry the fixed topbar/dock out
@@ -315,25 +329,9 @@ body.layout-mobile-shrink .book-layout {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Center Edit item: a raised circular FAB, always visible on the dock.
- * A 56px circle raised 12px above the 56px bar (transform keeps it a true
- * circle — a taller box with border-radius:50% renders as an ellipse). */
-.dock-item--fab {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
-  align-self: flex-end;
-  transform: translateY(-12px);
-  border-radius: 50%;
-  background: var(--color-accent);
-  color: var(--color-btn-active-text);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
-}
-
-.dock-item--fab .dock-icon {
-  height: 26px;
-}
-
+/* Editor tab: a plain dock item like Files and More. There is no FAB — the
+ * middle button used to be a raised circle that doubled as an "add block"
+ * trigger, which put a second "+" on the same screen as the edit-toolbar. */
 .dock-item .dock-icon {
   position: relative;
   display: flex;
@@ -373,26 +371,16 @@ body.layout-mobile-shrink .book-layout {
   color: var(--color-accent);
 }
 
-.dock-item--fab.is-active {
-  color: var(--color-active-text);
-  background-color: var(--color-btn-bg);
-}
-
-/* Editor tab states. The middle button is the editor toggle: it always shows
-   the pencil + "Editor" label, so the only "+" on screen is the edit-toolbar's
-   add-block button. */
-.dock-item--fab .dock-icon--pencil {
+/* Editor tab states. The middle button is always the editor toggle (pencil +
+ * "Editor" label), so the only "+" on screen is the edit-toolbar's add-block
+ * button. */
+.dock-item .dock-icon--pencil {
   height: 20px;
 }
 
-.dock-item--fab .dock-icon--pencil svg {
+.dock-item .dock-icon--pencil svg {
   width: 20px;
   height: 20px;
-}
-
-.dock-item--fab .dock-label {
-  font-size: 10px;
-  line-height: 1;
 }
 
 /* Fullview views occupy the editor area above the dock. The inner header/
