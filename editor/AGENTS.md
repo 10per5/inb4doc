@@ -469,6 +469,15 @@ dialog and the mobile per-section screens can never drift apart.
   view resets it to the menu (see `watchViewChanges()`).
 - Every field change funnels through `src/components/ui/prefs.ts` (shared by
   both surfaces) and emits an AppEvent so consumers update live.
+- The project scope picker (Navigation) is **badges + a paginated table**, never
+  a growing radio list: `PROJECT_BADGE_LIMIT` root folders get a badge (after
+  "Show all"), and everything else lives in the table behind the "More…" badge
+  (`PROJECT_PAGE_SIZE` rows per page, rows pre-rendered and toggled by
+  `PrefsController.showProjectPage`). Selecting any option applies the scope
+  through `onPrefsRootScopeChanged`, marks the badges/rows `is-active`, collapses
+  the table and closes the preferences surface so the retargeted tree shows.
+  Do not reintroduce a full list of radio rows — the content root can hold any
+  number of top-level folders.
 - The sidebar's "Filters" button opens the same window on `PrefsSection.Navigation`
   (`AppEvent.PrefsOpened` carries `{ section }`), so there is exactly one
   navigation-preferences UI.
@@ -480,6 +489,30 @@ dialog and the mobile per-section screens can never drift apart.
 one. The middle tab used to be a raised circular `.dock-item--fab` that doubled
 as an "add block" trigger; that duplicated the edit-toolbar's "+", so both the
 FAB chrome and its insert menu are gone. Do not reintroduce either.
+
+## Native "back" press (host → JS contract)
+
+The Android system back press / gesture goes through
+`window.inb4docUI.handleBack()` (declared in `src/bridge/interface.ts`, mounted
+by `exposeHostApi()` for every host). It returns **true** when the app consumed
+the press and **false** when nothing was left to unwind — then the host falls
+back to in-page history and finally exits (`WebViewActivity.onBackPressed`).
+
+The decision lives in `ShellController.handleBackPressed()`, which unwinds
+**exactly one layer per press**, innermost first:
+
+1. an open state-driven dialog (`closeTopDialog()` in dialog-service),
+2. anything a controller owns via `AppEvent.BackRequested` (payload
+   `{ handled: boolean }` — a pushed preferences section steps back to the
+   preferences menu, the Files multi-select mode exits selection; the handler
+   sets `handled = true`),
+3. the fullview itself: `navigation` (Files) and `more` go straight to
+   `editor`, every other fullview returns to `more`.
+
+Only when the editor is already frontmost does it return false, so a press can
+never quit the app from a subscreen — it walks back to the editor first, and the
+next press exits. Add new unwinding steps as `AppEvent.BackRequested`
+subscribers, never by teaching the host about app views.
 
 ## Bottom-strip clearance (desktop)
 

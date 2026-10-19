@@ -6,12 +6,9 @@
   closeLabel: "Back to preferences",
   closeIcon: "back",
   icons: it.icons,
-  body: `
-  <div class="prefs-pane-head">
-    <h4 class="prefs-pane-title">${active.label}</h4>
-    <p class="prefs-pane-desc">${active.description}</p>
-  </div>
-  ${active.html}`
+  // The pushed screen already names the section in its title bar, so the pane
+  // head (title + description) would only repeat it.
+  body: `${active.html}`
 }) %>
 <% } else { %>
 <% const rows = it.panes.map((pane) => `

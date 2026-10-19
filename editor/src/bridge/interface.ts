@@ -88,9 +88,34 @@ export interface HostApi {
   openFind: typeof openFind
   findNext: typeof findNext
   findPrev: typeof findPrev
+  handleBack: typeof handleBack
 }
 
-const hostApi: HostApi = { showToast, openFind, findNext, findPrev }
+const hostApi: HostApi = { showToast, openFind, findNext, findPrev, handleBack }
+
+// The back decision itself lives in the shell, which owns the view service and
+// the event bus; it registers on connect. Before that every press is reported
+// as unhandled so the host keeps its own fallback (history, then exit).
+let backHandler: (() => boolean) | null = null
+
+export function registerBackHandler(fn: (() => boolean) | null): void {
+  backHandler = fn
+}
+
+/**
+ * Native "back" affordance — the Android system back press / gesture. Returns
+ * true when the app consumed the press (a dialog closed, a screen stepped
+ * back) and false when there is nothing left to unwind, which is the host's cue
+ * to fall back to in-page history and then leave the app.
+ */
+export function handleBack(): boolean {
+  if (!backHandler) return false
+  try {
+    return backHandler()
+  } catch {
+    return false
+  }
+}
 
 /** Mount the shared native → JS API (called by every host bridge). */
 export function exposeHostApi(): void {

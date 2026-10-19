@@ -350,11 +350,21 @@ class WebViewActivity : AppCompatActivity() {
         )
     }
 
+    // The web app owns what "back" means: it unwinds one layer per press (open
+    // dialog → sub-screen → fullview → nothing left). We only fall back to
+    // in-page history when it reports the press as unhandled, and only then does
+    // a further press leave the app — so Files/More always land in the editor
+    // first and a press can never quit from a sub-screen.
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
+        webView.evaluateJavascript(
+            "(function(){try{return (window.inb4docUI && window.inb4docUI.handleBack ? window.inb4docUI.handleBack() === true : false).toString()}catch(e){return 'false'}})()"
+        ) { handled ->
+            if (handled == "true") return@evaluateJavascript
+            if (webView.canGoBack()) {
+                webView.goBack()
+            } else {
+                super.onBackPressed()
+            }
         }
     }
 
