@@ -134,13 +134,13 @@ export function buildAboutLinks(liveUrl: string): AboutLink[] {
       href: liveUrl || "https://10per5.github.io/inb4doc/",
       title: "Documentation",
       subtitle: "The published inb4doc wiki",
-      icon: ICONS.bookStack ?? "",
+      icon: icons.bookStack,
     },
     {
       href: "https://github.com/10per5/inb4doc",
       title: "GitHub",
       subtitle: "Source, issues and releases",
-      icon: ICONS.github ?? "",
+      icon: icons.github,
     },
   ]
 }

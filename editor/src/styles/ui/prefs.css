@@ -354,13 +354,16 @@
   gap: 0.75rem;
   padding: 0 1.25rem 0.5rem;
 }
+/* Each card is a row: icon tile on the left, the two-line text block next to
+ * it, chevron pushed to the trailing edge. The single line for `.about-links`
+ * itself is what makes the two cards sit side by side. */
 .about-link {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -369,14 +372,18 @@
   background: var(--color-bg-secondary);
 }
 .about-link-icon {
+  flex: 0 0 auto;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-accent);
 }
 .about-link-icon svg {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 .about-link-text {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -392,8 +399,10 @@
   overflow-wrap: anywhere;
 }
 .about-link-arrow {
-  margin-top: auto;
-  align-self: flex-end;
+  flex: 0 0 auto;
+  margin-left: auto;
+  align-self: center;
+  color: var(--color-text-tertiary);
 }
 .about-link-arrow svg {
   width: 1.1rem;
