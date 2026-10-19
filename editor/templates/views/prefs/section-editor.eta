@@ -1,0 +1,43 @@
+<div class="prefs-pane">
+  <div class="prefs-section">
+    <div class="prefs-section-title">Edit toolbar</div>
+    <div class="radio-group">
+      <label class="prefs-row">
+        <input type="radio" name="toolbar-placement" value="pinned" <%= it.prefs.followCaretToolbar ? "" : "checked" %> data-action="change-><%= it.controller %>#toolbarPlacementChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">Pinned to bottom</span>
+          <span class="prefs-row-hint">Always docked at the bottom of the screen.</span>
+        </span>
+      </label>
+      <label class="prefs-row">
+        <input type="radio" name="toolbar-placement" value="follow" <%= it.prefs.followCaretToolbar ? "checked" : "" %> data-action="change-><%= it.controller %>#toolbarPlacementChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">Follow caret</span>
+          <span class="prefs-row-hint">Float next to the block you are editing.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Writing assistance</div>
+    <label class="prefs-row">
+      <input type="checkbox" id="inb4doc-spellcheck-checkbox" <%= it.prefs.spellcheck ? "checked" : "" %> data-action="change-><%= it.controller %>#spellcheckChanged">
+      <span class="prefs-row-text">
+        <span class="prefs-row-label">Highlight as you type</span>
+        <span class="prefs-row-hint">Underline words your browser considers misspelled.</span>
+      </span>
+    </label>
+    <div class="prefs-subsection<%= it.prefs.spellcheck ? "" : " is-disabled" %>">
+      <div class="prefs-subsection-title">Languages</div>
+      <p class="prefs-note">Only dictionaries your browser already ships are highlighted — picking one never installs it.</p>
+      <div class="prefs-chips" data-<%= it.controller %>-target="langChips">
+        <% for (const lang of it.languages) { %>
+        <label class="prefs-chip<%= it.prefs.spellcheckLanguages.includes(lang.tag) ? " is-on" : "" %>">
+          <input type="checkbox" value="<%= lang.tag %>" <%= it.prefs.spellcheckLanguages.includes(lang.tag) ? "checked" : "" %> <%= it.prefs.spellcheck ? "" : "disabled" %> data-action="change-><%= it.controller %>#spellLanguageChanged">
+          <span><%= lang.label %></span>
+        </label>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>

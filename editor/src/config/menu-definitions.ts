@@ -29,6 +29,7 @@ import {
   videoCamera,
   plus,
   magicWand,
+  infoCircle,
 } from "@/eta/icons";
 
 export const menuRegistry = createRegistry();
@@ -91,13 +92,6 @@ menuRegistry.register("file", (): MenuItem[] => {
     ...projectItems,
     {
       type: MenuType.Item,
-      id: "img-mgr",
-      icon: mediaImage,
-      label: "Image Manager",
-      onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
-    },
-    {
-      type: MenuType.Item,
       id: "format-document",
       icon: magicWand,
       label: "Format document",
@@ -105,6 +99,24 @@ menuRegistry.register("file", (): MenuItem[] => {
       onClick: () => appEvents.emit(AppEvent.FormatDocumentRequested),
     },
     { type: MenuType.Separator },
+    ...shareMenuItems(),
+    ...compressMenuItems(),
+    { type: MenuType.Separator },
+    {
+      type: MenuType.Item,
+      id: "about",
+      icon: infoCircle,
+      label: "About inb4doc",
+      onClick: () => appEvents.emit(AppEvent.AboutOpened),
+    },
+  ];
+});
+
+// Share / Compress also ship as a standalone dropdown: the mobile topbar has
+// no File menu, so its Save button slot hosts one that reaches the same
+// actions. Kept as builders so the two surfaces cannot drift apart.
+function shareMenuItems(): MenuItem[] {
+  return [
     {
       type: MenuType.Submenu,
       id: "share",
@@ -125,6 +137,11 @@ menuRegistry.register("file", (): MenuItem[] => {
         },
       ],
     },
+  ];
+}
+
+function compressMenuItems(): MenuItem[] {
+  return [
     {
       type: MenuType.Submenu,
       id: "compress",
@@ -148,7 +165,8 @@ menuRegistry.register("file", (): MenuItem[] => {
       ],
     },
   ];
-});
+}
+
 
 // Part D hygiene: the topbar chunk is hot (updatable without a reload), so a
 // module-level subscription here would stack a new handler on every hot swap
@@ -374,6 +392,16 @@ menuRegistry.register("view", (): MenuItem[] => {
           onClick: () => layout.toggleRightPanel(),
         },
       ],
+    },
+    // Panels and screens are both "what the window shows", so the image
+    // manager belongs here rather than in File — it opens a browser/manager
+    // view over the content, not a document operation.
+    {
+      type: MenuType.Item,
+      id: "img-mgr",
+      icon: mediaImage,
+      label: "Image Manager",
+      onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
     },
   ];
 });

@@ -19,6 +19,28 @@
 .desktop-layout.block-handle-narrow #dock {
   display: block;
 }
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-leftpanel,
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-rightpanel,
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-leftpanel
+  .sidebar-wrapper {
+  /* The columns set an explicit `height: var(--vp)` in the critical layout,
+   * so the parent's padding-bottom cannot shorten them — subtract the strip
+   * instead or the navigator's "+ New" stays under it. */
+  height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px));
+}
+
 
 .desktop-layout.block-handle-narrow #dock .dock {
   display: none;
@@ -34,11 +56,25 @@
   left: var(--sidebar-width);
 }
 
+/* Bottom-strip clearance. #edit-toolbar lives in #dock, a SIBLING of
+ * .book-layout (see shell.eta), so the old `.book-layout:has(#edit-toolbar…)`
+ * rule could never match — nothing reserved space and the fixed strip sat on
+ * top of the status bar and the navigator's "+ New". Drive it from #app, the
+ * shared ancestor, and give the sticky status bar the same offset so it also
+ * clears the strip when the column overflows and actually sticks. */
 .desktop-layout.block-handle-narrow
-  .book-layout:has(#edit-toolbar:not([hidden])):not(
+  #app:has(#edit-toolbar:not([hidden])):not(
     :has(#edit-toolbar.is-follow-mode)
   ) {
-  padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+  --edit-toolbar-clearance: calc(47px + env(safe-area-inset-bottom, 0));
+}
+
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-layout {
+  padding-bottom: var(--edit-toolbar-clearance, 0px);
 }
 
   /* Tablet (768–1199px): show the quick bar only — the dock nav row
@@ -68,15 +104,42 @@
       left: var(--sidebar-width);
     }
 
-  /* Tighten the base 104px clearance (56px hidden nav row + 47px strip) to
-   * just the strip, since the nav row is gone. The :has chain out-specifies
-   * the plain .book-layout rule, so it must carry the same :has selectors. */
+  /* Same clearance as the .block-handle-narrow case above (and for the same
+   * reason: #edit-toolbar is not a descendant of .book-layout). */
   .desktop-layout
-    .book-layout:has(#edit-toolbar:not([hidden])):not(
+    #app:has(#edit-toolbar:not([hidden])):not(
       :has(#edit-toolbar.is-follow-mode)
     ) {
-    padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+    --edit-toolbar-clearance: calc(47px + env(safe-area-inset-bottom, 0));
   }
+
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-layout {
+    padding-bottom: var(--edit-toolbar-clearance, 0px);
+  }
+
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-leftpanel,
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-rightpanel,
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-leftpanel
+    .sidebar-wrapper {
+    height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px));
+  }
+
 }
 
 .mobile-layout .book-leftpanel,
@@ -161,6 +224,29 @@
   left: auto;
   right: 0;
 }
+
+/* File dropdown (right section): the panel would otherwise start at its
+ * trigger's left edge and run off the right margin, and its grouped submenus
+ * open even further right. Anchor the panel (and the shared --right flip) to
+ * the mount's right edge and let every nested level grow leftward instead.
+ * The trigger is icon-only on purpose — a "File ▾" label was wide enough to
+ * push the whole row past the viewport on a 390px phone. */
+.book-layout .app-toolbar .toolbar-section-right .toolbar-menu,
+.book-layout .app-toolbar .toolbar-section-right .toolbar-menu.toolbar-menu--right {
+  left: auto;
+  right: 0;
+}
+
+.book-layout .app-toolbar .toolbar-section-right .toolbar-menu .menu-item-submenu .menu-submenu {
+  left: auto;
+  right: 100%;
+}
+
+.book-layout .app-toolbar .toolbar-file-btn {
+  min-width: 32px;
+  padding: 0 0.2rem;
+}
+
 <% } else { %>
 /* Slim topbar: menus + save only (formatting lives in the edit toolbar).
  * Fixed (not sticky) so it stays at the top of the visible area even when the
@@ -270,17 +356,8 @@
 }
 
 /* On-screen keyboard (mobile): when the visual viewport shrinks, DockController
- * sets --kb-offset on #dock and toggles .kb-open. The FAB relocates to the
- * bottom-right corner, above the keyboard. position:fixed pulls it out of the
- * dock flex row (Files/More then split the bar, which is keyboard-covered
- * anyway). The edit-toolbar switches to follow mode (see below). */
-#dock.kb-open .dock-item--fab {
-  position: fixed;
-  right: 16px;
-  bottom: calc(var(--kb-offset) + env(safe-area-inset-bottom, 0) + 12px);
-  transform: none;
-  margin: 0;
-}
+ * sets --kb-offset on #dock and toggles .kb-open. The three tabs keep sharing
+ * the bar evenly; the edit-toolbar switches to follow mode (see below). */
 
 /* MobileShrink layout (keyboard open): the on-screen keyboard pans the visual
  * viewport to keep the caret visible, which can carry the fixed topbar/dock out
@@ -300,48 +377,6 @@ body.layout-mobile-shrink .book-layout {
   position: relative;
 }
 
-/* Anchor for the FAB popup menu. Default: a 0-height strip above the dock; the
- * shared .toolbar-menu panel is mounted here and pinned above the dock via the
- * shared up/right flip classes. When the keyboard is open the dock controller
- * adds .is-block-anchored and sets left/top to the selection block's coords,
- * turning the anchor into a 0×0 fixed point so the menu opens at the block. */
-.dock-fab-menu-anchor {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 56px;
-  height: 0;
-  z-index: 300;
-}
-
-.dock-fab-menu-anchor.is-block-anchored {
-  position: fixed;
-  right: auto;
-  bottom: auto;
-  width: 0;
-}
-
-/* The FAB popup in dock mode (keyboard closed): opens upward from the dock and
- * right-aligns toward the FAB button. The panel carries .dock-fab-menu from the
- * Menu's panelClass; while block-anchored (.is-block-anchored) this rule stops
- * applying so the shared toolbar-menu--up / --right flip classes position it at
- * the selection instead. */
-.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu {
-  top: auto;
-  bottom: calc(100% + 12px);
-  left: auto;
-  right: 12px;
-}
-
-/* The FAB popup's grouped expanders open leftward — with the panel
- * right-aligned they stay fully on screen on narrow phones. Dock mode always;
- * block mode only when the shared flip right-aligned the panel. */
-.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu .menu-item-submenu .menu-submenu,
-.dock-fab-menu-anchor.is-block-anchored .dock-fab-menu.toolbar-menu--right .menu-item-submenu .menu-submenu {
-  left: auto;
-  right: 100%;
-}
-
 .dock-item {
   flex: 1;
   display: flex;
@@ -357,25 +392,9 @@ body.layout-mobile-shrink .book-layout {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Center Edit item: a raised circular FAB, always visible on the dock.
- * A 56px circle raised 12px above the 56px bar (transform keeps it a true
- * circle — a taller box with border-radius:50% renders as an ellipse). */
-.dock-item--fab {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
-  align-self: flex-end;
-  transform: translateY(-12px);
-  border-radius: 50%;
-  background: var(--color-accent);
-  color: var(--color-btn-active-text);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
-}
-
-.dock-item--fab .dock-icon {
-  height: 26px;
-}
-
+/* Editor tab: a plain dock item like Files and More. There is no FAB — the
+ * middle button used to be a raised circle that doubled as an "add block"
+ * trigger, which put a second "+" on the same screen as the edit-toolbar. */
 .dock-item .dock-icon {
   position: relative;
   display: flex;
@@ -415,26 +434,16 @@ body.layout-mobile-shrink .book-layout {
   color: var(--color-accent);
 }
 
-.dock-item--fab.is-active {
-  color: var(--color-active-text);
-  background-color: var(--color-btn-bg);
-}
-
-/* FAB states (data-dock-state on the FAB): editor view → "+" insert trigger;
-   other views → pencil + "Editor" label (return-to-editor tab). The [hidden]
-   attribute toggles which icon/label shows. */
-.dock-item--fab .dock-icon--pencil {
+/* Editor tab states. The middle button is always the editor toggle (pencil +
+ * "Editor" label), so the only "+" on screen is the edit-toolbar's add-block
+ * button. */
+.dock-item .dock-icon--pencil {
   height: 20px;
 }
 
-.dock-item--fab .dock-icon--pencil svg {
+.dock-item .dock-icon--pencil svg {
   width: 20px;
   height: 20px;
-}
-
-.dock-item--fab .dock-label {
-  font-size: 10px;
-  line-height: 1;
 }
 
 /* Fullview views occupy the editor area above the dock. The inner header/
@@ -675,6 +684,23 @@ body.layout-mobile-shrink .book-layout {
 }
 
 .edit-toolbar-btn--add:active {
+  color: var(--color-btn-active-text);
+  background: var(--color-accent);
+}
+
+/* Save sits last in the strip (after "+") so the two primary actions are the
+ * rightmost targets, closest to the thumb. A disk, not an arrow: it writes the
+ * open document to the provider instead of flushing every dirty file. */
+.edit-toolbar-group--save {
+  margin-left: 0.125rem;
+  flex-shrink: 0;
+}
+
+.edit-toolbar-btn--save {
+  color: var(--color-accent);
+}
+
+.edit-toolbar-btn--save:active {
   color: var(--color-btn-active-text);
   background: var(--color-accent);
 }

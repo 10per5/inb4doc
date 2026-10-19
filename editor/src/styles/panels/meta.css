@@ -157,30 +157,33 @@
   padding-bottom: 0.5rem;
 }
 
-/* ── GitHub Link ───────────────────────────────────────────────────── */
+/* ── About Button ──────────────────────────────────────────────────── */
 
-.github-link {
+.about-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
   padding: 0.5rem 0.75rem;
   color: var(--color-text-primary);
-  text-decoration: none;
+  font: inherit;
   font-size: 0.85rem;
   font-weight: 500;
   border-radius: 6px;
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
+  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.github-link:hover {
+.about-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.about-btn:hover {
   background: var(--color-bg-secondary);
   border-color: var(--color-accent);
   color: var(--color-accent);
-}
-
-.github-icon {
-  width: 18px;
-  height: 18px;
 }

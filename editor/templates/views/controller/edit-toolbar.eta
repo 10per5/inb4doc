@@ -52,5 +52,10 @@
       <span class="edit-toolbar-icon"><%~ it.icons.plus %></span>
     </button>
   </div>
+  <div class="edit-toolbar-group edit-toolbar-group--save" data-edit-toolbar-target="saveGroup">
+    <button type="button" class="edit-toolbar-btn edit-toolbar-btn--save is-disabled" data-edit-toolbar-target="saveBtn" data-cmd="tc-<%= it.ToolbarCommand.Save %>" data-action="edit-toolbar#exec" title="Save" aria-label="Save" disabled>
+      <span class="edit-toolbar-icon"><%~ it.icons.floppyDisk %></span>
+    </button>
+  </div>
 </div>
 <div class="edit-toolbar-fab-menu-anchor" data-edit-toolbar-target="fabMenu"></div>

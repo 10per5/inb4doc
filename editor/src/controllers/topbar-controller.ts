@@ -31,6 +31,7 @@ export default class extends Controller {
 
   declare readonly dirtyCounterTarget: HTMLElement;
   declare readonly flushBtnTarget: HTMLButtonElement;
+  declare readonly hasFlushBtnTarget: boolean;
   declare readonly overflowWrapTarget: HTMLElement;
   declare readonly overflowBtnTarget: HTMLButtonElement;
   declare readonly overflowDropdownTarget: HTMLElement;
@@ -40,7 +41,11 @@ export default class extends Controller {
 
   private unsubs: (() => void)[] = [];
   private menus: Menu[] = [];
-  private menusByMnemonic = new Map<string, Menu>();
+  // A menu name can own two trigger shapes (the File menu has its own label in
+  // the left section and an icon-only trigger in the right one) and only one of
+  // them is displayed at any width, so resolve the mnemonic at use time to the
+  // visible instance.
+  private menusByMnemonic = new Map<string, Menu[]>();
   private boundKeyDown = (e: KeyboardEvent) => {};
   private boundKeyUp = (e: KeyboardEvent) => {};
   private resizeObserver: ResizeObserver | null = null;
@@ -143,7 +148,10 @@ export default class extends Controller {
       const name = mount.dataset.menuName!;
       const mnemonic = hasFunc(AppFunc.ToolbarQuickNav) ? mount.dataset.menuMnemonic?.toLowerCase() : undefined;
       if (!menuRegistry.get(name)) continue;
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
+      // `data-menu-label` overrides the derived label — used by the mobile
+      // Share/Compress dropdown, which reads "Save" instead of "Share-compress".
+      const label =
+        mount.dataset.menuLabel ?? name.charAt(0).toUpperCase() + name.slice(1);
       const title = label;
       // Pass the resolver (not the resolved array) so dynamic items — e.g. the
       // Recent Projects list — are re-read on every menu open.
@@ -155,7 +163,42 @@ export default class extends Controller {
         mnemonic,
       });
       this.menus.push(menu);
-      if (mnemonic) this.menusByMnemonic.set(mnemonic, menu);
+      if (mnemonic) {
+        const list = this.menusByMnemonic.get(mnemonic) ?? [];
+        list.push(menu);
+        this.menusByMnemonic.set(mnemonic, list);
+      }
+    }
+    this.createOwnTriggerMenus();
+  }
+
+  // Menus that supply their own trigger markup (`data-menu-mount` + a paired
+  // `[data-menu-trigger]`). Used by the mobile Save button: it has to be an
+  // icon-only control, and Menu's generated trigger always renders a text
+  // label plus a chevron — wide enough to push itself off narrow phones.
+  // The trigger must live OUTSIDE the mount: Menu replaces the mount's
+  // innerHTML with its panel, so a trigger nested in it would be destroyed
+  // the moment the panel is built.
+  private createOwnTriggerMenus() {
+    const mounts = this.element.querySelectorAll<HTMLElement>("[data-menu-mount]");
+    for (const mount of mounts) {
+      const name = mount.dataset.menuMount!;
+      const trigger = this.element.querySelector<HTMLElement>(
+        `[data-menu-trigger="${name}"]`,
+      );
+      if (!trigger || !menuRegistry.get(name)) continue;
+      const menu = new Menu({
+        mountEl: mount,
+        triggerEl: trigger,
+        label: name,
+        title: name,
+        items: () => menuRegistry.get(name)!,
+      });
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.toggle();
+      });
+      this.menus.push(menu);
     }
   }
 
@@ -223,7 +266,7 @@ export default class extends Controller {
       const mount = trigger.closest("[data-menu-name]");
       const mnemonic = mount?.getAttribute("data-menu-mnemonic")?.toLowerCase();
       if (!mnemonic) return;
-      const menu = this.menusByMnemonic.get(mnemonic);
+      const menu = this.menuForMnemonic(mnemonic);
       if (!menu) return;
       if (!menu.isOpen) this.openMenuAndFocusFirst(mnemonic);
       if (e.key === "ArrowDown") menu.focusFirstItem();
@@ -236,13 +279,23 @@ export default class extends Controller {
     // no-op: Alt release does nothing
   };
 
+  /** The visible instance for a mnemonic, or undefined when none is shown. */
+  private menuForMnemonic(mnemonic: string): Menu | undefined {
+    const list = this.menusByMnemonic.get(mnemonic);
+    if (!list?.length) return undefined;
+    return (
+      list.find((m) => m.trigger?.offsetParent !== null) ??
+      list[0]
+    );
+  }
+
   private focusMenu(mnemonic: string) {
-    const menu = this.menusByMnemonic.get(mnemonic);
+    const menu = this.menuForMnemonic(mnemonic);
     if (menu) menu.focus();
   }
 
   private openMenuAndFocusFirst(mnemonic: string) {
-    const menu = this.menusByMnemonic.get(mnemonic);
+    const menu = this.menuForMnemonic(mnemonic);
     if (menu) menu.openAndFocusFirst();
   }
 
@@ -420,7 +473,7 @@ export default class extends Controller {
   }
 
   openPrefs() {
-    appEvents.emit(AppEvent.PrefsOpened);
+    appEvents.emit(AppEvent.PrefsOpened, {});
   }
 
   dirtyClicked() {
@@ -626,7 +679,7 @@ export default class extends Controller {
       // "…" overflow would let the dirty badge push the layout when it returns.
       el.style.display = "none";
       el.tabIndex = -1;
-      this.flushBtnTarget.disabled = true;
+      if (this.hasFlushBtnTarget) this.flushBtnTarget.disabled = true;
       return;
     }
 
@@ -662,7 +715,7 @@ export default class extends Controller {
       el.classList.toggle("clickable", true);
     }
 
-    this.flushBtnTarget.disabled = false;
+    if (this.hasFlushBtnTarget) this.flushBtnTarget.disabled = false;
   }
 
   // ── Procedural overflow ──────────────────────────────────────────────

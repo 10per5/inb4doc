@@ -1,0 +1,22 @@
+<div class="prefs-pane">
+  <div class="prefs-section">
+    <div class="prefs-section-title">Window</div>
+    <label class="prefs-row">
+      <input type="checkbox" id="inb4doc-sticky-checkbox" <%= it.prefs.stickyToolbar ? "checked" : "" %> data-action="change-><%= it.controller %>#stickyChanged">
+      <span class="prefs-row-text">
+        <span class="prefs-row-label">Pin toolbar to top</span>
+        <span class="prefs-row-hint">Keep the formatting bar visible while scrolling.</span>
+      </span>
+    </label>
+  </div>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Appearance</div>
+    <label class="prefs-row">
+      <input type="checkbox" id="inb4doc-dark-checkbox" <%= it.prefs.darkMode ? "checked" : "" %> data-action="change-><%= it.controller %>#darkChanged">
+      <span class="prefs-row-text">
+        <span class="prefs-row-label">Dark mode</span>
+        <span class="prefs-row-hint">Nord dark palette for the whole app.</span>
+      </span>
+    </label>
+  </div>
+</div>

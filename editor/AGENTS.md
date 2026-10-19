@@ -80,6 +80,17 @@ await app.start();
 
 `app.register()` immediately connects controllers if matching DOM elements exist. `app.start()` starts the MutationObserver for future DOM changes.
 
+### Stimulus presence getters are SINGULAR
+
+`static targets = ["pane"]` generates `paneTarget`, `paneTargets`, **and
+`hasPaneTarget`** — NOT `hasPaneTargets`. The plural form does not exist, and
+because the getter is missing TypeScript never complains if you also declared it
+with `declare readonly hasPaneTargets: boolean`; the property is simply
+`undefined` at runtime, so a guard like `if (!this.hasPaneTargets) return`
+silently skips the work with no error anywhere. Use `has<Name>Target` (singular
+target name) for presence, always. (This cost a debugging session when the
+preferences tab rail looked fine but did nothing on click.)
+
 ### TypeScript `declare` for Stimulus Targets/Values
 
 With `target: "ESNext"` (or `useDefineForClassFields: true`), TypeScript compiles `foo!: HTMLElement` to `this.foo = undefined` in the constructor, which **shadows** the Stimulus prototype getter that queries the DOM. Always use `declare` for Stimulus-managed properties:
@@ -438,3 +449,123 @@ Pending images (unflushed) are tracked in `ImageRegistry` with `pendingByDir`. T
 - **Discard All** must call `imageRegistry.removeAllForDir(dir)` (added in `CacheManagementService.onDiscardAll`)
 - **Single delete** via Image Manager must call `imageRegistry.removePending(id)` (handled in `deleteImage()` for names starting with `pi-`)
 - **Flush** calls `commitPending(dir)` which uploads the file, builds the URL map, then removes from registry
+
+## Preferences window (tabs / mobile screens)
+
+`src/config/enums/prefs-section.ts` owns the four sections (`General`,
+`Editor`, `Navigation`, `Storage`). They render from one place —
+`src/components/ui/prefs-panes.ts::buildPrefsPanes()` — so the desktop tabbed
+dialog and the mobile per-section screens can never drift apart.
+
+- Desktop: `AppEvent.PrefsOpened` → `openPrefsDialog(section)` renders all four
+  panes in one centered dialog; `PrefsController.switchTab` toggles `[hidden]`
+  and `is-active` — no re-render (that would drop focus).
+- A menu may own its own trigger via `[data-menu-mount]` + `[data-menu-trigger]`
+  (see `TopbarController.createOwnTriggerMenus`). The trigger must be a SIBLING
+  of the mount, never a child: `Menu.build()` replaces the mount's `innerHTML`
+  with the panel and would delete a nested trigger.
+- Mobile: the `prefs` fullview first renders a menu of sections; picking one
+  pushes that section's screen (`PrefsController.openSectionValue`). Leaving the
+  view resets it to the menu (see `watchViewChanges()`).
+- Every field change funnels through `src/components/ui/prefs.ts` (shared by
+  both surfaces) and emits an AppEvent so consumers update live.
+- The sidebar's "Filters" button opens the same window on `PrefsSection.Navigation`
+  (`AppEvent.PrefsOpened` carries `{ section }`), so there is exactly one
+  navigation-preferences UI.
+
+## Mobile dock — three tabs, no FAB menu
+
+`#dock` renders three **identical** tabs: Files / Editor / More
+(`DockController`), styled by `.dock-item` with no special case for the middle
+one. The middle tab used to be a raised circular `.dock-item--fab` that doubled
+as an "add block" trigger; that duplicated the edit-toolbar's "+", so both the
+FAB chrome and its insert menu are gone. Do not reintroduce either.
+
+## Bottom-strip clearance (desktop)
+
+`#edit-toolbar` lives inside `#dock`, which is a **sibling** of `.book-layout`
+(see `shell.eta`) — so any clearance rule written as
+`.book-layout:has(#edit-toolbar…)` silently never matches and nothing reserves
+space (the fixed strip then covers `.editor-statusbar` and the navigator's
+"+ New"). Always drive it from `#app`, the shared ancestor:
+
+```css
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(:has(#edit-toolbar.is-follow-mode))
+  .book-layout { padding-bottom: var(--edit-toolbar-clearance, 0px) }
+```
+
+Two more things follow from that shape:
+
+- The columns (`.book-leftpanel`, `.book-rightpanel`, `.book-leftpanel
+  .sidebar-wrapper`) carry an explicit `height: var(--vp)` in the critical
+  layout, so the flex parent's padding cannot shorten them — they need
+  `height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px))` too.
+- Do **not** re-offset the sticky status bar (`bottom: <clearance>`): it stacks
+  with the parent padding and leaves a dead gap. The padding alone puts it
+  flush above the strip.
+- Always give the custom property a fallback (`0px`): the var is only defined
+  in the contexts where the strip is actually displayed, and an unresolved
+  `calc()` would drop the column height to `auto`.
+
+Follow mode (`.is-follow-mode`) is excluded on purpose: there the strip is a
+popover anchored at the caret, not a bottom bar.
+
+## Sidebar chrome
+
+The sidebar carries no provider/storage chrome — no provider bar, no backend
+switch, no live-version link. Anything about *where content lives* belongs in
+**Preferences ▸ Storage** (backend + Change…), and project links belong in the
+**About** window. The only sidebar toolbar control is the full-width **Filters**
+button (`AppEvent.PrefsOpened` → Navigation section); it shows the active
+filters as a chip so a scoped/emptied tree never looks like missing content.
+
+## Edit toolbar ordering and placement
+
+The strip order is fixed: history → contextual list/table groups → "+" → **Save
+(last, disk icon)**. The disk is the *save/flush* button: it emits
+`ToolbarCommand.Save`, which the mutation service maps to `AppEvent.FlushAll`
+(the same target as the desktop topbar's flush button), so it writes every
+pending change including the open document. It is disabled while nothing is
+pending (state comes from `DirtyChanged`, seeded from `pendingOpsStore` at
+connect). Placement is a preference (`followCaretToolbar`, Editor section):
+when off the strip stays pinned to the bottom even while the OSK is up; when on
+it becomes the block-anchored popover (`is-follow-mode`).
+
+Save/flush placement per surface: **desktop keeps it in the topbar** (the disk
+icon now; it used to be a nonsense "sort" arrow); **mobile puts it in the edit
+toolbar**, because the mobile topbar's right slot belongs to the File dropdown.
+
+**File menu → single top-right control below the big layout** (1200px, the aside
+breakpoint in `lib/style/layout.css` — the app's own definition of "big"):
+- ≥1200px: File menu keeps its label slot in the left section, top-right is the
+  plain **Save button**. Unchanged desktop behaviour.
+- <1200px (tablet band and the mobile dock bar): no room for both, so the File
+  menu collapses into one **icon-only dropdown** in the top-right and both the
+  left File trigger and the Save button are display:none. Its items come
+  straight from the `file` menu registry, which now also carries
+  **Save pending changes** (`AppEvent.FlushAll`) so nothing is lost.
+- Both trigger shapes are always rendered and the switch is pure CSS (no
+  re-render on resize). `Menu.trigger` exists so `TopbarController` can resolve
+  an Alt+mnemonic to the *visible* instance — a mnemonic may map to several
+  instances once a menu has more than one trigger shape.
+- The own-trigger (`[data-menu-mount]` + `[data-menu-trigger]`) rules: the
+  trigger must be a SIBLING of the mount, never a child — `Menu.build()` replaces
+  the mount's `innerHTML` with the panel and deletes anything nested — and the
+  trigger is icon-only because a "File ▾" label pushed the row past the right
+  margin on a 390px phone. The panel + every nested submenu are right-anchored
+  in `templates/styles/mobile-dock.eta`.
+
+**While the add-block menu is open the bar must not reposition.** Pressing "+"
+closes the OSK, which re-enters `positionPopover()` with `followMode` already
+false — `positionPopover()` therefore returns early while `addMenuOpen` and
+`setAddMenuOpen(false)` re-runs the layout after close.
+
+## Writing assistance
+
+There is no bundled dictionary: typo highlighting is the browser's. The editor
+owns it via `src/plugins/spellcheck.ts` — `spellcheck` + `lang` on
+`view.dom`, opt-in languages in `prefsStore.spellcheckLanguages`, and styling
+through `::spelling-error` / `::grammar-error`
+(`src/styles/editor/spellcheck.css`). Adding features here means adding CSS +
+DOM attributes, never a new dictionary.

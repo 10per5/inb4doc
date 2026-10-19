@@ -84,8 +84,10 @@
   <div class="toolbar-spacer"></div>
   <div class="toolbar-section toolbar-section-right">
     <div class="dirty-counter" role="button" tabindex="0" data-topbar-target="dirtyCounter" data-action="click->topbar#dirtyClicked"></div>
-    <button class="btn btn-accent flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" disabled><%~ it.icons.sort %></button>
+    <button type="button" class="btn btn-icon toolbar-file-btn" data-menu-trigger="file" data-topbar-target="fileBtn" title="File" aria-label="File actions" aria-haspopup="true"><%~ it.icons.menuScale %></button>
+    <span class="toolbar-relative toolbar-file-actions" data-menu-mount="file"></span>
     <% if (!it.mobileDock) { %>
+    <button class="btn btn-accent flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" title="Save pending changes" aria-label="Save pending changes" disabled><%~ it.icons.floppyDisk %></button>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.OpenPrefs] %>" title="Preferences"><%~ it.icons.settings %></button>
     <% } %>
   </div>

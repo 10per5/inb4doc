@@ -39,6 +39,7 @@ import { PendingOpType } from "@/entities/PendingOps";
 import { updateEditorTint } from "@/utils/file-status-tint";
 import { storageService } from "@/services/storage-service";
 import { isMobileDock } from "@/utils/mobile";
+import type { PrefsSection } from "@/config/enums/prefs-section";
 
 let sessionStarted = 0;
 
@@ -129,13 +130,34 @@ export default class extends Controller {
     this.unsubs.push(
       appEvents.on(AppEvent.FlushComplete, () => this.nav.loadSidebar()),
       appEvents.on(AppEvent.ModulesSwapped, () => this.nav.loadSidebar()),
-      appEvents.on(AppEvent.PrefsOpened, async () => {
+      appEvents.on(AppEvent.PrefsOpened, async ({ section }) => {
         if (isMobileDock()) {
           this.view.switchTo("prefs")
+          if (section !== undefined) {
+            // Land straight on the requested section (the sidebar Filters
+            // button opens navigation preferences directly). The screen only
+            // mounts after the view switch, so stash the request for it.
+            await import("@/controllers/prefs-controller")
+            const el = this.editor.element.querySelector<HTMLElement>('[data-controller="prefs"]')
+            const ctrl = el
+              ? (this.editor.application.getControllerForElementAndIdentifier(el, "prefs") as
+                  | { openSectionValue?: (section: PrefsSection) => void }
+                  | null)
+              : null
+            ctrl?.openSectionValue?.(section)
+          }
           return
         }
         const { openPrefsDialog } = await import("@/controllers/prefs-controller")
-        openPrefsDialog()
+        openPrefsDialog(section)
+      }),
+      appEvents.on(AppEvent.AboutOpened, async () => {
+        if (isMobileDock()) {
+          this.view.switchTo("about")
+          return
+        }
+        const { openAboutDialog } = await import("@/controllers/about-controller")
+        openAboutDialog()
       }),
       appEvents.on(AppEvent.StickyPreferenceChanged, ({ sticky }) => {
         this.toolbarStore!.setStickyPreference(sticky)

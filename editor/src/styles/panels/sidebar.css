@@ -419,6 +419,66 @@
   display: none;
 }
 
+/* Filters button — opens the navigation preferences.
+ *
+ * It spans the whole toolbar row and keeps a readable label: it replaces the
+ * old icon-only "Toggle empty" control, which gave no clue that hiding empty
+ * folders was why half the tree was missing. `.btn-toggle.active` flips the
+ * whole surface to the accent fill, so every bit of text below must set its
+ * own colour against BOTH states rather than inheriting.
+ */
+.sidebar-filters-btn {
+  flex: 1;
+  width: auto;
+  height: auto;
+  min-height: 26px;
+  gap: 0.35rem;
+  padding: 0.2rem 0.45rem;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.sidebar-filters-btn .sidebar-toggle-label {
+  display: inline;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: inherit;
+}
+
+.sidebar-filters-btn svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.sidebar-filters-btn .sidebar-filter-summary {
+  margin-left: auto;
+  font-size: 0.62rem;
+  line-height: 1;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  /* Solid background either way: a translucent soft-accent chip disappears
+   * against the accent fill of the `.active` state. */
+  background: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.sidebar-filters-btn:not(.active) .sidebar-filter-summary {
+  background: var(--color-bg-tertiary);
+}
+
+/* The selection-mode buttons share the row; while they own it the filters
+ * button drops back so both stay readable. */
+.sidebar-toolbar:has(.sidebar-delete-selected:not([hidden])) .sidebar-filters-btn {
+  flex: 0 0 auto;
+}
+
 /* ── Multi-select delete ─────────────────────────────────────────── */
 
 .sidebar-delete-selected {
@@ -506,6 +566,16 @@
     width: 3em;
     white-space: wrap;
   }
+
+  /* Filters keeps the full row on touch too — the 3em label width above would
+   * otherwise clip "Filters" to "Fil". */
+  .sidebar-filters-btn {
+    height: 40px;
+  }
+
+  .sidebar-filters-btn .sidebar-toggle-label {
+    width: auto;
+  }
 }
 
 /* ── Empty Sidebar ────────────────────────────────────────────────── */
@@ -547,88 +617,4 @@
   padding-bottom: 0.5rem;
   background: var(--color-bg-secondary);
   flex-shrink: 0;
-}
-
-/* ── Sidebar Provider Bar ──────────────────────────────────────────── */
-
-.sidebar-provider-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.35rem 0.75rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  flex-shrink: 0;
-  min-height: 32px;
-}
-
-.sidebar-provider-bar .provider-label {
-  flex: 1;
-  font-size: 0.78rem;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: flex;
-}
-
-.sidebar-provider-bar .provider-label .provider-icon {
-  width: 24px;
-  height: 24px;
-  margin-right: 0.25rem;
-  vertical-align: middle;
-}
-
-.sidebar-provider-bar .provider-label .provider-desc {
-  margin: auto 0;
-}
-
-.sidebar-provider-bar .provider-change-btn {
-  font-size: 0.7rem;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-primary);
-  color: #5e81ac;
-  flex-shrink: 0;
-}
-
-.sidebar-provider-bar .provider-change-btn:hover {
-  background: var(--color-bg-tertiary);
-}
-
-/* ── Live Link ────────────────────────────────────────────────────── */
-
-.nav-live-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  color: var(--color-text-primary);
-  text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: 500;
-  border-radius: 6px;
-  background: var(--color-nav-live-bg, #e7f3e8);
-  border: 1px solid var(--color-nav-live-border, #b8d9ba);
-  transition: all 0.2s ease;
-}
-
-.nav-live-link:hover {
-  background: var(--color-nav-live-bg-hover, #d4e8d6);
-  border-color: var(--color-nav-live-border-hover, #5eac66);
-  color: var(--color-text-primary);
-}
-
-.live-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--color-nav-live-icon, #5eac66);
-}
-
-:root[data-theme="dark"] {
-  --color-nav-live-bg: #3b4252;
-  --color-nav-live-border: #4c566a;
-  --color-nav-live-bg-hover: #434c5e;
-  --color-nav-live-border-hover: #81a1c1;
-  --color-nav-live-icon: #81a1c1;
 }

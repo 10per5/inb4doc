@@ -7,27 +7,43 @@ const DEFAULTS: WikiPrefs = {
   imageStorageMode: "file",
   darkMode: false,
   hideEmptyFolders: true,
+  rootScope: "",
+  spellcheck: true,
+  spellcheckLanguages: ["en"],
+  followCaretToolbar: true,
 }
 
 type PrefKey = keyof WikiPrefs
+type PrefValue = WikiPrefs[PrefKey]
 
 class PreferencesStore {
-  private cache = new Map<PrefKey, boolean | string>()
+  private cache = new Map<PrefKey, PrefValue>()
 
   constructor() {
     storageService.registerInit(STORE_PREFS, (entries) => {
       for (const { id, value } of entries) {
-        this.cache.set(id as PrefKey, value as boolean | string)
+        this.cache.set(id as PrefKey, this.normalize(id as PrefKey, value))
       }
     })
   }
 
-  private get<T>(key: PrefKey, fallback: T): T {
-    const v = this.cache.get(key)
-    return v !== undefined ? v as unknown as T : fallback
+  // Stored prefs come back from localStorage as plain JSON; arrays round-trip
+  // as arrays but a corrupt/hand-edited entry can be anything, so every read
+  // goes back through the default for its type.
+  private normalize(key: PrefKey, value: unknown): PrefValue {
+    if (value === undefined || value === null) return DEFAULTS[key]
+    if (Array.isArray(DEFAULTS[key])) {
+      return Array.isArray(value) ? (value as string[]) : DEFAULTS[key]
+    }
+    return value as PrefValue
   }
 
-  private persist(key: PrefKey, value: boolean | string): void {
+  private get<T>(key: PrefKey): T {
+    const v = this.cache.get(key)
+    return (v !== undefined ? v : DEFAULTS[key]) as T
+  }
+
+  private persist(key: PrefKey, value: PrefValue): void {
     this.cache.set(key, value)
     storageService.setJSON(STORE_PREFS, key, value)
   }
@@ -38,17 +54,25 @@ class PreferencesStore {
       imageStorageMode: this.imageStorageMode,
       darkMode: this.darkMode,
       hideEmptyFolders: this.hideEmptyFolders,
+      rootScope: this.rootScope,
+      spellcheck: this.spellcheck,
+      spellcheckLanguages: this.spellcheckLanguages,
+      followCaretToolbar: this.followCaretToolbar,
     }
   }
 
-  get stickyToolbar(): boolean { return this.get("stickyToolbar", DEFAULTS.stickyToolbar) }
-  get darkMode(): boolean { return this.get("darkMode", DEFAULTS.darkMode) }
-  get imageStorageMode(): ImageStorageMode { return this.get("imageStorageMode", DEFAULTS.imageStorageMode) }
-  get hideEmptyFolders(): boolean { return this.get("hideEmptyFolders", DEFAULTS.hideEmptyFolders) }
+  get stickyToolbar(): boolean { return this.get("stickyToolbar") }
+  get darkMode(): boolean { return this.get("darkMode") }
+  get imageStorageMode(): ImageStorageMode { return this.get("imageStorageMode") }
+  get hideEmptyFolders(): boolean { return this.get("hideEmptyFolders") }
+  get rootScope(): string { return this.get("rootScope") }
+  get spellcheck(): boolean { return this.get("spellcheck") }
+  get spellcheckLanguages(): string[] { return this.get("spellcheckLanguages") }
+  get followCaretToolbar(): boolean { return this.get("followCaretToolbar") }
 
   setPrefs(partial: Partial<WikiPrefs>): void {
     for (const [key, value] of Object.entries(partial)) {
-      this.persist(key as PrefKey, value as boolean | string)
+      this.persist(key as PrefKey, value as PrefValue)
     }
   }
 
@@ -56,6 +80,10 @@ class PreferencesStore {
   setImageStorageMode(v: ImageStorageMode): void { this.persist("imageStorageMode", v) }
   setDarkMode(v: boolean): void { this.persist("darkMode", v) }
   setHideEmptyFolders(v: boolean): void { this.persist("hideEmptyFolders", v) }
+  setRootScope(v: string): void { this.persist("rootScope", v) }
+  setSpellcheck(v: boolean): void { this.persist("spellcheck", v) }
+  setSpellcheckLanguages(v: string[]): void { this.persist("spellcheckLanguages", v) }
+  setFollowCaretToolbar(v: boolean): void { this.persist("followCaretToolbar", v) }
 }
 
 export const prefsStore = new PreferencesStore()

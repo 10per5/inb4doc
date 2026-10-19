@@ -1,8 +1,34 @@
+<% const active = it.panes.find(p => p.section === it.section) %>
+<% if (active) { %>
+<%~ it.renderScreen({
+  title: active.label,
+  closeAction: "click->prefs#backToMenu",
+  closeLabel: "Back to preferences",
+  closeIcon: "back",
+  icons: it.icons,
+  body: `
+  <div class="prefs-pane-head">
+    <h4 class="prefs-pane-title">${active.label}</h4>
+    <p class="prefs-pane-desc">${active.description}</p>
+  </div>
+  ${active.html}`
+}) %>
+<% } else { %>
+<% const rows = it.panes.map((pane) => `
+    <button type="button" class="more-item" data-action="click->prefs#openSection" data-section="${it.PREFS_SECTION_PREFIX}${pane.section}">
+      <span class="more-icon">${pane.icon}</span>
+      <span class="more-label">${pane.label}</span>
+      <span class="more-chevron">${it.icons.navArrowRight}</span>
+    </button>`).join("") %>
 <%~ it.renderScreen({
   title: "Preferences",
   closeAction: "click->prefs#close",
   closeLabel: "Back to more",
   closeIcon: "back",
   icons: it.icons,
-  body: it.form
+  body: `
+  <div class="more-list">
+    ${rows}
+  </div>`
 }) %>
+<% } %>

@@ -7,6 +7,7 @@
  */
 
 import type { ViewType } from "@/services/view-service"
+import type { PrefsSection } from "@/config/enums/prefs-section"
 import type { LayoutChangedPayload } from "@/services/layout-service"
 import type { MetaPanelData } from "@/entities/Frontmatter"
 import type { ProviderType } from "@/providers/index"
@@ -64,6 +65,10 @@ export enum AppEvent {
   SidebarToggle = "sidebar-toggle",
   LayoutChanged = "layout-changed",
   PrefsOpened = "prefs-opened",
+  AboutOpened = "about-opened",
+  RootScopeChanged = "root-scope-changed",
+  SpellcheckChanged = "spellcheck-changed",
+  FollowCaretToolbarChanged = "follow-caret-toolbar-changed",
   StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
   CreateFirstPage = "create-first-page",
@@ -143,7 +148,11 @@ export interface AppEventPayloads {
 
   [AppEvent.SidebarToggle]:         void
   [AppEvent.LayoutChanged]:         LayoutChangedPayload
-  [AppEvent.PrefsOpened]:           void
+  [AppEvent.PrefsOpened]:           { section?: PrefsSection }
+  [AppEvent.AboutOpened]:           void
+  [AppEvent.RootScopeChanged]:      void
+  [AppEvent.SpellcheckChanged]:     void
+  [AppEvent.FollowCaretToolbarChanged]: { follow: boolean }
   [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void
   [AppEvent.CreateFirstPage]:       void

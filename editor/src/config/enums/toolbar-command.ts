@@ -29,4 +29,6 @@ export enum ToolbarCommand {
   Blockquote,
   ToggleTaskChecked,
   ExitList,
+  /** Save the open document to the provider (edit-toolbar's trailing disk). */
+  Save,
 }

@@ -455,51 +455,6 @@
   font-size: 1rem;
   color: var(--color-text-primary);
 }
-.inb4doc-prefs-fields label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.9rem;
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-.inb4doc-prefs-fields input[type="checkbox"] {
-  margin: 0;
-}
-.inb4doc-prefs-fields .prefs-section {
-  margin-top: 1rem;
-}
-.inb4doc-prefs-fields .prefs-section-title {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-accent);
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-.inb4doc-prefs-fields .radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.inb4doc-prefs-fields .radio-group label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: var(--color-text-primary);
-}
-.inb4doc-prefs-fields .radio-group code {
-  background: var(--color-bg-secondary);
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
-  font-size: 0.8rem;
-}
-/* Mobile prefs screen: the fields render without the dialog box chrome. */
-.screen-body .inb4doc-prefs-fields {
-  padding: 1.25rem 1.5rem;
-}
 .inb4doc-prefs-actions {
   display: flex;
   justify-content: flex-end;

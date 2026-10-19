@@ -32,5 +32,10 @@
       <span class="more-label">Preferences</span>
       <span class="more-chevron">${it.icons.navArrowRight}</span>
     </button>
+    <button type="button" class="more-item" data-action="more#openAbout">
+      <span class="more-icon">${it.icons.infoCircle}</span>
+      <span class="more-label">About inb4doc</span>
+      <span class="more-chevron">${it.icons.navArrowRight}</span>
+    </button>
   </div>`
 }) %>

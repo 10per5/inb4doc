@@ -26,6 +26,15 @@ export function initEditorMutationService(getEditor: () => { action: (fn: (ctx: 
       return
     }
 
+    // Save/flush is an application-level action, not an editor mutation — hand
+    // it to the shell instead of entering the editor view below. Same target as
+    // the desktop topbar's flush button, so wherever the button lives it writes
+    // every pending change (the open document included).
+    if (command === ToolbarCommand.Save) {
+      appEvents.emit(AppEvent.FlushAll)
+      return
+    }
+
     editor.action(({ view }) => {
       view.focus()
       const { state, dispatch } = view

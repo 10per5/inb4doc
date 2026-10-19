@@ -1,0 +1,42 @@
+<div class="prefs-pane">
+  <div class="prefs-section">
+    <div class="prefs-section-title">File tree</div>
+    <label class="prefs-row">
+      <input type="checkbox" id="inb4doc-hide-empty-checkbox" <%= it.prefs.hideEmptyFolders ? "checked" : "" %> data-action="change-><%= it.controller %>#hideEmptyChanged">
+      <span class="prefs-row-text">
+        <span class="prefs-row-label">Hide empty folders</span>
+        <span class="prefs-row-hint">Folders with no readable page in them are skipped.</span>
+      </span>
+    </label>
+  </div>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Project</div>
+    <p class="prefs-note">Limit the tree to one root-level project, or show every project side by side.</p>
+    <div class="radio-group">
+      <label class="prefs-row">
+        <input type="radio" name="nav-root-scope" value="" <%= it.prefs.rootScope ? "" : "checked" %> data-action="change-><%= it.controller %>#rootScopeChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">Show all</span>
+        </span>
+      </label>
+      <% for (const folder of it.rootFolders) { %>
+      <label class="prefs-row">
+        <input type="radio" name="nav-root-scope" value="<%= folder.path %>" <%= it.prefs.rootScope === folder.path ? "checked" : "" %> data-action="change-><%= it.controller %>#rootScopeChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label"><%= folder.label %></span>
+          <% if (folder.count) { %><span class="prefs-row-hint"><%= folder.count %> page<%= folder.count === 1 ? "" : "s" %></span><% } %>
+        </span>
+      </label>
+      <% } %>
+    </div>
+    <% if (it.rootFolders.length === 0) { %>
+    <p class="prefs-note">This content root has no root-level folders.</p>
+    <% } %>
+    <% if (it.canOpenProject) { %>
+    <button type="button" class="btn prefs-inline-btn" data-action="click-><%= it.controller %>#openProject">
+      <span class="btn-icon"><%~ it.icons.folderOpen %></span>
+      <span>Open another folder…</span>
+    </button>
+    <% } %>
+  </div>
+</div>
