@@ -111,6 +111,19 @@ function mountDialog(state: DialogState): void {
   }
 }
 
+/**
+ * Dismiss the open dialog, if any. Used by the host "back" affordance: a modal
+ * is the topmost thing on screen, so it unwinds first. Returns true when there
+ * was one to close. Only state-driven dialogs are tracked here — the legacy
+ * html-string ones own their own overlay and Escape handling.
+ */
+export function closeTopDialog(): boolean {
+  const state = appState.get("dialog")
+  if (!state) return false
+  finishSession(state.sessionId, null)
+  return true
+}
+
 function ensureHost(): void {
   if (hostReady) return
   hostReady = true

@@ -99,6 +99,13 @@ export default class extends Controller {
       appEvents.on(AppEvent.SidebarCancel, () => {
         if (this.selectionMode) this.exitSelection();
       }),
+      // Multi-select is a mode, not a screen: back leaves the mode first so a
+      // press inside it doesn't jump straight out of Files.
+      appEvents.on(AppEvent.BackRequested, (request) => {
+        if (!this.selectionMode) return;
+        this.exitSelection();
+        request.handled = true;
+      }),
       appEvents.on(AppEvent.SidebarScrollToCurrent, () => {
         let el = this.itemByPath.get(this.activePath);
         // When the open file is a directory's _index page, focus the directory

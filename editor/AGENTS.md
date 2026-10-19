@@ -490,6 +490,30 @@ one. The middle tab used to be a raised circular `.dock-item--fab` that doubled
 as an "add block" trigger; that duplicated the edit-toolbar's "+", so both the
 FAB chrome and its insert menu are gone. Do not reintroduce either.
 
+## Native "back" press (host → JS contract)
+
+The Android system back press / gesture goes through
+`window.inb4docUI.handleBack()` (declared in `src/bridge/interface.ts`, mounted
+by `exposeHostApi()` for every host). It returns **true** when the app consumed
+the press and **false** when nothing was left to unwind — then the host falls
+back to in-page history and finally exits (`WebViewActivity.onBackPressed`).
+
+The decision lives in `ShellController.handleBackPressed()`, which unwinds
+**exactly one layer per press**, innermost first:
+
+1. an open state-driven dialog (`closeTopDialog()` in dialog-service),
+2. anything a controller owns via `AppEvent.BackRequested` (payload
+   `{ handled: boolean }` — a pushed preferences section steps back to the
+   preferences menu, the Files multi-select mode exits selection; the handler
+   sets `handled = true`),
+3. the fullview itself: `navigation` (Files) and `more` go straight to
+   `editor`, every other fullview returns to `more`.
+
+Only when the editor is already frontmost does it return false, so a press can
+never quit the app from a subscreen — it walks back to the editor first, and the
+next press exits. Add new unwinding steps as `AppEvent.BackRequested`
+subscribers, never by teaching the host about app views.
+
 ## Bottom-strip clearance (desktop)
 
 `#edit-toolbar` lives inside `#dock`, which is a **sibling** of `.book-layout`

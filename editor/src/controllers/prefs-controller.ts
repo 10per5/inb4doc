@@ -94,7 +94,24 @@ export default class PrefsController extends BaseDialogController {
       return
     }
     this.watchViewChanges()
+    this.watchBackRequests()
     this.renderScreen(this.currentSection())
+  }
+
+  /**
+   * A pushed section screen owns the first back press: it steps back to the
+   * preferences menu instead of the host leaving the app. Without a section
+   * there is nothing to unwind and the event stays unhandled.
+   */
+  private watchBackRequests(): void {
+    this.unsubs.push(
+      appEvents.on(AppEvent.BackRequested, (request) => {
+        if (this.hasPayloadValue) return
+        if (this.currentSection() === null) return
+        this.backToMenu()
+        request.handled = true
+      }),
+    )
   }
 
   // ── Desktop ────────────────────────────────────────────────────────

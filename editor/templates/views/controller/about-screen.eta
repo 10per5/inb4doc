@@ -16,7 +16,7 @@
   icons: it.icons,
   body: `
   <div class="about-hero">
-      <p class="about-tagline">A WYSIWYG markdown wiki for the <code>inb4doc</code> project.</p>
+      <p class="about-tagline">A WYSIWYG <code>inb4doc</code> project.</p>
       ${hero}
   </div>
   <div class="about-links">

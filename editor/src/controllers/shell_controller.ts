@@ -32,6 +32,8 @@ import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { getInitialState, getContentRoot } from "@/bridge/native";
+import { registerBackHandler } from "@/bridge/interface";
+import { closeTopDialog } from "@/services/dialog-service";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { changesScreenStore } from "@/stores/changes-screen-store";
@@ -71,6 +73,11 @@ export default class extends Controller {
 
   connect() {
     this.initialPath = this.data.get("path") || getCurrentPath()
+
+    // Host "back" affordance: until the view service exists (it is built in
+    // initializeApp) handleBack reports "unhandled" and the host keeps its own
+    // fallback, so a press during boot still exits.
+    registerBackHandler(() => this.handleBackPressed())
 
     // Runtime deep-link entry point for the desktop shell's single-instance IPC
     // (gui/src/app.cpp): when a second launch forwards an inb4doc:// URI, the
@@ -372,7 +379,32 @@ export default class extends Controller {
     return null
   }
 
+  /**
+   * Host "back" press (the Android system back press / gesture), mounted on
+   * `window.inb4docUI.handleBack`. Unwinds exactly one layer, innermost first:
+   * an open dialog, then whatever a controller owns (a pushed sub-screen, the
+   * file multi-select), then the fullview itself.
+   *
+   * Files (explorer) and More step straight back to the editor; every other
+   * fullview returns to More, which the next press leaves for the editor. Only
+   * once the editor is frontmost does this report "unhandled" — the host's cue
+   * to fall through to history and then exit — so a press can never quit the
+   * app from a subscreen.
+   */
+  private handleBackPressed(): boolean {
+    if (closeTopDialog()) return true
+    const request = { handled: false }
+    appEvents.emit(AppEvent.BackRequested, request)
+    if (request.handled) return true
+    if (!this.view) return false
+    const current = this.view.getCurrent()
+    if (current === "editor") return false
+    this.view.switchTo(current === "navigation" || current === "more" ? "editor" : "more")
+    return true
+  }
+
   disconnect() {
+    registerBackHandler(null)
     if (this.onBeforeUnload) window.removeEventListener("beforeunload", this.onBeforeUnload)
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
