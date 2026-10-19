@@ -19,4 +19,9 @@
       </span>
     </label>
   </div>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Custom CSS</div>
+    <p class="prefs-note">Applied on top of every built-in stylesheet, so it can override anything. Plain CSS only — nesting works if your browser supports it, but Sass helpers like <code>mix()</code> do not.</p>
+    <textarea class="prefs-textarea" rows="8" spellcheck="false" placeholder="/* e.g. */&#10;.ProseMirror { font-size: 1.05rem; }" data-action="input-><%= it.controller %>#customCssChanged"><%= it.prefs.customCss %></textarea>
+  </div>
 </div>

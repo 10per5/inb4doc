@@ -7,6 +7,7 @@ import { setRegistry } from "@/services/registry-provider-service";
 import { initializeProvider, setProviderReady } from "@/stores/provider-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { initNativeBridge } from "@/eta/bridge";
+import { initCustomCss } from "@/services/custom-css-service";
 import { setSessionStarted } from "@/controllers/shell_controller";
 import { initFarmCompat } from "$/farmfe-compat";
 import { logger } from "@/utils/logger";
@@ -168,6 +169,11 @@ async function init() {
   initNativeBridge();
 
   setProviderReady(initializeProvider());
+
+  // The author's stylesheet is injected before anything connects, so the first
+  // paint already carries it (same reasoning as the critical CSS). Needs no
+  // awaiting: it reads the prefs cache, which falls back to defaults.
+  initCustomCss();
 
   if (thinShell) {
     registerCoreControllers(app);

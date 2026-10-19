@@ -10,6 +10,7 @@ import {
   onPrefsRootScopeChanged,
   onPrefsSpellcheckChanged,
   onPrefsSpellcheckLanguagesChanged,
+  onPrefsCustomCssChanged,
   onPrefsFollowCaretToolbarChanged,
 } from "@/components/ui/prefs"
 import { buildPrefsPanes } from "@/components/ui/prefs-panes"
@@ -189,6 +190,10 @@ export default class PrefsController extends BaseDialogController {
   toolbarPlacementChanged(e: Event): void {
     const radio = e.target as HTMLInputElement
     if (radio.checked) onPrefsFollowCaretToolbarChanged(radio.value === "follow")
+  }
+
+  customCssChanged(e: Event): void {
+    onPrefsCustomCssChanged((e.target as HTMLTextAreaElement).value)
   }
 
   spellcheckChanged(e: Event): void {

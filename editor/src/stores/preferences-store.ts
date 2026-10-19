@@ -11,6 +11,7 @@ const DEFAULTS: WikiPrefs = {
   spellcheck: true,
   spellcheckLanguages: ["en"],
   followCaretToolbar: true,
+  customCss: "",
 }
 
 type PrefKey = keyof WikiPrefs
@@ -58,6 +59,7 @@ class PreferencesStore {
       spellcheck: this.spellcheck,
       spellcheckLanguages: this.spellcheckLanguages,
       followCaretToolbar: this.followCaretToolbar,
+      customCss: this.customCss,
     }
   }
 
@@ -69,6 +71,7 @@ class PreferencesStore {
   get spellcheck(): boolean { return this.get("spellcheck") }
   get spellcheckLanguages(): string[] { return this.get("spellcheckLanguages") }
   get followCaretToolbar(): boolean { return this.get("followCaretToolbar") }
+  get customCss(): string { return this.get("customCss") }
 
   setPrefs(partial: Partial<WikiPrefs>): void {
     for (const [key, value] of Object.entries(partial)) {
@@ -84,6 +87,7 @@ class PreferencesStore {
   setSpellcheck(v: boolean): void { this.persist("spellcheck", v) }
   setSpellcheckLanguages(v: string[]): void { this.persist("spellcheckLanguages", v) }
   setFollowCaretToolbar(v: boolean): void { this.persist("followCaretToolbar", v) }
+  setCustomCss(v: string): void { this.persist("customCss", v) }
 }
 
 export const prefsStore = new PreferencesStore()
