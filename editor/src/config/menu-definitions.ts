@@ -92,13 +92,6 @@ menuRegistry.register("file", (): MenuItem[] => {
     ...projectItems,
     {
       type: MenuType.Item,
-      id: "img-mgr",
-      icon: mediaImage,
-      label: "Image Manager",
-      onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
-    },
-    {
-      type: MenuType.Item,
       id: "format-document",
       icon: magicWand,
       label: "Format document",
@@ -174,11 +167,6 @@ function compressMenuItems(): MenuItem[] {
   ];
 }
 
-// Mobile topbar: Share + Compress without File-menu chrome.
-menuRegistry.register("share-compress", (): MenuItem[] => [
-  ...shareMenuItems(),
-  ...compressMenuItems(),
-]);
 
 // Part D hygiene: the topbar chunk is hot (updatable without a reload), so a
 // module-level subscription here would stack a new handler on every hot swap
@@ -404,6 +392,16 @@ menuRegistry.register("view", (): MenuItem[] => {
           onClick: () => layout.toggleRightPanel(),
         },
       ],
+    },
+    // Panels and screens are both "what the window shows", so the image
+    // manager belongs here rather than in File — it opens a browser/manager
+    // view over the content, not a document operation.
+    {
+      type: MenuType.Item,
+      id: "img-mgr",
+      icon: mediaImage,
+      label: "Image Manager",
+      onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
     },
   ];
 });

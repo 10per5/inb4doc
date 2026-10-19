@@ -534,11 +534,27 @@ it becomes the block-anchored popover (`is-follow-mode`).
 
 Save/flush placement per surface: **desktop keeps it in the topbar** (the disk
 icon now; it used to be a nonsense "sort" arrow); **mobile puts it in the edit
-toolbar**, because the mobile topbar slot now hosts the icon-only Save ▾
-Share/Compress dropdown. That dropdown's trigger is 32px and lives outside the
-menu mount, and its panel + every nested submenu are right-aligned in the mobile
-conditions CSS — a text "Save ▾" trigger or a left-aligned panel pushed past the
-right margin on a 390px phone.
+toolbar**, because the mobile topbar's right slot belongs to the File dropdown.
+
+**File menu → single top-right control below the big layout** (1200px, the aside
+breakpoint in `lib/style/layout.css` — the app's own definition of "big"):
+- ≥1200px: File menu keeps its label slot in the left section, top-right is the
+  plain **Save button**. Unchanged desktop behaviour.
+- <1200px (tablet band and the mobile dock bar): no room for both, so the File
+  menu collapses into one **icon-only dropdown** in the top-right and both the
+  left File trigger and the Save button are display:none. Its items come
+  straight from the `file` menu registry, which now also carries
+  **Save pending changes** (`AppEvent.FlushAll`) so nothing is lost.
+- Both trigger shapes are always rendered and the switch is pure CSS (no
+  re-render on resize). `Menu.trigger` exists so `TopbarController` can resolve
+  an Alt+mnemonic to the *visible* instance — a mnemonic may map to several
+  instances once a menu has more than one trigger shape.
+- The own-trigger (`[data-menu-mount]` + `[data-menu-trigger]`) rules: the
+  trigger must be a SIBLING of the mount, never a child — `Menu.build()` replaces
+  the mount's `innerHTML` with the panel and deletes anything nested — and the
+  trigger is icon-only because a "File ▾" label pushed the row past the right
+  margin on a 390px phone. The panel + every nested submenu are right-anchored
+  in `templates/styles/mobile-dock.eta`.
 
 **While the add-block menu is open the bar must not reposition.** Pressing "+"
 closes the OSK, which re-enters `positionPopover()` with `followMode` already

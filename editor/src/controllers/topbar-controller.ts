@@ -41,7 +41,11 @@ export default class extends Controller {
 
   private unsubs: (() => void)[] = [];
   private menus: Menu[] = [];
-  private menusByMnemonic = new Map<string, Menu>();
+  // A menu name can own two trigger shapes (the File menu has its own label in
+  // the left section and an icon-only trigger in the right one) and only one of
+  // them is displayed at any width, so resolve the mnemonic at use time to the
+  // visible instance.
+  private menusByMnemonic = new Map<string, Menu[]>();
   private boundKeyDown = (e: KeyboardEvent) => {};
   private boundKeyUp = (e: KeyboardEvent) => {};
   private resizeObserver: ResizeObserver | null = null;
@@ -159,7 +163,11 @@ export default class extends Controller {
         mnemonic,
       });
       this.menus.push(menu);
-      if (mnemonic) this.menusByMnemonic.set(mnemonic, menu);
+      if (mnemonic) {
+        const list = this.menusByMnemonic.get(mnemonic) ?? [];
+        list.push(menu);
+        this.menusByMnemonic.set(mnemonic, list);
+      }
     }
     this.createOwnTriggerMenus();
   }
@@ -258,7 +266,7 @@ export default class extends Controller {
       const mount = trigger.closest("[data-menu-name]");
       const mnemonic = mount?.getAttribute("data-menu-mnemonic")?.toLowerCase();
       if (!mnemonic) return;
-      const menu = this.menusByMnemonic.get(mnemonic);
+      const menu = this.menuForMnemonic(mnemonic);
       if (!menu) return;
       if (!menu.isOpen) this.openMenuAndFocusFirst(mnemonic);
       if (e.key === "ArrowDown") menu.focusFirstItem();
@@ -271,13 +279,23 @@ export default class extends Controller {
     // no-op: Alt release does nothing
   };
 
+  /** The visible instance for a mnemonic, or undefined when none is shown. */
+  private menuForMnemonic(mnemonic: string): Menu | undefined {
+    const list = this.menusByMnemonic.get(mnemonic);
+    if (!list?.length) return undefined;
+    return (
+      list.find((m) => m.trigger?.offsetParent !== null) ??
+      list[0]
+    );
+  }
+
   private focusMenu(mnemonic: string) {
-    const menu = this.menusByMnemonic.get(mnemonic);
+    const menu = this.menuForMnemonic(mnemonic);
     if (menu) menu.focus();
   }
 
   private openMenuAndFocusFirst(mnemonic: string) {
-    const menu = this.menusByMnemonic.get(mnemonic);
+    const menu = this.menuForMnemonic(mnemonic);
     if (menu) menu.openAndFocusFirst();
   }
 

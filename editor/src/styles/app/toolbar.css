@@ -58,6 +58,46 @@
   }
 }
 
+/* ── File menu 🡒 single top-right control ────────────────────────────
+ *
+ * Big layout (≥1200px, the meta aside's breakpoint): the File menu keeps its
+ * own slot in the left section and the top-right control is the plain Save
+ * button.
+ *
+ * Below that — tablet band and the mobile dock bar — the bar has no room for
+ * both, so the File menu collapses into one icon-only dropdown trigger in the
+ * top-right slot. Both trigger shapes are always rendered (layout switches are
+ * CSS-only, so resizing never re-renders the toolbar); exactly one is visible.
+ * The panel is right-anchored in templates/styles/mobile-dock.eta so it cannot
+ * run off the right margin. */
+.app-toolbar .toolbar-file-btn,
+.app-toolbar .toolbar-file-actions {
+  display: inline-flex;
+}
+
+.app-toolbar .toolbar-section-left [data-menu-name="file"] {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .app-toolbar .toolbar-file-btn,
+  .app-toolbar .toolbar-file-actions {
+    display: none;
+  }
+
+  .app-toolbar .toolbar-section-left [data-menu-name="file"] {
+    display: inline-flex;
+  }
+}
+
+/* Below the big layout the Save action moves into that dropdown
+ * (File ▸ Save pending changes), so its own button is redundant there. */
+@media (max-width: 1199px) {
+  .app-toolbar .flush-btn {
+    display: none;
+  }
+}
+
 /* ── Provider Badge ────────────────────────────────────────────────── */
 
 .app-toolbar .toolbar-provider {

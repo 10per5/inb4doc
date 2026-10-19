@@ -160,6 +160,10 @@ export class Menu {
 
   get isOpen() { return this._isOpen }
 
+  /** The element that opens this menu (generated inside the mount, or the
+   * caller's own `triggerEl`). Read-only: use setTriggerEl() to repoint it. */
+  get trigger(): HTMLElement { return this.triggerEl }
+
   // Re-point the trigger element. Needed when the triggering element is
   // re-created (e.g. the sidebar re-renders while its overflow menu is open)
   // so outside-click still ignores the current button and toggles work.

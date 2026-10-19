@@ -77,11 +77,6 @@
   padding-bottom: var(--edit-toolbar-clearance, 0px);
 }
 
-.desktop-layout.block-handle-narrow
-  #app:has(#edit-toolbar:not([hidden])):not(
-    :has(#edit-toolbar.is-follow-mode)
-  )
-
   /* Tablet (768–1199px): show the quick bar only — the dock nav row
    * (Files/FAB/More) stays hidden and the strip becomes a plain fixed bottom
    * bar. #edit-toolbar is a block child of fixed #dock (shell.eta), so showing
@@ -125,11 +120,6 @@
     .book-layout {
     padding-bottom: var(--edit-toolbar-clearance, 0px);
   }
-
-  .desktop-layout
-    #app:has(#edit-toolbar:not([hidden])):not(
-      :has(#edit-toolbar.is-follow-mode)
-    )
 
   .desktop-layout
     #app:has(#edit-toolbar:not([hidden])):not(
@@ -235,11 +225,11 @@
   right: 0;
 }
 
-/* Save dropdown (right section): the panel would otherwise start at its
+/* File dropdown (right section): the panel would otherwise start at its
  * trigger's left edge and run off the right margin, and its grouped submenus
  * open even further right. Anchor the panel (and the shared --right flip) to
  * the mount's right edge and let every nested level grow leftward instead.
- * The trigger is icon-only on purpose — a "Save ▾" label was wide enough to
+ * The trigger is icon-only on purpose — a "File ▾" label was wide enough to
  * push the whole row past the viewport on a 390px phone. */
 .book-layout .app-toolbar .toolbar-section-right .toolbar-menu,
 .book-layout .app-toolbar .toolbar-section-right .toolbar-menu.toolbar-menu--right {
@@ -252,7 +242,7 @@
   right: 100%;
 }
 
-.book-layout .app-toolbar .toolbar-save-btn {
+.book-layout .app-toolbar .toolbar-file-btn {
   min-width: 32px;
   padding: 0 0.2rem;
 }
