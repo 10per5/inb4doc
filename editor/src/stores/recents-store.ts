@@ -33,7 +33,7 @@ class RecentsStore extends EntityStore<string[]> {
   addRecent(path: string): void {
     const recents = this.readRecents().filter((p) => p !== path)
     recents.unshift(path)
-    this.writeRecents(recents.slice(0, 50))
+    this.writeRecents(recents.slice(0, 10))
   }
 
   clearRecents(): void {

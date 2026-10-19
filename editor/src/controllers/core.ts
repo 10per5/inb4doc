@@ -54,12 +54,13 @@ export function registerCoreControllers(app: Application): void {
     app.register("updater-loader", UpdaterLoaderController)
   }
   // Mobile bottom dock + its fullviews. The dock mount (shell.eta) ships for
-  // every MobileDock build (gui-mobile + all web modes) regardless of viewport,
+  // every MobileDock build (gui-mobile, web modes, gui-desktop) regardless of viewport,
   // so registration keys off the build flag — NOT the runtime viewport. The
   // runtime isMobileDock() (gui-mobile, viewport ≤ 767px) decides the ACTIVE
   // layout inside the controllers; at tablet width (768–1199px) the tablet CSS
   // shows the #edit-toolbar quick bar above the desktop chrome, and the dock
-  // controllers keep rendering into the (CSS-hidden) dock strip.
+  // controllers keep rendering into the (CSS-hidden) dock strip. Gui-desktop
+  // also gains the quick bar as a fallback when the block handle cannot fit.
   if (hasFunc(AppFunc.MobileDock)) {
     app.register("dock", DockController)
     app.register("more", MoreController)

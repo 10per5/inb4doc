@@ -113,24 +113,6 @@ export function setupBlockHandleUI(editor: Editor): () => void {
   const root = new BlockHandleRootElement();
   root.editor = editor;
 
-  root.addEventListener("stateChange", (e: Event) => {
-    hovered = (e as CustomEvent<HoveredBlock | null>).detail ?? null;
-  });
-
-  // The native add element binds its own target-phase listener inserting a
-  // bare paragraph; capture here first and open our menu instead.
-  root.addEventListener(
-    "pointerdown",
-    (e: Event) => {
-      const target = e.target as HTMLElement | null;
-      if (!target?.closest("prosekit-block-handle-add")) return;
-      e.preventDefault();
-      e.stopPropagation();
-      openAddMenu(target.closest("prosekit-block-handle-add") as HTMLElement);
-    },
-    true,
-  );
-
   const positioner = new BlockHandlePositionerElement();
   const popup = new BlockHandlePopupElement();
 
@@ -155,7 +137,130 @@ export function setupBlockHandleUI(editor: Editor): () => void {
   parent.appendChild(root);
   parent.appendChild(dropIndicator);
 
+  // The native add element binds its own target-phase listener inserting a
+  // bare paragraph; capture here first and open our menu instead.
+  root.addEventListener(
+    "pointerdown",
+    (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest("prosekit-block-handle-add")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openAddMenu(target.closest("prosekit-block-handle-add") as HTMLElement);
+    },
+    true,
+  );
+
+  // ── Panel-overlap guard ──
+  // ProseKit places the handle flush-left of the hovered block (placement
+  // "left", no shift/flip), so when the gutter between a side panel and the
+  // text column is narrower than the handle — e.g. at high browser zoom,
+  // where the CSS viewport shrinks — it covers the explorer (.book-leftpanel)
+  // or, on tablet, the meta panel (.book-rightpanel). Hide the handle in
+  // that case and let the slash/quick menu serve as the fallback. Track
+  // narrowness at layout level (resize + layout changes) and also measure on
+  // hover for accuracy; expose a body-level flag so CSS can reveal the quick
+  // bar (#edit-toolbar) on all builds.
+  const PANEL_GAP = 4;
+  const HANDLE_EST_WIDTH = 46; // matches ProseKit handle popup width
+  let overlapFrame: number | null = null;
+  let narrow = false;
+
+  const setNarrow = (v: boolean) => {
+    if (narrow === v) return;
+    narrow = v;
+    document.documentElement.classList.toggle("block-handle-narrow", v);
+  };
+
+  const computeNarrow = (): boolean => {
+    const viewDom = editor.view.dom as HTMLElement | null;
+    if (!viewDom) return false;
+    const rect = viewDom.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    const vw = document.documentElement.clientWidth;
+    const padLeft = parseFloat(getComputedStyle(viewDom).paddingLeft) || 0;
+    const blockLeft = rect.left + padLeft;
+    const handleLeft = blockLeft - 6 - HANDLE_EST_WIDTH;
+    const handleRight = blockLeft - 6;
+    for (const selector of [".book-leftpanel", ".book-rightpanel"]) {
+      const panel = document.querySelector(selector) as HTMLElement | null;
+      if (!panel) continue;
+      const pr = panel.getBoundingClientRect();
+      if (pr.width === 0 || pr.right <= 0 || pr.left >= vw) continue;
+      if (handleLeft < pr.right + PANEL_GAP && handleRight > pr.left - PANEL_GAP) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const refreshNarrow = () => {
+    setNarrow(computeNarrow());
+  };
+
+  const clearPanelOverlap = () => {
+    if (overlapFrame !== null) {
+      cancelAnimationFrame(overlapFrame);
+      overlapFrame = null;
+    }
+    popup.removeAttribute("data-panel-overlap");
+  };
+
+  const updatePanelOverlap = () => {
+    overlapFrame = null;
+    if (positioner.dataset.state !== "open") {
+      popup.removeAttribute("data-panel-overlap");
+      return;
+    }
+    const handle = positioner.getBoundingClientRect();
+    let overlaps = false;
+    if (handle.width > 0) {
+      const vw = document.documentElement.clientWidth;
+      for (const selector of [".book-leftpanel", ".book-rightpanel"]) {
+        const panel = document.querySelector(selector);
+        if (!panel) continue;
+        const rect = panel.getBoundingClientRect();
+        // Skip hidden columns (display: none) and off-canvas mobile drawers
+        // (translated fully out of view).
+        if (rect.width === 0 || rect.right <= 0 || rect.left >= vw) continue;
+        if (
+          handle.left < rect.right + PANEL_GAP &&
+          handle.right > rect.left - PANEL_GAP
+        ) {
+          overlaps = true;
+          break;
+        }
+      }
+    }
+    popup.toggleAttribute("data-panel-overlap", overlaps);
+  };
+
+  root.addEventListener("stateChange", (e: Event) => {
+    hovered = (e as CustomEvent<HoveredBlock | null>).detail ?? null;
+    if (!hovered) {
+      clearPanelOverlap();
+      return;
+    }
+    if (overlapFrame !== null) cancelAnimationFrame(overlapFrame);
+    overlapFrame = requestAnimationFrame(() => {
+      updatePanelOverlap();
+      refreshNarrow();
+    });
+  });
+
+  // Layout-level narrowness tracking
+  const ro = new ResizeObserver(refreshNarrow);
+  ro.observe(document.documentElement);
+  ro.observe(editor.view.dom as HTMLElement);
+  let unsubLayout: (() => void) | undefined;
+  void import("@/stores/app-events").then(({ appEvents, AppEvent }) => {
+    unsubLayout = appEvents.on(AppEvent.LayoutChanged, refreshNarrow);
+  });
+
   return () => {
+    if (overlapFrame !== null) cancelAnimationFrame(overlapFrame);
+    ro.disconnect();
+    unsubLayout?.();
     menu?.destroy();
     menu = null;
     menuMountEl?.remove();

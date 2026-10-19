@@ -45,7 +45,7 @@ export function createDirtyPlugin(config: DirtyPluginConfig) {
 
           if (md === prevLastSet) return
           config.setLastSetContent(path, md)
-          appEvents.emit(AppEvent.EditorChanged, { path, md })
+          appEvents.emit(AppEvent.EditorChanged, { path, md, baseCanonical: prevLastSet })
         },
       }
     },

@@ -14,6 +14,33 @@
   padding-bottom: 0;
 }
 
+/* Show quick bar when gutter is too narrow for the block handle (fallback)
+   or in the tablet band (768–1199px). */
+.desktop-layout.block-handle-narrow #dock {
+  display: block;
+}
+
+.desktop-layout.block-handle-narrow #dock .dock {
+  display: none;
+}
+
+.desktop-layout.block-handle-narrow #edit-toolbar {
+  display: block;
+}
+
+.desktop-layout.block-handle-narrow
+  body:not(.layout-leftpanel-off).layout-rightpanel-off
+  #dock {
+  left: var(--sidebar-width);
+}
+
+.desktop-layout.block-handle-narrow
+  .book-layout:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  ) {
+  padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+}
+
   /* Tablet (768–1199px): show the quick bar only — the dock nav row
    * (Files/FAB/More) stays hidden and the strip becomes a plain fixed bottom
    * bar. #edit-toolbar is a block child of fixed #dock (shell.eta), so showing

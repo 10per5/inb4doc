@@ -4,17 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <%~ include('partials/head-meta', it) %>
-<% if (it.webAdaptive) { %>
     <script>
-      // Web-local responsive-web: pick mobile/desktop chrome before first paint.
-      // Decided by viewport WIDTH only — an iPad in landscape (>=768px) gets the
-      // desktop toolbar. Must mirror isMobileViewport() in lib/build/build-mode.ts.
+      // Pick mobile/desktop chrome before first paint. GuiDesktop always forces
+      // desktop chrome unless the viewport is explicitly small (phones); other
+      // web builds are purely viewport-driven.
       (function () {
-        var mobile = window.matchMedia("(max-width: 767px)").matches;
-        document.documentElement.classList.add(mobile ? "mobile-layout" : "desktop-layout");
+        var isGuiDesktop = document.documentElement.dataset.buildMode === "gui-desktop";
+        var isMobile = window.matchMedia("(max-width: 767px)").matches;
+        if (isGuiDesktop && isMobile) isMobile = false; // TODO: gui-desktop narrow window
+        document.documentElement.classList.add(isMobile ? "mobile-layout" : "desktop-layout");
       })();
     </script>
-<% } %>
     <style><%~ it.criticalCss %></style>
     <link rel="stylesheet" href="assets/katex.css?ver=<%= it.APP_VERSION %>" />
     <link rel="stylesheet" href="assets/prosekit-style.css?ver=<%= it.APP_VERSION %>" />

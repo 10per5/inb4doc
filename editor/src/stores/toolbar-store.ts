@@ -3,6 +3,13 @@
  *
  * The toolbar uses CSS `position: sticky` for scroll tracking (compositor-thread).
  * This store only handles the auto-hide class toggle based on scroll direction.
+ *
+ * The auto-hide class is `toolbar-hidden` (NOT `hidden`) on purpose: the global
+ * `.hidden` utility is `display: none !important`, which would rip the sticky bar
+ * out of the layout on every toggle. That 28px reflow feeds back into the scroll
+ * handler (content height changes → scrollTop settles → spurious scroll event),
+ * so the bar flickered/appeared to "regress". `toolbar-hidden` only slides/fades
+ * the bar, leaving layout untouched.
  */
 
 export interface ToolbarConfig {
@@ -12,6 +19,17 @@ export interface ToolbarConfig {
 export class ToolbarStore {
   /** Don't auto-hide while scrolled this close to the top. */
   private static readonly HIDE_BELOW = 100
+
+  /**
+   * Dead-zone (px) for direction detection. Scroll events jitter by a few px
+   * (subpixel, momentum, reflow); without a margin a single stray event flips
+   * the bar. Accumulating movement until it crosses the margin keeps the
+   * show/hide responsive while ignoring noise.
+   */
+  private static readonly SCROLL_MARGIN = 8
+
+  /** Class that slides the toolbar out of view (see toolbar.css). */
+  private static readonly HIDDEN_CLASS = "toolbar-hidden"
 
   private toolbar: HTMLElement | null
   private editorEl: HTMLElement | null
@@ -64,15 +82,20 @@ export class ToolbarStore {
 
       const layoutEl = document.querySelector(".book-layout")
       const sy = layoutEl?.scrollTop ?? 0
+      const diff = sy - this.lastScrollY
 
-      // Direction-based: hide only after scrolling down past the top band, and
-      // show again on ANY upward scroll. The old threshold required scrolling
-      // up by a fixed margin from the hide point, which was unreachable on
-      // short documents (or near the bottom) — so the bar could never re-show.
-      if (sy > ToolbarStore.HIDE_BELOW && sy > this.lastScrollY) {
-        this.setHidden(true)
-      } else if (sy < this.lastScrollY) {
+      // Direction-based: hide on downward scroll past the top band, show on
+      // upward scroll. A dead-zone absorbs event jitter so the bar can't flip
+      // on a stray few-px scroll; movement accumulates until it crosses the
+      // margin. Near the top the bar is always shown.
+      if (sy <= ToolbarStore.HIDE_BELOW) {
         this.setHidden(false)
+      } else if (diff > ToolbarStore.SCROLL_MARGIN) {
+        this.setHidden(true)
+      } else if (diff < -ToolbarStore.SCROLL_MARGIN) {
+        this.setHidden(false)
+      } else {
+        return // inside the dead-zone — keep the current state
       }
       this.lastScrollY = sy
     }
@@ -92,6 +115,6 @@ export class ToolbarStore {
     this.hidden = hidden
     const layoutEl = document.querySelector(".book-layout")
     this.lastScrollY = layoutEl?.scrollTop ?? 0
-    this.toolbar?.classList.toggle("hidden", hidden)
+    this.toolbar?.classList.toggle(ToolbarStore.HIDDEN_CLASS, hidden)
   }
 }

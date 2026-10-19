@@ -47,11 +47,19 @@ export function defineBasicExtension() {
     defineHardBreak(),
     defineTable(),
     defineCodeBlock(),
+    // `defineCode()` is intentionally first among the inline marks. ProseKit
+    // merges this union into a schema whose mark ranks come out in the reverse
+    // of the order listed here, so listing code first gives it the HIGHEST
+    // rank. That matters for markdown output: prosemirror-markdown renders the
+    // non-escaping `code` mark innermost only when it is last in `node.marks`
+    // (i.e. highest rank), so `**`code`**` stays bold-wrapping-code. Moving this
+    // line regresses that — see the rank assertion in
+    // tests/markdown/roundtrip.test.ts.
+    defineCode(),
     defineItalic(),
     defineBold(),
     defineUnderline(),
     defineStrike(),
-    defineCode(),
     union(defineLinkSpec(), defineLinkCommands()),
     defineBaseKeymap(),
     defineBaseCommands(),

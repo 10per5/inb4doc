@@ -25,6 +25,18 @@ prosekit-block-handle-popup {
 prosekit-block-handle-popup[data-state="closed"] {
   opacity: 0;
   scale: 0.95;
+  /* A closed popup keeps its last placed position — never let it intercept
+     clicks (e.g. over the explorer) while invisible. */
+  pointer-events: none;
+}
+
+/* Panel-overlap guard (block-handle-ui.ts): when the gutter between a side
+   panel and the text column is narrower than the handle (high browser zoom),
+   the handle is fully hidden instead of covering the panel; the slash/quick
+   menu is the fallback. */
+prosekit-block-handle-popup[data-panel-overlap] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 prosekit-block-handle-add,

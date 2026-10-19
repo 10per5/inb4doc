@@ -274,26 +274,38 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
   });
 
   // Override list token handlers: track list kind via stack, create individual
-  // list nodes per list_item (not per bullet_list/ordered_list).
-  const listKindStack: string[] = [];
+  // list nodes per list_item (not per bullet_list/ordered_list). Ordered lists
+  // keep a running counter so each item carries its own `order`; without it
+  // every item serialized as "1." and a list starting mid-sequence (e.g. "5.")
+  // silently lost its start.
+  type ListFrame = { kind: "bullet" | "ordered"; next: number };
+  const listStack: ListFrame[] = [];
   const ListNode = schema.nodes.list;
+
+  const orderedStart = (tok: any): number => {
+    const attr = tok?.attrs?.find((a: string[]) => a[0] === "start");
+    const n = attr ? Number(attr[1]) : 1;
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  };
 
   Object.assign(handlers, {
     bullet_list_open() {
-      listKindStack.push("bullet");
+      listStack.push({ kind: "bullet", next: 1 });
     },
     bullet_list_close() {
-      listKindStack.pop();
+      listStack.pop();
     },
-    ordered_list_open() {
-      listKindStack.push("ordered");
+    ordered_list_open(_state: any, tok: any) {
+      listStack.push({ kind: "ordered", next: orderedStart(tok) });
     },
     ordered_list_close() {
-      listKindStack.pop();
+      listStack.pop();
     },
-    list_item_open(state: any, tok: any) {
-      const kind = listKindStack[listKindStack.length - 1] || "bullet";
-      state.openNode(ListNode, { kind });
+    list_item_open(state: any, _tok: any) {
+      const frame = listStack[listStack.length - 1];
+      const kind = frame?.kind || "bullet";
+      const order = kind === "ordered" ? frame!.next++ : null;
+      state.openNode(ListNode, { kind, order });
     },
     list_item_close(state: any) {
       state.closeNode();
@@ -674,15 +686,15 @@ function renderFlatList(
   anyState.inTightList = isTight;
   node.forEach((child, _o, i) => {
     if (i && isTight) anyState.flushClose(1);
-    if (child.type.name === "list") {
-      // Nested list: indent it but let it emit its own markers, otherwise the
-      // parent's bullet/number prefix is duplicated and nesting collapses.
-      state.wrapBlock(delim, "", node, () => state.render(child, node, i));
-    } else {
-      state.wrapBlock(delim, firstDelim(i, child), node, () =>
-        state.render(child, node, i),
-      );
-    }
+    // A `list` node is a single item, so only its FIRST block carries the item
+    // marker. Every later block is a continuation block of the same item (the
+    // second paragraph of a loose item, a code block, …) and must be indented
+    // by `delim` WITHOUT a marker — otherwise it re-parses as a new sibling
+    // item and the document churns on every save. Nested sub-lists (also
+    // `list` nodes) emit their own markers, so they never take this item's.
+    const marker =
+      i === 0 && child.type.name !== "list" ? firstDelim(0, child) : "";
+    state.wrapBlock(delim, marker, node, () => state.render(child, node, i));
   });
   anyState.inTightList = prevTight;
 }
@@ -750,6 +762,27 @@ function renderTable(state: MarkdownSerializerState, node: ProseNode) {
 
   state.write(lines.join("\n"));
   state.closeBlock(node);
+}
+
+/**
+ * Backtick delimiter for an inline `code` mark, mirroring prosemirror-markdown's
+ * `backticksFor`. `side` < 0 is the opening fence, > 0 the closing fence. The
+ * fence is one backtick longer than the longest run of backticks in the text,
+ * and a space is added on the side that faces the content when the fence is
+ * longer than one backtick (CommonMark requires it so the delimiter does not
+ * merge with the literal backticks).
+ */
+function codeFence(node: ProseNode | null | undefined, side: number): string {
+  let len = 0;
+  if (node && node.isText && node.text) {
+    const m = /`+/g;
+    let mm: RegExpExecArray | null;
+    while ((mm = m.exec(node.text))) len = Math.max(len, mm[0].length);
+  }
+  let result = len > 0 && side > 0 ? " `" : "`";
+  for (let i = 0; i < len; i++) result += "`";
+  if (len > 0 && side < 0) result += " ";
+  return result;
 }
 
 export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
@@ -825,9 +858,15 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
           renderFlatList(state, node, "  ", () => "* ");
         }
       },
-      paragraph(state, node, parent, index) {
+      paragraph(state, node, parent) {
         if (node.content.size === 0) {
-          if (parent && index < parent.childCount - 1) {
+          // Preserve an empty paragraph as an explicit `<br />` line whenever
+          // it is not the sole block. This covers blank lines between blocks
+          // AND a trailing empty block the user created with Enter at the end
+          // of the document — the latter MUST produce a real body change so
+          // the file registers as dirty. A document that is just one empty
+          // paragraph still serializes to "" so an empty file round-trips.
+          if (parent && parent.childCount > 1) {
             state.write("<br />");
             state.closeBlock(node);
             return;
@@ -961,20 +1000,10 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
       },
       code: {
         open(_state, _mark, parent, index) {
-          let len = 0;
-          const text = parent.child(index).text || "";
-          const m = /`+/g;
-          let mm: RegExpExecArray | null;
-          while ((mm = m.exec(text))) len = Math.max(len, mm[0].length);
-          return len > 0 ? " `" : "`";
+          return codeFence(parent.child(index), -1);
         },
         close(_state, _mark, parent, index) {
-          let len = 0;
-          const text = parent.child(index - 1).text || "";
-          const m = /`+/g;
-          let mm: RegExpExecArray | null;
-          while ((mm = m.exec(text))) len = Math.max(len, mm[0].length);
-          return len > 0 ? "` " : "`";
+          return codeFence(parent.child(index - 1), 1);
         },
         escape: false,
       },

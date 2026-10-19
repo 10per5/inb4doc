@@ -262,6 +262,44 @@ export class FileSyncService {
       .catch(() => {});
   }
 
+  /**
+   * The body a save would write for `path`.
+   *
+   * Per-section formatting: for an edit op we run a 3-way merge whose ancestor
+   * is C0 (the canonical serialization of the raw on-disk body), "ours" is that
+   * raw body, and "theirs" is the editor's canonical serialization now.
+   * Untouched regions therefore keep their original raw formatting and only the
+   * blocks the user actually changed are normalized. `fullFormat` (an explicit
+   * File → Format document) bypasses the merge and writes the canonical body.
+   *
+   * `canonical` is the current serialization for the open document (which may
+   * be newer than `op.patch` because the dirty debounce hasn't run yet); pass
+   * `undefined` for non-current paths to fall back to `op.patch`.
+   */
+  private async resolveBody(
+    path: string,
+    editOp: { patch?: string; fullFormat?: boolean } | undefined,
+    canonical: string | undefined,
+  ): Promise<string> {
+    const page = repo.getOrCreate(path);
+    const theirs = canonical ?? editOp?.patch ?? page.bodyState.body ?? "";
+    if (!editOp || editOp.fullFormat) return theirs;
+
+    const baseline = page.bodyState.baseline;
+    // Source-mode edits are written verbatim; never canonicalize them.
+    if (
+      baseline === undefined ||
+      (path === this.currentPath && this.editor.isSourceMode())
+    ) {
+      return theirs;
+    }
+    // C0 = canonical serialization of the raw on-disk body: a stable ancestor
+    // even when the editor is showing an already-edited (pending) patch.
+    const c0 = this.editor.canonicalize(baseline);
+    const { merge3 } = await import("@/utils/merge3");
+    return merge3(baseline, c0, theirs).merged;
+  }
+
   async flushDirtyFiles(): Promise<void> {
     const dirtyPaths = this.pendingOps.getDirtyPaths();
     if (dirtyPaths.length === 0 && this.pendingOps.count === 0) return;
@@ -286,17 +324,20 @@ export class FileSyncService {
 
       let bodyToWrite: string;
       if (editOp) {
-        bodyToWrite = editOp.patch ?? page.bodyState.body ?? "";
+        bodyToWrite = await this.resolveBody(
+          path,
+          editOp,
+          path === this.currentPath ? currentMd : undefined,
+        );
+      } else if (path === this.currentPath) {
+        bodyToWrite = currentMd;
       } else {
         bodyToWrite = page.bodyState.body ?? "";
-      }
-
-      if (path === this.currentPath) {
-        bodyToWrite = currentMd;
-      } else if (!editOp && !bodyToWrite) {
-        const cachedRaw = await provider?.readFile(path);
-        if (!cachedRaw) continue;
-        bodyToWrite = stripFrontmatter(cachedRaw).body;
+        if (!bodyToWrite) {
+          const cachedRaw = await provider?.readFile(path);
+          if (!cachedRaw) continue;
+          bodyToWrite = stripFrontmatter(cachedRaw).body;
+        }
       }
 
       if (path === this.currentPath) {
@@ -653,17 +694,20 @@ export class FileSyncService {
 
     let bodyToWrite: string;
     if (editOp) {
-      bodyToWrite = editOp.patch ?? page.bodyState.body ?? "";
+      bodyToWrite = await this.resolveBody(
+        path,
+        editOp,
+        path === this.currentPath ? this.editor.getCurrentContent() : undefined,
+      );
+    } else if (path === this.currentPath) {
+      bodyToWrite = this.editor.getCurrentContent();
     } else {
       bodyToWrite = page.bodyState.body ?? "";
-    }
-
-    if (path === this.currentPath) {
-      bodyToWrite = this.editor.getCurrentContent();
-    } else if (!editOp && !bodyToWrite) {
-      const cachedRaw = await provider?.readFile(path);
-      if (!cachedRaw) return false;
-      bodyToWrite = stripFrontmatter(cachedRaw).body;
+      if (!bodyToWrite) {
+        const cachedRaw = await provider?.readFile(path);
+        if (!cachedRaw) return false;
+        bodyToWrite = stripFrontmatter(cachedRaw).body;
+      }
     }
 
     if (path === this.currentPath) {
@@ -836,7 +880,6 @@ export class FileSyncService {
   }
 
   private async buildChangesItems(): Promise<ChangesDialogItem[]> {
-    const provider = getProvider();
     const items: ChangesDialogItem[] = [];
 
     const sorted = [...this.pendingOps.all].sort((a, b) => {
@@ -856,10 +899,16 @@ export class FileSyncService {
           const page = repo.getOrCreate(op.path);
           if (op.patch !== undefined) page.bodyState.body = op.patch;
 
-          let body = page.bodyState.body;
-          if (op.path === this.currentPath) {
-            body = this.editor.getCurrentContent();
-          }
+          // Show the merge-preserved body (raw formatting on untouched blocks)
+          // so the diff reflects what a save will actually write, not the full
+          // canonical rewrite.
+          const body = await this.resolveBody(
+            op.path,
+            op,
+            op.path === this.currentPath
+              ? this.editor.getCurrentContent()
+              : undefined,
+          );
 
           let fm: MetaPanelData | undefined =
             page.getFrontmatter() ?? page.originalFrontmatter?.toMeta();
@@ -870,33 +919,12 @@ export class FileSyncService {
             } as MetaPanelData;
           }
 
-          let md: string | undefined;
-          if (body !== undefined) {
-            md = fm
-              ? `---\n${serializeFrontmatter(fm)}\n---\n\n${body}`
-              : body;
-          }
-
-          if (md === undefined) {
-            const cachedRaw = await provider?.readFile(op.path);
-            if (!cachedRaw) continue;
-            const { frontmatter: rawFm, body: rawBody } =
-              stripFrontmatter(cachedRaw);
-            const fallbackPage = repo.getOrCreate(op.path);
-            fallbackPage.setBaseline(rawBody);
-            fallbackPage.originalFrontmatter = rawFm
-              ? Frontmatter.fromMeta(rawFm)
-              : undefined;
-            const diskFm = fallbackPage.getFrontmatter() ?? rawFm;
-            md = diskFm
-              ? `---\n${serializeFrontmatter(diskFm)}\n---\n\n${rawBody}`
-              : rawBody;
-          }
-
-          if (md === undefined) continue;
+          const md = fm
+            ? `---\n${serializeFrontmatter(fm)}\n---\n\n${body}`
+            : body;
 
           const changeSize =
-            op.patch.length - (page.bodyState.baseline?.length ?? 0);
+            body.length - (page.bodyState.baseline?.length ?? 0);
 
           items.push({
             path: op.path,

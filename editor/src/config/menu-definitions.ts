@@ -27,6 +27,8 @@ import {
   mathBook,
   table,
   videoCamera,
+  plus,
+  magicWand,
 } from "@/eta/icons";
 
 export const menuRegistry = createRegistry();
@@ -79,6 +81,13 @@ menuRegistry.register("file", (): MenuItem[] => {
       ]
     : [];
   return [
+    {
+      type: MenuType.Item,
+      id: "new-file",
+      icon: plus,
+      label: "New…",
+      onClick: () => appEvents.emit(AppEvent.NewFileRequested),
+    },
     ...projectItems,
     {
       type: MenuType.Item,
@@ -86,6 +95,14 @@ menuRegistry.register("file", (): MenuItem[] => {
       icon: mediaImage,
       label: "Image Manager",
       onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
+    },
+    {
+      type: MenuType.Item,
+      id: "format-document",
+      icon: magicWand,
+      label: "Format document",
+      disabled: !formatState.formattable,
+      onClick: () => appEvents.emit(AppEvent.FormatDocumentRequested),
     },
     { type: MenuType.Separator },
     {
@@ -153,6 +170,29 @@ if (
   ).__inb4docMenuViewTracked = true;
   appEvents.on(AppEvent.ViewChanged, ({ view }) => {
     viewState.current = view;
+  });
+}
+
+// #6: File → Format document enablement. The menu registry callback can't reach
+// the editor, and the topbar chunk is hot, so mirror the shell's
+// FormatSuggestionChanged signal in a globalThis flag (same one-time
+// subscription pattern as viewState above); the file menu reads it on each open.
+interface MenuFormatState {
+  formattable: boolean;
+}
+const formatState = ((
+  globalThis as unknown as { __inb4docMenuFormatState?: MenuFormatState }
+).__inb4docMenuFormatState ??= { formattable: false });
+
+if (
+  !(globalThis as unknown as { __inb4docMenuFormatTracked?: boolean })
+    .__inb4docMenuFormatTracked
+) {
+  (
+    globalThis as unknown as { __inb4docMenuFormatTracked?: boolean }
+  ).__inb4docMenuFormatTracked = true;
+  appEvents.on(AppEvent.FormatSuggestionChanged, ({ formattable }) => {
+    formatState.formattable = formattable;
   });
 }
 
