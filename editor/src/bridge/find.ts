@@ -8,6 +8,12 @@ let currentQuery = ""
 let currentIdx = -1  // -1 = no match navigated to yet
 let totalMatches = 0
 
+// Persist across close() so reopening Find (Ctrl+F) or navigating (F3) keeps
+// the previous term in the box and resumes from the last match — closing must
+// not throw the user's search away.
+let lastQuery = ""
+let lastIdx = -1
+
 // source-mode positions cached from an indexOf sweep over textarea.value
 let srcPositions: { start: number; end: number }[] = []
 
@@ -57,31 +63,42 @@ export function openFind(): void {
 
   bar.append(input, matchLabel, closeBtn)
   document.body.appendChild(bar)
+
+  // Restore the previous term (and match position) so reopening via Ctrl+F or
+  // F3 doesn't lose what the user was searching. Selecting the text means the
+  // first keystroke replaces it, like a fresh search.
+  if (lastQuery) {
+    input.value = lastQuery
+    search(lastQuery)
+    if (lastIdx >= 0 && lastIdx < totalMatches) {
+      currentIdx = lastIdx
+      updateCounter()
+    }
+  }
   input.focus()
   input.select()
 }
 
 export function findNext(): void {
+  if (!bar) openFind()
   if (bar && input) {
     if (input.value.trim() !== currentQuery) search(input.value)
     nextMatch()
-    return
   }
-  openFind()
 }
 
 export function findPrev(): void {
+  if (!bar) openFind()
   if (bar && input) {
     if (input.value.trim() !== currentQuery) search(input.value)
     prevMatch()
-    return
   }
-  openFind()
 }
 
 // ── internal ──
 
 function close(): void {
+  lastIdx = currentIdx
   srcPositions = []
   currentQuery = ""
   currentIdx = -1
@@ -90,8 +107,10 @@ function close(): void {
   bar = null
   input = null
   matchLabel = null
+  // preventScroll: focusing the editor must NOT scroll the caret into view —
+  // that would discard the scroll position the search just navigated to.
   const pm = document.querySelector<HTMLElement>(".ProseMirror")
-  pm?.focus()
+  pm?.focus({ preventScroll: true })
 }
 
 function updateCounter(): void {
@@ -125,6 +144,7 @@ function search(q: string): void {
     updateCounter()
     return
   }
+  lastQuery = trimmed
   currentQuery = trimmed
   currentIdx = -1
 

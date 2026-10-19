@@ -7,10 +7,19 @@
  * live in lib/style/layout.css (critical, inlined in <head>).
  */
 
-.app-toolbar.hidden {
+.app-toolbar {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Auto-hide (ToolbarStore). Slides/fades the sticky bar away WITHOUT changing
+ * layout, so hiding never reflows the scroller (which used to fire a spurious
+ * scroll event and flip the bar back). Deliberately NOT the global `.hidden`
+ * utility — that rule is `display: none !important` and would rip the sticky
+ * element out of flow on every toggle. */
+.app-toolbar.toolbar-hidden {
+  transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.46s;
 }
 
 /* ── Toolbar Buttons ───────────────────────────────────────────────── */
