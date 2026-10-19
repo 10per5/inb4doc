@@ -16,11 +16,8 @@
   icons: it.icons,
   body: `
   <div class="about-hero">
-    <span class="about-logo">${it.icons.bookStack}</span>
-    <span class="about-hero-text">
       <p class="about-tagline">A WYSIWYG markdown wiki for the <code>inb4doc</code> project.</p>
       ${hero}
-    </span>
   </div>
   <div class="about-links">
     ${links}
