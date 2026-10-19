@@ -19,6 +19,8 @@ export interface WikiPrefs {
   spellcheckLanguages: string[]
   /** Mobile edit toolbar: follow the caret instead of staying pinned bottom. */
   followCaretToolbar: boolean
+  /** User-authored stylesheet injected verbatim into the document head. */
+  customCss: string
 }
 
 export interface ConnectionConfig {

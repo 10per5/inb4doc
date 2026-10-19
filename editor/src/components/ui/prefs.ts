@@ -1,6 +1,7 @@
 import type { ImageStorageMode } from "@/services/storage-service"
 import { prefsStore } from "@/stores/preferences-store"
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { applyCustomCss } from "@/services/custom-css-service"
 import { applyTheme } from "@/utils/theme"
 
 /**
@@ -48,4 +49,17 @@ export function onPrefsSpellcheckLanguagesChanged(tags: string[]): void {
 export function onPrefsFollowCaretToolbarChanged(follow: boolean): void {
   prefsStore.setFollowCaretToolbar(follow)
   appEvents.emit(AppEvent.FollowCaretToolbarChanged, { follow })
+}
+
+/**
+ * User stylesheet. The CSS is injected verbatim into a single <style> element
+ * (see custom-css-service), so it cascades after every bundled rule — anything
+ * in the app can be overridden. Nothing is sanitized beyond what the browser's
+ * CSS parser drops: it is the author's own browser and their own stylesheet,
+ * and a `<style>` body cannot escape into HTML.
+ */
+export function onPrefsCustomCssChanged(css: string): void {
+  prefsStore.setCustomCss(css)
+  applyCustomCss(css)
+  appEvents.emit(AppEvent.CustomCssChanged, { css })
 }

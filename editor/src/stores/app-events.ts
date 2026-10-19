@@ -69,6 +69,7 @@ export enum AppEvent {
   RootScopeChanged = "root-scope-changed",
   SpellcheckChanged = "spellcheck-changed",
   FollowCaretToolbarChanged = "follow-caret-toolbar-changed",
+  CustomCssChanged = "custom-css-changed",
   StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
   CreateFirstPage = "create-first-page",
@@ -153,6 +154,7 @@ export interface AppEventPayloads {
   [AppEvent.RootScopeChanged]:      void
   [AppEvent.SpellcheckChanged]:     void
   [AppEvent.FollowCaretToolbarChanged]: { follow: boolean }
+  [AppEvent.CustomCssChanged]: { css: string }
   [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void
   [AppEvent.CreateFirstPage]:       void

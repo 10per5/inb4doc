@@ -55,17 +55,37 @@ export function isMobileOrTabletUA(): boolean {
 // viewport, tablet UA) sit in keyboard mode forever — the follow-only toolbar.
 const KEYBOARD_MIN_OFFSET = 80;
 
-// Track the on-screen keyboard: opening it shrinks the visual viewport, and the
-// space between its bottom edge and the layout viewport bottom is the keyboard's
-// overlay height. Anything below KEYBOARD_MIN_OFFSET reports as 0 (see above).
-// Fires immediately with the current offset, then on every visual viewport
-// resize/scroll and window resize. Returns an unsubscribe.
+// Track the on-screen keyboard and report its overlay height. Anything below
+// KEYBOARD_MIN_OFFSET reports as 0 (see above). Fires immediately with the
+// current offset, then on every visual viewport resize/scroll and window
+// resize. Returns an unsubscribe.
+//
+// Two engines, two models — both must be measured:
+//   iOS/WebKit shrinks the VISUAL viewport and leaves the layout one alone,
+//     so `innerHeight - (vv.offsetTop + vv.height)` is the keyboard height.
+//   Android (adjustResize) shrinks the LAYOUT viewport instead: `innerHeight`
+//     and `vv.height` drop together and that inset stays 0. Reading only the
+//     inset reported "keyboard closed" on every Android phone, so the toolbar
+//     could never leave pinned mode no matter what the preference said.
+// The Android signal is therefore the drop from the tallest layout height seen.
 export function trackKeyboardOffset(onChange: (offset: number) => void): () => void {
   if (typeof window === "undefined") return () => {};
   const vv = window.visualViewport;
+  let baselineHeight = window.innerHeight;
+  let lastWidth = window.innerWidth;
   const measure = (): void => {
-    if (!vv) return;
-    const inset = Math.round(window.innerHeight - (vv.offsetTop + vv.height));
+    // A width change is a rotation / window resize, not a keyboard: without the
+    // reset landscape's shorter height would read as a keyboard forever.
+    if (window.innerWidth !== lastWidth) {
+      lastWidth = window.innerWidth;
+      baselineHeight = window.innerHeight;
+    }
+    const layoutDrop = baselineHeight - window.innerHeight;
+    baselineHeight = Math.max(baselineHeight, window.innerHeight);
+    const visualInset = vv
+      ? Math.round(window.innerHeight - (vv.offsetTop + vv.height))
+      : 0;
+    const inset = Math.max(layoutDrop, visualInset);
     onChange(inset < KEYBOARD_MIN_OFFSET ? 0 : inset);
   };
   vv?.addEventListener("resize", measure);

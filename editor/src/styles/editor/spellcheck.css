@@ -4,44 +4,33 @@
  * The editor has no bundled dictionary — the browser flags misspellings and
  * paints a native decoration we cannot reach from JS. These pseudo-elements
  * ARE that decoration's styling hook (Chromium / WebKit / Firefox 121+), so
- * "modern highlight" means replacing the default red squiggle with a soft
- * marker underlay that reads as paper, not as an error dialog.
+ * "modern highlight" means pairing the squiggle with a soft marker underlay
+ * that reads as paper, not as an error dialog.
+ *
+ * Highlight pseudo-elements only honor a handful of properties: `color`,
+ * `background-COLOR` and the `text-decoration` family. Anything else — notably
+ * `background-image`, which is what this file used to draw its dotted marker
+ * with — is silently dropped by every engine, so the old rule removed the only
+ * visible part (`text-decoration: none`) and painted nothing of its own. The
+ * marker is therefore a translucent background plus a recoloured squiggle.
  *
  * `[data-spellcheck="off"]` is set by src/plugins/spellcheck.ts on the content
  * root when the preference is off (or no language is opted in) — belt and
  * braces, since the `spellcheck` attribute already disables it.
  */
 .ProseMirror ::spelling-error {
-  text-decoration: none;
-  background-image: linear-gradient(
-    to top,
-    var(--spellcheck-mark) 0,
-    var(--spellcheck-mark) 2px,
-    transparent 2px
-  );
-  background-repeat: repeat-x;
-  background-position: 0 100%;
-  background-size: 6px 100%;
-  border-radius: 2px;
+  background-color: var(--spellcheck-mark);
+  text-decoration-color: var(--spellcheck-mark-line);
 }
 
 .ProseMirror ::grammar-error {
-  text-decoration: none;
-  background-image: linear-gradient(
-    to top,
-    var(--spellcheck-mark-grammar) 0,
-    var(--spellcheck-mark-grammar) 2px,
-    transparent 2px
-  );
-  background-repeat: repeat-x;
-  background-position: 0 100%;
-  background-size: 6px 100%;
-  border-radius: 2px;
+  background-color: var(--spellcheck-mark-grammar);
+  text-decoration-color: var(--spellcheck-mark-grammar-line);
 }
 
 .ProseMirror[data-spellcheck="off"] ::spelling-error,
 .ProseMirror[data-spellcheck="off"] ::grammar-error {
-  background-image: none;
+  background-color: transparent;
 }
 
 /*
@@ -54,14 +43,20 @@
 .ProseMirror .cm-editor {
   --spellcheck-mark: transparent;
   --spellcheck-mark-grammar: transparent;
+  --spellcheck-mark-line: transparent;
+  --spellcheck-mark-grammar-line: transparent;
 }
 
 :root {
   --spellcheck-mark: rgba(191, 97, 106, 0.45);
   --spellcheck-mark-grammar: rgba(208, 135, 112, 0.45);
+  --spellcheck-mark-line: #bf616a;
+  --spellcheck-mark-grammar-line: #d08770;
 }
 
 :root[data-theme="dark"] {
   --spellcheck-mark: rgba(191, 97, 106, 0.6);
   --spellcheck-mark-grammar: rgba(208, 135, 112, 0.6);
+  --spellcheck-mark-line: #d4707d;
+  --spellcheck-mark-grammar-line: #e0a07f;
 }
