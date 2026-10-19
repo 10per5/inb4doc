@@ -14,17 +14,17 @@ import { applyPanelFlip, getBlockRectAt, type FlipAnchorRect } from "@/utils/pop
 import type { EditorController } from "@/controllers/editor-controller"
 
 /**
- * Quick bar for the mobile dock. Two modes:
- * - Default (keyboard closed): a strip pinned at the bottom of the dock.
+ * Quick bar for the mobile dock. Two modes, both set by this controller as a
+ * class on #edit-toolbar (they are mutually exclusive and exhaustive for a
+ * touch device — never neither, never both):
+ * - `.is-pinned-mode`: a strip pinned at the bottom of the viewport.
  * - Follow mode (keyboard open): a popover anchored at the block the caret is
  *   in, so the actions stay next to where you type. The `.is-follow-mode`
  *   class on #edit-toolbar switches the CSS; this controller positions the
- *   0×0 fixed anchor via applyPanelFlip and hides the popover once the block
- *   scrolls out of the viewport — or once it has nothing useful to offer. A
- *   popover is "useful" when there is a history action (undo OR redo — a lone
- *   redo keeps it visible so you can redo after an undo) or contextual list/
- *   table actions. When nothing is useful (no undo AND no redo AND no list/
- *   table) the popover must NOT follow the cursor.
+ *   0×0 fixed anchor via applyPanelFlip and hides the popover only once the
+ *   anchored block scrolls out of the viewport. It follows regardless of what
+ *   the bar currently has to offer — no history yet is not a reason to leave
+ *   it invisible while you type.
  * Undo/redo are always shown in both modes (disabled when the open file has
  * no history); the list/table groups appear contextually inside the bar.
  * A "+" FAB button on the strip opens the shared add-block menu in every mode
@@ -51,6 +51,12 @@ export default class EditToolbarController extends Controller {
   private currentType: ActiveBlockType = ActiveBlockType.None
   private viewIsEditor = true
   private followMode = false
+  // Pinned mode is explicit, not just "not follow mode": the strip must be
+  // docked whenever the bar is not tracking the caret. Both flags come out of
+  // the same eligibility check so a touch device is always in exactly one of
+  // the two states — pinning used to depend on the width band alone, which
+  // left tablets that measure desktop-wide with no bar outside follow mode.
+  private pinned = false
   private inViewport = true
   private stopKeyboardTrack: (() => void) | null = null
   private canUndo = false
@@ -152,20 +158,33 @@ export default class EditToolbarController extends Controller {
   // devices: phone/tablet by viewport, plus tablet by UA (a tablet in
   // landscape can still exceed the tablet breakpoint but pops the OSK).
   // With the preference off the strip stays pinned to the bottom even while
-  // the OSK is up.
+  // the OSK is up. Every non-follow state pins explicitly instead of relying
+  // on the CSS width band: the tablet band (768–1199px) is not the only
+  // tablet — one that measures desktop-wide shows no bar at all outside
+  // follow mode if pinning is keyed to that media query.
   private updateFollowMode(offset: number): void {
     this.keyboardOffset = offset
-    const eligible =
-      isMobileViewport() || isTabletViewport() || isMobileOrTabletUA()
-    const follow = offset > 0 && eligible && this.followCaret
-    if (follow === this.followMode) {
+    const follow = offset > 0 && this.isTouchDevice() && this.followCaret
+    const pinned = this.isTouchDevice() && !follow
+    const changed = follow !== this.followMode || pinned !== this.pinned
+    this.followMode = follow
+    this.pinned = pinned
+    this.element.classList.toggle("is-follow-mode", follow)
+    this.element.classList.toggle("is-pinned-mode", pinned)
+    if (!changed) {
       this.positionPopover()
       return
     }
-    this.followMode = follow
-    this.element.classList.toggle("is-follow-mode", follow)
     this.updateVisibility()
     this.positionPopover()
+  }
+
+  // Device gets the docked bar at all: phone/tablet by viewport, plus tablet by
+  // UA (a tablet in landscape can still exceed the tablet breakpoint but pops
+  // the OSK). Used for both directions so "not following the caret" always
+  // resolves to a pinned strip rather than to no bar at all.
+  private isTouchDevice(): boolean {
+    return isMobileViewport() || isTabletViewport() || isMobileOrTabletUA()
   }
 
   // Save button state: disabled while nothing is pending (same contract as the
@@ -317,35 +336,17 @@ export default class EditToolbarController extends Controller {
     }
   }
 
-  // Follow-mode popover visibility rule: follow only while the anchored block
-  // is still on screen AND the popover has something useful. "Useful" means a
-  // history action (undo OR redo — a lone redo, e.g. right after pressing undo,
-  // keeps the popover so you can redo) or contextual list/table actions. The
-  // "+" add-block FAB is deliberately excluded: it is always present, so
-  // counting it would make the popover follow even when nothing else is useful
-  // (an empty paragraph with no history). When there is nothing useful the
-  // popover must NOT follow the cursor.
-  private hasUsableActions(): boolean {
-    return (
-      this.canUndo ||
-      this.canRedo ||
-      !this.listGroupTarget.hidden ||
-      !this.tableGroupTarget.hidden
-    )
-  }
-
   private updateVisibility(): void {
-    // Default mode: always visible in the editor view. Follow mode: only while
-    // the anchored block is still on screen with something useful to offer.
+    // Pinned mode: always visible in the editor view. Follow mode: only while
+    // the anchored block is still on screen — it tracks the caret, so there is
+    // no "nothing useful yet" state that would leave the bar invisible just
+    // because the document has no undo/redo history or contextual actions yet.
     // While the add-block menu is open the element must stay visible — it
     // hosts the menu's fixed mount — only the strip hides (via
     // .edit-toolbar-fab-menu-open).
     ;(this.element as HTMLElement).hidden = this.addMenuOpen
       ? false
-      : !(
-          this.viewIsEditor &&
-          (!this.followMode || (this.inViewport && this.hasUsableActions()))
-        )
+      : !(this.viewIsEditor && (!this.followMode || this.inViewport))
   }
 
   private setAddMenuOpen(open: boolean): void {

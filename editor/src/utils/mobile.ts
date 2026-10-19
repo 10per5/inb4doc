@@ -46,16 +46,27 @@ export function isMobileOrTabletUA(): boolean {
   return MOBILE_OR_TABLET_UA.test(navigator.userAgent);
 }
 
+// Below this the "shrink" is browser chrome, not a keyboard: `visualViewport`
+// is regularly a few px shy of `innerHeight` (horizontal scrollbar ~15px,
+// fractional device-pixel rounding < 1px), so `innerHeight - vv.height` is a
+// small positive number even with no on-screen keyboard at all. A real OSK is
+// hundreds of px; anything this small means the viewport never shrank. Using
+// `> 0` as the "keyboard is up" test made every eligible device (phone/tablet
+// viewport, tablet UA) sit in keyboard mode forever — the follow-only toolbar.
+const KEYBOARD_MIN_OFFSET = 80;
+
 // Track the on-screen keyboard: opening it shrinks the visual viewport, and the
 // space between its bottom edge and the layout viewport bottom is the keyboard's
-// overlay height. Fires immediately with the current offset, then on every
-// visual viewport resize/scroll and window resize. Returns an unsubscribe.
+// overlay height. Anything below KEYBOARD_MIN_OFFSET reports as 0 (see above).
+// Fires immediately with the current offset, then on every visual viewport
+// resize/scroll and window resize. Returns an unsubscribe.
 export function trackKeyboardOffset(onChange: (offset: number) => void): () => void {
   if (typeof window === "undefined") return () => {};
   const vv = window.visualViewport;
   const measure = (): void => {
     if (!vv) return;
-    onChange(Math.max(0, window.innerHeight - (vv.offsetTop + vv.height)));
+    const inset = Math.round(window.innerHeight - (vv.offsetTop + vv.height));
+    onChange(inset < KEYBOARD_MIN_OFFSET ? 0 : inset);
   };
   vv?.addEventListener("resize", measure);
   vv?.addEventListener("scroll", measure);
