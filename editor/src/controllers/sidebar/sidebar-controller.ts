@@ -8,17 +8,14 @@ import {
   applyResults,
   showMenu,
   closeMenu,
-  computeLiveUrl,
-  liveIcon,
 } from "./sidebar";
 import { WEIGHT_STEP, WEIGHT_EXCHANGE_SHIFT, type TreeIndex, type ChildInfo } from "@/utils/tree";
-import { ProviderType } from "@/providers/index";
 import {
   folder,
   folderOpen,
   folderMinus,
   folderMinusOpen,
-  eyeClosed,
+  filterAlt,
 } from "@/eta/icons";
 import { searchContent } from "@/features/search/sidebar-search";
 import { confirmDialog } from "@/controllers/dialog/dialog";
@@ -27,6 +24,7 @@ import { appEvents, AppEvent } from "@/stores/app-events";
 import renderSidebar from "@/eta/views/controller/sidebar";
 
 import { prefsStore } from "@/stores/preferences-store";
+import { PrefsSection } from "@/config/enums/prefs-section";
 import { treeStore } from "@/stores/tree-store";
 import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps } from "@/entities/PendingOps";
@@ -41,7 +39,8 @@ export default class extends Controller {
     "searchWrapper",
     "newPageBtn",
     "providerLabel",
-    "hideEmptyToggle",
+    "filtersBtn",
+    "filterSummary",
     "deleteSelectedBtn",
     "cancelSelectionBtn",
   ];
@@ -51,7 +50,8 @@ export default class extends Controller {
   declare readonly searchWrapperTarget: HTMLElement;
   declare readonly newPageBtnTarget: HTMLElement;
   declare readonly providerLabelTarget: HTMLElement;
-  declare readonly hideEmptyToggleTarget: HTMLElement;
+  declare readonly filtersBtnTarget: HTMLElement;
+  declare readonly filterSummaryTarget: HTMLElement;
   declare readonly deleteSelectedBtnTarget: HTMLButtonElement;
   declare readonly cancelSelectionBtnTarget: HTMLButtonElement;
 
@@ -67,6 +67,7 @@ export default class extends Controller {
   private activePath = "";
   private prevDirty = new Set<string>();
   private hideEmptyFolders = false;
+  private rootScope = "";
 
   private dragFromPath = "";
   private dragFromParent = "";
@@ -84,6 +85,14 @@ export default class extends Controller {
         this.updateDirtyIndicators(dirtyPaths);
       }),
       appEvents.on(AppEvent.SidebarReload, () => {
+        this.load();
+      }),
+      // Navigation preferences (hide empty folders / root project scope) are
+      // edited outside the sidebar, in the preferences window. Re-read them
+      // and re-render so the tree always matches what the window shows.
+      appEvents.on(AppEvent.RootScopeChanged, () => {
+        this.hideEmptyFolders = prefsStore.hideEmptyFolders;
+        this.rootScope = prefsStore.rootScope;
         this.load();
       }),
       appEvents.on(AppEvent.SidebarActive, ({ path }) => {
@@ -156,8 +165,9 @@ export default class extends Controller {
     const prevScroll = this.targets.has("inner")
       ? this.innerTarget.scrollTop
       : 0;
-    this.element.innerHTML = renderSidebar({ eyeClosed });
+    this.element.innerHTML = renderSidebar({ filterAlt });
     this.hideEmptyFolders = prefsStore.hideEmptyFolders;
+    this.rootScope = prefsStore.rootScope;
     document.getElementById("sidebar-skeleton")?.classList.add("is-hidden");
     this.actions = this.buildActions();
 
@@ -191,15 +201,11 @@ export default class extends Controller {
       pendingSets: buildPendingSets(pendingOps.all),
       pendingOps: pendingOps.all,
       hideEmptyFolders: this.hideEmptyFolders,
+      rootScope: this.rootScope,
       selectionMode: this.selectionMode,
     };
 
-    if (this.hideEmptyToggleTarget) {
-      this.hideEmptyToggleTarget.classList.toggle(
-        "active",
-        this.hideEmptyFolders
-      );
-    }
+    this.updateFiltersUi();
 
     this.allPaths = treeEmpty ? [] : Array.from(mergedTree.paths);
 
@@ -220,8 +226,6 @@ export default class extends Controller {
 
     this.updateSelectionUI();
 
-    this.renderLiveUrl(provider.name, current);
-
     const prevQuery = this.currentQuery;
     this.currentQuery = "";
     this.searchTarget.value = "";
@@ -231,30 +235,6 @@ export default class extends Controller {
       this.searchTarget.value = prevQuery;
       this.searchTarget.parentElement?.classList.add("has-value");
       this.updateSearchResults(prevQuery);
-    }
-  }
-
-  private renderLiveUrl(providerType?: ProviderType, current?: string) {
-    const liveUrl = computeLiveUrl(providerType, current);
-    const footer =
-      this.innerTarget.parentElement?.querySelector(".sidebar-footer");
-    if (!footer) return;
-    const existing = footer.querySelector(
-      ".nav-live-link"
-    ) as HTMLElement | null;
-    if (liveUrl) {
-      if (existing) {
-        existing.setAttribute("href", liveUrl);
-      } else {
-        const link = document.createElement("a");
-        link.href = liveUrl;
-        link.rel = "noopener noreferrer";
-        link.className = "nav-live-link";
-        link.innerHTML = `${liveIcon}<span>View live version</span>`;
-        footer.appendChild(link);
-      }
-    } else if (existing) {
-      existing.remove();
     }
   }
 
@@ -272,14 +252,29 @@ export default class extends Controller {
     this.actions?.onChangeProvider();
   }
 
-  onToggleEmptyFolders() {
-    this.hideEmptyFolders = !this.hideEmptyFolders;
-    prefsStore.setHideEmptyFolders(this.hideEmptyFolders);
-    this.hideEmptyToggleTarget.classList.toggle(
+  // The empty-folders toggle moved into the navigation preferences window;
+  // this button now opens that window on the Navigation section. The summary
+  // chip reports the active filters so the button is not a mystery meat
+  // control when something is filtered out of the tree.
+  onOpenFilters() {
+    appEvents.emit(AppEvent.PrefsOpened, { section: PrefsSection.Navigation });
+  }
+
+  private updateFiltersUi(): void {
+    if (!this.targets.has("filtersBtn")) return
+    this.filtersBtnTarget.classList.toggle(
       "active",
-      this.hideEmptyFolders
+      this.hideEmptyFolders || this.rootScope !== ""
     );
-    appEvents.emit(AppEvent.SidebarReload);
+    const parts: string[] = [];
+    if (this.rootScope !== "") {
+      parts.push(this.rootScope.includes("/") ? this.rootScope.split("/").pop()! : this.rootScope);
+    }
+    if (this.hideEmptyFolders) parts.push("no empty");
+    this.filterSummaryTarget.textContent = parts.join(" · ");
+    this.filtersBtnTarget.title = parts.length
+      ? `Filters: ${parts.join(", ")}`
+      : "Navigation filters";
   }
 
   onSearchInput() {

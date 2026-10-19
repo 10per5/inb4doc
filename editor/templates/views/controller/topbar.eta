@@ -84,8 +84,10 @@
   <div class="toolbar-spacer"></div>
   <div class="toolbar-section toolbar-section-right">
     <div class="dirty-counter" role="button" tabindex="0" data-topbar-target="dirtyCounter" data-action="click->topbar#dirtyClicked"></div>
+    <% if (it.mobileDock) { %>
+    <div class="toolbar-relative toolbar-file-actions" data-menu-name="share-compress" data-menu-label="Save"></div>
+    <% } else { %>
     <button class="btn btn-accent flush-btn" data-topbar-target="flushBtn" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.FlushAll] %>" disabled><%~ it.icons.sort %></button>
-    <% if (!it.mobileDock) { %>
     <button class="btn btn-icon" data-action="click->topbar#<%= it.toolbarActions[it.ToolbarAction.OpenPrefs] %>" title="Preferences"><%~ it.icons.settings %></button>
     <% } %>
   </div>

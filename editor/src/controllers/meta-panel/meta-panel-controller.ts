@@ -77,7 +77,6 @@ export default class extends Controller {
     const mobile = isMobileDock()
     this.element.innerHTML = renderMetaPanel({
       icons: icons as Record<string, string>,
-      github: icons.github,
       renderScreen,
       backIcon: mobile ? "back" : "xmark",
       backLabel: mobile ? "Back to more" : "Close meta panel",
@@ -86,6 +85,10 @@ export default class extends Controller {
     const data = pagesStore.get(getCurrentPath())?.getFrontmatter()
     this.ui.update(data ?? { title: "" })
     this.renderOutline()
+  }
+
+  openAbout(): void {
+    appEvents.emit(AppEvent.AboutOpened)
   }
 
   close(): void {

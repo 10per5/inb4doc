@@ -1,0 +1,400 @@
+/* ── Preferences window (tabbed dialog + mobile section screens) ───── */
+
+.prefs-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 92vw);
+  max-height: min(72vh, 640px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.prefs-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.prefs-header .prefs-title {
+  margin: 0;
+  flex: 1;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+.prefs-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.prefs-x:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.prefs-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Vertical tab rail — desktop centered UX. */
+.prefs-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 190px;
+  flex: 0 0 190px;
+  padding: 1rem 0.75rem;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+.prefs-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-base);
+  text-align: left;
+  cursor: pointer;
+}
+.prefs-tab:hover {
+  background: var(--color-bg-tertiary);
+}
+.prefs-tab.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.prefs-tab-icon svg {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: middle;
+}
+
+.prefs-panes {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+.prefs-pane-head {
+  margin-bottom: 1rem;
+}
+.prefs-pane-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+.prefs-pane-desc {
+  margin: 0.15rem 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+
+.prefs-section + .prefs-section {
+  margin-top: 1.4rem;
+}
+.prefs-section-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  font-weight: 700;
+  margin-bottom: 0.55rem;
+}
+.prefs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.prefs-row input {
+  margin: 0.2rem 0 0;
+  flex: 0 0 auto;
+}
+.prefs-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.prefs-row-label {
+  font-weight: 500;
+}
+.prefs-row-hint {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+.prefs-row code {
+  background: var(--color-bg-secondary);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.prefs-note {
+  margin: 0 0 0.6rem;
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+
+.prefs-subsection {
+  margin-top: 0.9rem;
+  padding-left: 0.4rem;
+  border-left: 2px solid var(--color-border);
+}
+.prefs-subsection.is-disabled {
+  opacity: 0.55;
+}
+.prefs-subsection-title {
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.4rem;
+}
+.prefs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.prefs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-secondary);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+.prefs-chip.is-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.prefs-chip input {
+  margin: 0;
+}
+.prefs-chip:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.prefs-key-value {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  font-size: var(--font-size-base);
+}
+.prefs-key {
+  min-width: 120px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-small);
+}
+.prefs-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-text-primary);
+}
+.prefs-value svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.prefs-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+.prefs-inline-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+.prefs-inline-btn .btn-icon svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* Mobile: the section form fills the screen body, no tab rail involved. */
+.screen-body .prefs-pane-head {
+  padding: 0 1.5rem;
+}
+.screen-body .prefs-pane {
+  padding: 0 1.5rem 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .prefs-dialog {
+    width: 96vw;
+    max-height: 85vh;
+  }
+  .prefs-body {
+    flex-direction: column;
+  }
+  .prefs-tabs {
+    flex-direction: row;
+    width: auto;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .prefs-tab-label {
+    white-space: nowrap;
+  }
+}
+
+/* ── About window ──────────────────────────────────────────────────── */
+
+.about-dialog {
+  width: min(420px, 92vw);
+}
+.about-hero {
+  padding: 1.25rem;
+  text-align: center;
+}
+.about-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 10px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.about-logo svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+.about-tagline,
+.about-version {
+  margin: 0.75rem 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+.about-tagline code {
+  background: var(--color-bg-secondary);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+.about-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1.25rem 0.5rem;
+}
+.about-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  background: var(--color-bg-secondary);
+}
+.about-link-icon {
+  display: inline-flex;
+  color: var(--color-accent);
+}
+.about-link-icon svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+.about-link-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.about-link-title {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+}
+.about-link-sub {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+.about-link-arrow svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* Modern marker highlight: the link sits inside an underline that sweeps up
+ * behind the text on hover, plus a chevron tail that slides in after it. */
+.about-link {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
+}
+.about-link::before,
+.about-link::after {
+  will-change: transform;
+  content: "";
+  display: block;
+  position: absolute;
+  z-index: -1;
+}
+.about-link::before {
+  transition: 160ms ease-out 60ms;
+  transform-origin: 0 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--color-accent-soft);
+  opacity: 0.55;
+}
+.about-link::after {
+  transition: 60ms ease-out;
+  transform: scaleX(0);
+  transform-origin: left center;
+  right: 10px;
+  bottom: -1px;
+  border: 6px solid transparent;
+  border-right-color: var(--color-accent);
+}
+.about-link:hover::before {
+  transition: 160ms ease-out;
+  transform: scaleY(0.22);
+  opacity: 1;
+  background: var(--color-accent-soft);
+}
+.about-link:hover::after {
+  transition: 60ms ease-out 160ms;
+  transform: none;
+}
+.about-link:active::before {
+  transition: 120ms ease-in;
+  opacity: 1;
+}

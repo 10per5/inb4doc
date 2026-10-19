@@ -34,6 +34,7 @@ export type ViewType =
   | "more"
   | "meta"
   | "prefs"
+  | "about"
   | "images"
   | "changes";
 
@@ -242,11 +243,21 @@ export class ViewService {
     editorArea.appendChild(moreEl);
 
     // `prefs` — preferences as a fullview screen (desktop keeps the dialog).
+    // On a phone the tabbed desktop dialog becomes a menu that pushes one
+    // section per screen, so nothing extra is wired here.
     const prefsEl = document.createElement("div");
     prefsEl.dataset.controller = "prefs";
     prefsEl.className = "fullview-view";
     prefsEl.style.display = "none";
     editorArea.appendChild(prefsEl);
+
+    // `about` — project info links as a fullview screen (desktop keeps the
+    // dialog), reached from the meta panel and the more screen.
+    const aboutEl = document.createElement("div");
+    aboutEl.dataset.controller = "about";
+    aboutEl.className = "fullview-view";
+    aboutEl.style.display = "none";
+    editorArea.appendChild(aboutEl);
 
     // `images` — image manager as a fullview screen (desktop keeps the dialog).
     // Data loads on activation (like disk-usage), after the provider is ready.
@@ -294,6 +305,7 @@ export class ViewService {
       },
     });
     this.views.set("prefs", fullview(prefsEl));
+    this.views.set("about", fullview(aboutEl));
     this.views.set("images", {
       activate: () => {
         inb4docEl.style.display = "none";

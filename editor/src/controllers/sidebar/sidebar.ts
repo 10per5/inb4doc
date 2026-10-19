@@ -53,6 +53,8 @@ export interface RenderContext {
   pendingSets: PendingSets;
   pendingOps?: readonly PendingOp[];
   hideEmptyFolders?: boolean;
+  /** Restrict the top level to one root-level folder ("" shows every root). */
+  rootScope?: string;
   selectionMode?: boolean;
 }
 
@@ -208,13 +210,24 @@ function isFolderEmpty(tree: TreeIndex, dirPath: string): boolean {
   return dirs.every(dir => isFolderEmpty(tree, dir.path))
 }
 
+/**
+ * The children rendered for a level. At the root, an active project scope
+ * (rootScope) hides every other top-level folder — root-level pages stay, so
+ * the wiki's own home/index page never disappears.
+ */
+function getDisplayChildren(tree: TreeIndex, prefix: string, ctx: RenderContext): ChildInfo[] {
+  const children = tree.children.get(prefix) ?? []
+  if (prefix !== "" || !ctx.rootScope) return children
+  return children.filter((c) => !c.isDir || c.path === ctx.rootScope)
+}
+
 export function renderItems(
   tree: TreeIndex,
   prefix: string,
   depth: number,
   ctx: RenderContext,
 ): string {
-  const children = tree.children.get(prefix) ?? []
+  const children = getDisplayChildren(tree, prefix, ctx)
   const lineColor = LINE_COLORS[depth % LINE_COLORS.length]
 
   // Build display list: merge tree children with rawTree pending deletes.
@@ -510,5 +523,3 @@ export function computeLiveUrl(providerType?: ProviderType, current?: string): s
     ? `${baseUrl}${providerType === ProviderType.LocalStorage ? "" : page}`
     : "";
 }
-
-export { eye as liveIcon };

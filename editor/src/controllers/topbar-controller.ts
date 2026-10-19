@@ -31,6 +31,7 @@ export default class extends Controller {
 
   declare readonly dirtyCounterTarget: HTMLElement;
   declare readonly flushBtnTarget: HTMLButtonElement;
+  declare readonly hasFlushBtnTarget: boolean;
   declare readonly overflowWrapTarget: HTMLElement;
   declare readonly overflowBtnTarget: HTMLButtonElement;
   declare readonly overflowDropdownTarget: HTMLElement;
@@ -143,7 +144,10 @@ export default class extends Controller {
       const name = mount.dataset.menuName!;
       const mnemonic = hasFunc(AppFunc.ToolbarQuickNav) ? mount.dataset.menuMnemonic?.toLowerCase() : undefined;
       if (!menuRegistry.get(name)) continue;
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
+      // `data-menu-label` overrides the derived label — used by the mobile
+      // Share/Compress dropdown, which reads "Save" instead of "Share-compress".
+      const label =
+        mount.dataset.menuLabel ?? name.charAt(0).toUpperCase() + name.slice(1);
       const title = label;
       // Pass the resolver (not the resolved array) so dynamic items — e.g. the
       // Recent Projects list — are re-read on every menu open.
@@ -420,7 +424,7 @@ export default class extends Controller {
   }
 
   openPrefs() {
-    appEvents.emit(AppEvent.PrefsOpened);
+    appEvents.emit(AppEvent.PrefsOpened, {});
   }
 
   dirtyClicked() {
@@ -626,7 +630,7 @@ export default class extends Controller {
       // "…" overflow would let the dirty badge push the layout when it returns.
       el.style.display = "none";
       el.tabIndex = -1;
-      this.flushBtnTarget.disabled = true;
+      if (this.hasFlushBtnTarget) this.flushBtnTarget.disabled = true;
       return;
     }
 
@@ -662,7 +666,7 @@ export default class extends Controller {
       el.classList.toggle("clickable", true);
     }
 
-    this.flushBtnTarget.disabled = false;
+    if (this.hasFlushBtnTarget) this.flushBtnTarget.disabled = false;
   }
 
   // ── Procedural overflow ──────────────────────────────────────────────

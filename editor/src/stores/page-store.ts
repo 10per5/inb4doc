@@ -33,6 +33,11 @@ class PagesStore {
     })
   }
 
+  /** Number of pages currently cached in memory (also persisted to storage). */
+  get size(): number {
+    return this.cache.size
+  }
+
   get(path: string): Page | undefined {
     return this.cache.get(path)
   }

@@ -39,7 +39,11 @@ export default class MoreController extends Controller {
   }
 
   openPrefs(): void {
-    appEvents.emit(AppEvent.PrefsOpened)
+    appEvents.emit(AppEvent.PrefsOpened, {})
+  }
+
+  openAbout(): void {
+    appEvents.emit(AppEvent.AboutOpened)
   }
 
   openImageManager(): void {

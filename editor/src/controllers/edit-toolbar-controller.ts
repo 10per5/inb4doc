@@ -1,6 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { ToolbarCommand } from "@/config/enums"
+import { prefsStore } from "@/stores/preferences-store"
+import { pendingOpsStore } from "@/stores/pending-ops-store"
+import { PendingOps } from "@/entities/PendingOps"
 import { ActiveBlockType, type ActiveBlockContext } from "@/config/enums/block-context"
 import * as icons from "@/eta/icons"
 import renderEditToolbar from "@/eta/views/controller/edit-toolbar"
@@ -29,7 +32,7 @@ import type { EditorController } from "@/controllers/editor-controller"
  * hides so the two never overlap.
  */
 export default class EditToolbarController extends Controller {
-  static targets = ["btn", "listGroup", "tableGroup", "addGroup", "addBtn", "fabMenu"]
+  static targets = ["btn", "listGroup", "tableGroup", "addGroup", "addBtn", "fabMenu", "saveGroup", "saveBtn"]
   static outlets = ["editor"]
 
   declare readonly btnTargets: HTMLElement[]
@@ -38,6 +41,9 @@ export default class EditToolbarController extends Controller {
   declare readonly addGroupTarget: HTMLElement
   declare readonly addBtnTarget: HTMLElement
   declare readonly fabMenuTarget: HTMLElement
+  declare readonly saveGroupTarget: HTMLElement
+  declare readonly saveBtnTarget: HTMLButtonElement
+  declare readonly hasSaveBtnTarget: boolean
   declare readonly editorOutletElement: Element
   declare readonly hasEditorOutlet: boolean
 
@@ -51,9 +57,18 @@ export default class EditToolbarController extends Controller {
   private canRedo = false
   private addMenu: NavMenu | null = null
   private addMenuOpen = false
+  private keyboardOffset = 0
+  private saveDirty = 0
+  // Preference: anchor the bar at the caret while typing, or keep it pinned.
+  // Pinned is the "always docked" fallback for people who dislike the moving
+  // popover; the toggle lives in Preferences → Editor.
+  private followCaret = true
 
   connect(): void {
-    this.element.innerHTML = renderEditToolbar({ icons: icons as Record<string, string> })
+    this.element.innerHTML = renderEditToolbar({
+      icons: icons as Record<string, string>,
+      ToolbarCommand,
+    })
     this.addGroupTarget.hidden = false
     this.addMenu = new NavMenu({
       mountEl: this.fabMenuTarget,
@@ -77,6 +92,18 @@ export default class EditToolbarController extends Controller {
         this.updateVisibility()
         this.positionPopover()
       }),
+      appEvents.on(AppEvent.FollowCaretToolbarChanged, ({ follow }) => {
+        this.followCaret = follow
+        this.updateFollowMode(this.keyboardOffset)
+      }),
+      // The disk is the save/flush affordance: it writes every pending change
+      // (the open document included), exactly like the desktop topbar's flush
+      // button — so nothing a mobile author typed can get stranded now that
+      // the topbar slot hosts the Share/Compress dropdown instead.
+      appEvents.on(AppEvent.DirtyChanged, ({ count }) => {
+        this.saveDirty = count
+        this.updateSaveState()
+      }),
       appEvents.on(AppEvent.HistoryChanged, ({ canUndo, canRedo }) => {
         this.canUndo = canUndo
         this.canRedo = canRedo
@@ -93,17 +120,14 @@ export default class EditToolbarController extends Controller {
         if (this.followMode) this.positionPopover()
       }),
     )
-    // On-screen keyboard open → follow mode (the caret sits just above the
-    // keys, so the strip would be hidden behind them). Visual-viewport
-    // pan/scroll re-anchors the popover to the caret's block. Gated to touch
-    // devices: phone/tablet by viewport, plus tablet by UA (a tablet in
-    // landscape can still exceed the tablet breakpoint but pops the OSK).
+    this.followCaret = prefsStore.followCaretToolbar
+    // Seed the Save button from the persisted ops: DirtyChanged fires on
+    // recompute, but a reload with pending changes already on disk must show
+    // them immediately (the button starts disabled in the markup).
+    this.saveDirty = new PendingOps(pendingOpsStore.load()).count
+    this.updateSaveState()
     this.stopKeyboardTrack = trackKeyboardOffset((offset) => {
-      this.followMode =
-        offset > 0 && (isMobileViewport() || isTabletViewport() || isMobileOrTabletUA())
-      this.element.classList.toggle("is-follow-mode", this.followMode)
-      this.updateVisibility()
-      this.positionPopover()
+      this.updateFollowMode(offset)
     })
     // The follow-mode popover anchors to the focused block; document scroll
     // can carry the block out of the viewport. Capture-phase: scroll events
@@ -121,6 +145,45 @@ export default class EditToolbarController extends Controller {
     this.unsubs = []
     this.addMenu?.destroy()
     this.addMenu = null
+  }
+
+  // On-screen keyboard open → follow mode (the caret sits just above the
+  // keys, so a pinned strip would be hidden behind them). Gated to touch
+  // devices: phone/tablet by viewport, plus tablet by UA (a tablet in
+  // landscape can still exceed the tablet breakpoint but pops the OSK).
+  // With the preference off the strip stays pinned to the bottom even while
+  // the OSK is up.
+  private updateFollowMode(offset: number): void {
+    this.keyboardOffset = offset
+    const eligible =
+      isMobileViewport() || isTabletViewport() || isMobileOrTabletUA()
+    const follow = offset > 0 && eligible && this.followCaret
+    if (follow === this.followMode) {
+      this.positionPopover()
+      return
+    }
+    this.followMode = follow
+    this.element.classList.toggle("is-follow-mode", follow)
+    this.updateVisibility()
+    this.positionPopover()
+  }
+
+  // Save button state: disabled while nothing is pending (same contract as the
+  // desktop topbar's flush button); the label names the scope so flushing N
+  // files never comes as a surprise.
+  private updateSaveState(): void {
+    if (!this.hasSaveBtnTarget) return
+    const { saveBtnTarget: btn, saveDirty } = this
+    btn.disabled = saveDirty === 0
+    btn.classList.toggle("is-disabled", saveDirty === 0)
+    if (saveDirty === 0) {
+      btn.removeAttribute("aria-disabled")
+    } else {
+      btn.setAttribute("aria-disabled", "false")
+    }
+    const label = saveDirty > 1 ? `Save all (${saveDirty})` : "Save"
+    btn.title = label
+    btn.setAttribute("aria-label", label)
   }
 
   exec(event: Event): void {
@@ -154,6 +217,12 @@ export default class EditToolbarController extends Controller {
   private positionPopover(): void {
     const panel = this.element.querySelector<HTMLElement>(".edit-toolbar")
     if (!panel) return
+    // While the add-block menu is open it must stay where it was clicked.
+    // Pressing "+" focuses the menu, the OSK closes on its own, and that
+    // re-enters here with followMode already false — repositioning then would
+    // drag the open menu off the button it spawned from. Freeze until it
+    // closes; setAddMenuOpen() re-runs the layout afterwards.
+    if (this.addMenuOpen) return
     if (!this.followMode) {
       // Back to the docked strip — clear any follow-mode anchor offsets.
       ;(this.element as HTMLElement).style.left = ""
@@ -182,6 +251,7 @@ export default class EditToolbarController extends Controller {
     })
     // While the add-block menu is open the strip is hidden, so its "+"
     // button has no rect — re-anchor the menu at the caret's block instead.
+    // (Only reached before the menu opened; see the freeze above.)
     this.reanchorAddMenu(block, true)
   }
 
@@ -283,6 +353,9 @@ export default class EditToolbarController extends Controller {
     this.addMenuOpen = open
     this.element.classList.toggle("edit-toolbar-fab-menu-open", open)
     this.updateVisibility()
+    // The menu obeys the anchor it was opened with; once it is gone the bar
+    // can take up normal (strip or follow-mode) placement again.
+    if (!open) this.positionPopover()
   }
 
   // Anchor the add-block menu at the "+" button's rect, so it spawns above the

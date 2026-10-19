@@ -25,10 +25,11 @@
       <button class="meta-extra-add" data-action="click->meta-panel#addField">+ Add Field</button>
     </div>
     <div class="meta-panel-footer">
-      <a href="https://github.com/10per5/inb4doc" target="_blank" rel="noopener noreferrer" class="github-link">
-        ${it.github}
-        <span>View on GitHub</span>
-      </a>
+      <button type="button" class="about-btn" data-action="click->meta-panel#openAbout">
+        ${it.icons.infoCircle}
+        <span>About inb4doc</span>
+        ${it.icons.navArrowRight}
+      </button>
     </div>
   </div>`
 }) %>

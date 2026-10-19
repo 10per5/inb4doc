@@ -438,3 +438,59 @@ Pending images (unflushed) are tracked in `ImageRegistry` with `pendingByDir`. T
 - **Discard All** must call `imageRegistry.removeAllForDir(dir)` (added in `CacheManagementService.onDiscardAll`)
 - **Single delete** via Image Manager must call `imageRegistry.removePending(id)` (handled in `deleteImage()` for names starting with `pi-`)
 - **Flush** calls `commitPending(dir)` which uploads the file, builds the URL map, then removes from registry
+
+## Preferences window (tabs / mobile screens)
+
+`src/config/enums/prefs-section.ts` owns the four sections (`General`,
+`Editor`, `Navigation`, `Storage`). They render from one place —
+`src/components/ui/prefs-panes.ts::buildPrefsPanes()` — so the desktop tabbed
+dialog and the mobile per-section screens can never drift apart.
+
+- Desktop: `AppEvent.PrefsOpened` → `openPrefsDialog(section)` renders all four
+  panes in one centered dialog; `PrefsController.switchTab` toggles `[hidden]`
+  and `is-active` — no re-render (that would drop focus).
+- Mobile: the `prefs` fullview first renders a menu of sections; picking one
+  pushes that section's screen (`PrefsController.openSectionValue`). Leaving the
+  view resets it to the menu (see `watchViewChanges()`).
+- Every field change funnels through `src/components/ui/prefs.ts` (shared by
+  both surfaces) and emits an AppEvent so consumers update live.
+- The sidebar's "Filters" button opens the same window on `PrefsSection.Navigation`
+  (`AppEvent.PrefsOpened` carries `{ section }`), so there is exactly one
+  navigation-preferences UI.
+
+## Mobile dock — three tabs, no FAB menu
+
+`#dock` renders three plain tabs: Files / Editor / More
+(`DockController`). The middle tab used to double as an "add block" FAB; that
+duplicated the edit-toolbar's "+", so insert-block now lives only in the
+edit-toolbar's "+" menu. Do not reintroduce a dock insert menu.
+
+## Edit toolbar ordering and placement
+
+The strip order is fixed: history → contextual list/table groups → "+" → **Save
+(last, disk icon)**. The disk is the *save/flush* button: it emits
+`ToolbarCommand.Save`, which the mutation service maps to `AppEvent.FlushAll`
+(the same target as the desktop topbar's flush button), so it writes every
+pending change including the open document. It is disabled while nothing is
+pending (state comes from `DirtyChanged`, seeded from `pendingOpsStore` at
+connect). Placement is a preference (`followCaretToolbar`, Editor section):
+when off the strip stays pinned to the bottom even while the OSK is up; when on
+it becomes the block-anchored popover (`is-follow-mode`).
+
+Save/flush placement per surface: **desktop keeps it in the topbar** (the old
+arrow button, unchanged); **mobile puts it in the edit toolbar**, because the
+mobile topbar slot now hosts the Share/Compress dropdown instead.
+
+**While the add-block menu is open the bar must not reposition.** Pressing "+"
+closes the OSK, which re-enters `positionPopover()` with `followMode` already
+false — `positionPopover()` therefore returns early while `addMenuOpen` and
+`setAddMenuOpen(false)` re-runs the layout after close.
+
+## Writing assistance
+
+There is no bundled dictionary: typo highlighting is the browser's. The editor
+owns it via `src/plugins/spellcheck.ts` — `spellcheck` + `lang` on
+`view.dom`, opt-in languages in `prefsStore.spellcheckLanguages`, and styling
+through `::spelling-error` / `::grammar-error`
+(`src/styles/editor/spellcheck.css`). Adding features here means adding CSS +
+DOM attributes, never a new dictionary.

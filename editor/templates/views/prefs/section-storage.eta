@@ -1,0 +1,42 @@
+<div class="prefs-pane">
+  <div class="prefs-section">
+    <div class="prefs-section-title">Documents</div>
+    <div class="prefs-key-value">
+      <span class="prefs-key">Backend</span>
+      <span class="prefs-value"><%~ it.providerIcon %><%= it.providerLabel %></span>
+    </div>
+    <% if (it.rootLabel) { %>
+    <div class="prefs-key-value">
+      <span class="prefs-key">Content root</span>
+      <span class="prefs-value"><%= it.rootLabel %></span>
+    </div>
+    <% } %>
+    <div class="prefs-key-value">
+      <span class="prefs-key">Cached pages</span>
+      <span class="prefs-value"><%= it.cachedPages %></span>
+    </div>
+    <button type="button" class="btn prefs-inline-btn" data-action="click-><%= it.controller %>#changeProvider">
+      <span class="btn-icon"><%~ it.icons.database %></span>
+      <span>Change…</span>
+    </button>
+  </div>
+  <div class="prefs-section">
+    <div class="prefs-section-title">Images</div>
+    <div class="radio-group">
+      <label class="prefs-row">
+        <input type="radio" name="image-mode" value="file" <%= it.prefs.imageStorageMode === "file" ? "checked" : "" %> data-action="change-><%= it.controller %>#imageModeChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">Save to <code>image/</code> folder</span>
+          <span class="prefs-row-hint">Recommended — keeps the document small.</span>
+        </span>
+      </label>
+      <label class="prefs-row">
+        <input type="radio" name="image-mode" value="base64" <%= it.prefs.imageStorageMode === "base64" ? "checked" : "" %> data-action="change-><%= it.controller %>#imageModeChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">Embed as base64 in document</span>
+          <span class="prefs-row-hint">Self-contained page, larger file.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+</div>

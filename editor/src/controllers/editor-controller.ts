@@ -39,6 +39,7 @@ import {
   type TextMatch,
 } from "@/features/search/scroll-to-text";
 import type { MentionView } from "@/features/mention";
+import { initSpellcheck, applySpellcheck } from "@/plugins/spellcheck";
 
 export interface OutlineItem {
   level: number;
@@ -162,6 +163,7 @@ export class EditorController extends Controller {
       this.serializeDoc(this.editor.view)
     );
     appEvents.emit(AppEvent.OutlineChanged);
+    applySpellcheck(this.editor.view);
     this.scrollEditorToTop();
   }
 
@@ -468,6 +470,7 @@ export class EditorController extends Controller {
     this.unsubs.push(
       initEditorMutationService(() => this.editor),
       initLinkHandler(() => this.editor?.action(({ view }) => view) ?? null),
+      initSpellcheck(() => this.editor?.action(({ view }) => view) ?? null),
       appEvents.on(
         AppEvent.ScrollToText,
         ({ query, matchIndex, snippetText }) => {

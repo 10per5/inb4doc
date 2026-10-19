@@ -13,6 +13,7 @@ import "./editor/editor-components.css"
 import "./editor/table-handle.css"
 import "./editor/block-handle.css"
 import "./editor/source-editor.css"
+import "./editor/spellcheck.css"
 import "./content/dnd.css"
 
 /* ── Panels ─────────────────────────────────────────────────────── */
@@ -25,6 +26,7 @@ import "./app/toolbar.css"
 import "./app/dialogs.css"
 import "./ui/screen.css"
 import "./ui/diff.css"
+import "./ui/prefs.css"
 import "./app/toast.css"
 import "./app/notification.css"
 

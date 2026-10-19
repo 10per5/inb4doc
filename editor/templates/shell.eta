@@ -52,7 +52,7 @@
         <% } %>
       </div>
 <% if (it.mobileDock) { %>
-      <div id="dock" data-controller="dock" data-dock-editor-outlet="#editor-area">
+      <div id="dock" data-controller="dock">
         <div id="edit-toolbar" data-controller="edit-toolbar" data-edit-toolbar-editor-outlet="#editor-area"></div>
         <div data-dock-target="nav"></div>
       </div>

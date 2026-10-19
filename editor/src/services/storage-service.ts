@@ -11,6 +11,14 @@ export interface WikiPrefs {
   imageStorageMode: ImageStorageMode
   darkMode: boolean
   hideEmptyFolders: boolean
+  /** Restrict the navtree to one root-level folder ("project"). "" = show all. */
+  rootScope: string
+  /** Browser spell-check highlight inside the editor content. */
+  spellcheck: boolean
+  /** Opt-in dictionaries (BCP-47 tags) handed to the browser; first is primary. */
+  spellcheckLanguages: string[]
+  /** Mobile edit toolbar: follow the caret instead of staying pinned bottom. */
+  followCaretToolbar: boolean
 }
 
 export interface ConnectionConfig {

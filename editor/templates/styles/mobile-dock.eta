@@ -300,48 +300,6 @@ body.layout-mobile-shrink .book-layout {
   position: relative;
 }
 
-/* Anchor for the FAB popup menu. Default: a 0-height strip above the dock; the
- * shared .toolbar-menu panel is mounted here and pinned above the dock via the
- * shared up/right flip classes. When the keyboard is open the dock controller
- * adds .is-block-anchored and sets left/top to the selection block's coords,
- * turning the anchor into a 0×0 fixed point so the menu opens at the block. */
-.dock-fab-menu-anchor {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 56px;
-  height: 0;
-  z-index: 300;
-}
-
-.dock-fab-menu-anchor.is-block-anchored {
-  position: fixed;
-  right: auto;
-  bottom: auto;
-  width: 0;
-}
-
-/* The FAB popup in dock mode (keyboard closed): opens upward from the dock and
- * right-aligns toward the FAB button. The panel carries .dock-fab-menu from the
- * Menu's panelClass; while block-anchored (.is-block-anchored) this rule stops
- * applying so the shared toolbar-menu--up / --right flip classes position it at
- * the selection instead. */
-.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu {
-  top: auto;
-  bottom: calc(100% + 12px);
-  left: auto;
-  right: 12px;
-}
-
-/* The FAB popup's grouped expanders open leftward — with the panel
- * right-aligned they stay fully on screen on narrow phones. Dock mode always;
- * block mode only when the shared flip right-aligned the panel. */
-.dock-fab-menu-anchor:not(.is-block-anchored) .dock-fab-menu .menu-item-submenu .menu-submenu,
-.dock-fab-menu-anchor.is-block-anchored .dock-fab-menu.toolbar-menu--right .menu-item-submenu .menu-submenu {
-  left: auto;
-  right: 100%;
-}
-
 .dock-item {
   flex: 1;
   display: flex;
@@ -420,9 +378,9 @@ body.layout-mobile-shrink .book-layout {
   background-color: var(--color-btn-bg);
 }
 
-/* FAB states (data-dock-state on the FAB): editor view → "+" insert trigger;
-   other views → pencil + "Editor" label (return-to-editor tab). The [hidden]
-   attribute toggles which icon/label shows. */
+/* Editor tab states. The middle button is the editor toggle: it always shows
+   the pencil + "Editor" label, so the only "+" on screen is the edit-toolbar's
+   add-block button. */
 .dock-item--fab .dock-icon--pencil {
   height: 20px;
 }
@@ -675,6 +633,23 @@ body.layout-mobile-shrink .book-layout {
 }
 
 .edit-toolbar-btn--add:active {
+  color: var(--color-btn-active-text);
+  background: var(--color-accent);
+}
+
+/* Save sits last in the strip (after "+") so the two primary actions are the
+ * rightmost targets, closest to the thumb. A disk, not an arrow: it writes the
+ * open document to the provider instead of flushing every dirty file. */
+.edit-toolbar-group--save {
+  margin-left: 0.125rem;
+  flex-shrink: 0;
+}
+
+.edit-toolbar-btn--save {
+  color: var(--color-accent);
+}
+
+.edit-toolbar-btn--save:active {
   color: var(--color-btn-active-text);
   background: var(--color-accent);
 }
