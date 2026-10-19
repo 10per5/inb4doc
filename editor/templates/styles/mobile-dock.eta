@@ -19,6 +19,28 @@
 .desktop-layout.block-handle-narrow #dock {
   display: block;
 }
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-leftpanel,
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-rightpanel,
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-leftpanel
+  .sidebar-wrapper {
+  /* The columns set an explicit `height: var(--vp)` in the critical layout,
+   * so the parent's padding-bottom cannot shorten them — subtract the strip
+   * instead or the navigator's "+ New" stays under it. */
+  height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px));
+}
+
 
 .desktop-layout.block-handle-narrow #dock .dock {
   display: none;
@@ -34,12 +56,31 @@
   left: var(--sidebar-width);
 }
 
+/* Bottom-strip clearance. #edit-toolbar lives in #dock, a SIBLING of
+ * .book-layout (see shell.eta), so the old `.book-layout:has(#edit-toolbar…)`
+ * rule could never match — nothing reserved space and the fixed strip sat on
+ * top of the status bar and the navigator's "+ New". Drive it from #app, the
+ * shared ancestor, and give the sticky status bar the same offset so it also
+ * clears the strip when the column overflows and actually sticks. */
 .desktop-layout.block-handle-narrow
-  .book-layout:has(#edit-toolbar:not([hidden])):not(
+  #app:has(#edit-toolbar:not([hidden])):not(
     :has(#edit-toolbar.is-follow-mode)
   ) {
-  padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+  --edit-toolbar-clearance: calc(47px + env(safe-area-inset-bottom, 0));
 }
+
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
+  .book-layout {
+  padding-bottom: var(--edit-toolbar-clearance, 0px);
+}
+
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(
+    :has(#edit-toolbar.is-follow-mode)
+  )
 
   /* Tablet (768–1199px): show the quick bar only — the dock nav row
    * (Files/FAB/More) stays hidden and the strip becomes a plain fixed bottom
@@ -68,15 +109,47 @@
       left: var(--sidebar-width);
     }
 
-  /* Tighten the base 104px clearance (56px hidden nav row + 47px strip) to
-   * just the strip, since the nav row is gone. The :has chain out-specifies
-   * the plain .book-layout rule, so it must carry the same :has selectors. */
+  /* Same clearance as the .block-handle-narrow case above (and for the same
+   * reason: #edit-toolbar is not a descendant of .book-layout). */
   .desktop-layout
-    .book-layout:has(#edit-toolbar:not([hidden])):not(
+    #app:has(#edit-toolbar:not([hidden])):not(
       :has(#edit-toolbar.is-follow-mode)
     ) {
-    padding-bottom: calc(47px + env(safe-area-inset-bottom, 0));
+    --edit-toolbar-clearance: calc(47px + env(safe-area-inset-bottom, 0));
   }
+
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-layout {
+    padding-bottom: var(--edit-toolbar-clearance, 0px);
+  }
+
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-leftpanel,
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-rightpanel,
+  .desktop-layout
+    #app:has(#edit-toolbar:not([hidden])):not(
+      :has(#edit-toolbar.is-follow-mode)
+    )
+    .book-leftpanel
+    .sidebar-wrapper {
+    height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px));
+  }
+
 }
 
 .mobile-layout .book-leftpanel,

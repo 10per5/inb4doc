@@ -481,6 +481,36 @@ one. The middle tab used to be a raised circular `.dock-item--fab` that doubled
 as an "add block" trigger; that duplicated the edit-toolbar's "+", so both the
 FAB chrome and its insert menu are gone. Do not reintroduce either.
 
+## Bottom-strip clearance (desktop)
+
+`#edit-toolbar` lives inside `#dock`, which is a **sibling** of `.book-layout`
+(see `shell.eta`) — so any clearance rule written as
+`.book-layout:has(#edit-toolbar…)` silently never matches and nothing reserves
+space (the fixed strip then covers `.editor-statusbar` and the navigator's
+"+ New"). Always drive it from `#app`, the shared ancestor:
+
+```css
+.desktop-layout.block-handle-narrow
+  #app:has(#edit-toolbar:not([hidden])):not(:has(#edit-toolbar.is-follow-mode))
+  .book-layout { padding-bottom: var(--edit-toolbar-clearance, 0px) }
+```
+
+Two more things follow from that shape:
+
+- The columns (`.book-leftpanel`, `.book-rightpanel`, `.book-leftpanel
+  .sidebar-wrapper`) carry an explicit `height: var(--vp)` in the critical
+  layout, so the flex parent's padding cannot shorten them — they need
+  `height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px))` too.
+- Do **not** re-offset the sticky status bar (`bottom: <clearance>`): it stacks
+  with the parent padding and leaves a dead gap. The padding alone puts it
+  flush above the strip.
+- Always give the custom property a fallback (`0px`): the var is only defined
+  in the contexts where the strip is actually displayed, and an unresolved
+  `calc()` would drop the column height to `auto`.
+
+Follow mode (`.is-follow-mode`) is excluded on purpose: there the strip is a
+popover anchored at the caret, not a bottom bar.
+
 ## Sidebar chrome
 
 The sidebar carries no provider/storage chrome — no provider bar, no backend
