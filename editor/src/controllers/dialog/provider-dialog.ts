@@ -1,7 +1,7 @@
 import { getAvailableProviders } from "@/stores/provider-store";
 import { connectionStore } from "@/stores/connection-store";
 import { ProviderType } from "@/providers/index";
-import { openDialog } from "@/services/dialog-service";
+import { openWindow } from "@/services/window-service";
 import { ProviderDialogEvent } from "./provider-dialog-controller";
 import {
   cloud,
@@ -19,7 +19,14 @@ export interface ProviderDialogResult {
   configChanged: boolean;
 }
 
-export async function openProviderDialog(
+/**
+ * Storage-backend picker — a window in the shared mini-window chrome, not a
+ * dialog. Opened from Preferences → Storage it is pushed on top of the
+ * preferences window, so Cancel/Accept hands control back to it (see the stack
+ * in window-service); opened from the sidebar it is the only window on the
+ * stack and simply closes.
+ */
+export async function openProviderWindow(
   currentProvider: ProviderType
 ): Promise<ProviderDialogResult | null> {
   const providers = await getAvailableProviders();
@@ -38,7 +45,7 @@ export async function openProviderDialog(
   };
   const origConn = connectionStore.getConfig();
 
-  const handle = openDialog<ProviderDialogResult>(
+  const handle = openWindow<ProviderDialogResult>(
     "provider-dialog",
     {
       currentProvider,
@@ -48,6 +55,8 @@ export async function openProviderDialog(
       icons: { infoCircle, warningCircle },
     },
     {
+      title: "Change storage backend",
+      mode: "confirm",
       listeners: {
         [ProviderDialogEvent.Probe]: ((
           e: CustomEvent<{ host: string; port: number }>
@@ -56,10 +65,10 @@ export async function openProviderDialog(
           connectionStore.setConfig(host, port);
           connectionStore.probe().then(() => {
             const wrapper =
-              handle.overlay.querySelector(
+              handle.layer?.querySelector(
                 '[data-controller="provider-dialog"]'
-              ) ?? handle.overlay;
-            wrapper.dispatchEvent(
+              ) ?? handle.layer;
+            wrapper?.dispatchEvent(
               new CustomEvent(ProviderDialogEvent.ProbeResult, {
                 detail: { remoteAvailable: connectionStore.remoteAvailable },
                 bubbles: true,

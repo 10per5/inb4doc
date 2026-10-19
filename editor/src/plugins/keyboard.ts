@@ -858,6 +858,14 @@ const globalKeyBindings: ReadonlyArray<{
     handler: () => appEvents.emit(AppEvent.SidebarCancel),
   },
   {
+    // The window manager owns the dismissal surfaces (preferences + every
+    // window opened from them), so Escape is forwarded once here instead of
+    // each surface binding its own document listener. It decides whether the
+    // key applies — a modal dialog always wins.
+    matches: (e) => e.key === "Escape",
+    handler: () => appEvents.emit(AppEvent.Escape),
+  },
+  {
     matches: (e) =>
       (e.key === "e" || e.key === "E") &&
       (e.ctrlKey || e.metaKey) &&

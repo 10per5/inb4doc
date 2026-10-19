@@ -34,6 +34,7 @@ import { hasFunc, AppFunc } from "$/build/build-mode";
 import { getInitialState, getContentRoot } from "@/bridge/native";
 import { registerBackHandler } from "@/bridge/interface";
 import { closeTopDialog } from "@/services/dialog-service";
+import { closeTopWindow } from "@/services/window-service";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { changesScreenStore } from "@/stores/changes-screen-store";
@@ -155,16 +156,16 @@ export default class extends Controller {
           }
           return
         }
-        const { openPrefsDialog } = await import("@/controllers/prefs-controller")
-        openPrefsDialog(section)
+        const { openPrefsWindow } = await import("@/controllers/prefs-controller")
+        openPrefsWindow(section)
       }),
       appEvents.on(AppEvent.AboutOpened, async () => {
         if (isMobileDock()) {
           this.view.switchTo("about")
           return
         }
-        const { openAboutDialog } = await import("@/controllers/about-controller")
-        openAboutDialog()
+        const { openAboutWindow } = await import("@/controllers/about-controller")
+        openAboutWindow()
       }),
       appEvents.on(AppEvent.StickyPreferenceChanged, ({ sticky }) => {
         this.toolbarStore!.setStickyPreference(sticky)
@@ -174,8 +175,8 @@ export default class extends Controller {
           this.view.switchTo("images")
           return
         }
-        const { openImageManagerDialog } = await import("@/controllers/image-manager-controller")
-        openImageManagerDialog()
+        const { openImageManagerWindow } = await import("@/controllers/image-manager-controller")
+        openImageManagerWindow()
       }),
       appEvents.on(AppEvent.DirtyClicked, async () => {
         if (isMobileDock()) {
@@ -392,7 +393,10 @@ export default class extends Controller {
    * app from a subscreen.
    */
   private handleBackPressed(): boolean {
+    // A modal dialog is above every window in the stack, so it unwinds first;
+    // then the topmost window (and only that one — a parent stays open below).
     if (closeTopDialog()) return true
+    if (closeTopWindow()) return true
     const request = { handled: false }
     appEvents.emit(AppEvent.BackRequested, request)
     if (request.handled) return true

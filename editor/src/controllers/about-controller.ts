@@ -6,16 +6,16 @@ import { getProvider } from "@/stores/provider-store"
 import { getCurrentPath } from "@/utils/url"
 import { buildAboutLinks } from "@/components/ui/prefs-panes"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { openDialog } from "@/services/dialog-service"
+import { openWindow } from "@/services/window-service"
 import { renderScreen } from "@/eta/views/screen"
-import renderAboutDialog from "@/eta/views/dialog/about-dialog"
+import renderAboutWindow from "@/eta/views/window/about-window"
 import renderAboutScreen from "@/eta/views/controller/about-screen"
 
 /**
- * About inb4doc — a mini window (desktop dialog / mobile fullview screen) with
+ * About inb4doc — a mini window (desktop window / mobile fullview screen) with
  * links to the published documentation and the repository. Same one-controller
  * shape as PrefsController: the presence of a payload decides whether it
- * renders the dialog or the screen.
+ * renders the window body or the screen.
  */
 const DEFAULT_DOCS_URL = "https://10per5.github.io/inb4doc/"
 
@@ -28,7 +28,7 @@ export default class AboutController extends BaseDialogController {
 
   connect(): void {
     if (this.hasPayloadValue) {
-      this.element.innerHTML = renderAboutDialog({
+      this.element.innerHTML = renderAboutWindow({
         icons: icons as Record<string, string>,
         links: buildAboutLinks(this.liveUrl()),
         version: appVersion,
@@ -62,7 +62,7 @@ export default class AboutController extends BaseDialogController {
   }
 }
 
-/** Dialog facade — used by shell_controller's desktop path. */
-export function openAboutDialog(): void {
-  openDialog("about", {})
+/** Window facade — used by shell_controller's desktop path. */
+export function openAboutWindow(): void {
+  openWindow("about", {}, { title: "About inb4doc", boxClass: "about-dialog" })
 }

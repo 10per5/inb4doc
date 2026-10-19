@@ -32,6 +32,8 @@ export enum AppEvent {
   SidebarCancel = "sidebar-cancel",
   BackRequested = "back-requested",
   SidebarScrollToCurrent = "sidebar-scroll-to-current",
+  Escape = "escape",
+  WindowResumed = "window-resumed",
 
   // Dirty / sync
   EditorChanged = "editor-changed",
@@ -122,6 +124,8 @@ export interface AppEventPayloads {
   [AppEvent.SidebarWeightsRequested]: { weights: { path: string; weight: number }[] }
   [AppEvent.SidebarCancel]:         void
   [AppEvent.BackRequested]:         { handled: boolean }
+  [AppEvent.Escape]:                void
+  [AppEvent.WindowResumed]:         { id: string }
   [AppEvent.SidebarScrollToCurrent]: void
 
   [AppEvent.EditorChanged]:         { path: string; md: string; baseCanonical?: string }

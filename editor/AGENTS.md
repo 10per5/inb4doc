@@ -232,6 +232,19 @@ by the parser) so `5.`/`6.` survive a round-trip.
   - Serializes back to `> [!TYPE] ...` syntax
   - Supported types: note, tip, important, warning, caution, info, success, danger
 
+### Input rules must be anchored at both ends
+
+The blockquote rule lives in `src/config/blockquote-input-rule.ts` because
+ProseKit's stock one ships `/^>\s/`, which misfires badly:
+`prosemirror-inputrules` matches against the **last 500 characters before the
+caret**, so `^` is the start of that sliding window (not of the textblock), and
+the missing `$` lets anything follow the `> `. Net effect: a `>` typed
+mid-paragraph ("Preferences > Storage") turned the paragraph into a blockquote
+~500 characters later, exactly when the window slid onto it, deleting the `>`.
+Any new input rule needs **both** anchors (`^…$`), and only the characters that
+must be directly behind the caret — see
+`tests/input-rules/blockquote.test.ts`.
+
 ### Block / syntax feature requests — verify standard markdown first
 
 When a requested change involves **block or syntax behavior** (e.g. lists inside
@@ -457,9 +470,12 @@ Pending images (unflushed) are tracked in `ImageRegistry` with `pendingByDir`. T
 `src/components/ui/prefs-panes.ts::buildPrefsPanes()` — so the desktop tabbed
 dialog and the mobile per-section screens can never drift apart.
 
-- Desktop: `AppEvent.PrefsOpened` → `openPrefsDialog(section)` renders all four
-  panes in one centered dialog; `PrefsController.switchTab` toggles `[hidden]`
-  and `is-active` — no re-render (that would drop focus).
+- Desktop: `AppEvent.PrefsOpened` → `openPrefsWindow(section)` renders all four
+  panes in one centered **window** (see "Mini windows" below);
+  `PrefsController.switchTab` toggles `[hidden]` and `is-active` — no re-render
+  (that would drop focus). The window re-renders only when a window stacked on
+  top of it closes (`AppEvent.WindowResumed`), so the Storage pane's backend
+  label stays honest after a storage-backend change.
 - A menu may own its own trigger via `[data-menu-mount]` + `[data-menu-trigger]`
   (see `TopbarController.createOwnTriggerMenus`). The trigger must be a SIBLING
   of the mount, never a child: `Menu.build()` replaces the mount's `innerHTML`
@@ -481,6 +497,54 @@ dialog and the mobile per-section screens can never drift apart.
 - The sidebar's "Filters" button opens the same window on `PrefsSection.Navigation`
   (`AppEvent.PrefsOpened` carries `{ section }`), so there is exactly one
   navigation-preferences UI.
+
+## Mini windows (window-service)
+
+Every floating secondary surface that is **not** a modal dialog — Preferences,
+About, the storage-backend picker, the image manager — is a *window* owned by
+`src/services/window-service.ts`. They must all be opened through
+`openWindow(id, payload, { title, … })`; do not add a bespoke overlay or call
+`openDialog()` for them (dialog-service stays for true modals: confirm, prompt,
+create, link, …).
+
+- **One chrome for all of them.** The manager renders
+  `templates/views/window/window-frame.eta` (`.window-box`: header + X, body,
+  action row) and mounts `<div data-controller="<id>" data-<id>-payload-value>` in
+  `.window-body`. Body templates therefore render **only** their content
+  (`templates/views/window/*.eta`) — never their own box/header/footer — and width
+  tweaks live in `src/styles/ui/window.css` as `.window-box.<boxClass>` rules.
+- **The stack is what makes navigation work.** Windows form a stack in one
+  `#inb4doc-window-overlay`; only the top layer is visible, the parents keep
+  their DOM and Stimulus controllers. So a window opened *from* another window
+  returns to it on Cancel/Accept/Escape/backdrop — Preferences → Storage →
+  Change… → Cancel lands back in Preferences, on the section the user was
+  reading. A window opened on its own has no parent and simply closes: callers
+  need no special case.
+- **Promise semantics mirror dialog-service.** `handle.promise` resolves with
+  `dialog:confirm`'s detail (or whatever a `listeners` option closes with) and
+  `null` on cancel/dismiss. `handle.layer` is the mounted frame; `handle.close()`
+  dismisses it programmatically.
+- **The frame's buttons are the manager's, not the body's.** They live outside
+  the body controller's Stimulus scope, so a `data-action="click-><id>#close"`
+  on them silently does nothing: they carry `data-window-action="close|cancel|
+  accept"` and `window-service` owns the click. `close`/`cancel` dismiss with
+  `null`; `accept` is forwarded to the body as
+  `WindowEvent.AcceptRequest` on the body element, which the manager binds via
+  `data-action="window:accept-request-><id>#accept"` — so each window keeps
+  deciding what accepting means (and only `"confirm"` windows need an
+  `accept()`). Anything a *body* template renders stays a normal `data-action`.
+- **Actions**: `mode: "close"` renders a single Close button (Preferences,
+  About, images), `mode: "confirm"` renders Cancel + Accept (storage backend).
+  The Accept button lives in the frame, so a body controls its enabled state with
+  `setWindowAcceptEnabled(el, boolean)` — never by querying the frame's markup.
+- **Escape** is owned by `src/plugins/keyboard.ts` (single document keydown
+  listener → `AppEvent.Escape`); the manager cancels only the topmost window and
+  stays out of the way while a modal dialog is mounted. The native back press
+  unwinds dialogs first, then windows (`ShellController.handleBackPressed`).
+- Adding a window: a Stimulus body controller extending `BaseDialogController`,
+  a body-only template in `templates/views/window/`, a facade calling
+  `openWindow()`, and lazily registering the controller in
+  `src/controllers/lazy.ts`.
 
 ## Mobile dock — three tabs, no FAB menu
 

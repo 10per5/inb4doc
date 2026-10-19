@@ -1,0 +1,25 @@
+<div class="window-layer" data-window-session="<%= it.sessionId %>">
+  <% /* No stopPropagation here: the frame's buttons are handled by a
+     * listener on the window layer, so clicks must keep bubbling. The overlay's
+     * own handler already ignores anything whose target isn't the overlay. */ %>
+  <div class="inb4doc-prefs-box window-box <%= it.boxClass %>">
+    <header class="prefs-header">
+      <h3 class="prefs-title"><%= it.title %><% if (it.subtitle) { %><span class="prefs-title-sub"><%= it.subtitle %></span><% } %></h3>
+      <button type="button" class="prefs-x" data-window-action="close" aria-label="Close <%= it.title %>"><%~ it.icons.xmark %></button>
+    </header>
+    <div class="prefs-body">
+      <% /* The manager mounts `<div data-controller="<id>">` here. The frame's own
+            buttons use data-window-action (NOT data-action) because they sit
+            outside that controller's Stimulus scope — the manager owns them. */ %>
+      <div class="window-body" data-window-body></div>
+    </div>
+    <div class="inb4doc-prefs-actions">
+      <% if (it.mode === "confirm") { %>
+      <button type="button" class="inb4doc-prefs-close" data-window-action="cancel">Cancel</button>
+      <button type="button" class="inb4doc-prefs-close window-accept" data-window-accept data-window-action="accept" <%= it.acceptEnabled ? "" : "disabled" %>>Accept</button>
+      <% } else { %>
+      <button type="button" class="inb4doc-prefs-close" data-window-action="close">Close</button>
+      <% } %>
+    </div>
+  </div>
+</div>

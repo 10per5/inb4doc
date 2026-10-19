@@ -2,15 +2,15 @@ import * as icons from "@/eta/icons"
 import { BaseDialogController } from "./dialog/base-dialog-controller"
 import type { ImageEntry } from "@/providers/provider"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { openDialog } from "@/services/dialog-service"
+import { openWindow } from "@/services/window-service"
 import { renderScreen } from "@/eta/views/screen"
 import { loadImageManagerData, bindImageManagerActions } from "@/components/ui/image-manager"
 import renderImageManagerRows from "@/eta/views/image-manager-rows"
 import renderImageManagerScreen from "@/eta/views/controller/image-manager-screen"
-import renderImageManagerDialog from "@/eta/views/dialog/image-manager-dialog"
+import renderImageManagerWindow from "@/eta/views/window/image-manager-window"
 
 // One controller per feature: registered as `image-manager`, it renders the
-// desktop dialog when the element carries a payload (dialog-service mounts
+// desktop window body when the element carries a payload (window-service mounts
 // data-image-manager-payload-value) and the mobile fullview screen otherwise.
 // The screen defers its data load to load() (called by the view controller on
 // activation, once the provider is ready) — mirroring disk-usage.
@@ -31,7 +31,7 @@ export default class ImageManagerController extends BaseDialogController {
 
   connect(): void {
     if (!this.hasPayloadValue) return
-    this.element.innerHTML = renderImageManagerDialog(this.payloadValue)
+    this.element.innerHTML = renderImageManagerWindow(this.payloadValue)
     bindImageManagerActions(this.element as HTMLElement, {
       onAllImagesDeleted: () => this.close(),
     })
@@ -59,15 +59,13 @@ export default class ImageManagerController extends BaseDialogController {
   }
 }
 
-/** Dialog facade — used by shell_controller's desktop path. */
-export async function openImageManagerDialog(): Promise<void> {
+/** Window facade — used by shell_controller's desktop path. */
+export async function openImageManagerWindow(): Promise<void> {
   const data = await loadImageManagerData()
 
-  openDialog("image-manager", {
-    title: "Image Manager",
-    dir: data.dir,
+  openWindow("image-manager", {
     loadError: data.loadError,
     allEntries: data.allEntries,
     rows: renderImageManagerRows(data as unknown as Record<string, unknown>),
-  })
+  }, { title: "Image Manager", subtitle: data.dir || undefined })
 }

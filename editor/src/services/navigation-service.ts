@@ -246,8 +246,8 @@ export class NavigationService {
 
   async changeProvider(): Promise<void> {
     const current = getProvider();
-    const { openProviderDialog } = await import("@/controllers/dialog/provider-dialog");
-    const result = await openProviderDialog(current.name);
+    const { openProviderWindow } = await import("@/controllers/dialog/provider-dialog");
+    const result = await openProviderWindow(current.name);
 
     if (!result) return;
 
