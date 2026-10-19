@@ -33,7 +33,18 @@ import {
 // fields (tabs don't survive the phone layout, so each tab becomes a screen).
 export default class PrefsController extends BaseDialogController {
   static values = { payload: Object, section: String }
-  static targets = ["pane", "tab", "langChips"]
+  static targets = [
+    "pane",
+    "tab",
+    "langChips",
+    "projectBadge",
+    "projectMore",
+    "projectTable",
+    "projectRow",
+    "projectPrevPage",
+    "projectNextPage",
+    "projectPageLabel",
+  ]
 
   declare payloadValue: {
     section?: PrefsSection
@@ -53,6 +64,18 @@ export default class PrefsController extends BaseDialogController {
   declare readonly hasPaneTarget: boolean
   declare readonly hasLangChipsTarget: boolean
   declare readonly langChipsTarget: HTMLElement
+  declare readonly hasProjectMoreTarget: boolean
+  declare readonly projectMoreTarget: HTMLElement
+  declare readonly hasProjectTableTarget: boolean
+  declare readonly projectTableTarget: HTMLElement
+  declare readonly projectBadgeTargets: HTMLElement[]
+  declare readonly projectRowTargets: HTMLElement[]
+  declare readonly hasProjectPrevPageTarget: boolean
+  declare readonly projectPrevPageTarget: HTMLButtonElement
+  declare readonly hasProjectNextPageTarget: boolean
+  declare readonly projectNextPageTarget: HTMLButtonElement
+  declare readonly hasProjectPageLabelTarget: boolean
+  declare readonly projectPageLabelTarget: HTMLElement
 
   private unsubs: (() => void)[] = []
 
@@ -182,9 +205,90 @@ export default class PrefsController extends BaseDialogController {
     onPrefsHideEmptyFoldersChanged((e.target as HTMLInputElement).checked)
   }
 
-  rootScopeChanged(e: Event): void {
-    const radio = e.target as HTMLInputElement
-    if (radio.checked) onPrefsRootScopeChanged(radio.value)
+  // ── Project picker ────────────────────────────────────────────────
+
+  /**
+   * The picker is a switch, not a form field: picking a project retargets the
+   * tree and closes whatever surface rendered it (dialog / mobile screen) so
+   * the new files show through instead of sitting behind the panel.
+   */
+  projectPicked(e: Event): void {
+    this.applyProject((e.currentTarget as HTMLElement).dataset.projectValue ?? "")
+  }
+
+  /** Rows are focusable (role=button), so Enter/Space must activate them too. */
+  projectRowKey(e: KeyboardEvent): void {
+    if (e.key !== "Enter" && e.key !== " ") return
+    e.preventDefault()
+    this.applyProject((e.currentTarget as HTMLElement).dataset.projectValue ?? "")
+  }
+
+  private applyProject(value: string): void {
+    onPrefsRootScopeChanged(value)
+    this.syncProjectSelection(value)
+    this.collapseProjectTable()
+    this.close()
+  }
+
+  toggleProjectTable(): void {
+    if (!this.hasProjectTableTarget) return
+    if (this.projectTableTarget.hidden) this.showProjectPage(0)
+    else this.collapseProjectTable()
+  }
+
+  projectPrevPage(): void {
+    this.showProjectPage(this.currentProjectPage() - 1)
+  }
+
+  projectNextPage(): void {
+    this.showProjectPage(this.currentProjectPage() + 1)
+  }
+
+  private currentProjectPage(): number {
+    if (!this.hasProjectTableTarget) return 0
+    return Number(this.projectTableTarget.dataset.page ?? "0")
+  }
+
+  private showProjectPage(page: number): void {
+    if (!this.hasProjectTableTarget) return
+    const pages = Math.max(1, Number(this.projectTableTarget.dataset.pageCount ?? "1"))
+    const next = Math.min(Math.max(page, 0), pages - 1)
+    this.projectTableTarget.dataset.page = String(next)
+    this.projectTableTarget.hidden = false
+    if (this.hasProjectMoreTarget) {
+      // The disclosure swaps itself out for the table: while the table is open
+      // "More…" would be a dead badge, so it only comes back on collapse.
+      this.projectMoreTarget.hidden = true
+      this.projectMoreTarget.setAttribute("aria-expanded", "true")
+    }
+    for (const row of this.projectRowTargets) {
+      row.hidden = row.dataset.page !== String(next)
+    }
+    if (this.hasProjectPageLabelTarget) {
+      this.projectPageLabelTarget.textContent = `${next + 1} / ${pages}`
+    }
+    if (this.hasProjectPrevPageTarget) this.projectPrevPageTarget.disabled = next === 0
+    if (this.hasProjectNextPageTarget) this.projectNextPageTarget.disabled = next >= pages - 1
+  }
+
+  private collapseProjectTable(): void {
+    if (!this.hasProjectTableTarget) return
+    this.projectTableTarget.hidden = true
+    if (this.hasProjectMoreTarget) {
+      this.projectMoreTarget.hidden = false
+      this.projectMoreTarget.setAttribute("aria-expanded", "false")
+    }
+  }
+
+  private syncProjectSelection(value: string): void {
+    for (const badge of this.projectBadgeTargets) {
+      const on = (badge.dataset.projectValue ?? "") === value
+      badge.classList.toggle("is-active", on)
+      badge.setAttribute("aria-pressed", on ? "true" : "false")
+    }
+    for (const row of this.projectRowTargets) {
+      row.classList.toggle("is-active", (row.dataset.projectValue ?? "") === value)
+    }
   }
 
   toolbarPlacementChanged(e: Event): void {

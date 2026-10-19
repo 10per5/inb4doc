@@ -36,6 +36,24 @@ export interface RootFolder {
   count: number
 }
 
+/** A selectable project scope: one root-level folder, or "" for all of them. */
+export interface ProjectOption {
+  value: string
+  label: string
+  count: number
+}
+
+/** A row of the "More…" table — a project option plus the page it lands on. */
+export interface ProjectRow extends ProjectOption {
+  page: number
+}
+
+// The project picker shows a few badge-shaped shortcuts and keeps the long
+// tail in a paginated table, so a content root with hundreds of top-level
+// folders never grows an unbounded list.
+export const PROJECT_BADGE_LIMIT = 4
+export const PROJECT_PAGE_SIZE = 8
+
 function prettifySlug(name: string): string {
   return name.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase())
 }
@@ -53,6 +71,33 @@ function countPagesUnder(root: string): number {
     if (p.startsWith(prefix)) n++
   }
   return n
+}
+
+/**
+ * The folders that get a badge. The active project always gets one even when
+ * it sorts outside the first N — otherwise picking it from the table would
+ * leave the badge row looking unset.
+ */
+export function pickBadgeFolders(
+  folders: RootFolder[],
+  selected: string,
+  limit = PROJECT_BADGE_LIMIT,
+): RootFolder[] {
+  const head = folders.slice(0, limit)
+  if (!selected) return head
+  if (head.some((f) => f.path === selected)) return head
+  const chosen = folders.find((f) => f.path === selected)
+  if (!chosen) return head
+  return [...head.slice(0, limit - 1), chosen]
+}
+
+/** Table rows: "Show all" first, then every root-level folder, paginated. */
+export function buildProjectRows(folders: RootFolder[], totalCount: number): ProjectRow[] {
+  const rows: ProjectOption[] = [
+    { value: "", label: "Show all", count: totalCount },
+    ...folders.map((f) => ({ value: f.path, label: f.label, count: f.count })),
+  ]
+  return rows.map((row, i) => ({ ...row, page: Math.floor(i / PROJECT_PAGE_SIZE) }))
 }
 
 export function getRootFolders(): RootFolder[] {
@@ -90,7 +135,14 @@ export function buildPrefsPanes(active: PrefsSection, controller = "prefs"): Pre
       prefs,
       controller,
       icons: ICONS,
-      rootFolders,
+      badgeFolders: pickBadgeFolders(rootFolders, prefs.rootScope),
+      projectRows: buildProjectRows(rootFolders, treeStore.getTree().paths.size),
+      projectPages: Math.max(
+        1,
+        Math.ceil((rootFolders.length + 1) / PROJECT_PAGE_SIZE),
+      ),
+      hasProjectTable: rootFolders.length > 0,
+      rootFolderCount: rootFolders.length,
       canOpenProject: hasFunc(AppFunc.ProjectPicker),
     }),
     [PrefsSection.Storage]: renderStorage({
