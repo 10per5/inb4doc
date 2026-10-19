@@ -12,7 +12,9 @@
  * `background-image`, which is what this file used to draw its dotted marker
  * with — is silently dropped by every engine, so the old rule removed the only
  * visible part (`text-decoration: none`) and painted nothing of its own. The
- * marker is therefore a translucent background plus a recoloured squiggle.
+ * marker is therefore a translucent background plus our own dotted line —
+ * `text-decoration` is overridden wholesale so the engine's red squiggle is
+ * replaced, not drawn alongside it.
  *
  * `[data-spellcheck="off"]` is set by src/plugins/spellcheck.ts on the content
  * root when the preference is off (or no language is opted in) — belt and
@@ -20,17 +22,26 @@
  */
 .ProseMirror ::spelling-error {
   background-color: var(--spellcheck-mark);
-  text-decoration-color: var(--spellcheck-mark-line);
+  /* Replace the engine's own red squiggle instead of adding a second one:
+   * unlike `background-image`, the `text-decoration` family IS honored here,
+   * so overriding it makes both colour and shape ours. An engine that ignores
+   * the override falls back to the tint alone — never two decorations. */
+  text-decoration: underline dotted var(--spellcheck-mark-line);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
 }
 
 .ProseMirror ::grammar-error {
   background-color: var(--spellcheck-mark-grammar);
-  text-decoration-color: var(--spellcheck-mark-grammar-line);
+  text-decoration: underline dotted var(--spellcheck-mark-grammar-line);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
 }
 
 .ProseMirror[data-spellcheck="off"] ::spelling-error,
 .ProseMirror[data-spellcheck="off"] ::grammar-error {
   background-color: transparent;
+  text-decoration: none;
 }
 
 /*
