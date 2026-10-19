@@ -530,7 +530,29 @@ pending change including the open document. It is disabled while nothing is
 pending (state comes from `DirtyChanged`, seeded from `pendingOpsStore` at
 connect). Placement is a preference (`followCaretToolbar`, Editor section):
 when off the strip stays pinned to the bottom even while the OSK is up; when on
-it becomes the block-anchored popover (`is-follow-mode`).
+it becomes the block-anchored popover (`is-follow-mode`). **Pinning is explicit,
+not implicit**: `updateFollowMode()` toggles BOTH `is-follow-mode` and
+`is-pinned-mode` from one eligibility check (`isMobileViewport ||
+isTabletViewport || isMobileOrTabletUA`), so a touch device is always in exactly
+one of the two states. Do not leave "pinned" as merely "absence of follow mode"
+— nothing then docks the bar, and the only place it can still appear is the
+follow-style placement. Keep the two states driven by the same device test.
+
+**"Is the keyboard open?" is a threshold, never `offset > 0`.** `trackKeyboardOffset()`
+(`src/utils/mobile.ts`) measures `window.innerHeight - (visualViewport.offsetTop +
+height)`, and the visual viewport is routinely a few px smaller than the layout
+viewport even with no keyboard (horizontal scrollbar ~15px, fractional
+device-pixel rounding). Testing `> 0` therefore reported "keyboard up" forever
+on every eligible device — including desktop browsers in a device simulator —
+so the toolbar never left follow mode. It now rounds and clamps anything below
+`KEYBOARD_MIN_OFFSET` (80px) to 0; a real OSK is hundreds of px. Use the tracked
+offset, never a raw `> 0` comparison, for keyboard-driven behavior.
+
+**Follow mode must not be gated on "useful actions".** The caret-anchored popover
+is visible whenever it is following and the anchored block is on screen — do not
+require undo/redo availability or contextual list/table actions. A document with
+no history yet is not a reason to hide the bar while typing; the old
+`hasUsableActions()` gate made the popover appear only after the first edit.
 
 Save/flush placement per surface: **desktop keeps it in the topbar** (the disk
 icon now; it used to be a nonsense "sort" arrow); **mobile puts it in the edit

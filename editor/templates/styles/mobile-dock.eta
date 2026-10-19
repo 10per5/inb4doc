@@ -557,6 +557,60 @@ body.layout-mobile-shrink .book-layout {
   scrollbar-width: none;
 }
 
+/* Pinned mode — the not-following-the-caret state. The controller sets
+ * .is-pinned-mode on every eligible device (phone/tablet viewport, plus tablet
+ * by UA) whenever it is not anchoring to the caret, so the docked strip is not
+ * limited to the 768–1199px tablet band above: a tablet that measures
+ * desktop-wide (iPad Pro in landscape) pins the same bar instead of showing
+ * nothing until the OSK opens. Both rules deliberately sit outside the media
+ * query and must out-specify the un-gated
+ * `.desktop-layout #dock, .desktop-layout #edit-toolbar { display: none }`
+ * pair at the top of this file — that pair is what leaves such tablets with
+ * only the follow-mode popover. */
+.desktop-layout #dock:has(#edit-toolbar.is-pinned-mode:not([hidden])) {
+  display: block;
+}
+
+/* Pinned mode is the quick bar alone: the three-tab nav row belongs to the
+ * mobile dock layout, so keep it out of the desktop chrome (same as the tablet
+ * band does). */
+.desktop-layout #dock:has(#edit-toolbar.is-pinned-mode:not([hidden])) .dock {
+  display: none;
+}
+
+/* Nav tree visible → the strip lives in the editor column, not over the
+ * 260px navigator (mirrors the tablet band's left offset). */
+.desktop-layout body:not(.layout-leftpanel-off)
+  #dock:has(#edit-toolbar.is-pinned-mode:not([hidden])) {
+  left: var(--sidebar-width);
+}
+
+/* Same clearance as the band cases (and for the same reason: #edit-toolbar is
+ * not a descendant of .book-layout). */
+.desktop-layout
+  #app:has(#edit-toolbar.is-pinned-mode:not([hidden])) {
+  --edit-toolbar-clearance: calc(47px + env(safe-area-inset-bottom, 0));
+}
+
+.desktop-layout
+  #app:has(#edit-toolbar.is-pinned-mode:not([hidden]))
+  .book-layout {
+  padding-bottom: var(--edit-toolbar-clearance, 0px);
+}
+
+.desktop-layout
+  #app:has(#edit-toolbar.is-pinned-mode:not([hidden]))
+  .book-leftpanel,
+.desktop-layout
+  #app:has(#edit-toolbar.is-pinned-mode:not([hidden]))
+  .book-rightpanel,
+.desktop-layout
+  #app:has(#edit-toolbar.is-pinned-mode:not([hidden]))
+  .book-leftpanel
+  .sidebar-wrapper {
+  height: calc(var(--vp) - var(--edit-toolbar-clearance, 0px));
+}
+
 /* Follow mode (keyboard open): the strip becomes a popover anchored at the
  * caret's block. #edit-toolbar is a 0×0 fixed point whose left/top are set by
  * EditToolbarController (applyPanelFlip's positionAnchor) to the block bounds;
