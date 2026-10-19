@@ -803,10 +803,10 @@
   background: var(--color-bg-tertiary);
 }
 
-/* ── Provider Dialog ───────────────────────────────────────────────── */
+/* ── Storage-backend window (window-service "provider-dialog" body) ── */
 
-.provider-dialog-body {
-  padding: 0.5rem 0;
+.provider-window-body {
+  padding: 0;
 }
 .provider-current {
   font-size: 0.9rem;

@@ -4,7 +4,7 @@ import {
   defineHistory,
   union,
 } from "@prosekit/core";
-import { defineBlockquote } from "@prosekit/extensions/blockquote";
+import { defineBlockquote } from "./blockquote-input-rule";
 import { defineBold } from "@prosekit/extensions/bold";
 import { defineCode } from "@prosekit/extensions/code";
 import { defineCodeBlock } from "@prosekit/extensions/code-block";
@@ -41,6 +41,9 @@ export function defineBasicExtension() {
     defineParagraph(),
     defineHeading(),
     defineList(),
+    // Local: same union as @prosekit/extensions' defineBlockquote(), but the
+    // input rule is anchored at both ends — the stock `/^>\s/` misfires on a
+    // `>` typed mid-paragraph. See the note in ./blockquote-input-rule.
     defineBlockquote(),
     defineImage(),
     defineHorizontalRule(),

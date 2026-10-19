@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/prefs"
 import { buildPrefsPanes } from "@/components/ui/prefs-panes"
 import { appEvents, AppEvent } from "@/stores/app-events"
-import { openDialog } from "@/services/dialog-service"
+import { openWindow } from "@/services/window-service"
 import { renderScreen } from "@/eta/views/screen"
-import renderPrefsDialog from "@/eta/views/dialog/prefs-dialog"
+import renderPrefsWindow from "@/eta/views/window/prefs-window"
 import renderPrefsScreen from "@/eta/views/controller/prefs-screen"
 import {
   PrefsSection,
@@ -27,10 +27,15 @@ import {
 } from "@/config/enums/prefs-section"
 
 // One controller per feature: registered as `prefs`, it renders the desktop
-// tabbed dialog when the element carries a payload (dialog-service mounts
+// preferences window when the element carries a payload (window-service mounts
 // data-prefs-payload-value) and the mobile fullview otherwise. On mobile the
 // screen first shows a menu of sections; picking one pushes that section's
 // fields (tabs don't survive the phone layout, so each tab becomes a screen).
+//
+// On desktop it is the root of the window stack: a window opened from one of
+// its panes (Storage → Change… → storage backend) pushes onto that stack, so
+// Cancel/Accept returns here — to the section the user was reading — instead of
+// dropping back to the editor.
 export default class PrefsController extends BaseDialogController {
   static values = { payload: Object, section: String }
   static targets = [
@@ -78,6 +83,8 @@ export default class PrefsController extends BaseDialogController {
   declare readonly projectPageLabelTarget: HTMLElement
 
   private unsubs: (() => void)[] = []
+  /** Section the window was rendered with — kept so a resume redraw stays put. */
+  private openedSection: PrefsSection = DEFAULT_PREFS_SECTION
 
   disconnect(): void {
     this.unsubs.forEach((u) => u())
@@ -87,10 +94,11 @@ export default class PrefsController extends BaseDialogController {
 
   connect(): void {
     if (this.hasPayloadValue) {
-      this.renderDialog(
+      this.openedSection =
         parsePrefsSection(String(this.payloadValue?.section ?? "")) ??
-          DEFAULT_PREFS_SECTION,
-      )
+        DEFAULT_PREFS_SECTION
+      this.watchWindowResume()
+      this.renderDialog(this.openedSection)
       return
     }
     this.watchViewChanges()
@@ -117,17 +125,39 @@ export default class PrefsController extends BaseDialogController {
   // ── Desktop ────────────────────────────────────────────────────────
 
   private renderDialog(active: PrefsSection): void {
-    this.element.innerHTML = renderPrefsDialog({
+    this.element.innerHTML = renderPrefsWindow({
       PREFS_SECTION_PREFIX,
       icons: icons as Record<string, string>,
       panes: buildPrefsPanes(active),
     })
   }
 
+  /**
+   * A child window (storage backend) closing over us means the world may have
+   * moved on: the Storage pane reports the active provider, so redraw to keep
+   * the label honest. The redraw is why the last-opened section is remembered
+   * on every tab switch instead of being pure DOM state.
+   */
+  private watchWindowResume(): void {
+    if (!this.hasPayloadValue) return
+    this.unsubs.push(
+      appEvents.on(AppEvent.WindowResumed, ({ id }) => {
+        if (id !== "prefs") return
+        this.renderDialog(this.currentDialogSection())
+      }),
+    )
+  }
+
+  private currentDialogSection(): PrefsSection {
+    const active = this.tabTargets.find((el) => el.classList.contains("is-active"))
+    return parsePrefsSection(active?.dataset.section ?? "") ?? this.openedSection
+  }
+
   switchTab(event: Event): void {
     const target = event.currentTarget as HTMLElement
     const section = parsePrefsSection(target.dataset.section ?? "")
     if (section === null) return
+    this.openedSection = section
     if (!this.hasPaneTarget) return
     for (const el of this.paneTargets) {
       el.hidden = el.dataset.section !== `${PREFS_SECTION_PREFIX}${section}`
@@ -350,9 +380,9 @@ export default class PrefsController extends BaseDialogController {
   }
 }
 
-/** Dialog facade — used by shell_controller's desktop path. */
-export function openPrefsDialog(section: PrefsSection = DEFAULT_PREFS_SECTION): void {
-  openDialog("prefs", { section })
+/** Window facade — used by shell_controller's desktop path. */
+export function openPrefsWindow(section: PrefsSection = DEFAULT_PREFS_SECTION): void {
+  openWindow("prefs", { section }, { title: "Preferences", boxClass: "prefs-dialog" })
 }
 
 export { PrefsSection, DEFAULT_PREFS_SECTION }

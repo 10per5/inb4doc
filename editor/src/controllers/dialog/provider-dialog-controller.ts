@@ -2,7 +2,8 @@ import { BaseDialogController } from "./base-dialog-controller"
 import { ProviderType } from "@/providers/index"
 import { connectionStore } from "@/stores/connection-store"
 import { infoCircle, warningCircle } from "@/eta/icons"
-import renderProviderDialog from "@/eta/views/dialog/provider-dialog"
+import { setWindowAcceptEnabled } from "@/services/window-service"
+import renderProviderWindow from "@/eta/views/window/provider-window"
 
 export const ProviderDialogEvent = {
   Select: "provider-dialog:select",
@@ -41,13 +42,14 @@ export class ProviderDialogController extends BaseDialogController {
       this.onProbeResult(e)
     }) as EventListener)
     this.render()
+    this.syncAccept()
     if (this.selectedType === ProviderType.Remote) this.probe()
   }
 
   render() {
     const p = this.payloadValue
     const conn = connectionStore.getConfig()
-    this.element.innerHTML = renderProviderDialog({
+    this.element.innerHTML = renderProviderWindow({
       ProviderType,
       currentInfo: p.currentInfo,
       providers: p.providers,
@@ -59,9 +61,20 @@ export class ProviderDialogController extends BaseDialogController {
       initialStatusText: this.hasProbed
         ? (this.remoteAvailable ? `${infoCircle} Online` : "Server unreachable")
         : "Server status unknown",
-      canAccept: this.selectedType != null && (this.selectedType !== ProviderType.Remote || this.remoteAvailable),
       icons: { infoCircle, warningCircle },
     })
+  }
+
+  // The Accept button belongs to the window frame the manager renders, so its
+  // enabled state is pushed there instead of being part of this body.
+  private syncAccept(): void {
+    setWindowAcceptEnabled(this.element, this.canAccept())
+  }
+
+  private canAccept(): boolean {
+    if (this.selectedType == null) return false
+    if (this.selectedType === ProviderType.Remote) return this.remoteAvailable
+    return true
   }
 
   selectProvider(e: Event) {
@@ -69,6 +82,7 @@ export class ProviderDialogController extends BaseDialogController {
     if (Number.isNaN(type)) return
     this.selectedType = type as ProviderType
     this.render()
+    this.syncAccept()
     if (this.selectedType === ProviderType.Remote) this.probe()
   }
 
@@ -105,10 +119,7 @@ export class ProviderDialogController extends BaseDialogController {
       el.className = "remote-status " + (this.remoteAvailable ? "ok" : "err")
     }
 
-    const btn = this.element.querySelector(".inb4doc-btn-success") as HTMLButtonElement | null
-    if (btn) {
-      btn.disabled = this.selectedType == null || (this.selectedType === ProviderType.Remote && !this.remoteAvailable)
-    }
+    this.syncAccept()
   }
 
   cancel() {
@@ -116,8 +127,7 @@ export class ProviderDialogController extends BaseDialogController {
   }
 
   accept() {
-    if (this.selectedType == null) return
-    if (this.selectedType === ProviderType.Remote && !this.remoteAvailable) return
+    if (!this.canAccept()) return
     this.dispatch("accept", { detail: String(this.selectedType), bubbles: true })
   }
 }

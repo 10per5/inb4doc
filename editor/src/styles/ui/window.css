@@ -1,0 +1,135 @@
+/* ── Mini-window shell (window-service) ────────────────────────────
+ *
+ * Every window mounted by src/services/window-service.ts gets the same box:
+ * `.inb4doc-prefs-box.window-box` (header from the frame template, the body
+ * controller mounted in `.window-body`, and the frame's action row). Only the
+ * size varies — the class passed through `options.boxClass`, which always rides
+ * alongside `.window-box` so these rules win over the single-class ones in
+ * prefs.css regardless of cascade order.
+ */
+
+#inb4doc-window-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* `.window-layer` wraps one window so the stack can hide a parent behind its
+ * child without unmounting it (Stimulus stays connected, so the body keeps its
+ * scroll position and any half-filled form state). */
+.window-layer[hidden] {
+  display: none;
+}
+
+.window-box {
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 92vw);
+  max-height: min(72vh, 640px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Preferences keeps its wider two-column layout (tab rail + pane); every other
+ * window is a single scrollable column. `.prefs-body` is that row host, so it
+ * only stays `display: flex` for the preferences box. */
+.window-box .prefs-body {
+  display: block;
+  overflow-y: auto;
+}
+.window-box.prefs-dialog .prefs-body {
+  display: flex;
+  overflow: hidden;
+}
+.window-box.prefs-dialog {
+  width: min(760px, 92vw);
+}
+.window-box.about-dialog {
+  width: min(560px, 92vw);
+}
+
+.window-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1.25rem;
+}
+/* The body controller mounts *inside* `.window-body`, so a two-column window
+ * (preferences: tab rail | pane) needs the row on that child too — otherwise
+ * the rail and the pane are block siblings and the pane renders *below* the
+ * rail instead of beside it. */
+.window-box.prefs-dialog .window-body,
+.window-box.prefs-dialog .window-body > [data-controller] {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
+
+/* Optional second half of the header: the same lane as the title, muted (the
+ * image manager shows its image directory there). */
+.prefs-title-sub {
+  margin-left: 0.5rem;
+  color: var(--color-text-tertiary);
+}
+
+/* The action row is shared too — Cancel/Accept windows get a primary Accept. */
+.window-actions,
+.window-box .inb4doc-prefs-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+.window-box .inb4doc-prefs-close {
+  min-width: 5.5rem;
+  text-align: center;
+}
+.window-box .inb4doc-prefs-close.window-accept {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+.window-box .inb4doc-prefs-close.window-accept:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+.window-box .inb4doc-prefs-close:disabled {
+  opacity: 0.5;
+  background: var(--color-bg-primary);
+  color: var(--color-text-tertiary);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+.window-box .inb4doc-prefs-close.window-accept:disabled {
+  opacity: 0.5;
+  background: var(--color-bg-primary);
+  color: var(--color-text-tertiary);
+  border-color: var(--color-border);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .window-box,
+  .window-box.prefs-dialog,
+  .window-box.about-dialog {
+    width: 96vw;
+    max-height: 85vh;
+  }
+  /* Phone: the two-column body collapses so the tab rail sits above the pane
+   * (prefs.css turns it into a horizontal scroller there). */
+  .window-box.prefs-dialog .window-body,
+  .window-box.prefs-dialog .window-body > [data-controller] {
+    flex-direction: column;
+  }
+}

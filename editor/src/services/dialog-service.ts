@@ -1,7 +1,8 @@
 import { DialogEvent } from "@/config/dialog-events"
 import { appState, type DialogState } from "@/stores/app-state"
 
-const OVERLAY_ID = "inb4doc-dialog-overlay"
+export const DIALOG_OVERLAY_ID = "inb4doc-dialog-overlay"
+const OVERLAY_ID = DIALOG_OVERLAY_ID
 
 function createOverlay(classname?: string): HTMLDivElement {
   const existing = document.getElementById(OVERLAY_ID)
