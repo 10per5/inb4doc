@@ -86,7 +86,7 @@ class CommandService {
 
   /**
    * Toggle the current block(s) inside a collapsible `<details>` node. Inside
-   * one already, the content is lifted back out (same feel as quote).
+   * one already, the content is unwrapped back out (same feel as quote).
    */
   get wrapInDetailsCommand(): PMCommand {
     return (state, dispatch) => {
@@ -94,7 +94,14 @@ class CommandService {
       if (!details) return false
       const $from = state.selection.$from
       for (let d = $from.depth; d > 0; d--) {
-        if ($from.node(d).type === details) return lift(state, dispatch)
+        if ($from.node(d).type !== details) continue
+        // `details` is isolating, so the stock `lift` refuses to move its
+        // children out — splice the wrapper away by hand instead.
+        if (!dispatch) return true
+        const start = $from.before(d)
+        const node = $from.node(d)
+        dispatch(state.tr.replaceWith(start, start + node.nodeSize, node.content))
+        return true
       }
       return wrapIn(details)(state, dispatch)
     }

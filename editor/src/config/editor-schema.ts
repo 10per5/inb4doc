@@ -227,6 +227,12 @@ export function createSchemaExtension(): Extension {
       group: "alertBlock",
       content: "block+",
       defining: true,
+      // The panel itself is the smallest hoverable/edit unit: its children are
+      // `display: none` while collapsed, so any coordinate → block lookup (the
+      // drag "+" handle) finds nothing below it and never anchors. Marking it
+      // isolating makes that lookup stop at the `<details>` instead of walking
+      // into invisible children, so the handle works over the whole panel.
+      isolating: true,
       attrs: {
         title: { default: "", validate: "string" },
         open: { default: false },

@@ -20,13 +20,24 @@
 }
 
 .ProseMirror .md-details-summary {
-  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.75rem;
   font-weight: 600;
   color: var(--color-text-primary);
   cursor: pointer;
   list-style: none;
   outline: none;
   user-select: none;
+}
+
+.ProseMirror .md-details-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ProseMirror .md-details-summary::-webkit-details-marker {
@@ -46,11 +57,79 @@
   transform: rotate(90deg);
 }
 
-/* Empty title: keep a visible "click to name" affordance. */
-.ProseMirror .md-details-summary.is-empty::after {
+/* Empty title: keep a visible "unnamed" affordance. */
+.ProseMirror .md-details-summary.is-empty .md-details-title::after {
   content: "Details";
   color: var(--color-text-tertiary);
   font-weight: 400;
+  font-style: italic;
+}
+
+/* Rename control — always visible (a hover-only affordance was never found).
+   It is a real <button> inside the summary so the toggle can skip it. */
+.ProseMirror .md-details-rename {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.ProseMirror .md-details-rename:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+.ProseMirror .md-details-rename svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Rename mode: a real <input> takes the title's place (contenteditable inside
+   the editor is owned by ProseMirror and cannot be typed into). */
+.ProseMirror .md-details-summary.is-editing {
+  cursor: text;
+  user-select: text;
+}
+.ProseMirror .md-details-summary.is-editing .md-details-title {
+  display: none;
+}
+.ProseMirror .md-details-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.1rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-accent);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+}
+
+/* Save / Cancel: link-styled so the row stays a title row, not a form. */
+.ProseMirror .md-details-rename-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 0.5rem;
+}
+.ProseMirror .md-details-rename-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-small);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ProseMirror .md-details-rename-action:hover {
+  color: var(--color-accent-hover);
 }
 
 .ProseMirror .md-details-summary:focus-visible {

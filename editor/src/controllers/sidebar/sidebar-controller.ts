@@ -22,6 +22,8 @@ import {
   folderMinus,
   folderMinusOpen,
   filterAlt,
+  floppyDisk,
+  docMagnifyingGlass,
 } from "@/eta/icons";
 import { searchContent } from "@/features/search/sidebar-search";
 import { confirmDialog } from "@/controllers/dialog/dialog";
@@ -194,7 +196,11 @@ export default class extends Controller {
     const prevScroll = this.targets.has("inner")
       ? this.innerTarget.scrollTop
       : 0;
-    this.element.innerHTML = renderSidebar({ filterAlt });
+    this.element.innerHTML = renderSidebar({
+      filterAlt,
+      saveIcon: floppyDisk,
+      reviewIcon: docMagnifyingGlass,
+    });
     this.hideEmptyFolders = prefsStore.hideEmptyFolders;
     this.rootScope = prefsStore.rootScope;
     document.getElementById("sidebar-skeleton")?.classList.add("is-hidden");

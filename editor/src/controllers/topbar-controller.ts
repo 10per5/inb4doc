@@ -12,8 +12,6 @@ import {
 import * as icons from "@/eta/icons";
 import renderTopbar from "@/eta/views/controller/topbar";
 import { formatBytes } from "@/utils/format";
-import { colors } from "@/config/theme";
-import { pressTwiceButton } from "@/components/ui/press-twice-button";
 import { Menu } from "@/components/ui/menu";
 import { menuRegistry } from "@/config/menu-definitions";
 import { hasFunc, AppFunc } from "$/build/build-mode";
@@ -23,15 +21,13 @@ import * as focusHandler from "@/services/focus-handler-service";
 export default class extends Controller {
   static targets = [
     "dirtyCounter",
-    "flushBtn",
     "overflowWrap",
     "overflowBtn",
     "overflowDropdown",
   ];
 
   declare readonly dirtyCounterTarget: HTMLElement;
-  declare readonly flushBtnTarget: HTMLButtonElement;
-  declare readonly hasFlushBtnTarget: boolean;
+
   declare readonly overflowWrapTarget: HTMLElement;
   declare readonly overflowBtnTarget: HTMLButtonElement;
   declare readonly overflowDropdownTarget: HTMLElement;
@@ -87,12 +83,10 @@ export default class extends Controller {
       document.addEventListener("keyup", this.boundKeyUp, true);
     }
     this.unsubs.push(
-      appEvents.on(
-        AppEvent.DirtyChanged,
-        ({ count, bytes, singleDirtyPath, currentPath }) => {
-          this.updateDirtyCounter(count, bytes, singleDirtyPath, currentPath);
-          this.relayout();
-        },
+      appEvents.on(AppEvent.DirtyChanged, (payload) => {
+        this.updateDirtyCounter(payload);
+        this.relayout();
+      },
       ),
       appEvents.on(AppEvent.TextStateChanged, (state) => {
         this.updateTextState(state);
@@ -675,25 +669,32 @@ export default class extends Controller {
   }
 
   private updateDirtyCounter(
-    count: number,
-    bytes: number,
-    singleDirtyPath?: string,
-    currentPath?: string,
+    payload: {
+      count: number;
+      bytes: number;
+      singleDirtyPath?: string;
+      currentPath?: string;
+      dirtyPaths: string[];
+      bytesByPath?: Record<string, number>;
+    },
   ) {
+    const { count, currentPath, dirtyPaths, bytesByPath } = payload;
     const el = this.dirtyCounterTarget;
     if (!el) return;
 
     el.classList.toggle("clickable", false);
 
-    const hasDirty = count > 0;
-    if (!hasDirty) {
-      // Keep the last-rendered "X pending +Y B" content in the DOM (hidden) so
-      // relayout can measure the dirty portion's real width at the current
-      // viewport — the reservation must survive the counter hiding, or the
-      // "…" overflow would let the dirty badge push the layout when it returns.
+    // The topbar badge is about the document you are looking at: the whole-root
+    // pending count lives in the Files panel (its own Review / Save row), and
+    // counting every other file here made the badge fire for edits elsewhere.
+    const currentDirty = Boolean(currentPath) && dirtyPaths.includes(currentPath!);
+    if (!currentDirty || !currentPath) {
+      // Keep the last-rendered content in the DOM (hidden) so relayout can
+      // measure the dirty portion's real width at the current viewport — the
+      // reservation must survive the counter hiding, or the "…" overflow would
+      // let the badge push the layout when it returns.
       el.style.display = "none";
       el.tabIndex = -1;
-      if (this.hasFlushBtnTarget) this.flushBtnTarget.disabled = true;
       return;
     }
 
@@ -701,35 +702,19 @@ export default class extends Controller {
     el.textContent = "";
     el.tabIndex = 0;
 
-    const isSingleCurrent =
-      count === 1 && singleDirtyPath && singleDirtyPath === currentPath;
-
-    if (isSingleCurrent && isMobileDock()) {
-      // Current file only → compact eye + discard, no pending text.
-      el.prepend(createChangesBtn());
-      const btn = pressTwiceButton({
-        idleText: "⟲",
-        pendingText: "Press again",
-        variant: "danger",
-        small: true,
-        idleBadge: bytes !== 0 ? `(${formatBytes(bytes)})` : undefined,
-        onConfirm: () =>
-          appEvents.emit(AppEvent.SingleDiscardRequested, {
-            path: singleDirtyPath,
-          }),
-      });
-      el.appendChild(btn);
-    } else {
-      // Multiple pending ops, or a single op on a non-current file → text.
-      const badge =
-        bytes !== 0
-          ? `<span style="color:${bytes > 0 ? colors.green : colors.danger};font-size:0.7rem;margin-left:4px">${formatBytes(bytes)}</span>`
-          : "";
-      el.innerHTML = `<div style="display:flex;gap:6px;align-items:center"><span>${count} pending</span>${badge}</div>`;
-      el.classList.toggle("clickable", true);
-    }
-
-    if (this.hasFlushBtnTarget) this.flushBtnTarget.disabled = false;
+    // Just the size badge: "+1.2 KB" for the open document, clicked to open
+    // the pending-changes review. The eye/discard buttons lived here before —
+    // the Review row in the Files panel owns those actions instead.
+    el.textContent = "";
+    const bytes = bytesByPath?.[currentPath] ?? 0;
+    const size = document.createElement("span");
+    size.className = "dirty-size";
+    size.textContent = formatBytes(bytes);
+    if (bytes > 0) size.classList.add("is-up");
+    else if (bytes < 0) size.classList.add("is-down");
+    el.appendChild(size);
+    el.classList.toggle("clickable", true);
+    el.title = "Review pending changes";
   }
 
   // ── Procedural overflow ──────────────────────────────────────────────
@@ -903,16 +888,4 @@ export default class extends Controller {
       this.overflowDropdownTarget.classList.remove("open");
     }
   }
-}
-
-function createChangesBtn(): HTMLButtonElement {
-  const btn = document.createElement("button");
-  btn.className = "changes-btn";
-  btn.title = "View all changes";
-  btn.textContent = "👁";
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    appEvents.emit(AppEvent.DirtyClicked);
-  });
-  return btn;
 }

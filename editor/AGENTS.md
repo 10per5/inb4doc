@@ -26,6 +26,24 @@ File content is stored **body-only**; frontmatter lives separately (`Page.frontm
 
 6. **Never create or keep a no-op Edit op.** `onMetaDataChanged` (dirty-tracking-service) must not `queueEdit` when neither the frontmatter changed nor the body differs from baseline, and must `remove` an existing Edit op when `frontmatterPatch` becomes `undefined` and `patch === baseline` (e.g., a metadata change reverted to its original value). Otherwise a revert leaves an op that diffs as "No changes" but still shows `Pending changes (1)` / `+0B unflushed`.
 
+## Pending-changes surfaces
+
+Three places can show "there is unsaved work" — keep the split:
+
+- **Files panel footer** (`.sidebar-pending-row`) owns the root-wide picture:
+  pending count + icon-only **Review** (doc + magnifying glass) and **Save**
+  (floppy disk). This is the only place that acts on *all* files.
+- **Topbar badge** (top-right) is **current-document only** and is *just* the
+  size delta (`+1.2 KB`, green on growth / red on shrink) — clicking it opens
+  the pending-changes review (`dirtyClicked`). No eye and no discard button:
+  those actions belong to the Files panel row. `DirtyChanged` carries
+  `bytesByPath` (per-path byte deltas from `dirty-tracking-service`) and the
+  counter hides unless `dirtyPaths` contains the open path. Don't switch it
+  back to `count` — it fired for edits in files you were not looking at.
+- **Topbar Save button** was removed deliberately: it duplicated the Files
+  panel row. Don't reintroduce `.flush-btn` / `ToolbarAction.FlushAll` markup;
+  the Files panel (and Ctrl+S) are the save paths.
+
 ## Project Switching Invariants
 
 Switching projects happens in two very different ways; don't conflate them.
@@ -268,6 +286,16 @@ by the parser) so `5.`/`6.` survive a round-trip.
   never lets the browser's native summary toggle through — a DOM-only toggle is
   reverted on the next state update. Parsed from either dialect (raw HTML or the
   Hugo Book shortcode) in `fixBlockChildren`.
+  The pencil starts a rename that swaps the title span for a real `<input>`
+  (Enter commits, Esc/blur cancels). Do NOT go back to a contenteditable
+  summary: ProseMirror owns contenteditable inside the editor — it is reset on
+  re-render and typing is swallowed as caret moves — and the click that would
+  place the caret also toggles the panel.
+  The node spec sets `isolating: true` so coordinate→block lookups (the drag
+  "+" handle) stop at the panel instead of walking into children that have no
+  box while collapsed — without it the handle never appears over a closed
+  details. Isolating also blocks the stock `lift`, so toggling off unwraps by
+  hand in `wrapInDetailsCommand` (`tests/markdown/details-toggle.test.ts`).
 
 ### Input rules must be anchored at both ends
 

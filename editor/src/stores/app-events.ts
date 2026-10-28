@@ -144,7 +144,7 @@ export interface AppEventPayloads {
 
   [AppEvent.EditorChanged]:         { path: string; md: string; baseCanonical?: string }
   [AppEvent.OutlineChanged]:        void
-  [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
+  [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[]; bytesByPath?: Record<string, number> }
   [AppEvent.DirtyClicked]:          void
   [AppEvent.SingleDiscardRequested]:{ path: string }
   [AppEvent.FlushComplete]:         void

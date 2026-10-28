@@ -90,14 +90,6 @@
   }
 }
 
-/* Below the big layout the Save action moves into that dropdown
- * (File ▸ Save pending changes), so its own button is redundant there. */
-@media (max-width: 1199px) {
-  .app-toolbar .flush-btn {
-    display: none;
-  }
-}
-
 /* ── Provider Badge ────────────────────────────────────────────────── */
 
 .app-toolbar .toolbar-provider {
@@ -196,6 +188,14 @@
 
 .app-toolbar .dirty-counter .dirty-size {
   font-size: 0.65rem;
+}
+
+/* Size delta of the open document: growth reads green, shrink reads red. */
+.app-toolbar .dirty-counter .dirty-size.is-up {
+  color: var(--color-success);
+}
+.app-toolbar .dirty-counter .dirty-size.is-down {
+  color: var(--color-error);
 }
 
 .app-toolbar .dirty-counter.clickable {
