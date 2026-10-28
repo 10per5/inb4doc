@@ -7,12 +7,14 @@ import { trackKeyboardOffset } from "@/utils/mobile"
 import type { ViewType } from "@/services/view-service"
 
 /**
- * Mobile bottom dock — three tabs: Files, Editor, More.
+ * Mobile bottom dock — two tabs: Files, Editor.
  *
- * The middle tab used to double as an "add block" FAB, which put a second "+"
- * on the same screen the edit-toolbar strip already carried one on. It is now
- * a plain editor toggle (the way back to the editor from any fullview), so
- * insert-block lives in exactly one place: the edit-toolbar's "+" menu.
+ * The middle tab used to double as an "add block" FAB and the third one opened
+ * a "More" screen; both are gone. Everything they reached lives in the File ▸
+ * dropdown in the topbar (View ▸ and More ▸ submenus), so insert-block stays
+ * in exactly one place (the edit-toolbar's "+") and secondary screens keep one
+ * consistent entry point. The pending-changes badge moved to Files, since that
+ * is the screen that now carries the review/save row for them.
  */
 export default class DockController extends Controller {
   static targets = ["item", "nav", "badge"]
@@ -64,7 +66,7 @@ export default class DockController extends Controller {
     const item = ((event.currentTarget as HTMLElement).dataset.dockItem ?? "editor") as DockItem
     // Already on the editor tab — nothing to toggle back to.
     if (item === "editor" && viewToDockItem(this.currentView) === "editor") return
-    appEvents.emit(AppEvent.ViewChanged, { view: item })
+    appEvents.emit(AppEvent.ViewChanged, { view: item === "navigation" ? "navigation" : "editor" })
   }
 
   private setActiveItem(item: DockItem): void {
@@ -76,19 +78,18 @@ export default class DockController extends Controller {
   }
 }
 
+/**
+ * With the More screen gone the dock is two tabs, so every fullview that is
+ * not the file explorer simply highlights nothing — those screens are reached
+ * from the File ▸ View / More menus and step back to the editor themselves.
+ */
 function viewToDockItem(view: ViewType): DockItem {
   switch (view) {
     case "navigation":
       return "navigation"
-    case "more":
-    case "meta":
-    case "disk-usage":
-    case "prefs":
-    case "about":
-    case "images":
-    case "changes":
-      return "more"
-    default:
+    case "editor":
       return "editor"
+    default:
+      return "other"
   }
 }

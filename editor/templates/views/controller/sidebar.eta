@@ -20,5 +20,10 @@
   </div>
   <div class="sidebar-footer">
     <button class="nav-new-page" data-sidebar-target="newPageBtn" data-action="click->sidebar#onNewPage">+ New</button>
+    <div class="sidebar-pending-row" data-sidebar-target="pendingRow" hidden>
+      <button type="button" class="sidebar-pending-count" data-sidebar-target="pendingCount" data-action="click->sidebar#onReviewChanges" title="Review pending changes"></button>
+      <button type="button" class="btn btn-icon sidebar-review-btn" data-sidebar-target="reviewBtn" data-action="click->sidebar#onReviewChanges" title="Review pending changes" aria-label="Review pending changes"><%~ it.reviewIcon %></button>
+      <button type="button" class="btn btn-icon sidebar-save-btn" data-action="click->sidebar#onFlushAll" title="Save pending changes" aria-label="Save pending changes"><%~ it.saveIcon %></button>
+    </div>
   </div>
 </div>

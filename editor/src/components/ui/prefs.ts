@@ -1,4 +1,4 @@
-import type { ImageStorageMode } from "@/services/storage-service"
+import type { ImageStorageMode, MarkdownCompat } from "@/services/storage-service"
 import { prefsStore } from "@/stores/preferences-store"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { applyCustomCss } from "@/services/custom-css-service"
@@ -29,6 +29,16 @@ export function onPrefsHideEmptyFoldersChanged(hide: boolean): void {
   appEvents.emit(AppEvent.RootScopeChanged)
 }
 
+/**
+ * Star/unstar a root-level folder in the project picker. Pinning is pure
+ * ordering — it never filters the tree — so no RootScopeChanged: only the
+ * picker itself has to re-sort.
+ */
+export function onPrefsPinnedProjectsChanged(pinned: string[]): void {
+  prefsStore.setPinnedProjects(pinned)
+  appEvents.emit(AppEvent.ProjectPinsChanged)
+}
+
 /** `root` is a root-level folder path; "" shows every project at once. */
 export function onPrefsRootScopeChanged(root: string): void {
   prefsStore.setRootScope(root)
@@ -49,6 +59,30 @@ export function onPrefsSpellcheckLanguagesChanged(tags: string[]): void {
 export function onPrefsFollowCaretToolbarChanged(follow: boolean): void {
   prefsStore.setFollowCaretToolbar(follow)
   appEvents.emit(AppEvent.FollowCaretToolbarChanged, { follow })
+}
+
+/**
+ * Markdown dialect preset. The mode is a *preset*: it also pins the two
+ * behavior flags (modern turns both on, legacy turns both off) so switching
+ * presets immediately changes what a save writes. The flags stay independently
+ * editable afterwards — the serializer reads the flags, never the mode.
+ */
+export function onPrefsMarkdownCompatChanged(mode: MarkdownCompat): void {
+  prefsStore.setMarkdownCompat(mode)
+  const modern = mode !== "legacy"
+  prefsStore.setCompatGithubAlerts(modern)
+  prefsStore.setCompatRawHtml(modern)
+  appEvents.emit(AppEvent.MarkdownCompatChanged)
+}
+
+export function onPrefsCompatGithubAlertsChanged(on: boolean): void {
+  prefsStore.setCompatGithubAlerts(on)
+  appEvents.emit(AppEvent.MarkdownCompatChanged)
+}
+
+export function onPrefsCompatRawHtmlChanged(on: boolean): void {
+  prefsStore.setCompatRawHtml(on)
+  appEvents.emit(AppEvent.MarkdownCompatChanged)
 }
 
 /**

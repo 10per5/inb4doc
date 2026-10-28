@@ -20,6 +20,34 @@
     </label>
   </div>
   <div class="prefs-section">
+    <div class="prefs-section-title">Syntax</div>
+    <label class="prefs-row prefs-row-inline">
+      <span class="prefs-row-label">Markdown compat</span>
+      <select class="prefs-select" data-action="change-><%= it.controller %>#markdownCompatChanged">
+        <option value="modern" <%= it.prefs.markdownCompat === "legacy" ? "" : "selected" %>>Modern — every supported feature</option>
+        <option value="legacy" <%= it.prefs.markdownCompat === "legacy" ? "selected" : "" %>>Legacy — older renderers only</option>
+      </select>
+    </label>
+    <p class="prefs-note">Legacy targets renderers that reject raw HTML or GitHub callouts — saving under it rewrites those blocks in a plainer dialect.</p>
+    <div class="prefs-subsection<%= it.prefs.markdownCompat === "legacy" ? " is-disabled" : "" %>">
+      <div class="prefs-subsection-title">Behaviors</div>
+      <label class="prefs-row">
+        <input type="checkbox" id="inb4doc-compat-alerts-checkbox" <%= it.prefs.compatGithubAlerts && it.prefs.markdownCompat !== "legacy" ? "checked" : "" %> <%= it.prefs.markdownCompat === "legacy" ? "disabled" : "" %> data-action="change-><%= it.controller %>#compatGithubAlertsChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">GitHub callouts</span>
+          <span class="prefs-row-hint">Write alerts as <code>&gt; [!NOTE]</code>. Off — plain blockquotes.</span>
+        </span>
+      </label>
+      <label class="prefs-row">
+        <input type="checkbox" id="inb4doc-compat-rawhtml-checkbox" <%= it.prefs.compatRawHtml && it.prefs.markdownCompat !== "legacy" ? "checked" : "" %> <%= it.prefs.markdownCompat === "legacy" ? "disabled" : "" %> data-action="change-><%= it.controller %>#compatRawHtmlChanged">
+        <span class="prefs-row-text">
+          <span class="prefs-row-label">Raw HTML blocks</span>
+          <span class="prefs-row-hint">Write collapsible and centered blocks as HTML. Off — Hugo shortcodes and plain text.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+  <div class="prefs-section">
     <div class="prefs-section-title">Custom CSS</div>
     <p class="prefs-note">Applied on top of every built-in stylesheet, so it can override anything. Plain CSS only — nesting works if your browser supports it, but Sass helpers like <code>mix()</code> do not.</p>
     <textarea class="prefs-textarea" rows="8" spellcheck="false" placeholder="/* e.g. */&#10;.ProseMirror { font-size: 1.05rem; }" data-action="input-><%= it.controller %>#customCssChanged"><%= it.prefs.customCss %></textarea>

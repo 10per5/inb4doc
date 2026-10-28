@@ -1,6 +1,10 @@
 import { STORE_PREFS } from "@/config/storage-keys";
 import { storageService } from "@/services/storage-service";
-import type { WikiPrefs, ImageStorageMode } from "@/services/storage-service";
+import type {
+  WikiPrefs,
+  ImageStorageMode,
+  MarkdownCompat,
+} from "@/services/storage-service";
 
 const DEFAULTS: WikiPrefs = {
   stickyToolbar: true,
@@ -8,10 +12,14 @@ const DEFAULTS: WikiPrefs = {
   darkMode: false,
   hideEmptyFolders: true,
   rootScope: "",
+  pinnedProjects: [],
   spellcheck: false,
   spellcheckLanguages: ["en"],
   followCaretToolbar: true,
   customCss: "",
+  markdownCompat: "modern",
+  compatGithubAlerts: true,
+  compatRawHtml: true,
 };
 
 type PrefKey = keyof WikiPrefs;
@@ -56,10 +64,14 @@ class PreferencesStore {
       darkMode: this.darkMode,
       hideEmptyFolders: this.hideEmptyFolders,
       rootScope: this.rootScope,
+      pinnedProjects: this.pinnedProjects,
       spellcheck: this.spellcheck,
       spellcheckLanguages: this.spellcheckLanguages,
       followCaretToolbar: this.followCaretToolbar,
       customCss: this.customCss,
+      markdownCompat: this.markdownCompat,
+      compatGithubAlerts: this.compatGithubAlerts,
+      compatRawHtml: this.compatRawHtml,
     };
   }
 
@@ -78,6 +90,9 @@ class PreferencesStore {
   get rootScope(): string {
     return this.get("rootScope");
   }
+  get pinnedProjects(): string[] {
+    return this.get("pinnedProjects");
+  }
   get spellcheck(): boolean {
     return this.get("spellcheck");
   }
@@ -89,6 +104,15 @@ class PreferencesStore {
   }
   get customCss(): string {
     return this.get("customCss");
+  }
+  get markdownCompat(): MarkdownCompat {
+    return this.get("markdownCompat");
+  }
+  get compatGithubAlerts(): boolean {
+    return this.get("compatGithubAlerts");
+  }
+  get compatRawHtml(): boolean {
+    return this.get("compatRawHtml");
   }
 
   setPrefs(partial: Partial<WikiPrefs>): void {
@@ -112,6 +136,9 @@ class PreferencesStore {
   setRootScope(v: string): void {
     this.persist("rootScope", v);
   }
+  setPinnedProjects(v: string[]): void {
+    this.persist("pinnedProjects", v);
+  }
   setSpellcheck(v: boolean): void {
     this.persist("spellcheck", v);
   }
@@ -123,6 +150,15 @@ class PreferencesStore {
   }
   setCustomCss(v: string): void {
     this.persist("customCss", v);
+  }
+  setMarkdownCompat(v: MarkdownCompat): void {
+    this.persist("markdownCompat", v);
+  }
+  setCompatGithubAlerts(v: boolean): void {
+    this.persist("compatGithubAlerts", v);
+  }
+  setCompatRawHtml(v: boolean): void {
+    this.persist("compatRawHtml", v);
   }
 }
 

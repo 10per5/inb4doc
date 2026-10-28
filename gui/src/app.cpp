@@ -82,6 +82,22 @@ static LRESULT CALLBACK HotkeyProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                         "window.inb4docUI?.findPrev?.()");
                 return 0;
             }
+            if (wp == 5)
+            {
+                if (auto *w = static_cast<saucer::smartview *>(
+                        GetPropW(hwnd, L"PD_WV")))
+                    static_cast<saucer::webview &>(*w).execute(
+                        "window.inb4docUI?.cycleRecentDoc?.(1)");
+                return 0;
+            }
+            if (wp == 6)
+            {
+                if (auto *w = static_cast<saucer::smartview *>(
+                        GetPropW(hwnd, L"PD_WV")))
+                    static_cast<saucer::webview &>(*w).execute(
+                        "window.inb4docUI?.cycleRecentDoc?.(-1)");
+                return 0;
+            }
         }
     }
     auto *orig = static_cast<WNDPROC>(GetPropW(hwnd, L"PD_ORIG"));
@@ -429,6 +445,22 @@ int run_app(config cfg)
                     static_cast<saucer::webview &>(wv).execute(
                         "window.inb4docUI?.findPrev?.()");
                 });
+
+                // Ctrl(+Shift)+Tab cycles recently opened documents — a shell
+                // level MRU switch, not the "open any file" picker.
+                auto *st = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab), main_win);
+                QObject::connect(st, &QShortcut::activated, [&wv]()
+                {
+                    static_cast<saucer::webview &>(wv).execute(
+                        "window.inb4docUI?.cycleRecentDoc?.(1)");
+                });
+
+                auto *sst = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), main_win);
+                QObject::connect(sst, &QShortcut::activated, [&wv]()
+                {
+                    static_cast<saucer::webview &>(wv).execute(
+                        "window.inb4docUI?.cycleRecentDoc?.(-1)");
+                });
             }
 #elif defined(_WIN32)
             {
@@ -450,6 +482,8 @@ int run_app(config cfg)
                 RegisterHotKey(hwnd, 2, MOD_CONTROL | MOD_NOREPEAT, 'F');
                 RegisterHotKey(hwnd, 3, MOD_NOREPEAT, VK_F3);
                 RegisterHotKey(hwnd, 4, MOD_SHIFT | MOD_NOREPEAT, VK_F3);
+                RegisterHotKey(hwnd, 5, MOD_CONTROL | MOD_NOREPEAT, VK_TAB);
+                RegisterHotKey(hwnd, 6, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_TAB);
             }
 #elif defined(__APPLE__)
             setup_mac_shortcuts(app, &static_cast<saucer::webview &>(wv));

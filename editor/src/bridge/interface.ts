@@ -15,6 +15,7 @@
 
 import { showToast } from "@/components/notification/toast"
 import { openFind, findNext, findPrev } from "./find"
+import { cycleRecentDoc } from "./recent-docs"
 
 // ── JS → native ──
 
@@ -89,9 +90,10 @@ export interface HostApi {
   findNext: typeof findNext
   findPrev: typeof findPrev
   handleBack: typeof handleBack
+  cycleRecentDoc: typeof cycleRecentDoc
 }
 
-const hostApi: HostApi = { showToast, openFind, findNext, findPrev, handleBack }
+const hostApi: HostApi = { showToast, openFind, findNext, findPrev, handleBack, cycleRecentDoc }
 
 // The back decision itself lives in the shell, which owns the view service and
 // the event bus; it registers on connect. Before that every press is reported

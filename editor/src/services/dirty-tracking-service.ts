@@ -235,12 +235,16 @@ export class DirtyTrackingService {
   private recomputeAndEmit(): void {
     if (!this.pendingOps) return;
     let totalBytes = 0;
+    // Per-path deltas so the topbar can size the OPEN document only — the
+    // whole-root total belongs to the Files panel's own counter.
+    const bytesByPath: Record<string, number> = {};
     let singlePath: string | undefined;
 
     for (const op of this.pendingOps.all) {
       if (singlePath === undefined) {
         singlePath = "path" in op ? op.path : op.from;
       }
+      let opBytes = 0;
       switch (op.type) {
         case PendingOpType.Edit: {
           const page = pagesStore.get(op.path);
@@ -255,17 +259,22 @@ export class DirtyTrackingService {
           ) {
             // The actual write preserves the raw formatting of untouched
             // blocks, so size the merged body — not the full canonical patch.
-            totalBytes += merge3(baseline, c0, op.patch).merged.length - base;
+            opBytes = merge3(baseline, c0, op.patch).merged.length - base;
           } else {
-            totalBytes += (op.patch?.length ?? 0) - base;
+            opBytes = (op.patch?.length ?? 0) - base;
           }
           break;
         }
         case PendingOpType.Create:
-          totalBytes += op.content.length;
+          opBytes = op.content.length;
           break;
         default:
           break;
+      }
+      const opPath = "path" in op ? op.path : undefined;
+      if (opPath !== undefined) {
+        bytesByPath[opPath] = (bytesByPath[opPath] ?? 0) + opBytes;
+        totalBytes += opBytes;
       }
     }
 
@@ -278,6 +287,7 @@ export class DirtyTrackingService {
       singleDirtyPath: count === 1 ? singlePath : undefined,
       currentPath: this.pathResolver(),
       dirtyPaths,
+      bytesByPath,
     });
   }
 }

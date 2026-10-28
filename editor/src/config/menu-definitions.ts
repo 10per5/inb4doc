@@ -7,8 +7,16 @@ import { LayoutService } from "@/services/layout-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { SlashCommand, LayoutWidth } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
+import { isMobileDock } from "@/utils/mobile";
+import { pendingOpsStore } from "@/stores/pending-ops-store";
+import { PendingOps } from "@/entities/PendingOps";
 import {
   mediaImage,
+  eye,
+  menuScale,
+  settings,
+  hardDrive,
+  book,
   shareIos,
   packageIcon,
   floppyDisk,
@@ -61,6 +69,29 @@ function recentProjectItems(): MenuItem[] {
   }));
 }
 
+/**
+ * The View and More surfaces, folded into the File dropdown. Only the phone
+ * layout wants them — see the comment at the call site.
+ */
+function fileMobileExtras(): MenuItem[] {
+  return [
+    {
+      type: MenuType.Submenu,
+      id: "file-view",
+      icon: eye,
+      label: "View",
+      items: viewMenuItems(),
+    },
+    {
+      type: MenuType.Submenu,
+      id: "file-more",
+      icon: menuScale,
+      label: "More",
+      items: moreMenuItems(),
+    },
+  ];
+}
+
 menuRegistry.register("file", (): MenuItem[] => {
   const projectItems: MenuItem[] = hasFunc(AppFunc.ProjectPicker)
     ? [
@@ -102,6 +133,19 @@ menuRegistry.register("file", (): MenuItem[] => {
     ...shareMenuItems(),
     ...compressMenuItems(),
     { type: MenuType.Separator },
+    // Mobile-only: the phone topbar has no View menu of its own and no "More"
+    // dock tab, so everything those two surfaces reached is folded in here and
+    // File is the single entry point. On desktop both already have their own
+    // top-level menus — duplicating them only buries Preferences and About.
+    ...(isMobileDock() ? fileMobileExtras() : []),
+    {
+      type: MenuType.Item,
+      id: "preferences",
+      icon: settings,
+      label: "Preferences",
+      onClick: () => appEvents.emit(AppEvent.PrefsOpened, {}),
+    },
+    { type: MenuType.Separator },
     {
       type: MenuType.Item,
       id: "about",
@@ -111,6 +155,54 @@ menuRegistry.register("file", (): MenuItem[] => {
     },
   ];
 });
+
+function viewMenuItems(): MenuItem[] {
+  return menuRegistry.get("view") ?? []
+}
+
+/**
+ * The screens the retired "More" dock screen listed. Pending Changes leads when
+ * there is anything pending — it is the row the Files screen's Review button
+ * also opens, so the two entry points stay in sync.
+ */
+function moreMenuItems(): MenuItem[] {
+  const pendingCount = new PendingOps(pendingOpsStore.load()).count
+  return [
+    ...(pendingCount > 0
+      ? [
+          {
+            type: MenuType.Item,
+            id: "more-changes",
+            icon: clockRotateRight,
+            label: "Pending Changes",
+            sublabel: String(pendingCount),
+            onClick: () => appEvents.emit(AppEvent.DirtyClicked),
+          },
+        ]
+      : []),
+    {
+      type: MenuType.Item,
+      id: "more-disk",
+      icon: hardDrive,
+      label: "Disk Stats",
+      onClick: () => appEvents.emit(AppEvent.ViewChanged, { view: "disk-usage" }),
+    },
+    {
+      type: MenuType.Item,
+      id: "more-meta",
+      icon: book,
+      label: "Meta Panel",
+      onClick: () => appEvents.emit(AppEvent.ViewChanged, { view: "meta" }),
+    },
+    {
+      type: MenuType.Item,
+      id: "more-images",
+      icon: mediaImage,
+      label: "Image Manager",
+      onClick: () => appEvents.emit(AppEvent.ImageManagerOpened),
+    },
+  ];
+}
 
 // Share / Compress also ship as a standalone dropdown: the mobile topbar has
 // no File menu, so its Save button slot hosts one that reaches the same

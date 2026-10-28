@@ -45,14 +45,14 @@ export default class DiskUsageController extends Controller {
       icons: icons as Record<string, string>,
       renderScreen,
       backIcon: mobile ? "back" : "xmark",
-      backLabel: mobile ? "Back to more" : "Close disk stats",
+      backLabel: mobile ? "Back to editor" : "Close disk stats",
     });
     this.renderChart();
   }
 
   close(): void {
     appEvents.emit(AppEvent.ViewChanged, {
-      view: isMobileDock() ? "more" : "editor",
+      view: "editor",
     });
   }
 

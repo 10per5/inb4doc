@@ -1,4 +1,14 @@
-import { createNewItem, deletePages, renamePage, movePage, setPageWeights } from "@/features/editor-actions";
+import {
+  createNewItem,
+  deletePages,
+  duplicatePages,
+  clearPageContents,
+  cutPage,
+  pastePage,
+  renamePage,
+  movePage,
+  setPageWeights,
+} from "@/features/editor-actions";
 import { setupNavListeners } from "@/features/navigation";
 import { addRecent } from "@/utils/recent-files";
 import { storageService } from "@/services/storage-service";
@@ -11,6 +21,8 @@ import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
 import { updateEditorTint, clearEditorTint } from "@/utils/file-status-tint";
 import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
+import { resolveProjectEntryPath, isPathInScope } from "@/features/project-entry";
+import { prefsStore } from "@/stores/preferences-store";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
@@ -23,6 +35,7 @@ import { confirmDialog } from "@/controllers/dialog/dialog";
 
 export class NavigationService {
   private currentPath: string = "";
+  private activeProjectRoot: string = "";
   private loading: boolean = false;
   private editor: EditorController;
   private cache: FileSyncService;
@@ -43,16 +56,61 @@ export class NavigationService {
       appEvents.on(AppEvent.SidebarDeleteRequested, ({ paths }) => this.deletePages(paths)),
       appEvents.on(AppEvent.SidebarRenameRequested, ({ path }) => this.renamePage(path)),
       appEvents.on(AppEvent.SidebarMoveRequested, ({ from, to }) => this.movePage(from, to)),
+      appEvents.on(AppEvent.FileCutRequested, ({ path }) => this.cutPage(path)),
+      appEvents.on(AppEvent.FilePasteRequested, ({ target }) => this.pastePage(target)),
+      appEvents.on(AppEvent.SidebarDuplicateRequested, ({ paths }) =>
+        this.duplicatePages(paths),
+      ),
+      appEvents.on(AppEvent.SidebarClearContentRequested, ({ paths }) =>
+        this.clearPageContents(paths),
+      ),
       appEvents.on(AppEvent.SidebarWeightsRequested, ({ weights }) =>
         setPageWeights(this.cache, weights, () => {
           this.loadSidebar();
         }),
       ),
+      // Switching projects (root scope) only retargets the sidebar — the open
+      // document stayed put and, once it fell outside the new scope, the editor
+      // was left on someone else's page. Land on that project's own document
+      // instead: where you left off there, else the first page with content.
+      appEvents.on(AppEvent.RootScopeChanged, () => {
+        void this.restoreProjectEntry();
+      }),
     );
+  }
+
+  /**
+   * Opens the document belonging to the active project after a switch.
+   *
+   * A scope change is only a *switch* when the open document falls outside the
+   * new scope — switching to a broader scope (or to the one holding the current
+   * page) keeps context, so nothing is reloaded.
+   */
+  private async restoreProjectEntry(): Promise<void> {
+    const scope = prefsStore.rootScope;
+    if (isPathInScope(this.currentPath, scope)) return;
+
+    const entry = await resolveProjectEntryPath(scope, this.cache.getPendingOps());
+    if (!entry) {
+      this.editor.hideSkeleton();
+      appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+      return;
+    }
+    await this.navigate(entry);
   }
 
   getCurrentPath(): string {
     return this.currentPath;
+  }
+
+  /**
+   * The content root currently mounted. Remembered so switching projects can
+   * first record which document was open here, then restore the one belonging
+   * to the project being switched to.
+   */
+  setActiveProject(rootPath: string): void {
+    if (!rootPath) return;
+    this.activeProjectRoot = rootPath;
   }
 
   setCurrentPath(path: string): void {
@@ -188,6 +246,12 @@ export class NavigationService {
       targetPath = info.path;
     }
 
+    // Hand the outgoing project its "you were here" marker before the root
+    // changes — afterwards there is no way to attribute it.
+    if (this.activeProjectRoot) {
+      recentProjectsStore.setLastFile(this.activeProjectRoot, this.currentPath);
+    }
+
     const ops = this.cache.getPendingOps();
     if (ops.all.length > 0) {
       const confirmed = await confirmDialog({
@@ -227,17 +291,24 @@ export class NavigationService {
       this.loading = false;
     }
 
+    this.activeProjectRoot = targetPath;
+
     await this.loadSidebar();
     dirtyTrackingService.recompute();
 
     const pages = Array.from(treeStore.getTree().paths);
+    // A project remembers its own last document: switching back continues where
+    // you left off instead of dumping you on the home page. Only honoured when
+    // that file still exists — otherwise the usual home/no-file fallback runs.
+    const remembered = recentProjectsStore.getLastFile(targetPath);
     const home = resolveHomePageFromPaths(pages);
-    // Reset so navigate() reloads even when the new root's home equals the
+    const start = remembered && pages.includes(remembered) ? remembered : home;
+    // Reset so navigate() reloads even when the new root's start equals the
     // previously open path (otherwise the old root's document would stay in
     // the editor and could be saved into the new root).
     this.currentPath = "";
-    if (home) {
-      await this.navigate(home);
+    if (start) {
+      await this.navigate(start);
     } else {
       this.editor.hideSkeleton();
       appEvents.emit(AppEvent.NoFileView, {});
@@ -260,6 +331,8 @@ export class NavigationService {
       dirtyTrackingService.flush();
 
       pagesStore.clearAll();
+      // The root is only meaningful within one provider/backend.
+      this.activeProjectRoot = "";
 
       await switchProvider(result.type);
 
@@ -316,6 +389,90 @@ export class NavigationService {
       this.loadSidebar();
       dirtyTrackingService.recompute();
     });
+  }
+
+  /**
+   * Duplicate one or more rows (a folder copies itself and everything under
+   * it). The copies are pending Creates — nothing lands on disk until a flush.
+   */
+  async duplicatePages(paths: string[]): Promise<void> {
+    await duplicatePages(this.cache, paths, (created) => {
+      this.loadSidebar();
+      dirtyTrackingService.recompute();
+      showNotification(
+        `Duplicated ${created.length} item${created.length === 1 ? "" : "s"} — flush to write`,
+        { type: "info", id: "duplicate" },
+      );
+    });
+  }
+
+  /**
+   * Ctrl+X in the explorer: the page's contents move to the file clipboard and
+   * the page itself becomes a pending Delete, so the row survives (struck
+   * through) until a paste re-homes it or a flush commits the delete.
+   */
+  async cutPage(path: string): Promise<void> {
+    await cutPage(this.cache, path, () => {
+      updateEditorTint(this.editor.element as HTMLElement, path, this.cache.getPendingOps());
+      this.loadSidebar();
+      dirtyTrackingService.recompute();
+    });
+  }
+
+  /**
+   * Ctrl+V in the explorer: rebuild the cut document next to (or inside) the
+   * target row and open the fresh page. The original's pending Delete stays
+   * queued, so one flush performs the whole move.
+   */
+  async pastePage(target: string): Promise<void> {
+    await pastePage(this.cache, target, (created) => {
+      this.loadSidebar();
+      dirtyTrackingService.recompute();
+      this.navigate(created);
+    });
+  }
+
+  /**
+   * Empty a page's body (a folder's `_index`). Pending Edit, so the change is
+   * reviewable and reversible until the next flush. Clearing the open document
+   * also re-renders the editor — a flush/reload would otherwise resurrect the
+   * on-disk body, since the cleared body exists only as a pending patch.
+   */
+  async clearPageContents(paths: string[]): Promise<void> {
+    await clearPageContents(this.cache, paths, (cleared) => {
+      if (cleared.includes(this.currentPath)) {
+        this.editor.ensureEditor("");
+      }
+      this.loadSidebar();
+      dirtyTrackingService.recompute();
+      appEvents.emit(AppEvent.MetaPanelReload);
+      showNotification(
+        `Cleared ${cleared.length} page${cleared.length === 1 ? "" : "s"} — flush to write`,
+        { type: "info", id: "clear-content" },
+      );
+    });
+  }
+
+  /**
+   * Rename without asking — used by auto-naming, where the first `# heading`
+   * supplies the name. Skips silently when the target is taken (an inferred
+   * name must never clobber an existing file), leaving the explorer UI as the
+   * place to name it.
+   */
+  async renameTo(from: string, to: string): Promise<void> {
+    if (!from || !to || from === to) return
+    if (await this.cache.pathExists(to)) return
+    this.cache.queueRename(from, to)
+    pagesStore.clearPath(from)
+    pagesStore.clearPath(to)
+    if (this.currentPath === from) {
+      this.currentPath = to
+      this.editor.setCurrentPath(to)
+      this.cache.setCurrentPath(to)
+      replacePath(to)
+    }
+    await this.loadSidebar()
+    dirtyTrackingService.recompute()
   }
 
   async renamePage(pagePath: string): Promise<void> {

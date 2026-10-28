@@ -42,7 +42,7 @@ export default class ImageManagerController extends BaseDialogController {
       this.cancel()
       return
     }
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 
   /** Called by the view controller when the screen is activated (provider ready). */

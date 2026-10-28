@@ -12,12 +12,17 @@
       <% }) %>
     <% } %>
     <% if (it.replaceEntries.length > 0) { %>
-      <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-tertiary);padding:8px 0 2px;text-transform:uppercase;letter-spacing:0.5px">Will replace</div>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-tertiary);padding:8px 0 2px;text-transform:uppercase;letter-spacing:0.5px">Existing files</div>
+      <div class="import-mode-row" role="radiogroup" aria-label="What to do with existing files">
+        <label class="import-mode"><input type="radio" name="import-mode" value="replace" checked data-action="change->import-zip-dialog#modeChanged"><span>Replace</span></label>
+        <label class="import-mode"><input type="radio" name="import-mode" value="append" data-action="change->import-zip-dialog#modeChanged"><span>Append</span></label>
+        <label class="import-mode"><input type="radio" name="import-mode" value="merge" data-action="change->import-zip-dialog#modeChanged"><span>Merge</span></label>
+      </div>
       <% it.replaceEntries.forEach(function(e, i) { %>
         <label class="import-file-row">
           <input type="checkbox" data-idx="<%= i %>" data-type="replace" data-action="change->import-zip-dialog#toggle">
           <span class="import-file-path"><%= e.relPath %></span>
-          <span class="import-file-badge replace">Replace</span>
+          <span class="import-file-badge replace">Exists</span>
         </label>
       <% }) %>
     <% } %>

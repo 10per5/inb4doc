@@ -217,7 +217,7 @@ export default class ChangesController extends BaseDialogController {
       this.dispatch("done", { bubbles: true })
       return
     }
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 }
 

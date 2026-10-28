@@ -13,7 +13,7 @@ import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";
 import type { EditorController } from "@/controllers/editor-controller";
 import { FileSyncService } from "@/services/file-sync-service";
-import { ViewService } from "@/services/view-service";
+import { ViewService, type ViewType } from "@/services/view-service";
 import { LayoutService } from "@/services/layout-service";
 import { NavigationService } from "@/services/navigation-service";
 import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
@@ -25,6 +25,13 @@ import { exportToZip, pickAndParseZip } from "@/utils/zip";
 import type { ZipEntry, ZipFileEntry } from "@/utils/zip";
 import { showNotification } from "@/components/notification/notification";
 import { prefsStore } from "@/stores/preferences-store";
+
+import { createQuickPage } from "@/features/editor-actions";
+import { resolveImports, applyImportBody, readExistingBody } from "@/features/import-resolve";
+import type { MetaPanelData } from "@/entities/Frontmatter";
+// Auto-naming settles when typing pauses, not on every keystroke.
+const AUTO_RENAME_DEBOUNCE_MS = 1200
+import { isAutoNamed, markAutoNamed, clearAutoNamed, inferTargetPath } from "@/features/auto-name";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
 import { ProviderType } from "@/providers/index";
 import { getCurrentPath, replacePath } from "@/utils/url";
@@ -54,7 +61,7 @@ function treePaths(tree: ReturnType<typeof treeStore.getTree>): string[] {
   return Array.from(tree.paths)
 }
 
-export default class extends Controller {
+export default class Shell extends Controller {
   static targets = ["editorArea"]
   static outlets = ["editor"]
 
@@ -71,6 +78,9 @@ export default class extends Controller {
   private onBeforeUnload: (() => void) | null = null
   private unsubs: (() => void)[] = []
   private appInitialized = false
+  private fullviewHistoryDepth = 0
+  private ignoreNextPop = false
+  private autoRenameTimer: ReturnType<typeof setTimeout> | null = null
 
   connect() {
     this.initialPath = this.data.get("path") || getCurrentPath()
@@ -190,14 +200,31 @@ export default class extends Controller {
       }),
       appEvents.on(AppEvent.SingleDiscardRequested, ({ path }) => this.cache.discardFileChanges(path)),
       appEvents.on(AppEvent.NewFileRequested, () => {
-        // File → New…: create a sibling of the open document (same directory),
-        // falling back to the content root. Reuses the sidebar create flow so
-        // naming, slug validation and conflict handling stay in one place.
+        // File → New and the explorer's "+ New": the file is created under a
+        // throwaway three-word slug and takes its real name from the first
+        // `# heading` you type (see features/auto-name).
         const current = this.nav.getCurrentPath()
         const parentDir = current.includes("/")
           ? current.substring(0, current.lastIndexOf("/"))
           : ""
-        appEvents.emit(AppEvent.SidebarNewItemRequested, { parentPath: parentDir, isFolder: false })
+        createQuickPage(this.cache, parentDir, (p: string) => this.nav.navigate(p), () => this.nav.loadSidebar())
+      }),
+      // Auto-naming: while a file created unnamed still carries a heading, that
+      // heading keeps renaming it. Debounced, so the rename settles once typing
+      // pauses instead of firing on every keystroke.
+      appEvents.on(AppEvent.EditorChanged, ({ path, md }) => {
+        if (!isAutoNamed(path)) return
+        if (inferTargetPath(path, md) === null) return
+        if (this.autoRenameTimer !== null) clearTimeout(this.autoRenameTimer)
+        this.autoRenameTimer = setTimeout(() => {
+          this.autoRenameTimer = null
+          if (!isAutoNamed(path)) return
+          const renameTarget = inferTargetPath(path, md)
+          if (renameTarget === null) return
+          clearAutoNamed(path)
+          markAutoNamed(renameTarget)
+          this.nav.renameTo(path, renameTarget)
+        }, AUTO_RENAME_DEBOUNCE_MS)
       }),
       appEvents.on(AppEvent.FormatDocumentRequested, () => {
         dirtyTrackingService.formatDocument(
@@ -265,6 +292,7 @@ export default class extends Controller {
       }),
       appEvents.on(AppEvent.ViewChanged, ({ view }) => {
         this.view.switchTo(view)
+        this.syncFullviewHistory(view)
       }),
       appEvents.on(AppEvent.SourceModeToggled, () => {
         const source = this.editor.toggleSourceMode()
@@ -284,6 +312,7 @@ export default class extends Controller {
 
     this.onBeforeUnload = () => { dirtyTrackingService.flush() }
     window.addEventListener("beforeunload", this.onBeforeUnload)
+    window.addEventListener("popstate", this.onPopState)
 
     hotkeys.register("ctrl+s", () => appEvents.emit(AppEvent.SaveCurrentFile))
     hotkeys.attach()
@@ -304,7 +333,12 @@ export default class extends Controller {
     if (hasFunc(AppFunc.ProjectPicker) && getProvider().name !== ProviderType.Saf) {
       try {
         const root = await getContentRoot()
-        if (root?.path) recentProjectsStore.add(root.path, root.name)
+        if (root?.path) {
+          recentProjectsStore.add(root.path, root.name)
+          // Remember the mounted root so a later project switch can store this
+          // project's current document and restore the next one's.
+          this.nav.setActiveProject(root.path)
+        }
       } catch {
         // Host without the getContentRoot op — nothing to record.
       }
@@ -386,11 +420,10 @@ export default class extends Controller {
    * an open dialog, then whatever a controller owns (a pushed sub-screen, the
    * file multi-select), then the fullview itself.
    *
-   * Files (explorer) and More step straight back to the editor; every other
-   * fullview returns to More, which the next press leaves for the editor. Only
-   * once the editor is frontmost does this report "unhandled" — the host's cue
-   * to fall through to history and then exit — so a press can never quit the
-   * app from a subscreen.
+   * With "More" gone every fullview — Files included — steps straight back to
+   * the editor. Only once the editor is frontmost does this report
+   * "unhandled" — the host's cue to fall through to history and then exit — so
+   * a press can never quit the app from a subscreen.
    */
   private handleBackPressed(): boolean {
     // A modal dialog is above every window in the stack, so it unwinds first;
@@ -401,14 +434,55 @@ export default class extends Controller {
     appEvents.emit(AppEvent.BackRequested, request)
     if (request.handled) return true
     if (!this.view) return false
-    const current = this.view.getCurrent()
-    if (current === "editor") return false
-    this.view.switchTo(current === "navigation" || current === "more" ? "editor" : "more")
+    if (this.view.getCurrent() === "editor") return false
+    this.view.switchTo("editor")
     return true
   }
 
+  /**
+   * Browser / PWA back button.
+   *
+   * In the host apps the back press arrives through the bridge, but in a plain
+   * browser or installed PWA there is no bridge — only the session history, and
+   * fullview switches never touched it (they are `display` toggles on one
+   * document), so "Back" jumped straight out of the app instead of stepping out
+   * of Files / Disk stats / Preferences. Opening any fullview now pushes one
+   * history entry and returning to the editor pops it, which gives the browser
+   * the same one-step-back behavior the host implements.
+   */
+  private syncFullviewHistory(view: ViewType): void {
+    if (typeof history === "undefined") return
+    if (view !== "editor") {
+      if (this.fullviewHistoryDepth === 0) {
+        history.pushState({ inb4docFullview: true }, "")
+        this.fullviewHistoryDepth = 1
+      }
+      return
+    }
+    if (this.fullviewHistoryDepth === 0) return
+    this.fullviewHistoryDepth = 0
+    this.ignoreNextPop = true
+    history.back()
+  }
+
+  private onPopState = (): void => {
+    if (this.ignoreNextPop) {
+      this.ignoreNextPop = false
+      return
+    }
+    if (this.fullviewHistoryDepth === 0) return
+    this.fullviewHistoryDepth = 0
+    if (!this.view) return
+    if (this.view.getCurrent() !== "editor") this.view.switchTo("editor")
+  };
+
   disconnect() {
     registerBackHandler(null)
+    window.removeEventListener("popstate", this.onPopState)
+    if (this.autoRenameTimer !== null) {
+      clearTimeout(this.autoRenameTimer)
+      this.autoRenameTimer = null
+    }
     if (this.onBeforeUnload) window.removeEventListener("beforeunload", this.onBeforeUnload)
     this.unsubs.forEach((unsub) => unsub())
     this.unsubs = []
@@ -458,7 +532,6 @@ export default class extends Controller {
     if (!rawEntries) return
 
     const tree = treeStore.getTree()
-    const provider = getProvider()
     const existing = new Set(tree.paths)
 
     const entries: ZipFileEntry[] = rawEntries.map((e: ZipEntry) => ({
@@ -471,16 +544,64 @@ export default class extends Controller {
       entries,
       async (result) => {
         if (result.selected.length === 0) return
-        const paths = result.selected.map((e: ZipFileEntry) => e.relPath.replace(/\.md$/, ""))
-        await Promise.all(paths.map((path: string) => {
-          const entry = rawEntries.find((r: ZipEntry) => r.relPath.replace(/\.md$/, "") === path)
-          return entry ? provider.writeFile(path, entry.content) : Promise.resolve()
-        }))
-        pagesStore.clearAll()
-        treeStore.setTree(await provider.getTree())
+
+        // Resolve names BEFORE anything is written: a imported file whose name
+        // belongs to a directory is moved aside (`inb4doc` → `inb4doc-file`)
+        // so it can never take the folder over.
+        const resolved = resolveImports(
+          result.selected as ZipEntry[],
+          tree.paths,
+          result.mode,
+        )
+
+        let imported = 0
+        let renamed = 0
+        for (const item of resolved) {
+          if (!item.entry) continue
+          const { stripFrontmatter, serializeFrontmatter } = await import("@/utils/frontmatter")
+          const incoming = stripFrontmatter(item.entry.content)
+          let content = item.entry.content
+
+          if (item.exists) {
+            const current = await readExistingBody(item.path)
+            const currentParsed = stripFrontmatter(current)
+            const body = await applyImportBody(
+              currentParsed.body,
+              incoming.body,
+              item.mode,
+            )
+            const merged = { ...(currentParsed.frontmatter ?? {}), ...(incoming.frontmatter ?? {}) }
+            content = Object.keys(merged).length > 0
+              ? `---
+${serializeFrontmatter(merged as MetaPanelData)}
+---
+
+${body}`
+              : body
+          }
+
+          // Pending Edit (not a direct write) so the import is reviewable and
+          // its diff shows up in Pending Changes.
+          await this.cache.importContent(item.path, content)
+          if (item.path === this.nav.getCurrentPath()) {
+            await this.editor.ensureEditor(stripFrontmatter(content).body)
+          }
+          if (item.renamedFrom) renamed++
+          imported++
+        }
+
+        pagesStore.clearPath(this.nav.getCurrentPath())
         await this.nav.loadSidebar()
-        await this.editor.loadContent(this.initialPath, () => appEvents.emit(AppEvent.MetaPanelReload))
-        showNotification(`Imported ${result.selected.length} file${result.selected.length > 1 ? "s" : ""}`, { type: "info" })
+        dirtyTrackingService.recompute()
+        appEvents.emit(AppEvent.MetaPanelReload)
+
+        const parts: string[] = [`Imported ${imported} file${imported === 1 ? "s" : ""}`]
+        if (renamed > 0) {
+          parts.push(
+            `${renamed} renamed ("-file") to avoid overtaking a folder of the same name`,
+          )
+        }
+        showNotification(parts.join(" — "), { type: "info" })
       },
     )
   }

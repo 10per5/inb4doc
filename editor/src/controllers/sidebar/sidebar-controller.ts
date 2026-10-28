@@ -9,13 +9,21 @@ import {
   showMenu,
   closeMenu,
 } from "./sidebar";
-import { WEIGHT_STEP, WEIGHT_EXCHANGE_SHIFT, type TreeIndex, type ChildInfo } from "@/utils/tree";
+import {
+  WEIGHT_STEP,
+  WEIGHT_EXCHANGE_SHIFT,
+  type TreeIndex,
+  type ChildInfo,
+  ancestorDirs,
+} from "@/utils/tree";
 import {
   folder,
   folderOpen,
   folderMinus,
   folderMinusOpen,
   filterAlt,
+  floppyDisk,
+  docMagnifyingGlass,
 } from "@/eta/icons";
 import { searchContent } from "@/features/search/sidebar-search";
 import { confirmDialog } from "@/controllers/dialog/dialog";
@@ -41,6 +49,8 @@ export default class extends Controller {
     "filterSummary",
     "deleteSelectedBtn",
     "cancelSelectionBtn",
+    "pendingRow",
+    "pendingCount",
   ];
 
   declare readonly innerTarget: HTMLElement;
@@ -51,6 +61,8 @@ export default class extends Controller {
   declare readonly filterSummaryTarget: HTMLElement;
   declare readonly deleteSelectedBtnTarget: HTMLButtonElement;
   declare readonly cancelSelectionBtnTarget: HTMLButtonElement;
+  declare readonly pendingRowTarget: HTMLElement;
+  declare readonly pendingCountTarget: HTMLElement;
 
   private actions: SidebarActions | null = null;
   private tree: TreeIndex | null = null;
@@ -65,6 +77,8 @@ export default class extends Controller {
   private prevDirty = new Set<string>();
   private hideEmptyFolders = false;
   private rootScope = "";
+  /** Folders opened by the reveal to the current file (see `revealAncestors`). */
+  private revealPaths = new Set<string>();
 
   private dragFromPath = "";
   private dragFromParent = "";
@@ -78,8 +92,9 @@ export default class extends Controller {
 
   connect() {
     this.unsubs.push(
-      appEvents.on(AppEvent.DirtyChanged, ({ dirtyPaths }) => {
+      appEvents.on(AppEvent.DirtyChanged, ({ count, dirtyPaths }) => {
         this.updateDirtyIndicators(dirtyPaths);
+        this.updatePendingRow(count);
       }),
       appEvents.on(AppEvent.SidebarReload, () => {
         this.load();
@@ -95,6 +110,9 @@ export default class extends Controller {
       appEvents.on(AppEvent.SidebarActive, ({ path }) => {
         this.activePath = path
         this.setActive(path)
+        // Opening a document — including the one a project restores on open —
+        // opens just its chain of folders; the rest of the tree stays folded.
+        this.revealAncestors(path, false)
       }),
       appEvents.on(AppEvent.SidebarCancel, () => {
         if (this.selectionMode) this.exitSelection();
@@ -107,6 +125,11 @@ export default class extends Controller {
         request.handled = true;
       }),
       appEvents.on(AppEvent.SidebarScrollToCurrent, () => {
+        // The tree renders collapsed apart from the chain to the open file, so
+        // revealing it means opening those parents first — a row inside a
+        // collapsed section has no box to scroll to.
+        const active = this.activePath || getCurrentPath();
+        this.revealAncestors(active, true);
         let el = this.itemByPath.get(this.activePath);
         // When the open file is a directory's _index page, focus the directory
         // section in the explorer instead of the _index leaf item.
@@ -150,6 +173,10 @@ export default class extends Controller {
       onSelect: (path, isFolder) => this.enterSelection(path, isFolder),
       onRename: (path) =>
         appEvents.emit(AppEvent.SidebarRenameRequested, { path }),
+      onDuplicate: (paths) =>
+        appEvents.emit(AppEvent.SidebarDuplicateRequested, { paths }),
+      onClearContent: (paths) =>
+        appEvents.emit(AppEvent.SidebarClearContentRequested, { paths }),
       onMove: (from, to) =>
         appEvents.emit(AppEvent.SidebarMoveRequested, { from, to }),
       onReorderWeights: (weights) =>
@@ -169,7 +196,11 @@ export default class extends Controller {
     const prevScroll = this.targets.has("inner")
       ? this.innerTarget.scrollTop
       : 0;
-    this.element.innerHTML = renderSidebar({ filterAlt });
+    this.element.innerHTML = renderSidebar({
+      filterAlt,
+      saveIcon: floppyDisk,
+      reviewIcon: docMagnifyingGlass,
+    });
     this.hideEmptyFolders = prefsStore.hideEmptyFolders;
     this.rootScope = prefsStore.rootScope;
     document.getElementById("sidebar-skeleton")?.classList.add("is-hidden");
@@ -182,6 +213,9 @@ export default class extends Controller {
     this.tree = mergedTree;
 
     const current = getCurrentPath();
+    // A freshly opened project shows only the folders leading to the document
+    // being restored; everything else starts collapsed.
+    this.revealPaths = new Set(ancestorDirs(current));
 
     const treeEmpty = mergedTree.paths.size === 0;
 
@@ -201,6 +235,7 @@ export default class extends Controller {
       hideEmptyFolders: this.hideEmptyFolders,
       rootScope: this.rootScope,
       selectionMode: this.selectionMode,
+      revealPaths: this.revealPaths,
     };
 
     this.updateFiltersUi();
@@ -223,6 +258,11 @@ export default class extends Controller {
     }
 
     this.updateSelectionUI();
+
+    // Seed the pending-changes row from storage: DirtyChanged arrives after
+    // every recompute, but a sidebar mounted later (or a restored session with
+    // ops already queued) has to show the nagger with the right count.
+    this.updatePendingRow(new PendingOps(pendingOpsStore.load()).count)
 
     const prevQuery = this.currentQuery;
     this.currentQuery = "";
@@ -285,8 +325,14 @@ export default class extends Controller {
     this.clearSearch();
   }
 
+  /**
+   * "+ New" — same quick-create as File → New: a sibling of the open document
+   * (or a root-level page) under a generated slug that the first `# heading`
+   * renames. It used to force every new page into a hardcoded "docs" folder,
+   * which put pages where nobody asked for them.
+   */
   onNewPage() {
-    this.actions?.onNewItem("docs");
+    appEvents.emit(AppEvent.NewFileRequested);
   }
 
   onNavigate(event: Event) {
@@ -335,24 +381,46 @@ export default class extends Controller {
     const section = anchor.closest(".nav-section") as HTMLElement;
     if (!section) return;
     const path = section.getAttribute("data-nav-path") || "";
-    const wasCollapsed = this.collapsedSections.get(path) ?? false;
+    const wasCollapsed =
+      this.collapsedSections.get(path) ??
+      section.classList.contains("collapsed");
     this.collapsedSections.set(path, !wasCollapsed);
-    section.classList.toggle("collapsed");
-    const iconEl = section.querySelector(
-      ".sidebar-icon-folder, .sidebar-icon-folder-empty"
-    ) as HTMLElement | null;
-    if (iconEl) {
-      const isFolderEmpty = iconEl.classList.contains(
-        "sidebar-icon-folder-empty"
-      );
-      iconEl.innerHTML = wasCollapsed
-        ? isFolderEmpty
-          ? folderMinusOpen
-          : folderOpen
-        : isFolderEmpty
-        ? folderMinus
-        : folder;
+    this.setSectionCollapsed(path, !wasCollapsed);
+  }
+
+  /**
+   * Open the folders on the way to `path`.
+   *
+   * Navigation reveals softly: a folder the user toggled by hand keeps its
+   * state. The reveal shortcut (Ctrl/Cmd+Shift+E) reveals hard — it records
+   * the expansion so the next render doesn't fold the folder again.
+   */
+  private revealAncestors(path: string, force: boolean): void {
+    for (const dir of ancestorDirs(path)) {
+      if (!force && this.collapsedSections.has(dir)) continue;
+      if (force) this.collapsedSections.set(dir, false);
+      this.setSectionCollapsed(dir, false);
     }
+  }
+
+  private setSectionCollapsed(dirPath: string, collapsed: boolean): void {
+    const section = this.innerTarget.querySelector<HTMLElement>(
+      `.nav-section[data-nav-path="${CSS.escape(dirPath)}"]`,
+    );
+    if (!section) return;
+    section.classList.toggle("collapsed", collapsed);
+    const iconEl = section.querySelector<HTMLElement>(
+      ".sidebar-icon-folder, .sidebar-icon-folder-empty",
+    );
+    if (!iconEl) return;
+    const isFolderEmpty = iconEl.classList.contains("sidebar-icon-folder-empty");
+    iconEl.innerHTML = collapsed
+      ? isFolderEmpty
+        ? folderMinus
+        : folder
+      : isFolderEmpty
+        ? folderMinusOpen
+        : folderOpen;
   }
 
   // --- Keyboard navigation ---
@@ -371,6 +439,25 @@ export default class extends Controller {
       e.preventDefault();
       this.selectAll();
       return;
+    }
+
+    // Ctrl/Cmd+X / V are the explorer's cut & paste: the focused row (or the
+    // open document when the tree itself isn't focused) is the target. The
+    // editor owns those keys inside the document, so this never leaves the
+    // tree's own keydown handler.
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === "x" || key === "v") {
+        const path = this.focusedPath();
+        if (!path) return;
+        e.preventDefault();
+        if (key === "x") {
+          appEvents.emit(AppEvent.FileCutRequested, { path });
+        } else {
+          appEvents.emit(AppEvent.FilePasteRequested, { target: path });
+        }
+        return;
+      }
     }
 
     const items = this.getVisibleItems();
@@ -506,6 +593,13 @@ export default class extends Controller {
     if (path) this.actions?.onDelete([path]);
   }
 
+  /** The row the keyboard is on, falling back to the open document. */
+  private focusedPath(): string {
+    const active = document.activeElement as HTMLElement | null;
+    const host = active?.closest?.(".nav-item, .nav-section") as HTMLElement | null;
+    return host?.getAttribute("data-nav-path") || this.activePath;
+  }
+
   private getVisibleItems(): HTMLAnchorElement[] {
     const items =
       this.innerTarget.querySelectorAll<HTMLAnchorElement>(".nav-link");
@@ -530,6 +624,9 @@ export default class extends Controller {
 
     const q = query.toLowerCase().trim();
     this.currentQuery = q;
+    // Matches live anywhere in the tree, so searching opens every folder and
+    // leaving the query restores the tree underneath them.
+    this.setSearchExpansion(q !== "");
     if (!q) {
       applyResults({
         container: this.innerTarget,
@@ -576,7 +673,45 @@ export default class extends Controller {
     }, 200);
   }
 
+  /** Opens (or restores) every folder so search matches are never hidden. */
+  private setSearchExpansion(searching: boolean): void {
+    for (const section of this.innerTarget.querySelectorAll<HTMLElement>(
+      ".nav-section",
+    )) {
+      const dirPath = section.getAttribute("data-nav-path") ?? "";
+      if (!dirPath) continue;
+      this.setSectionCollapsed(
+        dirPath,
+        searching
+          ? false
+          : this.collapsedSections.get(dirPath) ??
+            !this.revealPaths.has(dirPath),
+      );
+    }
+  }
+
   // --- Dirty reactivity ---
+
+  /**
+   * The "+ New" row doubles as a pending-changes nagger: the explorer is the
+   * screen that shows which files changed, so Review (pending-changes screen)
+   * and Save (flush everything) sit right under it instead of being buried in
+   * the menu. Only shown while something is actually pending.
+   */
+  private updatePendingRow(count: number): void {
+    if (!this.targets.has("pendingRow")) return
+    this.pendingRowTarget.hidden = count === 0
+    this.pendingCountTarget.textContent =
+      count === 1 ? "1 change" : `${count} changes`
+  }
+
+  onReviewChanges(): void {
+    appEvents.emit(AppEvent.DirtyClicked);
+  }
+
+  onFlushAll(): void {
+    appEvents.emit(AppEvent.FlushAll);
+  }
 
   private updateDirtyIndicators(dirtyPaths: string[]): void {
     const dirtySet = new Set(dirtyPaths);

@@ -1,7 +1,7 @@
 /* ── Editor Component Styles ──────────────────────────────────────────
  *
  * UI components: slash menu, block handle, menus, icons, toolbars.
- * Content styles: task lists, images, video, div-center, dnd, hugo refs.
+ * Content styles: task lists, images, video, div-center, details, dnd, hugo refs.
  */
 
 @import "../ui/slash.css";
@@ -17,3 +17,4 @@
 @import "../content/image-block.css";
 @import "../content/video.css";
 @import "../content/div-center.css";
+@import "../content/details.css";

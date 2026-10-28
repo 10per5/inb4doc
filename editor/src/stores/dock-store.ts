@@ -1,4 +1,4 @@
-export type DockItem = "navigation" | "editor" | "more"
+export type DockItem = "navigation" | "editor" | "other"
 
 export class DockStore {
   private active: DockItem = "editor"

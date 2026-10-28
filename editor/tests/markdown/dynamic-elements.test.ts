@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { doc, paragraph, roundtrip, schema, serialize } from "../helpers/markdown";
+import { doc, parse, paragraph, roundtrip, schema, serialize } from "../helpers/markdown";
+import { prefsStore } from "@/stores/preferences-store";
 import type { Node as ProseNode } from "prosemirror-model";
 
 /**
@@ -110,6 +111,31 @@ describe("Hugo / raw HTML", () => {
     );
   });
 
+  test("details", () => {
+    expectSerializes(
+      doc(
+        node("details", { title: "More", open: false }, [para(text("hidden"))]),
+      ),
+      "<details>\n<summary>More</summary>\n\nhidden\n\n</details>",
+    );
+  });
+
+  test("details open", () => {
+    expectSerializes(
+      doc(
+        node("details", { title: "More", open: true }, [para(text("shown"))]),
+      ),
+      "<details open>\n<summary>More</summary>\n\nshown\n\n</details>",
+    );
+  });
+
+  test("details without a summary keeps no <summary> line", () => {
+    expectSerializes(
+      doc(node("details", { title: "", open: false }, [para(text("body"))])),
+      "<details>\nbody\n\n</details>",
+    );
+  });
+
   test("hugoRef", () => {
     expectSerializes(
       doc(
@@ -128,6 +154,60 @@ describe("Hugo / raw HTML", () => {
       doc(para(node("html", { value: '<span class="x">hi</span>' }))),
       '<span class="x">hi</span>',
     );
+  });
+});
+
+describe("markdown compat (legacy dialect)", () => {
+  // The serializer reads the flags live, so flipping them for one assertion is
+  // enough — but restore them, the store is shared by the whole test process.
+  const withPrefs = (patch: Partial<Record<"compatGithubAlerts" | "compatRawHtml", boolean>>, fn: () => void) => {
+    const before = {
+      alerts: prefsStore.compatGithubAlerts,
+      rawHtml: prefsStore.compatRawHtml,
+    };
+    prefsStore.setCompatGithubAlerts(patch.compatGithubAlerts ?? before.alerts);
+    prefsStore.setCompatRawHtml(patch.compatRawHtml ?? before.rawHtml);
+    try {
+      fn();
+    } finally {
+      prefsStore.setCompatGithubAlerts(before.alerts);
+      prefsStore.setCompatRawHtml(before.rawHtml);
+    }
+  };
+
+  test("alerts drop the GitHub callout marker", () => {
+    withPrefs({ compatGithubAlerts: false }, () => {
+      expectSerializes(
+        doc(node("alert", { type: "warning" }, [para(text("Careful now."))])),
+        "> Careful now.",
+      );
+    });
+  });
+
+  test("details become the Hugo Book shortcode", () => {
+    withPrefs({ compatRawHtml: false }, () => {
+      expectSerializes(
+        doc(
+          node("details", { title: "More", open: true }, [para(text("hidden"))]),
+        ),
+        '{{% details title="More" open=true %}}\n\nhidden\n\n{{% /details %}}',
+      );
+    });
+  });
+
+  test("a shortcoded details block still loads as one node", () => {
+    const d = parse('{{% details title="T" %}}\n\nbody\n\n{{% /details %}}');
+    expect(d.firstChild?.type.name).toBe("details");
+    expect(d.firstChild?.attrs.title).toBe("T");
+  });
+
+  test("divCenter keeps only its content", () => {
+    withPrefs({ compatRawHtml: false }, () => {
+      expectSerializes(
+        doc(node("divCenter", null, [para(text("centered"))])),
+        "centered",
+      );
+    });
   });
 });
 

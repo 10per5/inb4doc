@@ -93,7 +93,7 @@ export default class extends Controller {
 
   close(): void {
     if (isMobileDock()) {
-      appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+      appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
     } else {
       // Desktop: closes the aside column; tablet: toggles the left-bar panel
       // off, restoring the nav tree.

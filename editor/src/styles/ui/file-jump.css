@@ -1,0 +1,91 @@
+/* ── Jump to file picker (Ctrl/Cmd+Shift+Space) ─────────────────── */
+
+.file-jump-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.file-jump-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 92vw);
+  max-height: 62vh;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.file-jump-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-base);
+}
+.file-jump-input:focus {
+  outline: none;
+}
+
+.file-jump-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0.35rem 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.file-jump-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+}
+.file-jump-item.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.file-jump-name {
+  flex: 0 0 auto;
+  font-weight: 500;
+}
+.file-jump-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-small);
+}
+.file-jump-recent {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+  font-size: var(--font-size-small);
+}
+.file-jump-empty {
+  padding: 0.6rem 1rem;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-small);
+}
+
+.file-jump-hint {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-small);
+}

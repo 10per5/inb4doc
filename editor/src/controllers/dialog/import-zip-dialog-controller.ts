@@ -9,6 +9,8 @@ export class ImportZipDialogController extends BaseDialogController {
     replaceEntries: Array<{ relPath: string }>
   }
 
+  private mode: "replace" | "append" | "merge" = "replace"
+
   connect() {
     this.element.innerHTML = renderImportZipDialog(this.payloadValue)
     this.updateButton()
@@ -23,6 +25,11 @@ export class ImportZipDialogController extends BaseDialogController {
     this.updateButton()
   }
 
+  /** Existing-file strategy: replace / append / merge (see features/zip-import). */
+  modeChanged(e: Event) {
+    this.mode = (e.target as HTMLInputElement).value as "replace" | "append" | "merge"
+  }
+
   replaceAll(e: Event) {
     const checked = (e.target as HTMLInputElement).checked
     const replaceCbs = this.element.querySelectorAll<HTMLInputElement>('.import-file-row input[data-type="replace"]')
@@ -31,6 +38,13 @@ export class ImportZipDialogController extends BaseDialogController {
   }
 
   import() {
+    const modeInput = this.element.querySelector<HTMLInputElement>(
+      'input[name="import-mode"]:checked',
+    )
+    const mode = (modeInput?.value ?? this.mode ?? "replace") as
+      | "replace"
+      | "append"
+      | "merge"
     const newEntries = this.element.querySelectorAll<HTMLInputElement>('.import-file-row input[data-type="new"]:checked')
     const replaceEntries = this.element.querySelectorAll<HTMLInputElement>('.import-file-row input[data-type="replace"]:checked')
     const selected: Array<{ relPath: string }> = []
@@ -40,7 +54,7 @@ export class ImportZipDialogController extends BaseDialogController {
     replaceEntries.forEach(cb => {
       selected.push({ relPath: cb.closest(".import-file-row")?.querySelector(".import-file-path")?.textContent ?? "" })
     })
-    this.confirm({ selected })
+    this.confirm({ selected, mode })
   }
 
   private updateButton() {

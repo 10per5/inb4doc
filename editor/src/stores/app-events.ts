@@ -29,9 +29,15 @@ export enum AppEvent {
   SidebarRenameRequested = "sidebar-rename-requested",
   SidebarMoveRequested = "sidebar-move-requested",
   SidebarWeightsRequested = "sidebar-weights-requested",
+  SidebarDuplicateRequested = "sidebar-duplicate-requested",
+  SidebarClearContentRequested = "sidebar-clear-content-requested",
   SidebarCancel = "sidebar-cancel",
   BackRequested = "back-requested",
   SidebarScrollToCurrent = "sidebar-scroll-to-current",
+  FileCutRequested = "file-cut-requested",
+  FilePasteRequested = "file-paste-requested",
+  FileJumpRequested = "file-jump-requested",
+  FileStepRequested = "file-step-requested",
   Escape = "escape",
   WindowResumed = "window-resumed",
 
@@ -70,8 +76,10 @@ export enum AppEvent {
   PrefsOpened = "prefs-opened",
   AboutOpened = "about-opened",
   RootScopeChanged = "root-scope-changed",
+  ProjectPinsChanged = "project-pins-changed",
   SpellcheckChanged = "spellcheck-changed",
   FollowCaretToolbarChanged = "follow-caret-toolbar-changed",
+  MarkdownCompatChanged = "markdown-compat-changed",
   CustomCssChanged = "custom-css-changed",
   StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
@@ -122,15 +130,21 @@ export interface AppEventPayloads {
   [AppEvent.SidebarRenameRequested]:  { path: string }
   [AppEvent.SidebarMoveRequested]:    { from: string; to: string }
   [AppEvent.SidebarWeightsRequested]: { weights: { path: string; weight: number }[] }
+  [AppEvent.SidebarDuplicateRequested]: { paths: string[] }
+  [AppEvent.SidebarClearContentRequested]: { paths: string[] }
   [AppEvent.SidebarCancel]:         void
   [AppEvent.BackRequested]:         { handled: boolean }
   [AppEvent.Escape]:                void
   [AppEvent.WindowResumed]:         { id: string }
   [AppEvent.SidebarScrollToCurrent]: void
+  [AppEvent.FileCutRequested]:      { path: string }
+  [AppEvent.FilePasteRequested]:    { target: string }
+  [AppEvent.FileJumpRequested]:     void
+  [AppEvent.FileStepRequested]:     { delta: number }
 
   [AppEvent.EditorChanged]:         { path: string; md: string; baseCanonical?: string }
   [AppEvent.OutlineChanged]:        void
-  [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[] }
+  [AppEvent.DirtyChanged]:          { count: number; bytes: number; singleDirtyPath?: string; currentPath?: string; dirtyPaths: string[]; bytesByPath?: Record<string, number> }
   [AppEvent.DirtyClicked]:          void
   [AppEvent.SingleDiscardRequested]:{ path: string }
   [AppEvent.FlushComplete]:         void
@@ -158,8 +172,10 @@ export interface AppEventPayloads {
   [AppEvent.PrefsOpened]:           { section?: PrefsSection }
   [AppEvent.AboutOpened]:           void
   [AppEvent.RootScopeChanged]:      void
+  [AppEvent.ProjectPinsChanged]:    void
   [AppEvent.SpellcheckChanged]:     void
   [AppEvent.FollowCaretToolbarChanged]: { follow: boolean }
+  [AppEvent.MarkdownCompatChanged]: void
   [AppEvent.CustomCssChanged]: { css: string }
   [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void

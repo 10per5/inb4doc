@@ -12,7 +12,6 @@ import type DiskUsageController from "@/controllers/disk-usage-controller";
 import type { DiskUsageData } from "@/controllers/disk-usage-controller";
 import type ImageManagerController from "@/controllers/image-manager-controller";
 import type ChangesController from "@/controllers/changes-controller";
-import type MoreController from "@/controllers/more-controller";
 import { registerEditorView } from "@/utils/editor-view";
 import { pagesStore } from "@/stores/page-store";
 import { getProvider, getProviderDisplayInfo } from "@/stores/provider-store";
@@ -31,7 +30,6 @@ export type ViewType =
   | "no-file"
   | "dir-index-empty"
   | "navigation"
-  | "more"
   | "meta"
   | "prefs"
   | "about"
@@ -74,7 +72,7 @@ export class ViewService {
       appEvents.on(AppEvent.LayoutChanged, () => {
         if (isMobileDock()) return;
         // The meta panel is only a center-screen fullview on mobile (reached
-        // via the "more" screen). On tablet it is a left-bar panel and on
+        // via the Files ▸ menu). On tablet it is a left-bar panel and on
         // desktop the aside column — so drop any leftover center meta view.
         if (this.current === "meta") this.switchTo("editor");
       })
@@ -234,14 +232,6 @@ export class ViewService {
     navigationEl.style.display = "none";
     editorArea.appendChild(navigationEl);
 
-    // `more` — fullview screen with secondary actions. Re-renders on each
-    // activation so the Pending Changes row reflects the current count.
-    const moreEl = document.createElement("div");
-    moreEl.dataset.controller = "more";
-    moreEl.className = "fullview-view";
-    moreEl.style.display = "none";
-    editorArea.appendChild(moreEl);
-
     // `prefs` — preferences as a fullview screen (desktop keeps the dialog).
     // On a phone the tabbed desktop dialog becomes a menu that pushes one
     // section per screen, so nothing extra is wired here.
@@ -288,22 +278,6 @@ export class ViewService {
     });
 
     this.views.set("navigation", fullview(navigationEl));
-    this.views.set("more", {
-      activate: () => {
-        inb4docEl.style.display = "none";
-        sourceEl.style.display = "none";
-        moreEl.style.display = "";
-        const ctrl =
-          this.editor.application.getControllerForElementAndIdentifier(
-            moreEl,
-            "more"
-          ) as MoreController | null;
-        ctrl?.load();
-      },
-      deactivate: () => {
-        moreEl.style.display = "none";
-      },
-    });
     this.views.set("prefs", fullview(prefsEl));
     this.views.set("about", fullview(aboutEl));
     this.views.set("images", {
@@ -342,7 +316,7 @@ export class ViewService {
 
   /**
    * The meta panel as a center screen. Created lazily: needed on mobile (the
-   * "more" screen) and on tablet (the View-menu Meta toggle, where the aside
+   * Files ▸ Meta panel) and on tablet (the View-menu Meta toggle, where the aside
    * column is hidden below 1200px). Desktop never uses it — meta there is the
    * aside column. A second meta-panel instance renders inside the editor area
    * and shares the same outlet/event wiring as the aside.

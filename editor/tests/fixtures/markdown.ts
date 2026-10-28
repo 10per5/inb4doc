@@ -149,6 +149,14 @@ export const MARKDOWN_FIXTURES: Record<string, string> = {
     "\n",
   ),
 
+  details: ["<details>", "<summary>More</summary>", "", "hidden body", "", "</details>"].join(
+    "\n",
+  ),
+
+  detailsOpen: ["<details open>", "<summary>More</summary>", "", "shown body", "", "</details>"].join(
+    "\n",
+  ),
+
   hugoRef: 'A ref [Roadmap](<{{% ref path="/docs/roadmap" %}}>) inline.',
 
   video: '<video controls src="https://example.com/v.mp4"></video>',

@@ -8,7 +8,7 @@
 </nav>
 <div class="prefs-panes">
   <% for (const pane of it.panes) { %>
-  <section class="prefs-pane-wrap" role="tabpanel" data-prefs-target="pane" data-section="<%= it.PREFS_SECTION_PREFIX %><%= pane.section %>" <%= pane.active ? "" : "hidden" %>>
+  <section class="prefs-pane-wrap<%= pane.active ? "" : " is-inactive" %>" role="tabpanel" data-prefs-target="pane" data-section="<%= it.PREFS_SECTION_PREFIX %><%= pane.section %>" aria-hidden="<%= pane.active ? "false" : "true" %>">
     <div class="prefs-pane-head">
       <h4 class="prefs-pane-title"><%= pane.label %></h4>
       <p class="prefs-pane-desc"><%= pane.description %></p>

@@ -12,6 +12,10 @@ import {
   onPrefsSpellcheckLanguagesChanged,
   onPrefsCustomCssChanged,
   onPrefsFollowCaretToolbarChanged,
+  onPrefsMarkdownCompatChanged,
+  onPrefsCompatGithubAlertsChanged,
+  onPrefsCompatRawHtmlChanged,
+  onPrefsPinnedProjectsChanged,
 } from "@/components/ui/prefs"
 import { buildPrefsPanes } from "@/components/ui/prefs-panes"
 import { appEvents, AppEvent } from "@/stores/app-events"
@@ -159,8 +163,13 @@ export default class PrefsController extends BaseDialogController {
     if (section === null) return
     this.openedSection = section
     if (!this.hasPaneTarget) return
+    // Panes stay laid out (stacked in one grid cell) and are only made
+    // invisible, so the window keeps the size of the tallest section instead of
+    // growing and shrinking on every tab switch.
     for (const el of this.paneTargets) {
-      el.hidden = el.dataset.section !== `${PREFS_SECTION_PREFIX}${section}`
+      const on = el.dataset.section === `${PREFS_SECTION_PREFIX}${section}`
+      el.classList.toggle("is-inactive", !on)
+      el.setAttribute("aria-hidden", on ? "false" : "true")
     }
     for (const el of this.tabTargets) {
       const on = el.dataset.section === `${PREFS_SECTION_PREFIX}${section}`
@@ -230,7 +239,7 @@ export default class PrefsController extends BaseDialogController {
       this.backToMenu()
       return
     }
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 
   // ── Field handlers ─────────────────────────────────────────────────
@@ -291,6 +300,30 @@ export default class PrefsController extends BaseDialogController {
     this.showProjectPage(this.currentProjectPage() + 1)
   }
 
+  /**
+   * Star/unstar a root-level project ("Show all" has no pin). The row itself is
+   * a switch that would retarget the tree, so the click is swallowed here; and
+   * because pinning reorders the list, the surface is redrawn instead of having
+   * its DOM patched.
+   */
+  pinToggled(e: Event): void {
+    e.stopPropagation()
+    const value = (e.currentTarget as HTMLElement).dataset.projectValue ?? ""
+    if (!value) return
+    const pinned = prefsStore.pinnedProjects.filter((p) => p !== value)
+    if (pinned.length === prefsStore.pinnedProjects.length) pinned.push(value)
+    onPrefsPinnedProjectsChanged(pinned)
+    this.redraw()
+  }
+
+  private redraw(): void {
+    if (this.hasPayloadValue) {
+      this.renderDialog(this.currentDialogSection())
+      return
+    }
+    this.renderScreen(this.currentSection())
+  }
+
   private currentProjectPage(): number {
     if (!this.hasProjectTableTarget) return 0
     return Number(this.projectTableTarget.dataset.page ?? "0")
@@ -341,6 +374,27 @@ export default class PrefsController extends BaseDialogController {
   toolbarPlacementChanged(e: Event): void {
     const radio = e.target as HTMLInputElement
     if (radio.checked) onPrefsFollowCaretToolbarChanged(radio.value === "follow")
+  }
+
+  /**
+   * Markdown compat preset. It also pins the two behavior flags, so the pane
+   * has to be rebuilt: the checkboxes' checked/disabled state is part of the
+   * rendered markup (see section-general.eta), not something patched here.
+   */
+  markdownCompatChanged(e: Event): void {
+    const mode = (e.target as HTMLSelectElement).value === "legacy"
+      ? "legacy"
+      : "modern"
+    onPrefsMarkdownCompatChanged(mode)
+    this.redraw()
+  }
+
+  compatGithubAlertsChanged(e: Event): void {
+    onPrefsCompatGithubAlertsChanged((e.target as HTMLInputElement).checked)
+  }
+
+  compatRawHtmlChanged(e: Event): void {
+    onPrefsCompatRawHtmlChanged((e.target as HTMLInputElement).checked)
   }
 
   customCssChanged(e: Event): void {

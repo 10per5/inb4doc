@@ -219,6 +219,50 @@ export function createSchemaExtension(): Extension {
       toDOM: () => ["div", { align: "center", "data-type": "div-center" }, 0],
     }),
 
+    // <details> — collapsible disclosure block. The <summary> text lives in
+    // the `title` attr (there is no schema node for it) and `open` mirrors the
+    // HTML attribute so a toggle is a setNodeMarkup on this node.
+    defineNodeSpec({
+      name: "details",
+      group: "alertBlock",
+      content: "block+",
+      defining: true,
+      // The panel itself is the smallest hoverable/edit unit: its children are
+      // `display: none` while collapsed, so any coordinate → block lookup (the
+      // drag "+" handle) finds nothing below it and never anchors. Marking it
+      // isolating makes that lookup stop at the `<details>` instead of walking
+      // into invisible children, so the handle works over the whole panel.
+      isolating: true,
+      attrs: {
+        title: { default: "", validate: "string" },
+        open: { default: false },
+      },
+      parseDOM: [
+        {
+          tag: "details",
+          getAttrs: (dom: HTMLElement) => {
+            const summary = dom.querySelector("summary");
+            return {
+              title: (summary?.textContent ?? "").trim(),
+              open:
+                dom.hasAttribute("open") ||
+                dom.getAttribute("data-open") === "true",
+            };
+          },
+        },
+      ],
+      toDOM: (node) => [
+        "details",
+        {
+          class: "md-details",
+          "data-type": "details",
+          "data-title": String(node.attrs.title ?? ""),
+          ...(node.attrs.open ? { open: "open" } : {}),
+        },
+        0,
+      ],
+    }),
+
     defineNodeSpec({
       name: "hugoRef",
       group: "inline",
