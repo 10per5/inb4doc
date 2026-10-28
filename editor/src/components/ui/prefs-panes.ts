@@ -34,6 +34,8 @@ export interface RootFolder {
   path: string
   label: string
   count: number
+  /** Starred in the project picker — pinned folders sort first. */
+  pinned: boolean
 }
 
 /** A selectable project scope: one root-level folder, or "" for all of them. */
@@ -46,6 +48,7 @@ export interface ProjectOption {
 /** A row of the "More…" table — a project option plus the page it lands on. */
 export interface ProjectRow extends ProjectOption {
   page: number
+  pinned: boolean
 }
 
 // The project picker shows a few badge-shaped shortcuts and keeps the long
@@ -97,10 +100,20 @@ export function buildProjectRows(folders: RootFolder[], totalCount: number): Pro
     { value: "", label: "Show all", count: totalCount },
     ...folders.map((f) => ({ value: f.path, label: f.label, count: f.count })),
   ]
-  return rows.map((row, i) => ({ ...row, page: Math.floor(i / PROJECT_PAGE_SIZE) }))
+  return rows.map((row, i) => ({
+    ...row,
+    page: Math.floor(i / PROJECT_PAGE_SIZE),
+    pinned: row.value !== "" && folders.find((f) => f.path === row.value)?.pinned === true,
+  }))
 }
 
+/**
+ * Root-level folders with their star state. Starred projects come first (then
+ * alphabetically), so a pinned project never falls off the badge row no matter
+ * how many top-level folders the content root has.
+ */
 export function getRootFolders(): RootFolder[] {
+  const pinned = new Set(prefsStore.pinnedProjects)
   const children = treeStore.getTree().children.get("") ?? []
   return children
     .filter((c) => c.isDir)
@@ -108,8 +121,12 @@ export function getRootFolders(): RootFolder[] {
       path: c.path,
       label: folderLabel(c.path),
       count: countPagesUnder(c.path),
+      pinned: pinned.has(c.path),
     }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+      return a.label.localeCompare(b.label)
+    })
 }
 
 /**

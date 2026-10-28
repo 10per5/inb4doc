@@ -618,3 +618,32 @@
   background: var(--color-bg-secondary);
   flex-shrink: 0;
 }
+
+/* Pending-changes nagger under "+ New": the Files screen already shows which
+   files are dirty, so the two ways to act on them (Review → pending changes,
+   Save → flush everything) live right below it. */
+.sidebar-pending-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sidebar-pending-row[hidden] {
+  display: none;
+}
+
+.sidebar-pending-count {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+.sidebar-pending-row .btn {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.sidebar-save-btn {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}

@@ -41,6 +41,8 @@ export default class extends Controller {
     "filterSummary",
     "deleteSelectedBtn",
     "cancelSelectionBtn",
+    "pendingRow",
+    "pendingCount",
   ];
 
   declare readonly innerTarget: HTMLElement;
@@ -51,6 +53,8 @@ export default class extends Controller {
   declare readonly filterSummaryTarget: HTMLElement;
   declare readonly deleteSelectedBtnTarget: HTMLButtonElement;
   declare readonly cancelSelectionBtnTarget: HTMLButtonElement;
+  declare readonly pendingRowTarget: HTMLElement;
+  declare readonly pendingCountTarget: HTMLElement;
 
   private actions: SidebarActions | null = null;
   private tree: TreeIndex | null = null;
@@ -78,8 +82,9 @@ export default class extends Controller {
 
   connect() {
     this.unsubs.push(
-      appEvents.on(AppEvent.DirtyChanged, ({ dirtyPaths }) => {
+      appEvents.on(AppEvent.DirtyChanged, ({ count, dirtyPaths }) => {
         this.updateDirtyIndicators(dirtyPaths);
+        this.updatePendingRow(count);
       }),
       appEvents.on(AppEvent.SidebarReload, () => {
         this.load();
@@ -150,6 +155,10 @@ export default class extends Controller {
       onSelect: (path, isFolder) => this.enterSelection(path, isFolder),
       onRename: (path) =>
         appEvents.emit(AppEvent.SidebarRenameRequested, { path }),
+      onDuplicate: (paths) =>
+        appEvents.emit(AppEvent.SidebarDuplicateRequested, { paths }),
+      onClearContent: (paths) =>
+        appEvents.emit(AppEvent.SidebarClearContentRequested, { paths }),
       onMove: (from, to) =>
         appEvents.emit(AppEvent.SidebarMoveRequested, { from, to }),
       onReorderWeights: (weights) =>
@@ -224,6 +233,11 @@ export default class extends Controller {
 
     this.updateSelectionUI();
 
+    // Seed the pending-changes row from storage: DirtyChanged arrives after
+    // every recompute, but a sidebar mounted later (or a restored session with
+    // ops already queued) has to show the nagger with the right count.
+    this.updatePendingRow(new PendingOps(pendingOpsStore.load()).count)
+
     const prevQuery = this.currentQuery;
     this.currentQuery = "";
     this.searchTarget.value = "";
@@ -285,8 +299,14 @@ export default class extends Controller {
     this.clearSearch();
   }
 
+  /**
+   * "+ New" — same quick-create as File → New: a sibling of the open document
+   * (or a root-level page) under a generated slug that the first `# heading`
+   * renames. It used to force every new page into a hardcoded "docs" folder,
+   * which put pages where nobody asked for them.
+   */
   onNewPage() {
-    this.actions?.onNewItem("docs");
+    appEvents.emit(AppEvent.NewFileRequested);
   }
 
   onNavigate(event: Event) {
@@ -577,6 +597,27 @@ export default class extends Controller {
   }
 
   // --- Dirty reactivity ---
+
+  /**
+   * The "+ New" row doubles as a pending-changes nagger: the explorer is the
+   * screen that shows which files changed, so Review (pending-changes screen)
+   * and Save (flush everything) sit right under it instead of being buried in
+   * the menu. Only shown while something is actually pending.
+   */
+  private updatePendingRow(count: number): void {
+    if (!this.targets.has("pendingRow")) return
+    this.pendingRowTarget.hidden = count === 0
+    this.pendingCountTarget.textContent =
+      count === 1 ? "1 change" : `${count} changes`
+  }
+
+  onReviewChanges(): void {
+    appEvents.emit(AppEvent.DirtyClicked);
+  }
+
+  onFlushAll(): void {
+    appEvents.emit(AppEvent.FlushAll);
+  }
 
   private updateDirtyIndicators(dirtyPaths: string[]): void {
     const dirtySet = new Set(dirtyPaths);

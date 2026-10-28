@@ -5,6 +5,8 @@ export interface RecentProject {
   path: string
   name: string
   lastOpened: number
+  /** Document last open in this project — reopened when you switch back. */
+  lastFile?: string
 }
 
 const LIST_ID = "list"
@@ -37,9 +39,37 @@ class RecentProjectsStore {
   add(path: string, name?: string): void {
     const now = Date.now()
     const displayName = name ?? basename(path)
+    const existing = this.read().find((p) => p.path === path)
     const next = this.read().filter((p) => p.path !== path)
-    next.unshift({ path, name: displayName, lastOpened: now })
+    next.unshift({
+      path,
+      name: displayName,
+      lastOpened: now,
+      ...(existing?.lastFile ? { lastFile: existing.lastFile } : {}),
+    })
     this.write(next.slice(0, MAX_RECENTS))
+  }
+
+  /**
+   * Remember which document was open in a project so switching back lands on
+   * it instead of the home page. Keyed by the content root, so every project
+   * keeps its own "you were here".
+   */
+  setLastFile(projectPath: string, file: string): void {
+    if (!projectPath || !file) return
+    const list = this.read()
+    let entry = list.find((p) => p.path === projectPath)
+    if (!entry) {
+      entry = { path: projectPath, name: basename(projectPath), lastOpened: Date.now() }
+      list.unshift(entry)
+    }
+    entry.lastFile = file
+    entry.lastOpened = Math.max(entry.lastOpened, Date.now())
+    this.write(list.slice(0, MAX_RECENTS))
+  }
+
+  getLastFile(projectPath: string): string | undefined {
+    return this.read().find((p) => p.path === projectPath)?.lastFile
   }
 
   remove(path: string): void {

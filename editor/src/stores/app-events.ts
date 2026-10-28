@@ -29,6 +29,8 @@ export enum AppEvent {
   SidebarRenameRequested = "sidebar-rename-requested",
   SidebarMoveRequested = "sidebar-move-requested",
   SidebarWeightsRequested = "sidebar-weights-requested",
+  SidebarDuplicateRequested = "sidebar-duplicate-requested",
+  SidebarClearContentRequested = "sidebar-clear-content-requested",
   SidebarCancel = "sidebar-cancel",
   BackRequested = "back-requested",
   SidebarScrollToCurrent = "sidebar-scroll-to-current",
@@ -70,6 +72,7 @@ export enum AppEvent {
   PrefsOpened = "prefs-opened",
   AboutOpened = "about-opened",
   RootScopeChanged = "root-scope-changed",
+  ProjectPinsChanged = "project-pins-changed",
   SpellcheckChanged = "spellcheck-changed",
   FollowCaretToolbarChanged = "follow-caret-toolbar-changed",
   CustomCssChanged = "custom-css-changed",
@@ -122,6 +125,8 @@ export interface AppEventPayloads {
   [AppEvent.SidebarRenameRequested]:  { path: string }
   [AppEvent.SidebarMoveRequested]:    { from: string; to: string }
   [AppEvent.SidebarWeightsRequested]: { weights: { path: string; weight: number }[] }
+  [AppEvent.SidebarDuplicateRequested]: { paths: string[] }
+  [AppEvent.SidebarClearContentRequested]: { paths: string[] }
   [AppEvent.SidebarCancel]:         void
   [AppEvent.BackRequested]:         { handled: boolean }
   [AppEvent.Escape]:                void
@@ -158,6 +163,7 @@ export interface AppEventPayloads {
   [AppEvent.PrefsOpened]:           { section?: PrefsSection }
   [AppEvent.AboutOpened]:           void
   [AppEvent.RootScopeChanged]:      void
+  [AppEvent.ProjectPinsChanged]:    void
   [AppEvent.SpellcheckChanged]:     void
   [AppEvent.FollowCaretToolbarChanged]: { follow: boolean }
   [AppEvent.CustomCssChanged]: { css: string }

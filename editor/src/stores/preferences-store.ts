@@ -8,6 +8,7 @@ const DEFAULTS: WikiPrefs = {
   darkMode: false,
   hideEmptyFolders: true,
   rootScope: "",
+  pinnedProjects: [],
   spellcheck: false,
   spellcheckLanguages: ["en"],
   followCaretToolbar: true,
@@ -56,6 +57,7 @@ class PreferencesStore {
       darkMode: this.darkMode,
       hideEmptyFolders: this.hideEmptyFolders,
       rootScope: this.rootScope,
+      pinnedProjects: this.pinnedProjects,
       spellcheck: this.spellcheck,
       spellcheckLanguages: this.spellcheckLanguages,
       followCaretToolbar: this.followCaretToolbar,
@@ -77,6 +79,9 @@ class PreferencesStore {
   }
   get rootScope(): string {
     return this.get("rootScope");
+  }
+  get pinnedProjects(): string[] {
+    return this.get("pinnedProjects");
   }
   get spellcheck(): boolean {
     return this.get("spellcheck");
@@ -111,6 +116,9 @@ class PreferencesStore {
   }
   setRootScope(v: string): void {
     this.persist("rootScope", v);
+  }
+  setPinnedProjects(v: string[]): void {
+    this.persist("pinnedProjects", v);
   }
   setSpellcheck(v: boolean): void {
     this.persist("spellcheck", v);

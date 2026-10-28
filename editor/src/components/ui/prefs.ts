@@ -29,6 +29,16 @@ export function onPrefsHideEmptyFoldersChanged(hide: boolean): void {
   appEvents.emit(AppEvent.RootScopeChanged)
 }
 
+/**
+ * Star/unstar a root-level folder in the project picker. Pinning is pure
+ * ordering — it never filters the tree — so no RootScopeChanged: only the
+ * picker itself has to re-sort.
+ */
+export function onPrefsPinnedProjectsChanged(pinned: string[]): void {
+  prefsStore.setPinnedProjects(pinned)
+  appEvents.emit(AppEvent.ProjectPinsChanged)
+}
+
 /** `root` is a root-level folder path; "" shows every project at once. */
 export function onPrefsRootScopeChanged(root: string): void {
   prefsStore.setRootScope(root)

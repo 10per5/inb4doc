@@ -49,7 +49,7 @@ export default class AboutController extends BaseDialogController {
       this.cancel()
       return
     }
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 
   // The published wiki (what the sidebar used to call "View live version").

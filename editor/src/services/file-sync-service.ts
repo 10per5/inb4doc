@@ -107,6 +107,56 @@ export class FileSyncService {
     pendingOpsStore.save(this.pendingOps.all);
   }
 
+  /**
+   * Bring an imported file in as a pending Edit instead of writing it straight
+   * to the provider.
+   *
+   * A direct `provider.writeFile` used to be invisible: the file changed on
+   * disk with nothing to review and nothing in Pending Changes (so no diff at
+   * all, let alone per-line changes). Going through the same Edit op the typing
+   * pipeline produces keeps the baseline, so the changes dialog diffs the old
+   * body against the imported one and a flush is what actually writes it.
+   */
+  async importContent(path: string, content: string): Promise<void> {
+    const { frontmatter, body } = stripFrontmatter(content)
+    const page = repo.getOrCreate(path)
+    if (page.bodyState.body === undefined) {
+      const ok = await page.flushIn()
+      if (!ok && !this.pendingOps.hasPendingCreate(path)) return
+    }
+
+    const original: Record<string, string | number | undefined> = page.originalFrontmatter?.toMeta() ?? {}
+    const next: Record<string, string | number | undefined> = frontmatter ?? {}
+    const patch: Record<string, string | number | undefined> = {}
+    for (const key of new Set([...Object.keys(original), ...Object.keys(next)])) {
+      if (original[key] !== next[key]) patch[key] = next[key]
+    }
+
+    page.setBody(body)
+    page.frontmatter = frontmatter ? Frontmatter.fromMeta(frontmatter) : undefined
+    if (this.pendingOps.hasPendingCreate(path)) {
+      this.queueCreate(path, page.reconstructContent() ?? body)
+    } else {
+      this.queueEdit(path, body, Object.keys(patch).length > 0 ? patch : undefined)
+    }
+    pendingOpsStore.save(this.pendingOps.all)
+    this.recomputeDirty()
+  }
+
+  /**
+   * Queue an explicit Edit op from outside the typing pipeline (imports,
+   * "clear content", …). Same op shape the dirty tracker produces, so it shows
+   * up in Pending Changes with a real diff and only lands on disk on flush.
+   */
+  queueEdit(
+    path: string,
+    patch: string,
+    frontmatterPatch?: Record<string, string | number | undefined>,
+  ): void {
+    this.pendingOps.queueEdit(path, patch, frontmatterPatch);
+    pendingOpsStore.save(this.pendingOps.all);
+  }
+
   cancelCreate(path: string): void {
     this.pendingOps.cancelCreate(path);
     pendingOpsStore.save(this.pendingOps.all);

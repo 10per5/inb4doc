@@ -27,56 +27,222 @@ function deleteAtListItemStart(
   return true
 }
 
+/**
+ * Move the block(s) under the selection one slot up/down among their siblings.
+ *
+ * The unit is a list item when the selection sits inside a list (and every end
+ * stays inside the same list), otherwise a top-level block. A **range**
+ * selection moves every covered unit, not just the focused one: Ctrl+↑/↓ over
+ * three bullets lifts all three past the item above, keeping their order.
+ *
+ * Because the whole moved run is deleted first and re-inserted at the target,
+ * positions are computed in the ORIGINAL doc and mapped through the delete —
+ * so the run keeps its internal order in both directions.
+ */
 function moveBlock(
   state: any,
   dispatch: any,
   dir: -1 | 1,
 ): boolean {
-  const { $from } = state.selection
+  const { $from, $to, empty } = state.selection
   if ($from.depth < 1) return false
 
+  // Inside a list the unit is the list item — but only when both ends live in
+  // the SAME list node; a range that spans two items has their shared parent
+  // list as its container, which is what should be reordered.
   let itemDepth = -1
-  for (let d = $from.depth; d > 0; d--) {
+  for (let d = Math.min($from.depth, $to.depth); d > 0; d--) {
+    if ($from.node(d) !== $to.node(d)) break
     if ($from.node(d).type.name === "list") {
       itemDepth = d
       break
     }
   }
   if (itemDepth === -1) {
-    itemDepth = 1
+    // No shared list — fall back to the deepest list the anchor sits in (the
+    // classic single-item move), else reorder top-level blocks.
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === "list") {
+        itemDepth = d
+        break
+      }
+    }
   }
+  if (itemDepth === -1) itemDepth = 1
 
   const parentDepth = itemDepth - 1
   const parentNode = $from.node(parentDepth)
-  const itemStart = $from.before(itemDepth)
   const contentBase = parentDepth === 0 ? 0 : $from.before(parentDepth) + 1
 
-  const itemIndex = $from.index(itemDepth - 1)
-  const targetIndex = itemIndex + dir
-  if (targetIndex < 0 || targetIndex >= parentNode.childCount) return false
+  const from = $from.pos
+  const to = $to.pos
 
-  const node = parentNode.child(itemIndex)
-  const size = node.nodeSize
-  const tr = state.tr
-  tr.delete(itemStart, itemStart + size)
-
-  let offBeforeTarget = 0
-  for (let j = 0; j < targetIndex; j++) {
-    offBeforeTarget += parentNode.child(j).nodeSize
-  }
-  const targetSize = parentNode.child(targetIndex).nodeSize
-
-  let insertPos: number
-  if (dir === -1) {
-    insertPos = contentBase + offBeforeTarget
+  // Covered sibling indices, resolved by geometry (not `$to.index()`, which
+  // would claim the NEXT child when the range ends exactly on a boundary).
+  let startIndex = -1
+  let endIndex = -1
+  let startOffset = 0
+  let endOffset = 0
+  if (empty) {
+    // A caret resolves through `$from.index()` like the classic move: at a
+    // child boundary it belongs to the node AFTER it, which is what a user
+    // typing at the end of a bullet then pressing Ctrl+↑ expects.
+    startIndex = $from.index(parentDepth)
+    let offset = 0
+    for (let i = 0; i < startIndex; i++) offset += parentNode.child(i).nodeSize
+    endIndex = startIndex
+    startOffset = offset
+    endOffset = offset + parentNode.child(startIndex).nodeSize
   } else {
-    insertPos = contentBase + offBeforeTarget - size + targetSize
+    let offset = 0
+    for (let i = 0; i < parentNode.childCount; i++) {
+      const childStart = contentBase + offset
+      const childEnd = childStart + parentNode.child(i).nodeSize
+      const covered = from < childEnd && to > childStart
+      if (covered) {
+        if (startIndex === -1) {
+          startIndex = i
+          startOffset = offset
+        }
+        endIndex = i
+      }
+      offset += parentNode.child(i).nodeSize
+      if (covered) endOffset = offset
+    }
+  }
+  if (startIndex === -1) return false
+
+  if (dir === -1 && startIndex === 0) return false
+  if (dir === 1 && endIndex >= parentNode.childCount - 1) return false
+
+  const moved: any[] = []
+  let movedSize = 0
+  for (let i = startIndex; i <= endIndex; i++) {
+    const child = parentNode.child(i)
+    moved.push(child)
+    movedSize += child.nodeSize
   }
 
-  tr.insert(insertPos, node)
-  tr.setSelection(TextSelection.near(tr.doc.resolve(insertPos + 1)))
+  const deleteFrom = contentBase + startOffset
+  const deleteTo = contentBase + endOffset
+
+  // Target slot in the ORIGINAL doc: before the previous sibling (up) or after
+  // the next one (down). Mapped through the delete below.
+  let targetPos: number
+  if (dir === -1) {
+    let prevOffset = 0
+    for (let i = 0; i < startIndex - 1; i++) prevOffset += parentNode.child(i).nodeSize
+    targetPos = contentBase + prevOffset
+  } else {
+    let nextEnd = 0
+    for (let i = 0; i <= endIndex + 1; i++) nextEnd += parentNode.child(i).nodeSize
+    targetPos = contentBase + nextEnd
+  }
+
+  const tr = state.tr
+  tr.delete(deleteFrom, deleteTo)
+  const insertPos = tr.mapping.map(targetPos)
+  tr.insert(insertPos, moved)
+
+  // Keep the moved run selected so repeated presses keep walking it.
+  try {
+    tr.setSelection(
+      TextSelection.between(
+        tr.doc.resolve(insertPos + 1),
+        tr.doc.resolve(insertPos + movedSize - 1),
+      ),
+    )
+  } catch {
+    tr.setSelection(TextSelection.near(tr.doc.resolve(insertPos + 1)))
+  }
 
   if (dispatch) dispatch(tr.scrollIntoView())
+  return true
+}
+
+/**
+ * Backspace/Delete over a selection that spans several list ITEMS deletes
+ * those items, not just the text between the two carets.
+ *
+ * The stock `deleteSelection` is a text-range operation: it merges everything
+ * it touches into the first item, so selecting three checklist boxes and
+ * hitting Backspace left one empty checkbox behind instead of removing them
+ * (and on the soft-keyboard path nothing ever cleaned that stray item up).
+ * Here the covered siblings are removed whole and a parent list they empty
+ * out goes with them; the caret lands where the run used to be.
+ *
+ * Units are the LIST children of the deepest container that holds both ends
+ * — top-level items (doc children) or a run of nested items inside one item.
+ * Anything else (a caret, a single item, a range mixing text with items)
+ * reports "unhandled" so every other delete path stays exactly as it was.
+ */
+function deleteSelectedListItems(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, $to, empty } = state.selection
+  if (empty) return false
+
+  // Deepest container holding both ends — possibly the doc itself (top-level
+  // items are its children in the flat-list model).
+  let containerDepth = 0
+  for (let d = 1; d <= Math.min($from.depth, $to.depth); d++) {
+    if ($from.node(d) !== $to.node(d)) break
+    containerDepth = d
+  }
+
+  const parentNode = containerDepth === 0 ? state.doc : $from.node(containerDepth)
+  const contentBase = containerDepth === 0 ? 0 : $from.before(containerDepth) + 1
+  const from = $from.pos
+  const to = $to.pos
+
+  let startIndex = -1
+  let endIndex = -1
+  let startOffset = 0
+  let endOffset = 0
+  const covered: any[] = []
+  {
+    let offset = 0
+    for (let i = 0; i < parentNode.childCount; i++) {
+      const child = parentNode.child(i)
+      const childStart = contentBase + offset
+      const childEnd = childStart + child.nodeSize
+      if (from < childEnd && to > childStart) {
+        if (startIndex === -1) {
+          startIndex = i
+          startOffset = offset
+        }
+        endIndex = i
+        covered.push(child)
+      }
+      offset += child.nodeSize
+      if (endIndex === i) endOffset = offset
+    }
+  }
+
+  // Only a run of two or more whole items is ours; anything else keeps the
+  // built-in text-merge behavior.
+  if (covered.length < 2) return false
+  if (!covered.every((c) => c.type.name === "list")) return false
+  if (!dispatch) return true
+
+  const tr = state.tr
+  tr.delete(contentBase + startOffset, contentBase + endOffset)
+
+  // Removing every nested item under one parent leaves an empty item behind
+  // (only nested lists) — drop that husk too.
+  if (containerDepth > 0 && parentNode.childCount === covered.length) {
+    const start = tr.mapping.map($from.before(containerDepth))
+    const end = tr.mapping.map($from.after(containerDepth))
+    if (tr.doc.nodeAt(start)?.childCount === 0) tr.delete(start, end)
+  }
+
+  const caret = Math.min(
+    tr.mapping.map(contentBase + startOffset),
+    tr.doc.content.size,
+  )
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, caret))))
+  dispatch(tr.scrollIntoView())
   return true
 }
 
@@ -152,6 +318,37 @@ function insertBlockAbove(
   return true
 }
 
+/**
+ * Ctrl+Space — mark/unmark the checklist item the caret is in.
+ *
+ * The checkbox is the item's own `checked` attr (each item is its own list
+ * node in the flat-list model), so this flips just that one; outside a task
+ * list it reports "unhandled" and the browser keeps the key.
+ */
+function toggleTaskChecked(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from } = state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d)
+    if (node.type.name !== "list") continue
+    if (node.attrs.kind !== "task") return false
+    if (!dispatch) return true
+    const pos = $from.before(d)
+    dispatch(
+      state.tr
+        .setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          checked: !node.attrs.checked,
+        })
+        .scrollIntoView(),
+    )
+    return true
+  }
+  return false
+}
+
 // Ctrl+X with no selection → cut the whole current block (a bullet point cuts
 // the item, a paragraph cuts the paragraph). ProseMirror has no Mod-x binding —
 // the browser only cuts a real DOM selection — so we select the block as a
@@ -168,12 +365,84 @@ export function setEditorView(view: import("prosemirror-view").EditorView) {
   _editorView = view
 }
 
+/**
+ * Ctrl+X inside a code block cuts the caret's LINE, not the whole block.
+ *
+ * A code block is one node, so the generic block cut would yank the entire
+ * snippet (gutter and language chrome included) out of the document — nearly
+ * never what someone editing line 12 of a 40-line snippet wants. Line bounds
+ * come from the block's plain text, and the trailing newline goes with the
+ * line (the leading one when it is the last line) so no blank line is left.
+ */
+function cutCodeBlockLine(
+  state: any,
+  dispatch: any,
+): boolean {
+  const { $from, empty } = state.selection
+  if (!empty || !dispatch || !_editorView) return false
+
+  let depth = -1
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === "codeBlock") {
+      depth = d
+      break
+    }
+  }
+  if (depth === -1) return false
+
+  const blockStart = $from.start(depth)
+  const blockEnd = $from.end(depth)
+  const text = state.doc.textBetween(blockStart, blockEnd, "\n")
+  const off = Math.max(0, Math.min($from.pos - blockStart, text.length))
+
+  const lineStartOff = text.lastIndexOf("\n", Math.max(0, off - 1)) + 1
+  let lineEndOff = text.indexOf("\n", off)
+  if (lineEndOff === -1) lineEndOff = text.length
+
+  const lineFrom = blockStart + lineStartOff
+  const lineTo = blockStart + lineEndOff
+
+  let delFrom = lineFrom
+  let delTo = lineTo
+  if (lineTo < blockEnd) delTo = lineTo + 1
+  else if (lineFrom > blockStart) delFrom = lineFrom - 1
+
+  const { dom, text: plain } = (
+    _editorView as unknown as {
+      serializeForClipboard(slice: unknown): { dom: HTMLElement; text: string }
+    }
+  ).serializeForClipboard(state.doc.slice(lineFrom, lineTo))
+  try {
+    void navigator.clipboard
+      .write([
+        new ClipboardItem({
+          "text/html": new Blob([dom.innerHTML], { type: "text/html" }),
+          "text/plain": new Blob([plain], { type: "text/plain" }),
+        }),
+      ])
+      .catch(() => {}) // clipboard denied — the deletion below still applies
+  } catch {
+    // ClipboardItem unavailable — skip the copy, keep the cut.
+  }
+
+  const tr = state.tr.delete(delFrom, delTo)
+  tr.setSelection(
+    TextSelection.near(tr.doc.resolve(tr.mapping.map(delFrom))),
+  )
+  dispatch(tr.scrollIntoView())
+  return true
+}
+
 function cutBlock(
   state: any,
   dispatch: any,
 ): boolean {
   const { $from, empty } = state.selection
   if (!empty) return false
+
+  // Inside a code block the meaningful unit is the line, not the whole block.
+  if (isInsideCodeBlock($from)) return cutCodeBlockLine(state, dispatch)
+
   const pos = findBlockStart($from)
   if (pos === null || !dispatch || !_editorView) return false
 
@@ -659,8 +928,14 @@ function cycleBlockCommand(
   }
 }
 
-export function createKeymap() {
-  return defineKeymap({
+export type KeyHandler = (state: any, dispatch: any, view?: any) => boolean
+
+/**
+ * The ProseMirror/ProseKit keymap. Hoisted out of `createKeymap` (and exported)
+ * so the block-move / list-delete commands can be driven straight from tests
+ * without standing up a whole editor.
+ */
+export const editorKeymap: Record<string, KeyHandler> = {
     "Mod-b": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
     "Mod-B": (state, dispatch) => toggleMark(state.schema.marks.bold)(state, dispatch),
     "Mod-i": (state, dispatch) => toggleMark(state.schema.marks.italic)(state, dispatch),
@@ -781,6 +1056,7 @@ export function createKeymap() {
       enterCodeBlockVertically(state, dispatch, view, -1),
     "Mod-ArrowUp": (state, dispatch) => moveBlock(state, dispatch, -1),
     "Mod-ArrowDown": (state, dispatch) => moveBlock(state, dispatch, 1),
+    "Ctrl-Space": (state, dispatch) => toggleTaskChecked(state, dispatch),
     "ArrowLeft": (state, dispatch) => enterInlineCodeFromLeft(state, dispatch),
     "ArrowRight": (state, dispatch) => exitInlineCode(state, dispatch),
     "Home": (state, dispatch, view) => homeStaged(state, dispatch, view),
@@ -809,14 +1085,19 @@ export function createKeymap() {
       return true
     },
     "Backspace": (state, dispatch) => {
+      if (deleteSelectedListItems(state, dispatch)) return true
       if (backspaceCodeBlockToParagraph(state, dispatch)) return true
       return headingToParagraph(state, dispatch)
     },
     "Delete": (state, dispatch) => {
+      if (deleteSelectedListItems(state, dispatch)) return true
       if (deleteAtListItemStart(state, dispatch)) return true
       return headingToParagraph(state, dispatch)
     },
-  })
+}
+
+export function createKeymap() {
+  return defineKeymap(editorKeymap)
 }
 
 const codeBlockMoveKey = new PluginKey("code-block-block-move")

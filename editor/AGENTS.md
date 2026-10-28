@@ -546,13 +546,20 @@ create, link, …).
   `openWindow()`, and lazily registering the controller in
   `src/controllers/lazy.ts`.
 
-## Mobile dock — three tabs, no FAB menu
+## Mobile dock — two tabs, no FAB menu, no "More" screen
 
-`#dock` renders three **identical** tabs: Files / Editor / More
-(`DockController`), styled by `.dock-item` with no special case for the middle
-one. The middle tab used to be a raised circular `.dock-item--fab` that doubled
-as an "add block" trigger; that duplicated the edit-toolbar's "+", so both the
-FAB chrome and its insert menu are gone. Do not reintroduce either.
+`#dock` renders two **identical** tabs: Files / Editor (`DockController`),
+styled by `.dock-item` with no special case for either. The middle tab used to
+be a raised circular `.dock-item--fab` that doubled as an "add block" trigger;
+that duplicated the edit-toolbar's "+", so both the FAB chrome and its insert
+menu are gone. A third "More" tab used to open a fullview of secondary actions —
+it is gone too, because the mobile topbar's **File ▸** dropdown now carries what
+it did as `View ▸` (screens, panels) and `More ▸` (Disk Stats, Meta Panel, Image
+Manager) submenus, with Preferences and About as their own entries. Do not
+reintroduce any of them: secondary screens have exactly one entry point, the
+`file` menu registry (`src/config/menu-definitions.ts`), and the pending-changes
+badge lives on the Files tab (the Files screen also has the Review / Save row
+below "+ New").
 
 ## Native "back" press (host → JS contract)
 
@@ -570,13 +577,22 @@ The decision lives in `ShellController.handleBackPressed()`, which unwinds
    `{ handled: boolean }` — a pushed preferences section steps back to the
    preferences menu, the Files multi-select mode exits selection; the handler
    sets `handled = true`),
-3. the fullview itself: `navigation` (Files) and `more` go straight to
-   `editor`, every other fullview returns to `more`.
+3. the fullview itself — **every** fullview (Files included) goes straight to
+   `editor`. There is no intermediate "More" screen any more, so one press
+   always lands on the editor.
 
 Only when the editor is already frontmost does it return false, so a press can
 never quit the app from a subscreen — it walks back to the editor first, and the
 next press exits. Add new unwinding steps as `AppEvent.BackRequested`
 subscribers, never by teaching the host about app views.
+
+**Browser / PWA** have no bridge, so the same one-step behavior comes from the
+session history: `ShellController.syncFullviewHistory()` pushes one entry when a
+fullview opens and pops it when the app returns to the editor, and `popstate`
+maps a back press to `switchTo("editor")`. Without it, fullviews were pure
+`display` toggles on one document — the browser Back button skipped straight
+past them and left the app. Any new fullview gets this for free: it only has to
+emit `AppEvent.ViewChanged`.
 
 ## Bottom-strip clearance (desktop)
 
@@ -607,6 +623,47 @@ Two more things follow from that shape:
 
 Follow mode (`.is-follow-mode`) is excluded on purpose: there the strip is a
 popover anchored at the caret, not a bottom bar.
+
+## New files are named by their first `# heading`
+
+"New" (File ▸ New and the Files screen's "+ New") no longer asks for a name: it
+creates the page under a throwaway three-word slug (`quiet-river-stone`) with an
+empty `#` heading and focuses it, and `src/features/auto-name.ts` renames the
+file to whatever the user types in that heading (debounced 1.2s, through
+`NavigationService.renameTo`).
+
+- Only files created this way auto-rename — `markAutoNamed(path)` records them
+  and any explicit rename clears the mark. Never infer a name for a file the
+  user named themselves.
+- Deleting or omitting the heading yields nothing: the file keeps its name and
+  the explorer's **… ▸ Rename** is the only way forward. Do not fall back to the
+  slug, and do not wipe the name when the heading disappears.
+- An inferred name must never clobber: `renameTo` bails when the target path is
+  taken.
+
+## Explorer row actions
+
+The `…` menu on every row carries Duplicate and Clear content alongside Delete.
+Both are **pending ops** (a `queueCreate` per copy, an Edit with an empty patch
+for a clear), so they appear in Pending Changes and only reach disk on a flush —
+the same guarantee Delete gives. Duplicating a folder copies its `_index` and
+every descendant; clearing a folder empties its `_index`. Remember that an
+empty patch is a valid Edit (use `!== undefined`, never truthiness).
+
+## Imports never overtake what is already there
+
+`src/features/import-resolve.ts` decides where an imported file lands **before**
+anything is written:
+
+- A name owned by a DIRECTORY becomes `<name>-file` — a stable suffix, so later
+  imports of the same name land on the same companion file instead of spawning
+  `-2`, `-3`.
+- A name owned by a FILE is the user's call: replace / append / merge (merge is
+  a real `merge3` line merge over an empty ancestor).
+- Every import goes through `FileSyncService.importContent()` — a pending Edit,
+  never a bare `provider.writeFile`. That is what makes it reviewable and gives
+  the changes dialog a real per-line diff; a direct write was invisible and no
+  diff was ever shown.
 
 ## Sidebar chrome
 

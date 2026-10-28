@@ -973,3 +973,20 @@
 .remote-status.info {
   color: var(--color-info, #3b82f6);
 }
+
+/* Existing-file strategy for the zip import: replace / append / merge. */
+.import-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 4px 0 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.import-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}

@@ -13,7 +13,6 @@ import UpdaterLoaderController from "./updater-loader-controller"
 import MetaPanelController from "./meta-panel/meta-panel-controller"
 import DockController from "./dock-controller"
 import NavigationController from "./navigation-controller"
-import MoreController from "./more-controller"
 import EditToolbarController from "./edit-toolbar-controller"
 import StatusBarController from "./statusbar-controller"
 
@@ -63,7 +62,6 @@ export function registerCoreControllers(app: Application): void {
   // also gains the quick bar as a fallback when the block handle cannot fit.
   if (hasFunc(AppFunc.MobileDock)) {
     app.register("dock", DockController)
-    app.register("more", MoreController)
     app.register("edit-toolbar", EditToolbarController)
   }
 }

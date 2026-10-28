@@ -30,6 +30,8 @@ export interface SidebarActions {
   onDelete: (paths: string[]) => void;
   onSelect: (path: string, isFolder?: boolean) => void;
   onRename: (path: string) => void;
+  onDuplicate: (paths: string[]) => void;
+  onClearContent: (paths: string[]) => void;
   onMove: (from: string, to: string) => void;
   onReorderWeights: (weights: { path: string; weight: number }[]) => void;
   onChangeProvider: () => void;
@@ -509,6 +511,14 @@ export function showMenu(
     { type: MenuType.Item, label: "New…", onClick: () => actions.onNewItem(pagePath, isFolder) },
     { type: MenuType.Item, label: "Rename", onClick: () => actions.onRename(pagePath) },
     { type: MenuType.Item, label: "Select", onClick: () => actions.onSelect(pagePath, isFolder) },
+    // Duplicate / Clear content go through pending ops like every other
+    // sidebar mutation, so a flush is what actually writes them.
+    {
+      type: MenuType.Item,
+      label: isFolder ? "Duplicate folder…" : "Duplicate",
+      onClick: () => actions.onDuplicate([pagePath]),
+    },
+    { type: MenuType.Item, label: "Clear content", onClick: () => actions.onClearContent([pagePath]) },
     { type: MenuType.Item, label: "Delete", danger: true, onClick: () => actions.onDelete([pagePath]) },
   ];
 

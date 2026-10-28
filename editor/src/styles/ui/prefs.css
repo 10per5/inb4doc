@@ -610,3 +610,48 @@
   transition: 120ms ease-in;
   opacity: 1;
 }
+
+/* ── Project pinning (star column) ─────────────────────────────────── */
+
+.project-col-pin {
+  width: 2rem;
+  padding-right: 0 !important;
+  text-align: center;
+}
+
+.project-table thead .project-col-pin svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.project-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--color-border);
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 0;
+}
+
+.project-pin svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.project-pin:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-warning);
+}
+
+.project-pin.is-pinned {
+  color: var(--color-warning);
+}
+
+.project-pin:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

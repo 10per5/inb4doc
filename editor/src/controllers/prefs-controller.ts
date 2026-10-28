@@ -12,6 +12,7 @@ import {
   onPrefsSpellcheckLanguagesChanged,
   onPrefsCustomCssChanged,
   onPrefsFollowCaretToolbarChanged,
+  onPrefsPinnedProjectsChanged,
 } from "@/components/ui/prefs"
 import { buildPrefsPanes } from "@/components/ui/prefs-panes"
 import { appEvents, AppEvent } from "@/stores/app-events"
@@ -230,7 +231,7 @@ export default class PrefsController extends BaseDialogController {
       this.backToMenu()
       return
     }
-    appEvents.emit(AppEvent.ViewChanged, { view: "more" })
+    appEvents.emit(AppEvent.ViewChanged, { view: "editor" })
   }
 
   // ── Field handlers ─────────────────────────────────────────────────
@@ -289,6 +290,30 @@ export default class PrefsController extends BaseDialogController {
 
   projectNextPage(): void {
     this.showProjectPage(this.currentProjectPage() + 1)
+  }
+
+  /**
+   * Star/unstar a root-level project ("Show all" has no pin). The row itself is
+   * a switch that would retarget the tree, so the click is swallowed here; and
+   * because pinning reorders the list, the surface is redrawn instead of having
+   * its DOM patched.
+   */
+  pinToggled(e: Event): void {
+    e.stopPropagation()
+    const value = (e.currentTarget as HTMLElement).dataset.projectValue ?? ""
+    if (!value) return
+    const pinned = prefsStore.pinnedProjects.filter((p) => p !== value)
+    if (pinned.length === prefsStore.pinnedProjects.length) pinned.push(value)
+    onPrefsPinnedProjectsChanged(pinned)
+    this.redraw()
+  }
+
+  private redraw(): void {
+    if (this.hasPayloadValue) {
+      this.renderDialog(this.currentDialogSection())
+      return
+    }
+    this.renderScreen(this.currentSection())
   }
 
   private currentProjectPage(): number {

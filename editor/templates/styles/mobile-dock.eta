@@ -392,9 +392,9 @@ body.layout-mobile-shrink .book-layout {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Editor tab: a plain dock item like Files and More. There is no FAB — the
- * middle button used to be a raised circle that doubled as an "add block"
- * trigger, which put a second "+" on the same screen as the edit-toolbar. */
+/* Both tabs are plain dock items. There is no FAB — the middle button used to
+ * be a raised circle that doubled as an "add block" trigger, which put a
+ * second "+" on the same screen as the edit-toolbar. */
 .dock-item .dock-icon {
   position: relative;
   display: flex;

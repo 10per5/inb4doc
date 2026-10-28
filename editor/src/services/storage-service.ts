@@ -13,6 +13,8 @@ export interface WikiPrefs {
   hideEmptyFolders: boolean
   /** Restrict the navtree to one root-level folder ("project"). "" = show all. */
   rootScope: string
+  /** Starred root-level folders: they sort first in the project picker. */
+  pinnedProjects: string[]
   /** Browser spell-check highlight inside the editor content. */
   spellcheck: boolean
   /** Opt-in dictionaries (BCP-47 tags) handed to the browser; first is primary. */
