@@ -84,6 +84,22 @@ class CommandService {
     }
   }
 
+  /**
+   * Toggle the current block(s) inside a collapsible `<details>` node. Inside
+   * one already, the content is lifted back out (same feel as quote).
+   */
+  get wrapInDetailsCommand(): PMCommand {
+    return (state, dispatch) => {
+      const details = state.schema.nodes.details
+      if (!details) return false
+      const $from = state.selection.$from
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type === details) return lift(state, dispatch)
+      }
+      return wrapIn(details)(state, dispatch)
+    }
+  }
+
   get toggleStrikethroughCommand(): PMCommand {
     return (state, dispatch) => toggleMark(state.schema.marks.strike)(state, dispatch)
   }

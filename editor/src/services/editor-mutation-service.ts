@@ -73,6 +73,8 @@ export function initEditorMutationService(getEditor: () => { action: (fn: (ctx: 
           setTaskChecked(view, false); break
         case ToolbarCommand.Blockquote:
           commandService.wrapInBlockquoteCommand(state, dispatch); break
+        case ToolbarCommand.Details:
+          commandService.wrapInDetailsCommand(state, dispatch); break
         case ToolbarCommand.ToggleTaskChecked:
           toggleTaskChecked(view); break
         case ToolbarCommand.ExitList:

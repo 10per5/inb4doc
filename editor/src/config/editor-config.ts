@@ -34,6 +34,7 @@ import { codeBlockUI } from "@/plugins/code-block-ui";
 import { setupTableHandleUI } from "@/plugins/table-handle-ui";
 import { setupBlockHandleUI } from "@/plugins/block-handle-ui";
 import { videoView } from "@/plugins/video";
+import { detailsView } from "@/plugins/details";
 import { fixedTableBlockView } from "@/plugins/table-block-view";
 import { createDirtyPlugin } from "@/plugins/dirty";
 import { createMentionPlugin } from "@/plugins/mention";
@@ -165,6 +166,7 @@ export async function createEditor(
     codeBlockUI,
     mathBlockPreviewView,
     videoView,
+    detailsView,
   ];
 
   const prosekitEditor = prosekitCreateEditor({ extension: union(extensions) });

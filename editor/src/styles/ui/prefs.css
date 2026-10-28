@@ -163,6 +163,29 @@
   font-size: 0.8rem;
 }
 
+/* Label + control on one line (the Markdown compat dropdown row): the label
+ * keeps its natural width and the control takes whatever room is left. */
+.prefs-row-inline {
+  align-items: center;
+  gap: 0.75rem;
+  cursor: default;
+}
+.prefs-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+.prefs-select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
 .prefs-note {
   margin: 0 0 0.6rem;
   font-size: var(--font-size-small);

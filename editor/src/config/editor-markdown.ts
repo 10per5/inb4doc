@@ -11,6 +11,7 @@ import taskLists from "markdown-it-task-lists";
 
 import { ALERT_TYPES } from "./editor-schema";
 import type { EditorInstance } from "./editor-config";
+import { prefsStore } from "@/stores/preferences-store";
 
 /**
  * Markdown <-> ProseKit bridge.
@@ -19,7 +20,7 @@ import type { EditorInstance } from "./editor-config";
   * autolinks are editor-level, see src/plugins/link-autolink.ts,
   * markdown-it-task-lists) via prosemirror-markdown's token
  * handlers, plus a post-parse doc fixup that rebuilds the app's custom
- * nodes (video, div-center, alert, hugoRef, math, image-block, task
+ * nodes (video, div-center, details, alert, hugoRef, math, image-block, task
  * checkboxes). Serialization uses a MarkdownSerializer covering the same
  * custom nodes so the markdown corpus round-trips.
  */
@@ -319,6 +320,12 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
 
 const DIV_CENTER_OPEN = /^<div\s+align\s*=\s*"center"\s*>/i;
 const BR_ONLY = /^<\s*br\s*\/?\s*>$/i;
+const DETAILS_CLOSE = /<\/details>\s*$/i;
+const DETAILS_SUMMARY = /^\s*<summary(?:\s[^>]*)?>([\s\S]*?)<\/summary>/i;
+// Hugo Book's collapsible shortcode — the legacy spelling of the same block
+// (`{{% details title="X" %}}`, `{{< details "X" >}}`).
+const DETAILS_SHORTCODE_OPEN = /^\{\{[<%]\s*details\b([\s\S]*?)[%>]\}\}/;
+const DETAILS_SHORTCODE_CLOSE = /^\{\{[<%]\s*\/details\b\s*[%>]\}\}$/;
 const TASK_CHECKBOX =
   /<input\b[^>]*class\s*=\s*"[^"]*task-list-item-checkbox[^"]*"[^>]*>/i;
 const REF_LINK = /^\{\{%\s*ref\s/;
@@ -407,6 +414,156 @@ function htmlInParagraph(node: ProseNode): string | null {
   const only = node.firstChild;
   if (!only || only.type.name !== "html") return null;
   return only.attrs.value;
+}
+
+/**
+ * Concatenated raw source of a paragraph that holds nothing but text and raw
+ * html atoms (a markdown-it html_block lands here either way). Returns null for
+ * any other block, or for a paragraph containing other inline nodes.
+ */
+function rawBlockHtml(node: ProseNode): string | null {
+  if (node.type.name !== "paragraph" || node.childCount === 0) return null;
+  let out = "";
+  let simple = true;
+  node.forEach((child) => {
+    if (child.isText) out += child.text ?? "";
+    else if (child.type.name === "html") out += String(child.attrs.value ?? "");
+    else simple = false;
+  });
+  return simple ? out : null;
+}
+
+interface DetailsHeader {
+  title: string;
+  open: boolean;
+  /** Text after the opening construct — the body when it fits in one block. */
+  rest: string;
+  /** True when the closer is written as the Hugo Book shortcode. */
+  shortcode: boolean;
+}
+
+/**
+ * Recognizes either dialect of a collapsible block's opening line: the raw
+ * `<details [open]>` HTML or `{{% details title="…" [open=true] %}}` /
+ * `{{< details "…" >}}`. Returns null for anything else.
+ */
+function parseDetailsOpen(raw: string): DetailsHeader | null {
+  const tag = raw.match(/^<details(\s[^>]*)?>/i);
+  if (tag) {
+    let rest = raw.slice(tag[0].length);
+    const summary = rest.match(DETAILS_SUMMARY);
+    let title = "";
+    if (summary) {
+      title = summary[1].trim();
+      rest = rest.slice(summary[0].length);
+    }
+    return {
+      title,
+      open: /\bopen\b/i.test(tag[0]),
+      rest,
+      shortcode: false,
+    };
+  }
+
+  const shortcode = raw.match(DETAILS_SHORTCODE_OPEN);
+  if (!shortcode) return null;
+  const params = shortcode[1] ?? "";
+  const title =
+    params.match(/title\s*=\s*"([^"]*)"/)?.[1] ??
+    params.match(/^"([^"]*)"/)?.[1] ??
+    "";
+  return {
+    title: title.trim(),
+    open: /\bopen\s*=\s*(?:true|1)\b/i.test(params) || /^\s*open\b/i.test(params),
+    rest: raw.slice(shortcode[0].length),
+    shortcode: true,
+  };
+}
+
+/** Closing line of a collapsible block in either dialect. */
+function isDetailsClose(raw: string, shortcode: boolean): boolean {
+  const trimmed = raw.trim();
+  return shortcode
+    ? DETAILS_SHORTCODE_CLOSE.test(trimmed)
+    : DETAILS_CLOSE.test(trimmed);
+}
+
+/**
+ * Builds one `details` node starting at `children[i]`. Two shapes are handled:
+ * the whole block collapsed into a single markdown block, and the open tag,
+ * body and closer living in separate blocks. Returns null when `children[i]`
+ * does not open a details block or when its closer is missing.
+ */
+function tryDetailsBlock(
+  schema: Schema,
+  children: readonly ProseNode[],
+  i: number,
+): { node: ProseNode; next: number } | null {
+  const detailsType = schema.nodes.details;
+  if (!detailsType) return null;
+
+  const openRaw = rawBlockHtml(children[i]);
+  if (openRaw === null) return null;
+  const header = parseDetailsOpen(openRaw.trimStart().trim());
+  if (!header) return null;
+
+  const attrs = { title: header.title, open: header.open };
+
+  // One-block form: `<details>` … `</details>` inside a single html_block.
+  if (isDetailsClose(header.rest, header.shortcode)) {
+    const body = header.rest.replace(
+      header.shortcode ? DETAILS_SHORTCODE_CLOSE : DETAILS_CLOSE,
+      "",
+    );
+    return {
+      node: detailsType.create(attrs, detailsBodyBlocks(schema, body)),
+      next: i + 1,
+    };
+  }
+
+  let closeIdx = -1;
+  for (let j = i + 1; j < children.length; j++) {
+    const cv = rawBlockHtml(children[j]);
+    if (cv !== null && isDetailsClose(cv, header.shortcode)) {
+      closeIdx = j;
+      break;
+    }
+  }
+  if (closeIdx === -1) return null;
+
+  const middle = children.slice(i + 1, closeIdx);
+  // Leftover text on the opening line (rare) becomes its own leading block; a
+  // bare newline left by the tag must NOT become one, or every save appends
+  // another empty paragraph.
+  const prelude = header.rest.trim()
+    ? detailsBodyBlocks(schema, header.rest)
+    : [];
+  const inner = fixBlockChildren(schema, middle) ?? [...middle];
+  // Only fall back to an empty block when there is genuinely no content left —
+  // otherwise the placeholder paragraph is serialized as `<br />` and comes
+  // back as another real block on the next load.
+  const content =
+    inner.length > 0 || prelude.length > 0
+      ? inner
+      : [schema.nodes.paragraph.create()];
+
+  return {
+    node: detailsType.create(attrs, [...prelude, ...content]),
+    next: closeIdx + 1,
+  };
+}
+
+/**
+ * Body text of a one-block `<details>…</details>` → paragraphs. Blank lines
+ * separate paragraphs; the result is never empty (content is `block+`).
+ */
+function detailsBodyBlocks(schema: Schema, body: string): ProseNode[] {
+  const chunks = body
+    .split(/\n\s*\n/)
+    .map((c) => c.trim())
+    .filter((c) => c.length > 0);
+  if (chunks.length === 0) return [schema.nodes.paragraph.create()];
+  return chunks.map((c) => schema.nodes.paragraph.create({}, schema.text(c)));
 }
 
 /**
@@ -564,6 +721,18 @@ function fixBlockChildren(
         i = closeIdx + 1;
         continue;
       }
+    }
+
+    // <details> [<summary>title</summary>] … </details> — or the Hugo Book
+    // shortcode form. markdown-it swallows consecutive HTML-only lines into one
+    // html_block, so either the whole thing lands in a single paragraph or
+    // (with blank lines inside) open tag, body and closer are separate blocks.
+    const details = tryDetailsBlock(schema, children, i);
+    if (details) {
+      out.push(details.node);
+      changed = true;
+      i = details.next;
+      continue;
     }
 
     // blockquote -> alert when it opens with `> [!TYPE]`
@@ -898,9 +1067,11 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
       },
       alert(state, node) {
         const type = node.attrs.type || "note";
+        // Legacy: no GitHub callout marker — just a plain blockquote.
+        const callout = prefsStore.compatGithubAlerts;
         state.wrapBlock("> ", null, node, () => {
           node.forEach((child, _o, i) => {
-            if (i === 0 && child.type.name === "paragraph") {
+            if (i === 0 && callout && child.type.name === "paragraph") {
               state.write(`[!${type.toUpperCase()}] `);
               state.renderInline(child, false);
               state.closeBlock(child);
@@ -927,9 +1098,42 @@ export function createMarkdownSerializer(schema: Schema): MarkdownSerializer {
         state.closeBlock(node);
       },
       divCenter(state, node) {
+        // Legacy renderers drop raw HTML, so the wrapper is dropped too and the
+        // content saves as plain blocks.
+        if (!prefsStore.compatRawHtml) {
+          state.renderContent(node);
+          state.closeBlock(node);
+          return;
+        }
         state.write('<div align="center">\n');
         state.renderContent(node);
         state.write("</div>");
+        state.closeBlock(node);
+      },
+      details(state, node) {
+        const title = String(node.attrs.title ?? "").trim();
+        // Legacy: the Hugo Book shortcode instead of raw `<details>` HTML.
+        if (!prefsStore.compatRawHtml) {
+          const params = [
+            title ? `title="${title.replace(/"/g, '\\"')}"` : "",
+            node.attrs.open ? "open=true" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          state.write(params ? `{{% details ${params} %}}\n\n` : "{{% details %}}\n\n");
+          state.renderContent(node);
+          state.write("{{% /details %}}");
+          state.closeBlock(node);
+          return;
+        }
+        // The blank line after `<summary>` is load-bearing: without it
+        // markdown-it keeps the whole block as one HTML block and the body
+        // would not survive as separate paragraphs.
+        const open = node.attrs.open ? " open" : "";
+        state.write(`<details${open}>\n`);
+        if (title) state.write(`<summary>${title}</summary>\n\n`);
+        state.renderContent(node);
+        state.write("</details>");
         state.closeBlock(node);
       },
       hugoRef(state, node) {

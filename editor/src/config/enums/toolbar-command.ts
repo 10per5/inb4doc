@@ -31,4 +31,6 @@ export enum ToolbarCommand {
   ExitList,
   /** Save the open document to the provider (edit-toolbar's trailing disk). */
   Save,
+  /** Wrap the selection in a collapsible `<details>` block (toggle). */
+  Details,
 }

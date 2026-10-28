@@ -3,6 +3,8 @@ import {
   deletePages,
   duplicatePages,
   clearPageContents,
+  cutPage,
+  pastePage,
   renamePage,
   movePage,
   setPageWeights,
@@ -52,6 +54,8 @@ export class NavigationService {
       appEvents.on(AppEvent.SidebarDeleteRequested, ({ paths }) => this.deletePages(paths)),
       appEvents.on(AppEvent.SidebarRenameRequested, ({ path }) => this.renamePage(path)),
       appEvents.on(AppEvent.SidebarMoveRequested, ({ from, to }) => this.movePage(from, to)),
+      appEvents.on(AppEvent.FileCutRequested, ({ path }) => this.cutPage(path)),
+      appEvents.on(AppEvent.FilePasteRequested, ({ target }) => this.pastePage(target)),
       appEvents.on(AppEvent.SidebarDuplicateRequested, ({ paths }) =>
         this.duplicatePages(paths),
       ),
@@ -370,6 +374,32 @@ export class NavigationService {
         `Duplicated ${created.length} item${created.length === 1 ? "" : "s"} — flush to write`,
         { type: "info", id: "duplicate" },
       );
+    });
+  }
+
+  /**
+   * Ctrl+X in the explorer: the page's contents move to the file clipboard and
+   * the page itself becomes a pending Delete, so the row survives (struck
+   * through) until a paste re-homes it or a flush commits the delete.
+   */
+  async cutPage(path: string): Promise<void> {
+    await cutPage(this.cache, path, () => {
+      updateEditorTint(this.editor.element as HTMLElement, path, this.cache.getPendingOps());
+      this.loadSidebar();
+      dirtyTrackingService.recompute();
+    });
+  }
+
+  /**
+   * Ctrl+V in the explorer: rebuild the cut document next to (or inside) the
+   * target row and open the fresh page. The original's pending Delete stays
+   * queued, so one flush performs the whole move.
+   */
+  async pastePage(target: string): Promise<void> {
+    await pastePage(this.cache, target, (created) => {
+      this.loadSidebar();
+      dirtyTrackingService.recompute();
+      this.navigate(created);
     });
   }
 

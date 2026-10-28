@@ -219,6 +219,44 @@ export function createSchemaExtension(): Extension {
       toDOM: () => ["div", { align: "center", "data-type": "div-center" }, 0],
     }),
 
+    // <details> — collapsible disclosure block. The <summary> text lives in
+    // the `title` attr (there is no schema node for it) and `open` mirrors the
+    // HTML attribute so a toggle is a setNodeMarkup on this node.
+    defineNodeSpec({
+      name: "details",
+      group: "alertBlock",
+      content: "block+",
+      defining: true,
+      attrs: {
+        title: { default: "", validate: "string" },
+        open: { default: false },
+      },
+      parseDOM: [
+        {
+          tag: "details",
+          getAttrs: (dom: HTMLElement) => {
+            const summary = dom.querySelector("summary");
+            return {
+              title: (summary?.textContent ?? "").trim(),
+              open:
+                dom.hasAttribute("open") ||
+                dom.getAttribute("data-open") === "true",
+            };
+          },
+        },
+      ],
+      toDOM: (node) => [
+        "details",
+        {
+          class: "md-details",
+          "data-type": "details",
+          "data-title": String(node.attrs.title ?? ""),
+          ...(node.attrs.open ? { open: "open" } : {}),
+        },
+        0,
+      ],
+    }),
+
     defineNodeSpec({
       name: "hugoRef",
       group: "inline",

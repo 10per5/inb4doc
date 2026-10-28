@@ -189,6 +189,22 @@
   display: none;
 }
 
+/* The list rows are icon-only controls (bullets / ordered / task / remove), so
+ * each row is a square hit area with the glyph centered; the tooltip carries
+ * the name that used to be printed next to it. */
+.toolbar-list-dropdown button.toolbar-list-icon-btn {
+  gap: 0;
+  padding: 8px 10px;
+  justify-content: center;
+}
+
+.toolbar-list-dropdown button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex: 0 0 auto;
+}
+
 
 .toolbar-section-center button svg {
   width: 18px;

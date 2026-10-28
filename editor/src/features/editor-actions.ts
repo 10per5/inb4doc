@@ -7,6 +7,7 @@ import type { FileSyncService } from "@/services/file-sync-service"
 import { showNotification } from "@/components/notification/notification"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { treeStore } from "@/stores/tree-store"
+import { clearFileClipboard, getFileClipboard, setFileClipboard } from "@/stores/file-clipboard"
 import { pendingOpsStore } from "@/stores/pending-ops-store"
 import { dirtyTrackingService } from "@/services/dirty-tracking-service"
 import { HOME_PATH, HOME_FILENAME, validateHugoSlug } from "@/utils/hugo-compat"
@@ -502,6 +503,72 @@ export async function duplicatePages(
     return
   }
   afterDuplicate(created)
+}
+
+/**
+ * Cut one page into the file clipboard: its contents travel with the cursor and
+ * the original is queued for deletion — the same pending Delete the menu's
+ * Delete queues, so the row strikes through and nothing leaves the folder until
+ * a flush. Pasting re-creates the document elsewhere; saving with nothing
+ * pasted is simply the delete.
+ */
+export async function cutPage(
+  cacheService: FileSyncService,
+  path: string,
+  afterCut: (path: string) => void,
+): Promise<void> {
+  const content = await readFullContent(cacheService, path)
+  if (content === undefined) {
+    showNotification("Nothing to cut", { title: "Cut", type: "warning", id: "file-cut" })
+    return
+  }
+
+  setFileClipboard({ path, content, mode: "cut" })
+  cacheService.queueDelete(path)
+  afterCut(path)
+  showNotification(`Cut "${path.split("/").pop() ?? path}" — paste it, then save`, {
+    title: "Cut",
+    type: "info",
+    id: "file-cut",
+  })
+}
+
+/**
+ * Paste the file clipboard's document back as a new page. A folder target
+ * receives it inside itself, a page target next to itself; the original name is
+ * kept, falling back to `-copy` only when something already sits there.
+ */
+export async function pastePage(
+  cacheService: FileSyncService,
+  target: string,
+  afterPaste: (created: string) => void,
+): Promise<void> {
+  const entry = getFileClipboard()
+  if (!entry) {
+    showNotification("Nothing to paste", { title: "Paste", type: "warning", id: "file-paste" })
+    return
+  }
+
+  const tree = treeStore.getTree()
+  const base = entry.path.split("/").pop() ?? entry.path
+  const dir = tree.paths.has(target) ? target.slice(0, Math.max(0, target.lastIndexOf("/"))) : target
+  let targetPath = dir ? `${dir}/${base}` : base
+  if (await cacheService.pathExists(targetPath)) {
+    let n = 2
+    while (await cacheService.pathExists(`${targetPath}-${n}`)) n++
+    targetPath = `${targetPath}-${n}`
+  }
+
+  cacheService.queueCreate(targetPath, entry.content)
+
+  const { frontmatter, body } = stripFrontmatter(entry.content)
+  const page = pagesStore.getOrCreate(targetPath)
+  if (frontmatter) page.frontmatter = Frontmatter.fromMeta(frontmatter)
+  page.bodyState.cacheBody(body)
+  page.setBaseline(body)
+
+  clearFileClipboard()
+  afterPaste(targetPath)
 }
 
 /**

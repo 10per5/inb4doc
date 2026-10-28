@@ -435,6 +435,25 @@ export default class extends Controller {
       return;
     }
 
+    // Ctrl/Cmd+X / V are the explorer's cut & paste: the focused row (or the
+    // open document when the tree itself isn't focused) is the target. The
+    // editor owns those keys inside the document, so this never leaves the
+    // tree's own keydown handler.
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === "x" || key === "v") {
+        const path = this.focusedPath();
+        if (!path) return;
+        e.preventDefault();
+        if (key === "x") {
+          appEvents.emit(AppEvent.FileCutRequested, { path });
+        } else {
+          appEvents.emit(AppEvent.FilePasteRequested, { target: path });
+        }
+        return;
+      }
+    }
+
     const items = this.getVisibleItems();
     if (items.length === 0) return;
 
@@ -566,6 +585,13 @@ export default class extends Controller {
       link.closest(".nav-section")?.getAttribute("data-nav-path") ||
       "";
     if (path) this.actions?.onDelete([path]);
+  }
+
+  /** The row the keyboard is on, falling back to the open document. */
+  private focusedPath(): string {
+    const active = document.activeElement as HTMLElement | null;
+    const host = active?.closest?.(".nav-item, .nav-section") as HTMLElement | null;
+    return host?.getAttribute("data-nav-path") || this.activePath;
   }
 
   private getVisibleItems(): HTMLAnchorElement[] {

@@ -415,6 +415,16 @@ export default class extends Controller {
     el?.classList.toggle("open");
   }
 
+  /**
+   * The dropdown rows are icon-only, so a contextual slot swaps its SVG and
+   * keeps the accessible name in sync — `textContent` would drop the markup.
+   */
+  private setListSlot(slot: HTMLElement, icon: string, label: string): void {
+    slot.innerHTML = icon;
+    slot.title = label;
+    slot.setAttribute("aria-label", label);
+  }
+
   execList(e: Event) {
     const target = (e.target as HTMLElement).closest(
       "[data-kind]",
@@ -548,11 +558,15 @@ export default class extends Controller {
     if (taskSlot) {
       if (isTask) {
         taskSlot.dataset.kind = "checked";
-        taskSlot.textContent =
-          context.checked === true ? "Uncheck" : "Check";
+        const checked = context.checked === true;
+        this.setListSlot(
+          taskSlot,
+          checked ? icons.square : icons.checkSquare,
+          checked ? "Uncheck" : "Check",
+        );
       } else {
         taskSlot.dataset.kind = "task";
-        taskSlot.textContent = "Task list";
+        this.setListSlot(taskSlot, icons.checkSquare, "Task list");
       }
     }
 

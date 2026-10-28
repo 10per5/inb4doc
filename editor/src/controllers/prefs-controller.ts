@@ -12,6 +12,9 @@ import {
   onPrefsSpellcheckLanguagesChanged,
   onPrefsCustomCssChanged,
   onPrefsFollowCaretToolbarChanged,
+  onPrefsMarkdownCompatChanged,
+  onPrefsCompatGithubAlertsChanged,
+  onPrefsCompatRawHtmlChanged,
   onPrefsPinnedProjectsChanged,
 } from "@/components/ui/prefs"
 import { buildPrefsPanes } from "@/components/ui/prefs-panes"
@@ -371,6 +374,27 @@ export default class PrefsController extends BaseDialogController {
   toolbarPlacementChanged(e: Event): void {
     const radio = e.target as HTMLInputElement
     if (radio.checked) onPrefsFollowCaretToolbarChanged(radio.value === "follow")
+  }
+
+  /**
+   * Markdown compat preset. It also pins the two behavior flags, so the pane
+   * has to be rebuilt: the checkboxes' checked/disabled state is part of the
+   * rendered markup (see section-general.eta), not something patched here.
+   */
+  markdownCompatChanged(e: Event): void {
+    const mode = (e.target as HTMLSelectElement).value === "legacy"
+      ? "legacy"
+      : "modern"
+    onPrefsMarkdownCompatChanged(mode)
+    this.redraw()
+  }
+
+  compatGithubAlertsChanged(e: Event): void {
+    onPrefsCompatGithubAlertsChanged((e.target as HTMLInputElement).checked)
+  }
+
+  compatRawHtmlChanged(e: Event): void {
+    onPrefsCompatRawHtmlChanged((e.target as HTMLInputElement).checked)
   }
 
   customCssChanged(e: Event): void {

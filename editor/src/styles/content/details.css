@@ -1,0 +1,70 @@
+/* ── Collapsible details ───────────────────────────────────────
+
+   `<details>` blocks render as a card whose summary row toggles the body.
+   The node view owns the toggle (see src/plugins/details.ts); these rules
+   only style what it builds — including the native disclosure marker, which
+   has to be re-drawn because the summary is contenteditable.
+*/
+
+.ProseMirror details.md-details {
+  margin: 0.75rem 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+}
+
+.ProseMirror details.md-details[open] {
+  padding-bottom: 0.25rem;
+}
+
+.ProseMirror .md-details-summary {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  list-style: none;
+  outline: none;
+  user-select: none;
+}
+
+.ProseMirror .md-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ProseMirror .md-details-summary::before {
+  content: "\25B8";
+  display: inline-block;
+  width: 1rem;
+  margin-right: 0.35rem;
+  color: var(--color-text-tertiary);
+  transition: transform 0.12s ease;
+}
+
+.ProseMirror details.md-details[open] > .md-details-summary::before {
+  transform: rotate(90deg);
+}
+
+/* Empty title: keep a visible "click to name" affordance. */
+.ProseMirror .md-details-summary.is-empty::after {
+  content: "Details";
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+}
+
+.ProseMirror .md-details-summary:focus-visible {
+  background: var(--color-accent-soft);
+}
+
+.ProseMirror .md-details-body {
+  padding: 0 0.75rem;
+}
+
+.ProseMirror .md-details-body > *:first-child {
+  margin-top: 0;
+}
+
+.ProseMirror .md-details-body > *:last-child {
+  margin-bottom: 0;
+}

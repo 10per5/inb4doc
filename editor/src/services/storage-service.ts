@@ -6,6 +6,15 @@ import {
 
 export type ImageStorageMode = "file" | "base64"
 
+/**
+ * Markdown dialect the serializer targets. `modern` allows every feature the
+ * app supports (raw HTML blocks, GitHub callouts); `legacy` restricts output to
+ * the constructs older renderers (Hugo before Goldmark, strict CommonMark
+ * sanitizers) accept. The individual behaviors below stay independently
+ * editable — the mode only sets their defaults.
+ */
+export type MarkdownCompat = "modern" | "legacy"
+
 export interface WikiPrefs {
   stickyToolbar: boolean
   imageStorageMode: ImageStorageMode
@@ -23,6 +32,12 @@ export interface WikiPrefs {
   followCaretToolbar: boolean
   /** User-authored stylesheet injected verbatim into the document head. */
   customCss: string
+  /** Markdown dialect the serializer targets — sets the compat defaults. */
+  markdownCompat: MarkdownCompat
+  /** Serialize alerts as `> [!NOTE]` GitHub callouts instead of plain quotes. */
+  compatGithubAlerts: boolean
+  /** Serialize centered/collapsible blocks as raw HTML instead of shortcodes. */
+  compatRawHtml: boolean
 }
 
 export interface ConnectionConfig {

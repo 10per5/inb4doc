@@ -28,6 +28,7 @@ import "./ui/screen.css"
 import "./ui/diff.css"
 import "./ui/prefs.css"
 import "./ui/window.css"
+import "./ui/file-jump.css"
 import "./app/toast.css"
 import "./app/notification.css"
 

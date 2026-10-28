@@ -242,6 +242,13 @@ by the parser) so `5.`/`6.` survive a round-trip.
   - Renders as `<blockquote class="book-hint TYPE">` in the editor
   - Serializes back to `> [!TYPE] ...` syntax
   - Supported types: note, tip, important, warning, caution, info, success, danger
+- **Collapsible `<details>`** — node in `src/config/editor-schema.ts`, view in
+  `src/plugins/details.ts` (registered in `editor-config.ts` as `detailsView`).
+  The summary text and the open state live in node **attrs** (`title`, `open`);
+  there is no child node for them, so the view toggles with `setNodeMarkup` and
+  never lets the browser's native summary toggle through — a DOM-only toggle is
+  reverted on the next state update. Parsed from either dialect (raw HTML or the
+  Hugo Book shortcode) in `fixBlockChildren`.
 
 ### Input rules must be anchored at both ends
 
@@ -275,6 +282,62 @@ extensions, and do not work around the schema limit with lossy rewrites
 - Handles VS Code paste detection (code block with language)
 - Handles Google Docs multi-table paste (strips `docs-internal-guid` wrapper)
 - If rich paste formatting is still lost, add a `$prose` plugin with turndown HTML→Markdown conversion
+
+## File Clipboard Invariants (Ctrl+X / Ctrl+V in the explorer)
+
+The explorer's file clipboard (`src/stores/file-clipboard.ts`) is separate from
+the OS/ProseMirror clipboard and owns **moving whole pages**, not text. It is
+in-memory on purpose — the durable half of a cut is the pending Delete op it
+queues, so a cut page stays visible (struck through) until it is pasted
+somewhere or flushed. Carried contents deliberately do NOT survive a reload.
+
+1. **Who owns `Mod-x` / `Mod-v`:** inside the document the ProseKit keymap
+   (`src/plugins/keyboard.ts`) owns both — `Mod-x` cuts the block, `Mod-v`
+   pastes the carried *file contents* at the caret (`features/file-clipboard-
+   paste.ts`) and returns `false` when the clipboard is empty so ordinary OS
+   paste falls through. Never return `true` unconditionally there: that would
+   swallow every normal paste.
+2. **In the tree, `Ctrl+X`/`Ctrl+V` belong to `SidebarController#onKeydown`**,
+   not to a document-level listener. The tree is a focusable list, so the
+   shortcut must resolve against the focused row (`focusedPath()`, falling back
+   to the open document) — a global handler would either fight the document's
+   own Mod-x/v or act on the wrong path. This is the one place a keydown is
+   handled locally; it is scoped to the sidebar element, which keeps the
+   "no global bindings outside keyboard.ts" rule intact.
+3. A paste rebuilds a pending **Create** (in a folder target / next to a page
+   target), keeping the original name unless it is taken, seeding both the new
+   `Page` body and its baseline — otherwise the new file diffs as one huge
+   change. The clipboard clears after a successful paste.
+
+## File jumper / stepping hotkeys
+
+- `Ctrl/Cmd+Shift+Space` → `AppEvent.FileJumpRequested`-style overlay picker
+  (`src/features/file-jump.ts`): recents lead, then every tree path in explorer
+  order (`flattenTreeOrder()`), fuzzy-filtered (`src/utils/fuzzy.ts`). Loaded
+  lazily from the `globalKeyBindings` entry, so the picker costs nothing until
+  it is used.
+- `Alt+↑` / `Alt+↓` → `AppEvent.FileStepRequested` with `delta` ∓1: step through
+  documents in explorer order with wrap-around. Both are registered in
+  `globalKeyBindings` with an `isTextEntry()` guard so typing is unaffected.
+- The jumper's own key handling is bound to **its overlay element**, never to
+  `document` — the rule against global listeners still holds.
+
+## Markdown compat (serializer dialect)
+
+`prefsStore.compatGithubAlerts` / `compatRawHtml` are read **live** inside the
+serializer functions in `src/config/editor-markdown.ts`, so flipping a pref
+changes what the next save writes without rebuilding the bridge. Keep it that
+way — do not snapshot them at bridge construction. The `markdownCompat`
+preset only pins the two flags (General ▸ Syntax); it is never consulted by the
+serializer itself.
+
+- `details` writes raw `<details><summary>…` when `compatRawHtml` is on, and
+  Hugo Book's `{{% details title="…" [open=true] %}}` when off. Both dialects
+  parse back into the same node, so switching is not lossy.
+- The blank line after `<summary>` is load-bearing: without it markdown-it keeps
+  the whole block as one HTML block and the body does not survive as paragraphs.
+- `alert` writes `> [!NOTE]` only when `compatGithubAlerts` is on; `divCenter`
+  drops its `<div align="center">` wrapper when `compatRawHtml` is off.
 
 ## Hugo Shortcodes — Decoration + Text Handler Override
 

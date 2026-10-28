@@ -1,5 +1,7 @@
 import { PendingOpType, type PendingOp } from "@/entities/PendingOps"
 
+import { HOME_PATH, isHomePageFilename } from "@/utils/hugo-compat"
+
 export type { PendingOp }
 export { PendingOpType }
 
@@ -299,6 +301,39 @@ export function ancestorDirs(path: string): string[] {
     dirs.push(acc);
   }
   return dirs;
+}
+
+/**
+ * Every file in the tree in the order the explorer shows it: folders first as
+ * their `_index` page, then the folder's contents, depth-first. This is the
+ * order "next/previous file" steps through, so it has to match the rendering
+ * sort (home page, then weight, then name).
+ */
+export function flattenTreeOrder(tree: TreeIndex): string[] {
+  const out: string[] = []
+
+  const walk = (prefix: string): void => {
+    const children = [...(tree.children.get(prefix) ?? [])]
+    children.sort((a, b) => {
+      const aHome = isHomePageFilename(a.name)
+      const bHome = isHomePageFilename(b.name)
+      if (aHome !== bHome) return aHome ? -1 : 1
+      if (a.weight !== b.weight) return a.weight - b.weight
+      return a.name.localeCompare(b.name)
+    })
+    for (const child of children) {
+      if (child.isDir) {
+        const indexPath = `${child.path}/${HOME_PATH}`
+        if (tree.paths.has(indexPath)) out.push(indexPath)
+        walk(child.path)
+      } else {
+        out.push(child.path)
+      }
+    }
+  }
+
+  walk("")
+  return out
 }
 
 export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): TreeIndex {

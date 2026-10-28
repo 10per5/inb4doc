@@ -6,6 +6,7 @@ import { addRow, goToNextCell, isInTable, selectedRect } from "prosemirror-table
 import { defineKeymap } from "@prosekit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { isInsideTableCell } from "@/plugins/editor-drag-drop"
+import { pasteFileClipboard } from "@/features/file-clipboard-paste"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
 // after Home), the stock list keymap (prosemirror-flat-list) binds Delete to
@@ -959,6 +960,10 @@ export const editorKeymap: Record<string, KeyHandler> = {
     "Mod-y": (state, dispatch) => redo(state, dispatch),
     "Mod-x": (state, dispatch) => cutBlock(state, dispatch),
     "Mod-c": (state, dispatch) => copyBlock(state, dispatch),
+    // A cut page's markdown wins over the OS clipboard: Ctrl/Cmd+V inside the
+    // document drops those contents at the caret. Returns false when the file
+    // clipboard is empty so ordinary paste is untouched.
+    "Mod-v": (state, dispatch) => pasteFileClipboard(state, dispatch),
     "Mod-Enter": (state, dispatch) => {
       // Inside a code block Mod-Enter exits it (legacy prism-editor behavior);
       // elsewhere it inserts an empty paragraph below the current block.
@@ -1156,7 +1161,34 @@ const globalKeyBindings: ReadonlyArray<{
       appEvents.emit(AppEvent.SidebarScrollToCurrent)
     },
   },
+  {
+    // Jump to any file (recent documents first). Kept lazy: the picker and its
+    // fuzzy matcher are dead weight until the shortcut is actually used.
+    matches: (e) => e.code === "Space" && (e.ctrlKey || e.metaKey) && e.shiftKey,
+    handler: (e) => {
+      e.preventDefault()
+      void import("@/features/file-jump").then((m) => m.openFileJump())
+    },
+  },
+  {
+    matches: (e) =>
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+      !isTextEntry(e.target),
+    handler: (e) => {
+      e.preventDefault()
+      const delta = e.key === "ArrowDown" ? 1 : -1
+      void import("@/features/file-jump").then((m) => m.navigateRelativeFile(delta))
+    },
+  },
 ]
+
+function isTextEntry(target: EventTarget | null): boolean {
+  const tag = (target as HTMLElement | null)?.tagName
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
+}
 
 function dispatchGlobalKey(event: KeyboardEvent): void {
   for (const binding of globalKeyBindings) {

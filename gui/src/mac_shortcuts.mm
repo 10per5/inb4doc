@@ -26,6 +26,20 @@ void setup_mac_shortcuts(saucer::application *app, saucer::webview *wv)
                 return nil;
             }
         }
+        if ([event keyCode] == 0x30) // kVK_Tab
+        {
+            if ([event modifierFlags] & NSEventModifierFlagControl)
+            {
+                auto *wk = static_cast<WKWebView *>(wv->native<true>().webview);
+                if ([event modifierFlags] & NSEventModifierFlagShift)
+                    [wk evaluateJavaScript:@"window.inb4docUI?.cycleRecentDoc?.(-1)"
+                         completionHandler:nil];
+                else
+                    [wk evaluateJavaScript:@"window.inb4docUI?.cycleRecentDoc?.(1)"
+                         completionHandler:nil];
+                return nil;
+            }
+        }
         if ([event keyCode] == 0x63) // kVK_F3
         {
             auto *wk = static_cast<WKWebView *>(wv->native<true>().webview);

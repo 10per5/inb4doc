@@ -34,6 +34,10 @@ export enum AppEvent {
   SidebarCancel = "sidebar-cancel",
   BackRequested = "back-requested",
   SidebarScrollToCurrent = "sidebar-scroll-to-current",
+  FileCutRequested = "file-cut-requested",
+  FilePasteRequested = "file-paste-requested",
+  FileJumpRequested = "file-jump-requested",
+  FileStepRequested = "file-step-requested",
   Escape = "escape",
   WindowResumed = "window-resumed",
 
@@ -75,6 +79,7 @@ export enum AppEvent {
   ProjectPinsChanged = "project-pins-changed",
   SpellcheckChanged = "spellcheck-changed",
   FollowCaretToolbarChanged = "follow-caret-toolbar-changed",
+  MarkdownCompatChanged = "markdown-compat-changed",
   CustomCssChanged = "custom-css-changed",
   StickyPreferenceChanged = "sticky-preference-changed",
   ImageManagerOpened = "image-manager-opened",
@@ -132,6 +137,10 @@ export interface AppEventPayloads {
   [AppEvent.Escape]:                void
   [AppEvent.WindowResumed]:         { id: string }
   [AppEvent.SidebarScrollToCurrent]: void
+  [AppEvent.FileCutRequested]:      { path: string }
+  [AppEvent.FilePasteRequested]:    { target: string }
+  [AppEvent.FileJumpRequested]:     void
+  [AppEvent.FileStepRequested]:     { delta: number }
 
   [AppEvent.EditorChanged]:         { path: string; md: string; baseCanonical?: string }
   [AppEvent.OutlineChanged]:        void
@@ -166,6 +175,7 @@ export interface AppEventPayloads {
   [AppEvent.ProjectPinsChanged]:    void
   [AppEvent.SpellcheckChanged]:     void
   [AppEvent.FollowCaretToolbarChanged]: { follow: boolean }
+  [AppEvent.MarkdownCompatChanged]: void
   [AppEvent.CustomCssChanged]: { css: string }
   [AppEvent.StickyPreferenceChanged]: { sticky: boolean }
   [AppEvent.ImageManagerOpened]:    void
