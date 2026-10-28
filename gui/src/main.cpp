@@ -11,9 +11,14 @@
 #include <regex>
 #include <sstream>
 #include <cstring>
+// Only Linux runs the single-instance IPC: the receiving end is a QLocalServer
+// started in app.cpp behind the same guard. Keeping the client probe behind it
+// too keeps POSIX-only headers out of the Windows build (no <sys/un.h>).
+#if defined(__linux__)
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#endif
 namespace fs = std::filesystem;
 
 static bool mode_ambiguous(const parsed_args &args)
@@ -215,7 +220,9 @@ int main(int argc, char **argv)
     // Single-instance: if another inb4doc is already running, hand it the deep
     // link (or a focus request) over the AF_UNIX socket and don't launch a
     // second window. The probe is raw POSIX so it runs before Saucer/Qt spin
-    // up — there's no QApplication yet.
+    // up — there's no QApplication yet. Guard matches the QLocalServer in
+    // app.cpp: Linux only.
+#if defined(__linux__)
     {
         auto sock = share_socket_path();
         int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -238,6 +245,7 @@ int main(int argc, char **argv)
             ::close(fd);
         }
     }
+#endif
 
     auto cfg = resolve_config(args);
     if (!cfg)

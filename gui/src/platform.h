@@ -34,4 +34,7 @@ std::string pick_directory(const std::string &initial_dir = {});
 /// inb4doc process listens here; later launches connect and forward a deep
 /// link (or a focus request) instead of opening a second window. Lives under
 /// $XDG_RUNTIME_DIR when available, else $TMPDIR/$TMP.
+///
+/// Linux only: both ends are guarded by `__linux__` (QLocalServer in app.cpp,
+/// raw POSIX probe in main.cpp), so Windows/macOS simply open another window.
 std::string share_socket_path();
