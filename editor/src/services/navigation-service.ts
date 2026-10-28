@@ -21,6 +21,8 @@ import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
 import { updateEditorTint, clearEditorTint } from "@/utils/file-status-tint";
 import { isHugoIndex, isRootPath } from "@/utils/hugo-compat";
+import { resolveProjectEntryPath, isPathInScope } from "@/features/project-entry";
+import { prefsStore } from "@/stores/preferences-store";
 import { treeStore } from "@/stores/tree-store";
 import { HOME_PATH, resolveHomePageFromPaths } from "@/utils/hugo-compat";
 import type { EditorController } from "@/controllers/editor-controller";
@@ -67,7 +69,34 @@ export class NavigationService {
           this.loadSidebar();
         }),
       ),
+      // Switching projects (root scope) only retargets the sidebar — the open
+      // document stayed put and, once it fell outside the new scope, the editor
+      // was left on someone else's page. Land on that project's own document
+      // instead: where you left off there, else the first page with content.
+      appEvents.on(AppEvent.RootScopeChanged, () => {
+        void this.restoreProjectEntry();
+      }),
     );
+  }
+
+  /**
+   * Opens the document belonging to the active project after a switch.
+   *
+   * A scope change is only a *switch* when the open document falls outside the
+   * new scope — switching to a broader scope (or to the one holding the current
+   * page) keeps context, so nothing is reloaded.
+   */
+  private async restoreProjectEntry(): Promise<void> {
+    const scope = prefsStore.rootScope;
+    if (isPathInScope(this.currentPath, scope)) return;
+
+    const entry = await resolveProjectEntryPath(scope, this.cache.getPendingOps());
+    if (!entry) {
+      this.editor.hideSkeleton();
+      appEvents.emit(AppEvent.NoFileView, { lastPath: this.currentPath });
+      return;
+    }
+    await this.navigate(entry);
   }
 
   getCurrentPath(): string {

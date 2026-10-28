@@ -7,6 +7,7 @@ import { LayoutService } from "@/services/layout-service";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { SlashCommand, LayoutWidth } from "@/config/enums";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
+import { isMobileDock } from "@/utils/mobile";
 import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps } from "@/entities/PendingOps";
 import {
@@ -68,6 +69,29 @@ function recentProjectItems(): MenuItem[] {
   }));
 }
 
+/**
+ * The View and More surfaces, folded into the File dropdown. Only the phone
+ * layout wants them — see the comment at the call site.
+ */
+function fileMobileExtras(): MenuItem[] {
+  return [
+    {
+      type: MenuType.Submenu,
+      id: "file-view",
+      icon: eye,
+      label: "View",
+      items: viewMenuItems(),
+    },
+    {
+      type: MenuType.Submenu,
+      id: "file-more",
+      icon: menuScale,
+      label: "More",
+      items: moreMenuItems(),
+    },
+  ];
+}
+
 menuRegistry.register("file", (): MenuItem[] => {
   const projectItems: MenuItem[] = hasFunc(AppFunc.ProjectPicker)
     ? [
@@ -109,23 +133,11 @@ menuRegistry.register("file", (): MenuItem[] => {
     ...shareMenuItems(),
     ...compressMenuItems(),
     { type: MenuType.Separator },
-    // The mobile topbar has no View menu of its own, and the "More" dock tab is
-    // gone: everything those two surfaces reached is folded in here so the
-    // File dropdown is the one entry point on a phone.
-    {
-      type: MenuType.Submenu,
-      id: "file-view",
-      icon: eye,
-      label: "View",
-      items: viewMenuItems(),
-    },
-    {
-      type: MenuType.Submenu,
-      id: "file-more",
-      icon: menuScale,
-      label: "More",
-      items: moreMenuItems(),
-    },
+    // Mobile-only: the phone topbar has no View menu of its own and no "More"
+    // dock tab, so everything those two surfaces reached is folded in here and
+    // File is the single entry point. On desktop both already have their own
+    // top-level menus — duplicating them only buries Preferences and About.
+    ...(isMobileDock() ? fileMobileExtras() : []),
     {
       type: MenuType.Item,
       id: "preferences",

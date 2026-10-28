@@ -26,6 +26,25 @@ File content is stored **body-only**; frontmatter lives separately (`Page.frontm
 
 6. **Never create or keep a no-op Edit op.** `onMetaDataChanged` (dirty-tracking-service) must not `queueEdit` when neither the frontmatter changed nor the body differs from baseline, and must `remove` an existing Edit op when `frontmatterPatch` becomes `undefined` and `patch === baseline` (e.g., a metadata change reverted to its original value). Otherwise a revert leaves an op that diffs as "No changes" but still shows `Pending changes (1)` / `+0B unflushed`.
 
+## Project Switching Invariants
+
+Switching projects happens in two very different ways; don't conflate them.
+
+- **Content-root switch** (`File ▸ Open Project…` / Recent Projects) →
+  `NavigationService.openProject()`. It re-points the provider root and already
+  restores `recentProjectsStore.getLastFile(root)`.
+- **Scope switch** (the project picker in Preferences ▸ Navigation) writes
+  `prefsStore.rootScope` and only emits `RootScopeChanged`. Nothing navigates by
+  itself: `NavigationService` listens to it and calls
+  `resolveProjectEntryPath()` (`src/features/project-entry.ts`), which picks the
+  most recent document **inside that scope**, else the first page whose content
+  goes beyond a title block (`# thisthat`-only `_index` stubs are skipped), else
+  the first page there is. A scope change that still contains the open document
+  is *not* a switch — context is kept, nothing reloads.
+
+Scope containment must use `isPathInScope()` (exact match or `scope/` prefix):
+a plain `startsWith` counts a sibling folder like `docs-old` as inside `docs`.
+
 ## Explorer Tree Invariants
 
 The file tree renders **collapsed by default**; only the chain of folders that
