@@ -282,6 +282,25 @@ export function getSuggestions(tree: TreeIndex, lastPath: string, max = 3): stri
   return result.slice(0, max)
 }
 
+/**
+ * Every directory leading to `path`, outermost first — the folders that have to
+ * be open for `path` to be visible in a collapsed-by-default tree. Index pages
+ * resolve to their own folder, so revealing `_index` opens all the way down to
+ * the section header rather than stopping one level short.
+ */
+export function ancestorDirs(path: string): string[] {
+  const segments = path.replace(/\/+$/, "").split("/");
+  segments.pop();
+  const dirs: string[] = [];
+  let acc = "";
+  for (const segment of segments) {
+    if (!segment) continue;
+    acc = acc ? `${acc}/${segment}` : segment;
+    dirs.push(acc);
+  }
+  return dirs;
+}
+
 export function applyPendingOps(tree: TreeIndex, ops: readonly PendingOp[]): TreeIndex {
   if (ops.length === 0) return tree
 

@@ -4,7 +4,13 @@ import { confirmDialog } from "@/controllers/dialog/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { buildEditorUrl } from "@/utils/url";
 import { pagesStore } from "@/stores/page-store";
-import { PendingOpType, type PendingOp, type TreeIndex, type ChildInfo } from "@/utils/tree";
+import {
+  PendingOpType,
+  type PendingOp,
+  type TreeIndex,
+  type ChildInfo,
+  ancestorDirs,
+} from "@/utils/tree";
 import { SidebarAction, sidebarActions } from "@/config/enums";
 import { Menu, MenuType, type MenuItem } from "@/components/ui/menu";
 import { ProviderType } from "@/providers/index";
@@ -58,6 +64,8 @@ export interface RenderContext {
   /** Restrict the top level to one root-level folder ("" shows every root). */
   rootScope?: string;
   selectionMode?: boolean;
+  /** Directories expanded despite the collapsed-by-default tree (the chain to the open file). */
+  revealPaths?: ReadonlySet<string>;
 }
 
 const LINE_COLORS = [
@@ -311,7 +319,12 @@ export function renderItems(
     const indexTitle = indexPage?.getFrontmatter?.()?.title
     const dirBaseName = child.name.replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase())
     const label = indexTitle || dirBaseName
-    const collapsed = ctx.collapsedSections.get(dirPath) ?? false
+    // Folders start collapsed: only the chain that leads to the open file is
+    // expanded (revealPaths), plus anything the user opened by hand. Without
+    // this every project opened with its whole tree unfolded.
+    const collapsed =
+      ctx.collapsedSections.get(dirPath) ??
+      !(ctx.revealPaths?.has(dirPath) ?? false)
     const isActive = indexPagePath === ctx.current
     const dirLinkClasses = [
       "nav-link",

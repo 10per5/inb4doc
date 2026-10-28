@@ -9,7 +9,13 @@ import {
   showMenu,
   closeMenu,
 } from "./sidebar";
-import { WEIGHT_STEP, WEIGHT_EXCHANGE_SHIFT, type TreeIndex, type ChildInfo } from "@/utils/tree";
+import {
+  WEIGHT_STEP,
+  WEIGHT_EXCHANGE_SHIFT,
+  type TreeIndex,
+  type ChildInfo,
+  ancestorDirs,
+} from "@/utils/tree";
 import {
   folder,
   folderOpen,
@@ -69,6 +75,8 @@ export default class extends Controller {
   private prevDirty = new Set<string>();
   private hideEmptyFolders = false;
   private rootScope = "";
+  /** Folders opened by the reveal to the current file (see `revealAncestors`). */
+  private revealPaths = new Set<string>();
 
   private dragFromPath = "";
   private dragFromParent = "";
@@ -100,6 +108,9 @@ export default class extends Controller {
       appEvents.on(AppEvent.SidebarActive, ({ path }) => {
         this.activePath = path
         this.setActive(path)
+        // Opening a document — including the one a project restores on open —
+        // opens just its chain of folders; the rest of the tree stays folded.
+        this.revealAncestors(path, false)
       }),
       appEvents.on(AppEvent.SidebarCancel, () => {
         if (this.selectionMode) this.exitSelection();
@@ -112,6 +123,11 @@ export default class extends Controller {
         request.handled = true;
       }),
       appEvents.on(AppEvent.SidebarScrollToCurrent, () => {
+        // The tree renders collapsed apart from the chain to the open file, so
+        // revealing it means opening those parents first — a row inside a
+        // collapsed section has no box to scroll to.
+        const active = this.activePath || getCurrentPath();
+        this.revealAncestors(active, true);
         let el = this.itemByPath.get(this.activePath);
         // When the open file is a directory's _index page, focus the directory
         // section in the explorer instead of the _index leaf item.
@@ -191,6 +207,9 @@ export default class extends Controller {
     this.tree = mergedTree;
 
     const current = getCurrentPath();
+    // A freshly opened project shows only the folders leading to the document
+    // being restored; everything else starts collapsed.
+    this.revealPaths = new Set(ancestorDirs(current));
 
     const treeEmpty = mergedTree.paths.size === 0;
 
@@ -210,6 +229,7 @@ export default class extends Controller {
       hideEmptyFolders: this.hideEmptyFolders,
       rootScope: this.rootScope,
       selectionMode: this.selectionMode,
+      revealPaths: this.revealPaths,
     };
 
     this.updateFiltersUi();
@@ -355,24 +375,46 @@ export default class extends Controller {
     const section = anchor.closest(".nav-section") as HTMLElement;
     if (!section) return;
     const path = section.getAttribute("data-nav-path") || "";
-    const wasCollapsed = this.collapsedSections.get(path) ?? false;
+    const wasCollapsed =
+      this.collapsedSections.get(path) ??
+      section.classList.contains("collapsed");
     this.collapsedSections.set(path, !wasCollapsed);
-    section.classList.toggle("collapsed");
-    const iconEl = section.querySelector(
-      ".sidebar-icon-folder, .sidebar-icon-folder-empty"
-    ) as HTMLElement | null;
-    if (iconEl) {
-      const isFolderEmpty = iconEl.classList.contains(
-        "sidebar-icon-folder-empty"
-      );
-      iconEl.innerHTML = wasCollapsed
-        ? isFolderEmpty
-          ? folderMinusOpen
-          : folderOpen
-        : isFolderEmpty
-        ? folderMinus
-        : folder;
+    this.setSectionCollapsed(path, !wasCollapsed);
+  }
+
+  /**
+   * Open the folders on the way to `path`.
+   *
+   * Navigation reveals softly: a folder the user toggled by hand keeps its
+   * state. The reveal shortcut (Ctrl/Cmd+Shift+E) reveals hard — it records
+   * the expansion so the next render doesn't fold the folder again.
+   */
+  private revealAncestors(path: string, force: boolean): void {
+    for (const dir of ancestorDirs(path)) {
+      if (!force && this.collapsedSections.has(dir)) continue;
+      if (force) this.collapsedSections.set(dir, false);
+      this.setSectionCollapsed(dir, false);
     }
+  }
+
+  private setSectionCollapsed(dirPath: string, collapsed: boolean): void {
+    const section = this.innerTarget.querySelector<HTMLElement>(
+      `.nav-section[data-nav-path="${CSS.escape(dirPath)}"]`,
+    );
+    if (!section) return;
+    section.classList.toggle("collapsed", collapsed);
+    const iconEl = section.querySelector<HTMLElement>(
+      ".sidebar-icon-folder, .sidebar-icon-folder-empty",
+    );
+    if (!iconEl) return;
+    const isFolderEmpty = iconEl.classList.contains("sidebar-icon-folder-empty");
+    iconEl.innerHTML = collapsed
+      ? isFolderEmpty
+        ? folderMinus
+        : folder
+      : isFolderEmpty
+        ? folderMinusOpen
+        : folderOpen;
   }
 
   // --- Keyboard navigation ---
@@ -550,6 +592,9 @@ export default class extends Controller {
 
     const q = query.toLowerCase().trim();
     this.currentQuery = q;
+    // Matches live anywhere in the tree, so searching opens every folder and
+    // leaving the query restores the tree underneath them.
+    this.setSearchExpansion(q !== "");
     if (!q) {
       applyResults({
         container: this.innerTarget,
@@ -594,6 +639,23 @@ export default class extends Controller {
         actions: this.actions!,
       });
     }, 200);
+  }
+
+  /** Opens (or restores) every folder so search matches are never hidden. */
+  private setSearchExpansion(searching: boolean): void {
+    for (const section of this.innerTarget.querySelectorAll<HTMLElement>(
+      ".nav-section",
+    )) {
+      const dirPath = section.getAttribute("data-nav-path") ?? "";
+      if (!dirPath) continue;
+      this.setSectionCollapsed(
+        dirPath,
+        searching
+          ? false
+          : this.collapsedSections.get(dirPath) ??
+            !this.revealPaths.has(dirPath),
+      );
+    }
   }
 
   // --- Dirty reactivity ---

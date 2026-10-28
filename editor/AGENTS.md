@@ -26,6 +26,17 @@ File content is stored **body-only**; frontmatter lives separately (`Page.frontm
 
 6. **Never create or keep a no-op Edit op.** `onMetaDataChanged` (dirty-tracking-service) must not `queueEdit` when neither the frontmatter changed nor the body differs from baseline, and must `remove` an existing Edit op when `frontmatterPatch` becomes `undefined` and `patch === baseline` (e.g., a metadata change reverted to its original value). Otherwise a revert leaves an op that diffs as "No changes" but still shows `Pending changes (1)` / `+0B unflushed`.
 
+## Explorer Tree Invariants
+
+The file tree renders **collapsed by default**; only the chain of folders that
+leads to the open document is expanded (`ancestorDirs()` in `src/utils/tree.ts`,
+passed to the renderer as `RenderContext.revealPaths`). Don't reintroduce a
+default-expanded tree or a "expand all on load" helper.
+
+1. `renderItems()` decides a folder's state as `collapsedSections.get(path) ?? !revealPaths.has(path)` — `collapsedSections` holds **user toggles only**, and `revealPaths` is recomputed from the current path on every render. Deriving state from the DOM class instead of the map (e.g. in `onToggleSection`) silently resets whichever folders were only opened by the reveal.
+2. Revealing is two-tiered: navigation expands softly (`revealAncestors(path, false)`, skips folders the user toggled by hand), the reveal shortcut `Ctrl/Cmd+Shift+E` expands hard (records `false` in the map so the next render keeps it open). Both must expand before scrolling — a row inside a collapsed section has no box to scroll to.
+3. Search opens every folder while a query is active and restores the tree when it is cleared (`setSearchExpansion`), otherwise matches inside collapsed folders stay invisible.
+
 ## Architecture — Stimulus + Eta
 
 ### Controller Hierarchy

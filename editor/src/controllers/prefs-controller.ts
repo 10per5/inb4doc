@@ -160,8 +160,13 @@ export default class PrefsController extends BaseDialogController {
     if (section === null) return
     this.openedSection = section
     if (!this.hasPaneTarget) return
+    // Panes stay laid out (stacked in one grid cell) and are only made
+    // invisible, so the window keeps the size of the tallest section instead of
+    // growing and shrinking on every tab switch.
     for (const el of this.paneTargets) {
-      el.hidden = el.dataset.section !== `${PREFS_SECTION_PREFIX}${section}`
+      const on = el.dataset.section === `${PREFS_SECTION_PREFIX}${section}`
+      el.classList.toggle("is-inactive", !on)
+      el.setAttribute("aria-hidden", on ? "false" : "true")
     }
     for (const el of this.tabTargets) {
       const on = el.dataset.section === `${PREFS_SECTION_PREFIX}${section}`

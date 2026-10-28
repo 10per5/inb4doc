@@ -85,11 +85,25 @@
   vertical-align: middle;
 }
 
+/* Every pane is laid out in the same grid cell so the host box measures the
+ * tallest section once and keeps that size across tab switches — hiding the
+ * inactive panes with `display: none` made the window jump to each section's
+ * own height. */
 .prefs-panes {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
   padding: 1.25rem;
+  display: grid;
+  grid-template-areas: "pane";
+  align-content: start;
+}
+.prefs-pane-wrap {
+  grid-area: pane;
+  min-width: 0;
+}
+.prefs-pane-wrap.is-inactive {
+  visibility: hidden;
 }
 .prefs-pane-head {
   margin-bottom: 1rem;
