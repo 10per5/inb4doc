@@ -64,9 +64,10 @@ export class ViewService {
       }),
       appEvents.on(AppEvent.Navigate, () => {
         // Selecting a file while a full-screen view (navigation / meta) is the
-        // center view lands back in the editor.
+        // center view lands back in the editor. Marked as a document switch so
+        // the shell replaces this history entry rather than popping it.
         if (this.current === "navigation" || this.current === "meta") {
-          this.switchTo("editor");
+          this.switchTo("editor", "document");
         }
       }),
       appEvents.on(AppEvent.LayoutChanged, () => {
@@ -79,7 +80,7 @@ export class ViewService {
     );
   }
 
-  switchTo(type: ViewType): void {
+  switchTo(type: ViewType, reason?: "document"): void {
     if (type === this.current) return;
     if (type === "meta") this.ensureMetaScreenView();
     if (type === "navigation") {
@@ -92,7 +93,7 @@ export class ViewService {
     this.views.get(this.current)?.deactivate();
     this.current = type;
     this.views.get(type)?.activate();
-    appEvents.emit(AppEvent.ViewChanged, { view: type });
+    appEvents.emit(AppEvent.ViewChanged, { view: type, ...(reason ? { reason } : {}) });
   }
 
   setNoFileLastPath(path: string): void {

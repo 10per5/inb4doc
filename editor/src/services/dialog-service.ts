@@ -1,5 +1,6 @@
 import { DialogEvent } from "@/config/dialog-events"
 import { appState, type DialogState } from "@/stores/app-state"
+import { setUiLayerCount } from "@/services/ui-history-service"
 
 export const DIALOG_OVERLAY_ID = "inb4doc-dialog-overlay"
 const OVERLAY_ID = DIALOG_OVERLAY_ID
@@ -47,10 +48,18 @@ export interface DialogOpenResult<T> {
   close: (value?: T) => void
 }
 
+/** Legacy html-string overlays are not in `sessions`; count them separately. */
+let legacyDialogs = 0
+
+function syncDialogLayer(): void {
+  setUiLayerCount("dialog", sessions.size + legacyDialogs)
+}
+
 function finishSession(sessionId: string, value: unknown): void {
   const session = sessions.get(sessionId)
   if (!session) return
   sessions.delete(sessionId)
+  syncDialogLayer()
   session.cleanup()
   session.onClose?.()
   session.resolve(value)
@@ -151,6 +160,7 @@ export function openDialog<T = unknown>(
       onClose: options.onClose,
       cleanup: () => {},
     })
+    syncDialogLayer()
     appState.set("dialog", { id, sessionId, payload })
   })
   result.promise = promise
@@ -172,14 +182,29 @@ export interface HtmlDialogOptions {
   html: string
 }
 
+/** Count one legacy overlay as a history layer; returns an idempotent untrack. */
+function trackLegacyDialog(): () => void {
+  legacyDialogs++
+  syncDialogLayer()
+  let tracked = true
+  return () => {
+    if (!tracked) return
+    tracked = false
+    legacyDialogs = Math.max(0, legacyDialogs - 1)
+    syncDialogLayer()
+  }
+}
+
 export function openHtmlDialog(opts: HtmlDialogOptions): DialogHandle {
   const overlay = createOverlay(opts.class)
   overlay.innerHTML = opts.html
+  const untrack = trackLegacyDialog()
 
   const close = () => {
     opts.onClose?.()
     document.removeEventListener("keydown", onKeydown)
     overlay.remove()
+    untrack()
   }
 
   const onKeydown = (e: KeyboardEvent) => {
@@ -206,6 +231,7 @@ export function openHtmlDialogPromise<T = void>(opts: HtmlDialogPromiseOptions<T
   return new Promise<T | null>((resolve) => {
     const overlay = createOverlay(opts.class)
     overlay.innerHTML = opts.html
+    const untrack = trackLegacyDialog()
 
     const resolveEvent = opts.resolveEvent ?? DialogEvent.Confirm
     const cancelEvent = opts.cancelEvent ?? DialogEvent.Cancel
@@ -215,6 +241,7 @@ export function openHtmlDialogPromise<T = void>(opts: HtmlDialogPromiseOptions<T
       overlay.removeEventListener(resolveEvent, onResolve)
       overlay.removeEventListener(cancelEvent, onCancel)
       overlay.remove()
+      untrack()
       resolve(value)
     }
 

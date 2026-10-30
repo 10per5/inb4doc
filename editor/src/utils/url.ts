@@ -8,6 +8,36 @@ import { isRootPath, HOME_PATH } from "@/utils/hugo-compat";
 // SAF and has no MountProvider flag).
 const isGui = hasFunc(AppFunc.MountProvider) || hasFunc(AppFunc.SafProvider);
 
+/**
+ * Is the document path reflected in the URL (browser / PWA)?
+ *
+ * Native shells load at a fixed shell URL and their back press arrives through
+ * the bridge, so `pushPath`/`replacePath` are no-ops there and the UI-layer
+ * history in `services/ui-history-service.ts` must stay out of `history`.
+ */
+export function usesBrowserHistory(): boolean {
+  return typeof history !== "undefined" && !isGui;
+}
+
+/**
+ * Set when a document opens while a UI layer is frontmost: the document adopts
+ * the layer's history entry (`replacePath`) instead of pushing another one.
+ * Popping the entry with `history.back()` next to a `pushState` raced the
+ * traversal and re-opened the previous document (or the home page), which is
+ * why tapping a file on mobile appeared to do nothing.
+ */
+let adoptNextDocumentPath = false;
+
+export function markDocumentPathAdopted(): void {
+  adoptNextDocumentPath = true;
+}
+
+export function takeAdoptedDocumentPath(): boolean {
+  const adopted = adoptNextDocumentPath;
+  adoptNextDocumentPath = false;
+  return adopted;
+}
+
 export function getCurrentPath(): string {
   if (staticSiteGeneration) {
     return new URLSearchParams(window.location.search).get("path") || HOME_PATH;
@@ -45,7 +75,19 @@ export function pushPath(path: string): void {
   }
 }
 
+/**
+ * Called before `replacePath` rewrites the current history entry. The browser
+ * UI-layer bookkeeping uses it to release its sentinel entry: replacing it in
+ * place means there is nothing left to pop when the layer closes.
+ */
+let beforePathReplace: (() => void) | null = null
+
+export function setBeforePathReplace(fn: (() => void) | null): void {
+  beforePathReplace = fn
+}
+
 export function replacePath(path: string): void {
+  beforePathReplace?.()
   if (staticSiteGeneration) {
     const url = new URL(window.location.href);
     if (isRootPath(path)) {

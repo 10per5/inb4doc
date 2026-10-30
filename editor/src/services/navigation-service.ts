@@ -15,7 +15,7 @@ import { storageService } from "@/services/storage-service";
 import { getProvider, switchProvider, getProviderDisplayInfo } from "@/stores/provider-store";
 import { showNotification } from "@/components/notification/notification";
 import { pagesStore } from "@/stores/page-store";
-import { pushPath, replacePath } from "@/utils/url";
+import { pushPath, replacePath, takeAdoptedDocumentPath } from "@/utils/url";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { PendingOpType } from "@/entities/PendingOps";
@@ -50,6 +50,9 @@ export class NavigationService {
       appEvents.on(AppEvent.Navigate, ({ path, query, matchIndex, snippetText }) =>
         this.navigate(path, true, query, matchIndex, snippetText),
       ),
+      // Browser Back/Forward between documents: the URL already points at the
+      // target, so load it without pushing a duplicate history entry.
+      appEvents.on(AppEvent.HistoryNavigate, ({ path }) => this.navigate(path, false)),
       appEvents.on(AppEvent.SidebarNewItemRequested, ({ parentPath, isFolder }) =>
         createNewItem(this.cache, parentPath, (p) => this.navigate(p), () => this.loadSidebar(), isFolder),
       ),
@@ -125,7 +128,11 @@ export class NavigationService {
   }
 
   async navigate(path: string, pushHistory = true, searchQuery?: string, matchIndex?: number, snippetText?: string): Promise<void> {
-    if (this.loading) return;
+    if (this.loading) {
+      // Drop a stale adoption from an aborted navigation.
+      takeAdoptedDocumentPath();
+      return;
+    }
     this.loading = true;
 
     try {
@@ -135,7 +142,10 @@ export class NavigationService {
       this.currentPath = path;
       clearEditorTint(this.editor.element as HTMLElement);
       updateEditorTint(this.editor.element as HTMLElement, path, this.cache.getPendingOps());
-      appEvents.emit(AppEvent.ViewChanged, { view: "editor" });
+      appEvents.emit(AppEvent.ViewChanged, { view: "editor", reason: "document" });
+      // Opening a document from a fullview adopts that entry (the shell marks
+      // it during the emit above); a normal switch pushes a new one.
+      const adoptedEntry = takeAdoptedDocumentPath();
       this.editor.setCurrentPath(path);
       this.cache.setCurrentPath(path);
 
@@ -160,7 +170,8 @@ export class NavigationService {
       this.editor.showSkeleton();
 
       if (pushHistory) {
-        pushPath(path);
+        if (adoptedEntry) replacePath(path);
+        else pushPath(path);
       }
 
       const sourceEl = this.editor.sourceTarget;

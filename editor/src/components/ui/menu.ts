@@ -4,6 +4,7 @@ import renderCheck from "@/eta/menu/check"
 import renderSubmenu from "@/eta/menu/submenu"
 import { check, arrowRight, navArrowDown } from "@/eta/icons"
 import { applyPanelFlip, type FlipAnchorRect } from "@/utils/popover"
+import { setUiLayerCount } from "@/services/ui-history-service"
 
 export enum MenuType {
   Item,
@@ -58,6 +59,14 @@ function closeAllMenus(except?: Menu) {
   for (const m of openMenus) {
     if (m !== except) m.close()
   }
+}
+
+/** Back-press step: close the open menu, if any. Returns true when one closed. */
+export function closeTopMenu(): boolean {
+  const menu = Array.from(openMenus).pop()
+  if (!menu) return false
+  menu.close()
+  return true
 }
 
 let autoIdCounter = 0
@@ -205,6 +214,7 @@ export class Menu {
     this.triggerEl.classList.add("is-open")
     this._isOpen = true
     openMenus.add(this)
+    setUiLayerCount("menu", openMenus.size)
     requestAnimationFrame(() => this.triggerEl.focus())
     document.addEventListener("click", this.boundOutsideClick, true)
     this.onOpen?.()
@@ -220,6 +230,7 @@ export class Menu {
     this.triggerEl.classList.remove("is-open")
     this._isOpen = false
     openMenus.delete(this)
+    setUiLayerCount("menu", openMenus.size)
     document.removeEventListener("click", this.boundOutsideClick, true)
     this.onClose?.()
   }

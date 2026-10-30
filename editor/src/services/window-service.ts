@@ -29,6 +29,7 @@ import { DialogEvent } from "@/config/dialog-events"
 import { WindowEvent } from "@/config/window-events"
 import { DIALOG_OVERLAY_ID } from "@/services/dialog-service"
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { setUiLayerCount } from "@/services/ui-history-service"
 import renderWindowFrame from "@/eta/views/window/window-frame"
 
 const OVERLAY_ID = "inb4doc-window-overlay"
@@ -214,6 +215,7 @@ function finishSession(sessionId: string, value: unknown): void {
   const index = stack.findIndex((s) => s.sessionId === sessionId)
   if (index === -1) return
   const [session] = stack.splice(index, 1)
+  setUiLayerCount("window", stack.length)
   session.cleanup()
   session.layer = null
   session.onClose?.()
@@ -293,6 +295,7 @@ export function openWindow<T = unknown>(
     cleanup: () => {},
   }
   stack.push(session)
+  setUiLayerCount("window", stack.length)
 
   mountWindow(session)
   return {

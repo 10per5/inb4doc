@@ -22,6 +22,8 @@ import type { FileEntry } from "@/config/storage-keys"
 export enum AppEvent {
   // Navigation
   Navigate = "navigate",
+  /** URL-driven navigation (browser Back/Forward) — do not push again. */
+  HistoryNavigate = "history-navigate",
   SidebarReload = "sidebar-reload",
   SidebarActive = "sidebar-active",
   SidebarNewItemRequested = "sidebar-new-item-requested",
@@ -123,6 +125,7 @@ export enum AppEvent {
 
 export interface AppEventPayloads {
   [AppEvent.Navigate]:              { path: string; query?: string; matchIndex?: number; snippetText?: string }
+  [AppEvent.HistoryNavigate]:       { path: string }
   [AppEvent.SidebarReload]:         void
   [AppEvent.SidebarActive]:         { path: string }
   [AppEvent.SidebarNewItemRequested]: { parentPath: string; isFolder: boolean }
@@ -159,7 +162,10 @@ export interface AppEventPayloads {
   [AppEvent.FormatSuggestionChanged]: { path: string; formattable: boolean }
   [AppEvent.FormatDocumentRequested]: void
 
-  [AppEvent.ViewChanged]:           { view: ViewType }
+  // `reason: "document"` marks a switch that is part of opening a document, so
+  // the browser-history bookkeeping adopts the layer entry instead of popping
+  // it (see services/ui-history-service.ts).
+  [AppEvent.ViewChanged]:           { view: ViewType; reason?: "document" }
   [AppEvent.ProviderChanged]:       { type: ProviderType; icon: string; label: string }
   [AppEvent.ProviderChangeRequested]: void
   [AppEvent.TreeChanged]:           void

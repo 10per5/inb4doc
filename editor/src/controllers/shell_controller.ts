@@ -13,7 +13,7 @@ import { ToolbarStore } from "@/stores/toolbar-store";
 import { UIService } from "@/stores/ui-store";
 import type { EditorController } from "@/controllers/editor-controller";
 import { FileSyncService } from "@/services/file-sync-service";
-import { ViewService, type ViewType } from "@/services/view-service";
+import { ViewService } from "@/services/view-service";
 import { LayoutService } from "@/services/layout-service";
 import { NavigationService } from "@/services/navigation-service";
 import { getProvider, getProviderDisplayInfo, waitProviderReady } from "@/stores/provider-store";
@@ -35,11 +35,18 @@ import { isAutoNamed, markAutoNamed, clearAutoNamed, inferTargetPath } from "@/f
 import { recentProjectsStore } from "@/stores/recent-projects-store";
 import { ProviderType } from "@/providers/index";
 import { getCurrentPath, replacePath } from "@/utils/url";
+import {
+  markDocumentSwitch,
+  setUiLayerCount,
+  startUiHistory,
+  stopUiHistory,
+} from "@/services/ui-history-service";
+import { closeTopMenu } from "@/components/ui/menu";
 import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { getInitialState, getContentRoot } from "@/bridge/native";
-import { registerBackHandler } from "@/bridge/interface";
+import { registerBackHandler } from "@/services/back-service";
 import { closeTopDialog } from "@/services/dialog-service";
 import { closeTopWindow } from "@/services/window-service";
 import { appEvents, AppEvent } from "@/stores/app-events";
@@ -78,17 +85,18 @@ export default class Shell extends Controller {
   private onBeforeUnload: (() => void) | null = null
   private unsubs: (() => void)[] = []
   private appInitialized = false
-  private fullviewHistoryDepth = 0
-  private ignoreNextPop = false
   private autoRenameTimer: ReturnType<typeof setTimeout> | null = null
 
   connect() {
     this.initialPath = this.data.get("path") || getCurrentPath()
 
-    // Host "back" affordance: until the view service exists (it is built in
-    // initializeApp) handleBack reports "unhandled" and the host keeps its own
-    // fallback, so a press during boot still exits.
+    // One unwinder for every Back source: the native bridge calls it through
+    // window.inb4docUI, and browser/PWA session history calls it through
+    // services/ui-history-service. Until the view service exists (it is built
+    // in initializeApp) handleBack reports "unhandled", so the host keeps its
+    // own fallback and a press during boot still exits.
     registerBackHandler(() => this.handleBackPressed())
+    startUiHistory()
 
     // Runtime deep-link entry point for the desktop shell's single-instance IPC
     // (gui/src/app.cpp): when a second launch forwards an inb4doc:// URI, the
@@ -253,7 +261,7 @@ export default class Shell extends Controller {
       }),
       appEvents.on(AppEvent.OpenSharedDocRequested, ({ path, content }) => {
         this.cache.createDraft(path, content)
-        this.view.switchTo("editor")
+        this.view.switchTo("editor", "document")
         appEvents.emit(AppEvent.Navigate, { path })
         this.nav.loadSidebar()
         dirtyTrackingService.recompute()
@@ -271,7 +279,7 @@ export default class Shell extends Controller {
       }),
       appEvents.on(AppEvent.CreateFirstPage, () => {
         this.cache.createDraft(HOME_PATH, NEW_PAGE_BODY)
-        this.view.switchTo("editor")
+        this.view.switchTo("editor", "document")
         appEvents.emit(AppEvent.Navigate, { path: HOME_PATH })
       }),
       appEvents.on(AppEvent.DirIndexActivated, ({ path }) => {
@@ -287,12 +295,15 @@ export default class Shell extends Controller {
               return `# ${dirName}\n\n<desc here>\n\n## Topics\n\n{{< table-of-directory >}}\n\n`;
             })();
         this.cache.createDraft(path, template)
-        this.view.switchTo("editor")
+        this.view.switchTo("editor", "document")
         appEvents.emit(AppEvent.Navigate, { path })
       }),
-      appEvents.on(AppEvent.ViewChanged, ({ view }) => {
-        this.view.switchTo(view)
-        this.syncFullviewHistory(view)
+      appEvents.on(AppEvent.ViewChanged, ({ view, reason }) => {
+        this.view.switchTo(view, reason)
+        // A document opening releases the layer's history entry (navigate
+        // replaces it); any other editor switch lets the manager pop it.
+        if (reason === "document") markDocumentSwitch()
+        setUiLayerCount("view", view === "editor" ? 0 : 1)
       }),
       appEvents.on(AppEvent.SourceModeToggled, () => {
         const source = this.editor.toggleSourceMode()
@@ -312,7 +323,6 @@ export default class Shell extends Controller {
 
     this.onBeforeUnload = () => { dirtyTrackingService.flush() }
     window.addEventListener("beforeunload", this.onBeforeUnload)
-    window.addEventListener("popstate", this.onPopState)
 
     hotkeys.register("ctrl+s", () => appEvents.emit(AppEvent.SaveCurrentFile))
     hotkeys.attach()
@@ -415,10 +425,12 @@ export default class Shell extends Controller {
   }
 
   /**
-   * Host "back" press (the Android system back press / gesture), mounted on
-   * `window.inb4docUI.handleBack`. Unwinds exactly one layer, innermost first:
-   * an open dialog, then whatever a controller owns (a pushed sub-screen, the
-   * file multi-select), then the fullview itself.
+   * The app's single unwinder, shared by both Back sources: the native bridge
+   * (`window.inb4docUI.handleBack`) and browser/PWA session history
+   * (`services/ui-history-service`). Unwinds exactly one layer, innermost
+   * first: an open dialog, the topmost window, an open menu, then whatever a
+   * controller owns (a pushed sub-screen, the file multi-select), then the
+   * fullview itself.
    *
    * With "More" gone every fullview — Files included — steps straight back to
    * the editor. Only once the editor is frontmost does this report
@@ -427,9 +439,11 @@ export default class Shell extends Controller {
    */
   private handleBackPressed(): boolean {
     // A modal dialog is above every window in the stack, so it unwinds first;
-    // then the topmost window (and only that one — a parent stays open below).
+    // then the topmost window (and only that one — a parent stays open below),
+    // then a dropdown (menus float above the page but below modal surfaces).
     if (closeTopDialog()) return true
     if (closeTopWindow()) return true
+    if (closeTopMenu()) return true
     const request = { handled: false }
     appEvents.emit(AppEvent.BackRequested, request)
     if (request.handled) return true
@@ -439,46 +453,9 @@ export default class Shell extends Controller {
     return true
   }
 
-  /**
-   * Browser / PWA back button.
-   *
-   * In the host apps the back press arrives through the bridge, but in a plain
-   * browser or installed PWA there is no bridge — only the session history, and
-   * fullview switches never touched it (they are `display` toggles on one
-   * document), so "Back" jumped straight out of the app instead of stepping out
-   * of Files / Disk stats / Preferences. Opening any fullview now pushes one
-   * history entry and returning to the editor pops it, which gives the browser
-   * the same one-step-back behavior the host implements.
-   */
-  private syncFullviewHistory(view: ViewType): void {
-    if (typeof history === "undefined") return
-    if (view !== "editor") {
-      if (this.fullviewHistoryDepth === 0) {
-        history.pushState({ inb4docFullview: true }, "")
-        this.fullviewHistoryDepth = 1
-      }
-      return
-    }
-    if (this.fullviewHistoryDepth === 0) return
-    this.fullviewHistoryDepth = 0
-    this.ignoreNextPop = true
-    history.back()
-  }
-
-  private onPopState = (): void => {
-    if (this.ignoreNextPop) {
-      this.ignoreNextPop = false
-      return
-    }
-    if (this.fullviewHistoryDepth === 0) return
-    this.fullviewHistoryDepth = 0
-    if (!this.view) return
-    if (this.view.getCurrent() !== "editor") this.view.switchTo("editor")
-  };
-
   disconnect() {
     registerBackHandler(null)
-    window.removeEventListener("popstate", this.onPopState)
+    stopUiHistory()
     if (this.autoRenameTimer !== null) {
       clearTimeout(this.autoRenameTimer)
       this.autoRenameTimer = null

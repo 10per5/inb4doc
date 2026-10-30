@@ -694,11 +694,14 @@ The decision lives in `ShellController.handleBackPressed()`, which unwinds
 **exactly one layer per press**, innermost first:
 
 1. an open state-driven dialog (`closeTopDialog()` in dialog-service),
-2. anything a controller owns via `AppEvent.BackRequested` (payload
+2. the topmost window (`closeTopWindow()` in window-service — a parent window
+   below stays open),
+3. an open menu/dropdown (`closeTopMenu()` in `components/ui/menu`),
+4. anything a controller owns via `AppEvent.BackRequested` (payload
    `{ handled: boolean }` — a pushed preferences section steps back to the
    preferences menu, the Files multi-select mode exits selection; the handler
    sets `handled = true`),
-3. the fullview itself — **every** fullview (Files included) goes straight to
+5. the fullview itself — **every** fullview (Files included) goes straight to
    `editor`. There is no intermediate "More" screen any more, so one press
    always lands on the editor.
 
@@ -707,13 +710,36 @@ never quit the app from a subscreen — it walks back to the editor first, and t
 next press exits. Add new unwinding steps as `AppEvent.BackRequested`
 subscribers, never by teaching the host about app views.
 
-**Browser / PWA** have no bridge, so the same one-step behavior comes from the
-session history: `ShellController.syncFullviewHistory()` pushes one entry when a
-fullview opens and pops it when the app returns to the editor, and `popstate`
-maps a back press to `switchTo("editor")`. Without it, fullviews were pure
-`display` toggles on one document — the browser Back button skipped straight
-past them and left the app. Any new fullview gets this for free: it only has to
-emit `AppEvent.ViewChanged`.
+**Browser / PWA** have no bridge, so session history feeds the *same* unwinder.
+`services/back-service.ts` owns the one handler registration (the host bridge
+and history both call `handleBack()`); `services/ui-history-service.ts` owns the
+browser side:
+
+- While at least one layer is open it keeps **one** extra history entry on top
+  of the document. Layers report counts by source — `view` (shell, from
+  `ViewChanged`), `menu` (Menu.open/close), `dialog` (dialog-service),
+  `window` (window-service) — so a window stack still needs one Back per window.
+- A user Back pops that entry, calls the shared `handleBack()`, and re-pushes the
+  entry when anything is still open; closing the last layer ourselves pops it
+  (on a macrotask, so a `replacePath` that follows the close wins —
+  `setBeforePathReplace` releases the sentinel instead of popping it). Do not
+  add another `popstate` listener (e.g. in `features/navigation.ts`): it would
+  navigate away from the layer the shell is still unwinding. URL-only
+  Back/Forward goes through `AppEvent.HistoryNavigate`, which loads the document
+  without pushing a duplicate entry.
+- It is **browser-only** (`usesBrowserHistory()` in `src/utils/url.ts`). Native
+  hosts (Android WebView included) reach the app at a fixed shell URL and send
+  back presses through the bridge; calling `pushState`/`back()` there made
+  `popstate` re-navigate to the previous (or home) document, so tapping a file
+  on mobile appeared not to open it.
+- A switch to the editor that is part of opening a document must carry
+  `ViewChanged { reason: "document" }`. The shell then *adopts* the layer's
+  history entry (`markDocumentSwitch()` → `markDocumentPathAdopted()` →
+  `replacePath` in `navigate()`) instead of popping it. Calling `history.back()`
+  next to the navigation's `pushState` races the traversal and pops the document
+  that was just opened. Emit that reason from any path that switches to the
+  editor before emitting `AppEvent.Navigate` (view-service's Navigate listener,
+  the shell's first-page / dir-index / shared-doc handlers).
 
 ## Bottom-strip clearance (desktop)
 
