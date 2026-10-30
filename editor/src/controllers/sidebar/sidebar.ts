@@ -47,6 +47,8 @@ export interface PendingSets {
   pendingDeleteSet: Set<string>;
   pendingRenameFromSet: Set<string>;
   pendingRenameToMap: Map<string, string>;
+  /** Old folder path → new folder path for a queued folder rename. */
+  pendingFolderRenameMap: Map<string, string>;
   pendingCreateSet: Set<string>;
   pendingMoveToSet: Set<string>;
   pendingMoveFromSet: Set<string>;
@@ -81,6 +83,16 @@ const LINE_COLORS = [
 export function buildPendingSets(
   pendingOps?: readonly PendingOp[],
 ): PendingSets {
+  const pendingFolderRenameMap = new Map<string, string>();
+  for (const op of pendingOps ?? []) {
+    if (op.type !== PendingOpType.Rename || !op.folderRename) continue;
+    const suffix = op.from.slice(op.folderRename.length);
+    if (!suffix.startsWith("/") || !op.to.endsWith(suffix)) continue;
+    pendingFolderRenameMap.set(
+      op.folderRename,
+      op.to.slice(0, op.to.length - suffix.length),
+    );
+  }
   return {
     pendingDeleteSet: new Set(
       pendingOps?.filter((o) => o.type === PendingOpType.Delete).map((o) => o.path) ?? [],
@@ -91,6 +103,7 @@ export function buildPendingSets(
     pendingRenameToMap: new Map(
       pendingOps?.filter((o) => o.type === PendingOpType.Rename).map((o) => [o.from, o.to]) ?? [],
     ),
+    pendingFolderRenameMap,
     pendingCreateSet: new Set(
       pendingOps?.filter((o) => o.type === PendingOpType.Create).map((o) => o.path) ?? [],
     ),
@@ -143,6 +156,13 @@ export function isFileConvertToDir(pagePath: string, ps: PendingSets, ops?: read
   return toBase.endsWith(`/${HOME_PATH}`) || toBase === HOME_PATH;
 }
 
+export function isInsidePendingFolderRename(pagePath: string, ps: PendingSets): boolean {
+  for (const dirPath of ps.pendingFolderRenameMap.keys()) {
+    if (pagePath.startsWith(`${dirPath}/`)) return true;
+  }
+  return false;
+}
+
 export function pendingClass(name: string, prefix: string, ps: PendingSets): string {
   const parts = prefix ? `${prefix}/${name}` : name;
   const pagePath = parts.replace(/\.md$/, "");
@@ -183,7 +203,7 @@ export function pendingLabelSuffix(
       }
     }
   }
-  if (ps.pendingRenameFromSet.has(pagePath)) {
+  if (ps.pendingRenameFromSet.has(pagePath) && !isInsidePendingFolderRename(pagePath, ps)) {
     const to = ps.pendingRenameToMap.get(pagePath);
     if (to) {
       result.push(
@@ -338,9 +358,16 @@ export function renderItems(
     const dirPendingDelete = isPendingDelete(dirPath, ctx.pendingSets)
     const dirPendingCreate = isDirPendingCreate(dirPath, ctx.pendingSets)
     const dirPendingMove = isDirPendingMove(dirPath, ctx.pendingSets)
+    const dirRenameTarget = ctx.pendingSets.pendingFolderRenameMap.get(dirPath)
+    const dirPendingRename = dirRenameTarget !== undefined
     const dirBadges: string[] = []
     if (dirPendingDelete) {
       dirBadges.push('<span class="pending-badge pending-badge-delete">delete</span>')
+    }
+    if (dirPendingRename && dirRenameTarget) {
+      dirBadges.push(
+        `<span class="pending-badge pending-badge-rename">→ ${dirRenameTarget.split("/").pop()}</span>`,
+      )
     }
     if (dirPendingMove) {
       const fromOp = ctx.pendingOps?.find(
@@ -355,7 +382,7 @@ export function renderItems(
       dirBadges.push('<span class="pending-badge pending-badge-create">new</span>')
     }
     return `
-      <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}" draggable="true" data-nav-path="${dirPath}">
+      <div class="nav-section${collapsed ? " collapsed" : ""}${dirPendingDelete ? " pending-delete" : ""}${dirPendingRename ? " pending-rename" : ""}" draggable="true" data-nav-path="${dirPath}">
         <span class="nav-section-title depth-${depth}">
           <a href="${buildEditorUrl(ctx.basePath, indexPagePath)}" class="${dirLinkClasses}" data-nav-path="${indexPagePath}" data-action="click->sidebar#onNavigate">
             ${ctx.selectionMode ? `<span class="sidebar-checkbox"></span>` : dirIcon}${label}${fileCount > 0 ? `<span class="sidebar-count">${fileCount}</span>` : ""}${dirBadges.join("")}

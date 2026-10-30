@@ -6,6 +6,7 @@ import {
   cutPage,
   pastePage,
   renamePage,
+  renameFolder,
   movePage,
   setPageWeights,
 } from "@/features/editor-actions";
@@ -516,6 +517,61 @@ export class NavigationService {
   }
 
   async renamePage(pagePath: string): Promise<void> {
+    const tree = this.cache.getPendingOps().applyToTree(treeStore.getTree());
+    const parentDir = pagePath.includes("/")
+      ? pagePath.substring(0, pagePath.lastIndexOf("/"))
+      : "";
+    const isFolder = (tree.children.get(parentDir) ?? []).some(
+      (child) => child.isDir && child.path === pagePath,
+    );
+
+    if (isFolder) {
+      const openPath = this.currentPath;
+      const openWasPendingCreate = this.cache
+        .getPendingOps()
+        .all.some((op) => op.type === PendingOpType.Create && op.path === openPath);
+      const openInsideFolder =
+        openPath === pagePath || openPath.startsWith(`${pagePath}/`);
+
+      await renameFolder(this.cache, pagePath, (newPath) => {
+        if (newPath == null) return;
+        // A not-yet-created page has no file to rename; its Create moved with
+        // the folder, so move the editor with it as well. Existing files keep
+        // their old (still readable) path until the flush emits Navigate.
+        if (openWasPendingCreate && openInsideFolder) {
+          const newCurrent = `${newPath}${openPath.slice(pagePath.length)}`;
+          movePageState(openPath, newCurrent);
+          this.currentPath = newCurrent;
+          this.editor.setCurrentPath(newCurrent);
+          this.cache.setCurrentPath(newCurrent);
+          replacePath(newCurrent);
+        } else if (openInsideFolder && openPath !== pagePath) {
+          // A directory's `_index` may not exist on disk (empty folder view);
+          // there is no Rename op to follow it, so retarget the virtual index
+          // path now.
+          const covered = this.cache.getPendingOps().all.some(
+            (op) =>
+              (op.type === PendingOpType.Rename && op.from === openPath) ||
+              (op.type === PendingOpType.Create && op.path === openPath) ||
+              (op.type === PendingOpType.Move && op.from === openPath),
+          );
+          if (!covered) {
+            const newCurrent = `${newPath}${openPath.slice(pagePath.length)}`;
+            if (pagesStore.get(openPath)) movePageState(openPath, newCurrent);
+            this.currentPath = newCurrent;
+            this.editor.setCurrentPath(newCurrent);
+            this.cache.setCurrentPath(newCurrent);
+            replacePath(newCurrent);
+          }
+        }
+        // Keep existing cached page state at the old paths until the flush
+        // moves the files; edits queued meanwhile fold into the Rename ops.
+        this.loadSidebar();
+        dirtyTrackingService.recompute();
+      });
+      return;
+    }
+
     await renamePage(this.cache, pagePath, (newPath) => {
       if (newPath == null) return;
       pagesStore.clearPath(pagePath);

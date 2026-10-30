@@ -296,6 +296,10 @@
   color: var(--color-warning);
 }
 
+.nav-section.pending-rename > .nav-section-title .nav-link {
+  color: var(--color-warning);
+}
+
 .nav-item.pending-create .nav-link {
   color: var(--color-success);
 }

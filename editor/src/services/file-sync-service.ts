@@ -32,6 +32,7 @@ import { pagesStore as repo } from "@/stores/page-store";
 import { appEvents, AppEvent } from "@/stores/app-events";
 import { dirtyTrackingService } from "@/services/dirty-tracking-service";
 import { clearEditorTint, updateEditorTint } from "@/utils/file-status-tint";
+import { prefsStore } from "@/stores/preferences-store";
 
 import type { EditorController } from "@/controllers/editor-controller";
 
@@ -163,6 +164,16 @@ export class FileSyncService {
     patch: string,
     frontmatterPatch?: Record<string, string | number | undefined>,
   ): void {
+    // A rename owns the op slot. Replacing it with an Edit would silently drop
+    // the pending move, so fold the new body into the rename instead.
+    const rename = this.pendingOps.findRename(path);
+    if (rename) {
+      const page = repo.getOrCreate(path);
+      page.setBody(patch);
+      rename.content = page.reconstructContent() ?? rename.content ?? patch;
+      pendingOpsStore.save(this.pendingOps.all);
+      return;
+    }
     this.pendingOps.queueEdit(path, patch, frontmatterPatch);
     pendingOpsStore.save(this.pendingOps.all);
   }
@@ -172,7 +183,7 @@ export class FileSyncService {
     pendingOpsStore.save(this.pendingOps.all);
   }
 
-  queueRename(from: string, to: string): void {
+  queueRename(from: string, to: string, folderRename?: string): void {
     const page = repo.getOrCreate(from);
     // Pending Edit ops carry only the body patch — the page's cached body is
     // still the pre-edit baseline. Fold it in before reconstructing the full
@@ -181,7 +192,7 @@ export class FileSyncService {
     const editOp = this.pendingOps.findEdit(from);
     if (editOp?.patch !== undefined) page.setBody(editOp.patch);
     const content = page.reconstructContent() ?? undefined;
-    this.pendingOps.queueRename(from, to, content);
+    this.pendingOps.queueRename(from, to, content, folderRename);
     pendingOpsStore.save(this.pendingOps.all);
     const fromDir = from.includes("/")
       ? from.substring(0, from.lastIndexOf("/"))
@@ -441,6 +452,21 @@ export class FileSyncService {
     }
 
     const flushedPaths = new Set(dirtyPaths);
+    // Remember folder renames before the ops are cleared, so the active
+    // project scope (and pinned namespaces) can follow a renamed root folder
+    // after a successful flush.
+    const folderRenames = new Map<string, { to: string; froms: Set<string> }>();
+    for (const op of this.pendingOps.all) {
+      if (op.type !== PendingOpType.Rename || !op.folderRename) continue;
+      const suffix = op.from.slice(op.folderRename.length);
+      if (!suffix.startsWith("/") || !op.to.endsWith(suffix)) continue;
+      const entry =
+        folderRenames.get(op.folderRename) ?? { to: "", froms: new Set<string>() };
+      entry.to = op.to.slice(0, op.to.length - suffix.length);
+      entry.froms.add(op.from);
+      folderRenames.set(op.folderRename, entry);
+    }
+
     const { deletedPaths, renamedPaths, hadFailure: opFailed } =
       await this.executePendingOps(flushedPaths);
     hadFailure = hadFailure || opFailed;
@@ -482,6 +508,8 @@ export class FileSyncService {
       );
     }
 
+    this.followRenamedScopes(folderRenames, renamedPaths);
+
     if (hadFailure) {
       showNotification("Some files failed to save", { type: "danger", id: "save" });
     } else {
@@ -501,6 +529,50 @@ export class FileSyncService {
         })
         .catch(() => {});
     }
+  }
+
+  /**
+   * Keep the active project scope and pinned-project list pointing at the new
+   * name after a root folder (namespace) was renamed and flushed. A partially
+   * failed folder rename is left alone: its old path still owns files.
+   */
+  private followRenamedScopes(
+    folderRenames: Map<string, { to: string; froms: Set<string> }>,
+    renamedPaths: Map<string, string>,
+  ): void {
+    if (folderRenames.size === 0) return;
+
+    const mapPath = (path: string): string | null => {
+      let mapped = path;
+      let changed = false;
+      for (const [from, info] of folderRenames) {
+        if (![...info.froms].every((p) => renamedPaths.has(p))) continue;
+        if (mapped === from || mapped.startsWith(`${from}/`)) {
+          mapped = `${info.to}${mapped.slice(from.length)}`;
+          changed = true;
+        }
+      }
+      return changed ? mapped : null;
+    };
+
+    let changed = false;
+    const scope = mapPath(prefsStore.rootScope);
+    if (scope !== null && scope !== prefsStore.rootScope) {
+      prefsStore.setRootScope(scope);
+      changed = true;
+    }
+
+    const pins = prefsStore.pinnedProjects.map((pin) => mapPath(pin) ?? pin);
+    const nextPins = [...new Set(pins)];
+    if (
+      nextPins.length !== prefsStore.pinnedProjects.length ||
+      nextPins.some((pin, i) => pin !== prefsStore.pinnedProjects[i])
+    ) {
+      prefsStore.setPinnedProjects(nextPins);
+      changed = true;
+    }
+
+    if (changed) appEvents.emit(AppEvent.RootScopeChanged);
   }
 
   private async executeOp(
@@ -540,7 +612,7 @@ export class FileSyncService {
         break;
       }
       case PendingOpType.Rename:
-        if (op.content) {
+        if (op.content !== undefined) {
           await provider?.deleteFile?.(op.from);
           if (!flushedPaths?.has(op.to)) {
             const latest =

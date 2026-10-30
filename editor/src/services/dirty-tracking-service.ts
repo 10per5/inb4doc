@@ -90,7 +90,9 @@ export class DirtyTrackingService {
             }
           }
         } else if (body !== baseline) {
-          this.pendingOps!.queueEdit(path, body, undefined, undefined, c0);
+          if (!this.foldIntoRename(path, body)) {
+            this.pendingOps!.queueEdit(path, body, undefined, undefined, c0);
+          }
         }
         pendingOpsStore.save(this.pendingOps!.all);
 
@@ -129,7 +131,12 @@ export class DirtyTrackingService {
       baseline !== undefined && (page.bodyState.body ?? "") !== baseline;
 
     const editOp = this.pendingOps.findEdit(path);
-    if (editOp) {
+    const renameOp = this.pendingOps.findRename(path);
+    if (renameOp) {
+      // A pending rename keeps the op slot; fold the metadata/body into the
+      // content it will write rather than replacing it with an Edit.
+      renameOp.content = page.reconstructContent() ?? renameOp.content;
+    } else if (editOp) {
       editOp.frontmatterPatch = frontmatterPatch;
       if (!frontmatterPatch && !bodyChanged) {
         this.pendingOps.remove(path);
@@ -146,6 +153,20 @@ export class DirtyTrackingService {
     pendingOpsStore.save(this.pendingOps.all);
 
     this.recomputeAndEmit();
+  }
+
+  /**
+   * Fold a body edit into an existing Rename op for the same path. Renames own
+   * the op slot; queueing an Edit instead would replace the rename and leave
+   * the file at its old name after the next flush.
+   */
+  private foldIntoRename(path: string, body: string): boolean {
+    const rename = this.pendingOps?.findRename(path);
+    if (!rename) return false;
+    const page = pagesStore.getOrCreate(path);
+    page.setBody(body);
+    rename.content = page.reconstructContent() ?? rename.content ?? body;
+    return true;
   }
 
   recompute(): void {
@@ -165,7 +186,10 @@ export class DirtyTrackingService {
     page.bodyState.setBody(md);
 
     const createOp = this.pendingOps.findCreate(path);
-    if (createOp) {
+    const renameOp = this.pendingOps.findRename(path);
+    if (renameOp) {
+      renameOp.content = page.reconstructContent() ?? md;
+    } else if (createOp) {
       const full = page.reconstructContent() ?? md;
       this.pendingOps.queueCreate(path, full);
     } else {
@@ -218,13 +242,15 @@ export class DirtyTrackingService {
           }
         }
       } else if (body !== baseline) {
-        this.pendingOps.queueEdit(
-          path,
-          body,
-          undefined,
-          undefined,
-          this.canonicalBaselineResolver(path)
-        );
+        if (!this.foldIntoRename(path, body)) {
+          this.pendingOps.queueEdit(
+            path,
+            body,
+            undefined,
+            undefined,
+            this.canonicalBaselineResolver(path)
+          );
+        }
       }
       pendingOpsStore.save(this.pendingOps.all);
     }

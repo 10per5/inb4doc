@@ -835,6 +835,18 @@ the same guarantee Delete gives. Duplicating a folder copies its `_index` and
 every descendant; clearing a folder empties its `_index`. Remember that an
 empty patch is a valid Edit (use `!== undefined`, never truthiness).
 
+**Renaming a folder is a batch of Rename ops**, one per descendant page, each
+carrying `folderRename: <old folder path>` (see `renameFolder`). The marker is
+what lets `buildPendingSets` expose `pendingFolderRenameMap` and the explorer
+style the old folder row with a `→ newname` badge; don't derive folder renames
+from ordinary file renames (moving one file out of a folder looks the same by
+path alone). The tree intentionally keeps the old paths until flush (same UX as
+file rename), so cache/editor state stays keyed to the readable old path;
+typing after the rename must fold into the Rename op's `content` (see
+`foldIntoRename`) instead of replacing it with an Edit. On flush the per-file
+`renamedPaths` map makes the open document inside the namespace navigate to its
+new path.
+
 ## Imports never overtake what is already there
 
 `src/features/import-resolve.ts` decides where an imported file lands **before**
