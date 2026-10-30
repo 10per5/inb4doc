@@ -57,6 +57,7 @@ export class FileSyncService {
   private currentPath: string = "";
   private pendingOps: PendingOps;
   private unsubs: (() => void)[] = [];
+  private beforeFlush: (() => Promise<void>) | null = null;
 
   constructor(editor: EditorController) {
     this.editor = editor;
@@ -70,6 +71,15 @@ export class FileSyncService {
 
   getPendingOps(): PendingOps {
     return this.pendingOps;
+  }
+
+  /**
+   * Hook run at the very start of a flush, before dirty paths or the current
+   * body are captured. The shell uses it to settle a debounced title rename so
+   * a brand-new page is written under its typed name on the *first* save.
+   */
+  setBeforeFlush(fn: (() => Promise<void>) | null): void {
+    this.beforeFlush = fn;
   }
 
   /**
@@ -163,7 +173,14 @@ export class FileSyncService {
   }
 
   queueRename(from: string, to: string): void {
-    const content = repo.getOrCreate(from).reconstructContent() ?? undefined;
+    const page = repo.getOrCreate(from);
+    // Pending Edit ops carry only the body patch — the page's cached body is
+    // still the pre-edit baseline. Fold it in before reconstructing the full
+    // content, otherwise a rename queued before the next flush writes the old
+    // body and drops the latest edits.
+    const editOp = this.pendingOps.findEdit(from);
+    if (editOp?.patch !== undefined) page.setBody(editOp.patch);
+    const content = page.reconstructContent() ?? undefined;
     this.pendingOps.queueRename(from, to, content);
     pendingOpsStore.save(this.pendingOps.all);
     const fromDir = from.includes("/")
@@ -351,6 +368,16 @@ export class FileSyncService {
   }
 
   async flushDirtyFiles(): Promise<void> {
+    // Write the latest editor body into the pending ops first, so a title
+    // rename below cannot leave a stale 300ms body timer queued for the old
+    // slug path.
+    dirtyTrackingService.flush()
+
+    // Settle a pending title rename first: it retargets the pending Create and
+    // the editor/current path, so everything captured below sees the final
+    // name instead of the throwaway slug.
+    if (this.beforeFlush) await this.beforeFlush()
+
     const dirtyPaths = this.pendingOps.getDirtyPaths();
     if (dirtyPaths.length === 0 && this.pendingOps.count === 0) return;
 

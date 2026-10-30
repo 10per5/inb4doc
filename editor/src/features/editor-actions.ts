@@ -374,9 +374,9 @@ export async function createDirectory(
 export async function createQuickPage(
   cacheService: FileSyncService,
   parentPath: string,
-  doNavigate: (path: string) => void,
+  doNavigate: (path: string) => Promise<void> | void,
   loadSidebar: () => Promise<void>,
-): Promise<void> {
+): Promise<boolean> {
   const parentDir = parentPath || ""
   let fullPath = ""
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -389,7 +389,7 @@ export async function createQuickPage(
   }
   if (!fullPath) {
     showNotification("Could not find a free name", { title: "New", type: "warning" })
-    return
+    return false
   }
 
   // No title on purpose: the name comes from the first line (see
@@ -411,7 +411,8 @@ export async function createQuickPage(
   markAutoNamed(fullPath)
 
   await loadSidebar()
-  doNavigate(fullPath)
+  await doNavigate(fullPath)
+  return true
 }
 
 /**

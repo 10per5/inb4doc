@@ -778,13 +778,39 @@ popover anchored at the caret, not a bottom bar.
 
 "New" (File ▸ New and the Files screen's "+ New") no longer asks for a name: it
 creates the page under a throwaway three-word slug (`quiet-river-stone`) with an
-empty `#` heading and focuses it, and `src/features/auto-name.ts` renames the
-file to whatever the user types in that heading (debounced 1.2s, through
+empty `#` heading, focuses it, and `src/features/auto-name.ts` renames the file
+to whatever the user types in that heading (debounced 1.2s, through
 `NavigationService.renameTo`).
+
+- **Where it lands**: the project scope selected in Preferences ▸ Navigation
+  (`prefsStore.rootScope`), else the vault root. Do not derive the folder from
+  the currently open document — on boot that is whichever page the initial-path
+  resolver picked, so new files appeared under an arbitrary directory. A
+  folder-specific "New…" is the explorer row's context menu
+  (`SidebarNewItemRequested`, which carries `parentPath`).
+
+- The empty heading shows a gray **decoration-only** prompt
+  (`plugins/auto-title-placeholder.ts`, styled in `styles/editor/editor.css`).
+  It is never serialized and disappears on the first typed character; it is
+  gated on `isAutoNamed`, so an empty heading in an ordinary document stays
+  plain. `EditorController.focusFirstHeading()` places the caret in it after
+  `createQuickPage` finishes navigating.
 
 - Only files created this way auto-rename — `markAutoNamed(path)` records them
   and any explicit rename clears the mark. Never infer a name for a file the
   user named themselves.
+- **Saving settles the debounce.** Ctrl+S (`saveCurrentFile`) settles the rename
+  before it chooses between "flush pending ops" and "write the open file", and
+  `flushDirtyFiles()` flushes the 300ms dirty body timer first, then runs its
+  `setBeforeFlush` hook (`ShellController.settleAutoRename`). So a Save pressed
+  inside the 1.2s naming pause writes the title-derived path on the *first*
+  save — never content under the old name followed by a still-unflushed Rename.
+  `queueRename` folds a pending Edit's body patch into the page before
+  reconstructing the op content, so the rename carries the latest text. The
+  marker only moves after `renameTo` reports success (a taken target keeps the
+  old name and retries on a later save), and `renameTo` re-keys the cached page
+  instead of dropping it so the pending Create keeps its parsed
+  frontmatter/baseline for that write.
 - Deleting or omitting the heading yields nothing: the file keeps its name and
   the explorer's **… ▸ Rename** is the only way forward. Do not fall back to the
   slug, and do not wipe the name when the heading disappears.

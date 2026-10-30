@@ -33,6 +33,31 @@ import { pickProjectDirectory } from "@/bridge/native";
 import { recentProjectsStore } from "@/stores/recent-projects-store";
 import { confirmDialog } from "@/controllers/dialog/dialog";
 
+/**
+ * Re-key the cached page for a rename instead of dropping it.
+ *
+ * A pending Create has no file on disk yet, so its parsed frontmatter and
+ * baseline live only in `pagesStore`. Clearing both keys here made the first
+ * save of a renamed new page write its body without frontmatter.
+ */
+function movePageState(from: string, to: string): void {
+  const page = pagesStore.get(from);
+  pagesStore.clearPath(to);
+  if (!page) return;
+  const next = pagesStore.getOrCreate(to);
+  if (page.bodyState.body !== undefined) {
+    next.bodyState.cacheBody(page.bodyState.body);
+  }
+  if (page.bodyState.baseline !== undefined) {
+    next.bodyState.setBaseline(page.bodyState.baseline);
+  }
+  next.frontmatter = page.frontmatter;
+  next.originalFrontmatter = page.originalFrontmatter;
+  const serverTime = page.getServerTime();
+  if (serverTime !== undefined) next.setServerTime(serverTime);
+  pagesStore.clearPath(from);
+}
+
 export class NavigationService {
   private currentPath: string = "";
   private activeProjectRoot: string = "";
@@ -466,16 +491,19 @@ export class NavigationService {
 
   /**
    * Rename without asking — used by auto-naming, where the first `# heading`
-   * supplies the name. Skips silently when the target is taken (an inferred
-   * name must never clobber an existing file), leaving the explorer UI as the
-   * place to name it.
+   * supplies the name. Returns false when the target is empty, unchanged, or
+   * already taken (an inferred name must never clobber an existing file);
+   * the caller keeps the old path and can retry on a later save.
    */
-  async renameTo(from: string, to: string): Promise<void> {
-    if (!from || !to || from === to) return
-    if (await this.cache.pathExists(to)) return
+  async renameTo(from: string, to: string): Promise<boolean> {
+    if (!from || !to || from === to) return false
+    if (await this.cache.pathExists(to)) return false
+    // Another unsaved draft may already own the target: a Create that only
+    // exists in pending ops would otherwise be overwritten by the move.
+    const ops = this.cache.getPendingOps()
+    if (ops.hasPendingCreate(to) || ops.hasPendingMoveTo(to)) return false
     this.cache.queueRename(from, to)
-    pagesStore.clearPath(from)
-    pagesStore.clearPath(to)
+    movePageState(from, to)
     if (this.currentPath === from) {
       this.currentPath = to
       this.editor.setCurrentPath(to)
@@ -484,6 +512,7 @@ export class NavigationService {
     }
     await this.loadSidebar()
     dirtyTrackingService.recompute()
+    return true
   }
 
   async renamePage(pagePath: string): Promise<void> {

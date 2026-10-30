@@ -9,6 +9,15 @@
   caret-color: var(--color-caret);
 }
 
+/* Empty title heading of a freshly created page: a decoration-only prompt
+ * (see plugins/auto-title-placeholder.ts), never part of the document. */
+.ProseMirror h1.auto-title-empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── ProseMirror Links ─────────────────────────────────────────────── */
 
 .ProseMirror a {

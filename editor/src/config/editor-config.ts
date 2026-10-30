@@ -37,6 +37,7 @@ import { videoView } from "@/plugins/video";
 import { detailsView } from "@/plugins/details";
 import { fixedTableBlockView } from "@/plugins/table-block-view";
 import { createDirtyPlugin } from "@/plugins/dirty";
+import { createAutoTitlePlaceholderPlugin } from "@/plugins/auto-title-placeholder";
 import { createMentionPlugin } from "@/plugins/mention";
 import { createImagePastePlugin } from "@/plugins/image-paste";
 import { createLinkBoundaryPlugin } from "@/plugins/link-boundary";
@@ -138,6 +139,7 @@ export async function createEditor(
         setLastSetContent: (path, c) => host.stateCache.setLastSet(path, c),
         getCurrentPath: () => host.currentPath,
       }),
+      createAutoTitlePlaceholderPlugin(() => host.currentPath),
       createMentionPlugin((_mv: MentionView | null) => {
         host.onMentionView(_mv);
       }),
