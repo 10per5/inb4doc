@@ -21,7 +21,7 @@ import { treeStore } from "@/stores/tree-store";
 import { showNotification } from "@/components/notification/notification";
 import { surfaceBackendError } from "@/utils/backend-error";
 import type { TreeIndex } from "@/utils/tree";
-import { extractSnippets } from "@/utils/content-search";
+import { extractHits, type SearchHit } from "@/utils/content-search";
 import {
   imageService,
   type ImageCommitResult,
@@ -38,7 +38,7 @@ import type { EditorController } from "@/controllers/editor-controller";
 
 export interface SearchMatch {
   path: string;
-  snippets: string[];
+  hits: SearchHit[];
 }
 
 function enrichChangesItems(items: ChangesDialogItem[]): ChangesDialogItem[] {
@@ -1148,7 +1148,7 @@ export function searchCache(allPaths: string[], query: string): SearchMatch[] {
     const page = repo.get(path);
     const body = page?.bodyState.body ?? page?.bodyState.baseline;
     if (body && body.toLowerCase().includes(q)) {
-      results.push({ path, snippets: extractSnippets(body, q) });
+      results.push({ path, hits: extractHits(body, q) });
     }
   }
   return results;

@@ -6,7 +6,7 @@ import type {
 import type { TreeIndex } from "@/utils/tree";
 import { buildTreeIndex } from "@/utils/tree";
 import { ProviderType } from "@/providers/index";
-import { extractSnippets, contentMatches } from "@/utils/content-search";
+import { extractHits, contentMatches } from "@/utils/content-search";
 import { sanitizeImageName } from "@/utils/sanitize";
 import { hasFunc, AppFunc } from "$/build/build-mode";
 import { pickProjectDirectory } from "@/bridge/native";
@@ -255,7 +255,7 @@ export class FileSystemProvider implements ContentProvider {
           const full = prefix ? `${prefix}/${entry.name}` : entry.name;
           results.push({
             path: full.replace(/\.md$/, ""),
-            snippets: extractSnippets(body, query),
+            hits: extractHits(body, query),
           });
         }
       }

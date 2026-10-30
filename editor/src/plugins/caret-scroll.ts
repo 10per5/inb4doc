@@ -1,5 +1,6 @@
 import { Plugin, PluginKey } from "prosemirror-state"
 import type { EditorView } from "prosemirror-view"
+import { scrollContainer } from "@/utils/scroll"
 
 const CARET_MARGIN = 12
 
@@ -37,7 +38,7 @@ function scrollCaretIntoView(view: EditorView): void {
   const { from } = view.state.selection
   const caret = view.coordsAtPos(from)
   if (!caret) return
-  const scrollEl = document.querySelector<HTMLElement>(".book-layout")
+  const scrollEl = scrollContainer()
   if (!scrollEl) return
 
   // Layout-viewport coordinates: both coordsAtPos and the fixed chrome rects

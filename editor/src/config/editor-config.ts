@@ -21,6 +21,7 @@ import { createBlockContextPlugin } from "@/plugins/block-context";
 import { createTextStatePlugin } from "@/plugins/text-state";
 import { createHistoryContextPlugin } from "@/plugins/history-context";
 import { createCaretScrollPlugin } from "@/plugins/caret-scroll";
+import { createSearchFlashPlugin } from "@/plugins/search-highlight";
 import { createPlainPastePlugin } from "@/plugins/plain-paste";
 import { createInlineCodeInputPlugin } from "@/plugins/inline-code-input";
 import { shortcodeDecoration } from "@/plugins/shortcode";
@@ -154,6 +155,7 @@ export async function createEditor(
       createCodeBlockMovePlugin(),
       createBlockContextPlugin(),
       createSelectionPlugin(),
+      createSearchFlashPlugin(),
       createTextStatePlugin(),
       createHistoryContextPlugin(),
       ...(isMobileDock() ? [createCaretScrollPlugin()] : []),

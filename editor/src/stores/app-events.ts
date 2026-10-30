@@ -124,7 +124,7 @@ export enum AppEvent {
 // ── Strict payload map ──
 
 export interface AppEventPayloads {
-  [AppEvent.Navigate]:              { path: string; query?: string; matchIndex?: number; snippetText?: string }
+  [AppEvent.Navigate]:              { path: string; query?: string; matchIndex?: number; blockText?: string; headingPath?: string[] }
   [AppEvent.HistoryNavigate]:       { path: string }
   [AppEvent.SidebarReload]:         void
   [AppEvent.SidebarActive]:         { path: string }
@@ -203,7 +203,7 @@ export interface AppEventPayloads {
   [AppEvent.HistoryChanged]:         { canUndo: boolean; canRedo: boolean }
   [AppEvent.ToolbarCommandExec]:    { command: ToolbarCommand; level?: number }
   [AppEvent.InsertBlockCommand]:    { command: SlashCommand; level?: number }
-  [AppEvent.ScrollToText]:          { query: string; matchIndex: number; snippetText?: string }
+  [AppEvent.ScrollToText]:          { query: string; matchIndex: number; blockText?: string; headingPath?: string[] }
   [AppEvent.LinkDialogRequested]:   void
 
   [AppEvent.ProviderFilesLoaded]:  Record<string, FileEntry>

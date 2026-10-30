@@ -1,4 +1,6 @@
 import { appEvents, AppEvent } from "@/stores/app-events"
+import { findDocMatches } from "@/features/search/doc-search"
+import { getEditorView } from "@/plugins/keyboard"
 
 let bar: HTMLDivElement | null = null
 let input: HTMLInputElement | null = null
@@ -157,21 +159,11 @@ function search(q: string): void {
 }
 
 function countInProsemirror(q: string): number {
-  const pm = document.querySelector(".ProseMirror")
-  if (!pm) return 0
-  const lower = q.toLowerCase()
-  let count = 0
-  const walker = document.createTreeWalker(pm, NodeFilter.SHOW_TEXT)
-  let tn: Text | null
-  while ((tn = walker.nextNode() as Text | null)) {
-    const text = tn.textContent || ""
-    let idx = 0
-    while ((idx = text.toLowerCase().indexOf(lower, idx)) >= 0) {
-      count++
-      idx += q.length
-    }
-  }
-  return count
+  // Count on the document model, not by walking rendered text nodes — the
+  // match indices we then navigate to are document positions.
+  const view = getEditorView()
+  if (!view) return 0
+  return findDocMatches(view.state.doc, q).length
 }
 
 function searchProseMirror(q: string): void {

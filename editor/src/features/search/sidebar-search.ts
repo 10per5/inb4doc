@@ -1,5 +1,6 @@
 import { getProvider } from "@/stores/provider-store";
 import { searchCache, type SearchMatch } from "@/services/file-sync-service";
+import { hitsFromSnippets } from "@/utils/content-search";
 import { register as registerHotkey } from "@/utils/hotkeys";
 
 export type { SearchMatch } from "@/services/file-sync-service";
@@ -35,7 +36,10 @@ export async function searchContent(
     const serverResults = await provider.search(query);
     for (const r of serverResults) {
       if (allPaths.includes(r.path) && !searched.has(r.path)) {
-        results.push(r);
+        results.push({
+          path: r.path,
+          hits: r.hits ?? hitsFromSnippets(r.snippets ?? []),
+        });
       }
     }
   }

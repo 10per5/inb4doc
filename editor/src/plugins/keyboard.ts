@@ -7,6 +7,7 @@ import { defineKeymap } from "@prosekit/core"
 import { appEvents, AppEvent } from "@/stores/app-events"
 import { isInsideTableCell } from "@/plugins/editor-drag-drop"
 import { pasteFileClipboard } from "@/features/file-clipboard-paste"
+import { scrollContainer } from "@/utils/scroll"
 
 // When the caret sits at the start of a list item's first textblock (e.g.
 // after Home), the stock list keymap (prosemirror-flat-list) binds Delete to
@@ -366,6 +367,11 @@ export function setEditorView(view: import("prosemirror-view").EditorView) {
   _editorView = view
 }
 
+/** The live editor view, or null before the first document is created. */
+export function getEditorView(): import("prosemirror-view").EditorView | null {
+  return _editorView
+}
+
 /**
  * Ctrl+X inside a code block cuts the caret's LINE, not the whole block.
  *
@@ -677,7 +683,7 @@ function isInsideCodeBlock($from: any): boolean {
 // caret-only move leaves the outer scroll position untouched otherwise).
 function scrollContainersTo(view: any, toTop: boolean): void {
   const targets = new Set<HTMLElement>()
-  const layout = document.querySelector<HTMLElement>(".book-layout")
+  const layout = scrollContainer()
   if (layout) targets.add(layout)
   let el: HTMLElement | null = (view?.dom as HTMLElement) ?? null
   while (el && el !== document.body) {

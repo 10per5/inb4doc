@@ -1,3 +1,5 @@
+import { scrollContainer } from "@/utils/scroll"
+
 /**
  * ToolbarStore — manages toolbar visibility and auto-hide behavior.
  *
@@ -51,7 +53,7 @@ export class ToolbarStore {
     this.onScroll = this.createScrollHandler()
     this.showOnFocus = this.createFocusHandler()
 
-    const layoutEl = document.querySelector(".book-layout")
+    const layoutEl = scrollContainer()
     layoutEl?.addEventListener("scroll", this.onScroll, { passive: true })
 
     this.editorEl?.addEventListener("focusin", this.showOnFocus)
@@ -69,7 +71,7 @@ export class ToolbarStore {
   destroy(): void {
     if (!this.onScroll || !this.showOnFocus) return
 
-    const layoutEl = document.querySelector(".book-layout")
+    const layoutEl = scrollContainer()
     layoutEl?.removeEventListener("scroll", this.onScroll)
 
     this.editorEl?.removeEventListener("focusin", this.showOnFocus)
@@ -80,8 +82,7 @@ export class ToolbarStore {
     return () => {
       if (!this.toolbar || !this.autoHidePref) return
 
-      const layoutEl = document.querySelector(".book-layout")
-      const sy = layoutEl?.scrollTop ?? 0
+      const sy = scrollContainer()?.scrollTop ?? 0
       const diff = sy - this.lastScrollY
 
       // Direction-based: hide on downward scroll past the top band, show on
@@ -113,7 +114,7 @@ export class ToolbarStore {
     if (this.hidden === hidden) return
 
     this.hidden = hidden
-    const layoutEl = document.querySelector(".book-layout")
+    const layoutEl = scrollContainer()
     this.lastScrollY = layoutEl?.scrollTop ?? 0
     this.toolbar?.classList.toggle(ToolbarStore.HIDDEN_CLASS, hidden)
   }

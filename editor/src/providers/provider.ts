@@ -1,9 +1,16 @@
 import type { ProviderType } from "@/providers/index"
 import type { TreeIndex } from "@/utils/tree"
+import type { SearchHit } from "@/utils/content-search"
 
 export interface SearchResult {
   path: string;
-  snippets: string[];
+  /** Block-level hits (preferred). */
+  hits?: SearchHit[];
+  /**
+   * Legacy raw snippet payload. Older remote servers / native hosts still
+   * answer with this; the client maps it onto `hits` with no heading context.
+   */
+  snippets?: string[];
 }
 
 export interface ImageEntry {

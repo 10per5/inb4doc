@@ -37,6 +37,7 @@ import { treeStore } from "@/stores/tree-store";
 import { pendingOpsStore } from "@/stores/pending-ops-store";
 import { PendingOps } from "@/entities/PendingOps";
 import { getCurrentPath } from "@/utils/url";
+import { centerSpan, scrollParentOf } from "@/utils/scroll";
 import { HOME_PATH } from "@/utils/hugo-compat";
 
 export default class extends Controller {
@@ -141,12 +142,9 @@ export default class extends Controller {
           if (section) el = section;
         }
         if (!el) return;
-        const scroller = el.closest<HTMLElement>(".sidebar-inner") ?? el.closest<HTMLElement>(".book-leftpanel");
+        const scroller = scrollParentOf(el);
         if (scroller) {
-          const sr = el.getBoundingClientRect();
-          const cr = scroller.getBoundingClientRect();
-          const target = sr.top - cr.top + scroller.scrollTop - (scroller.clientHeight - el.clientHeight) / 2;
-          scroller.scrollTop = Math.max(0, target);
+          centerSpan(el.getBoundingClientRect(), scroller);
         } else {
           el.scrollIntoView({ block: "center", behavior: "smooth" });
         }
@@ -156,12 +154,12 @@ export default class extends Controller {
 
   private buildActions(): SidebarActions {
     return {
-      onNavigate: (path, searchQuery, matchIndex, snippetText) =>
+      onNavigate: (path, searchQuery, hit) =>
         appEvents.emit(AppEvent.Navigate, {
           path,
           query: searchQuery,
-          matchIndex,
-          snippetText,
+          blockText: hit?.text,
+          headingPath: hit?.headingPath,
         }),
       onNewItem: (parentPath, isFolder) =>
         appEvents.emit(AppEvent.SidebarNewItemRequested, {
@@ -660,10 +658,9 @@ export default class extends Controller {
 
     this.searchTimer = setTimeout(async () => {
       const matches = await searchContent(this.allPaths, q);
-      const contentMatches = new Map<string, string[]>();
-      for (const m of matches) {
-        contentMatches.set(m.path, m.snippets);
-      }
+      const contentMatches = new Map(
+        matches.map((m) => [m.path, m.hits] as const),
+      );
       applyResults({
         container: this.innerTarget,
         q,
