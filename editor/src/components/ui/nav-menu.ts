@@ -2,6 +2,7 @@ import { applyPanelFlip, type FlipAnchorRect } from "@/utils/popover"
 import renderMenuItem from "@/eta/menu/item"
 import renderSeparator from "@/eta/menu/separator"
 import { navArrowLeft, navArrowRight, xmark } from "@/eta/icons"
+import { setUiLayerCount } from "@/services/ui-history-service"
 import type { MenuItem } from "./menu"
 import { MenuType } from "./menu"
 
@@ -35,6 +36,18 @@ export interface NavMenuOptions {
 const openMenus = new Set<NavMenu>()
 function closeAllNavMenus(except?: NavMenu) {
   for (const m of openMenus) if (m !== except) m.close()
+}
+
+/**
+ * Back-press step for the edit-toolbar "+" menu: walk out of a drilled level
+ * first (same as its internal Back button), then close. Returns true when a
+ * menu was open.
+ */
+export function closeTopNavMenu(): boolean {
+  const menu = Array.from(openMenus).pop()
+  if (!menu) return false
+  if (!menu.stepBack()) menu.close()
+  return true
 }
 
 let autoId = 0
@@ -110,6 +123,7 @@ export class NavMenu {
     this.triggerEl?.classList.add("is-open")
     this._isOpen = true
     openMenus.add(this)
+    setUiLayerCount("nav-menu", openMenus.size)
     document.addEventListener("click", this.boundOutsideClick, true)
     requestAnimationFrame(() => this.focusFirstItem())
     this.onOpen?.()
@@ -124,8 +138,19 @@ export class NavMenu {
     this.triggerEl?.classList.remove("is-open")
     this._isOpen = false
     openMenus.delete(this)
+    setUiLayerCount("nav-menu", openMenus.size)
     document.removeEventListener("click", this.boundOutsideClick, true)
     this.onClose?.()
+  }
+
+  /**
+   * Back press: leave the drilled level. Returns true when the menu stayed
+   * open (there was a parent level), false at the root.
+   */
+  stepBack(): boolean {
+    if (!this._isOpen || this.stack.length <= 1) return false
+    this.back()
+    return true
   }
 
   destroy(): void {

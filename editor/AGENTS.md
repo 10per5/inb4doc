@@ -696,7 +696,9 @@ The decision lives in `ShellController.handleBackPressed()`, which unwinds
 1. an open state-driven dialog (`closeTopDialog()` in dialog-service),
 2. the topmost window (`closeTopWindow()` in window-service — a parent window
    below stays open),
-3. an open menu/dropdown (`closeTopMenu()` in `components/ui/menu`),
+3. an open menu/dropdown (`closeTopMenu()` in `components/ui/menu`, or
+   `closeTopNavMenu()` for the edit-toolbar "+" drill-down — it steps out of a
+   submenu level first, then closes),
 4. anything a controller owns via `AppEvent.BackRequested` (payload
    `{ handled: boolean }` — a pushed preferences section steps back to the
    preferences menu, the Files multi-select mode exits selection; the handler
@@ -717,8 +719,9 @@ browser side:
 
 - While at least one layer is open it keeps **one** extra history entry on top
   of the document. Layers report counts by source — `view` (shell, from
-  `ViewChanged`), `menu` (Menu.open/close), `dialog` (dialog-service),
-  `window` (window-service) — so a window stack still needs one Back per window.
+  `ViewChanged`), `menu` (Menu.open/close), `nav-menu` (NavMenu.open/close,
+  the edit-toolbar "+"), `dialog` (dialog-service), `window` (window-service) —
+  so a window stack still needs one Back per window.
 - A user Back pops that entry, calls the shared `handleBack()`, and re-pushes the
   entry when anything is still open; closing the last layer ourselves pops it
   (on a macrotask, so a `replacePath` that follows the close wins —

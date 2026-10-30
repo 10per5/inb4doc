@@ -11,8 +11,9 @@
  *   entry if anything is still open (so the next Back unwinds the next layer),
  * - closing the last layer ourselves pops the entry again.
  *
- * Layers report their own count by source (`view`, `menu`, `dialog`, `window`)
- * so a window stack (prefs → storage backend) still needs one Back per window.
+ * Layers report their own count by source (`view`, `menu`, `nav-menu`,
+ * `dialog`, `window`) so a window stack (prefs → storage backend) still needs
+ * one Back per window.
  *
  * Document navigation must never race this bookkeeping: `markDocumentSwitch()`
  * is called when a document is opened, which releases the layer entry to
@@ -33,7 +34,7 @@ import {
 import { handleBack } from "@/services/back-service"
 import { appEvents, AppEvent } from "@/stores/app-events"
 
-export type UiLayer = "view" | "menu" | "dialog" | "window"
+export type UiLayer = "view" | "menu" | "nav-menu" | "dialog" | "window"
 
 const counts = new Map<UiLayer, number>()
 let entryPushed = false

@@ -42,6 +42,7 @@ import {
   stopUiHistory,
 } from "@/services/ui-history-service";
 import { closeTopMenu } from "@/components/ui/menu";
+import { closeTopNavMenu } from "@/components/ui/nav-menu";
 import { imageService } from "@/services/image-service";
 import * as hotkeys from "@/utils/hotkeys";
 import { hasFunc, AppFunc } from "$/build/build-mode";
@@ -428,9 +429,9 @@ export default class Shell extends Controller {
    * The app's single unwinder, shared by both Back sources: the native bridge
    * (`window.inb4docUI.handleBack`) and browser/PWA session history
    * (`services/ui-history-service`). Unwinds exactly one layer, innermost
-   * first: an open dialog, the topmost window, an open menu, then whatever a
-   * controller owns (a pushed sub-screen, the file multi-select), then the
-   * fullview itself.
+   * first: an open dialog, the topmost window, an open menu (dropdown or the
+   * edit-toolbar "+" drill-down), then whatever a controller owns (a pushed
+   * sub-screen, the file multi-select), then the fullview itself.
    *
    * With "More" gone every fullview — Files included — steps straight back to
    * the editor. Only once the editor is frontmost does this report
@@ -444,6 +445,7 @@ export default class Shell extends Controller {
     if (closeTopDialog()) return true
     if (closeTopWindow()) return true
     if (closeTopMenu()) return true
+    if (closeTopNavMenu()) return true
     const request = { handled: false }
     appEvents.emit(AppEvent.BackRequested, request)
     if (request.handled) return true
