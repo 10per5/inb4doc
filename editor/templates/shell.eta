@@ -39,6 +39,10 @@
               <%~ include('partials/editor-area', it) %>
             </div>
           </div>
+          <footer id="source-statusbar" class="source-statusbar" data-shell-target="sourceBar" hidden>
+            <button type="button" class="source-statusbar__btn is-primary" data-action="click->shell#applySource">Apply</button>
+            <button type="button" class="source-statusbar__btn" data-action="click->shell#cancelSource">Cancel</button>
+          </footer>
           <footer class="editor-statusbar" data-controller="statusbar">
             <span data-statusbar-target="path" class="editor-statusbar__path"></span>
             <span data-statusbar-target="dirty" class="pending-badge pending-badge-unsaved" hidden>unsaved</span>

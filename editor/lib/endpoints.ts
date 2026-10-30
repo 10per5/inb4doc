@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, rmSync, renameSync, writeFileSync } from "fs";
 import { join, extname, dirname, relative, resolve } from "path";
 import { sanitizeImageName } from "../src/utils/sanitize";
+import { extractHits } from "../src/utils/content-search";
 
 export interface ServerContext {
   contentDir: string;
@@ -347,40 +348,6 @@ const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".
 
 // ── Search API ────────────────────────────────────────────────────────────
 
-function extractTableCells(table: string, query: string): string[] {
-  const q = query.toLowerCase();
-  const rows = table.split("\n").filter(r => r.trim().startsWith("|") && !r.includes("---"));
-  const results: string[] = [];
-  for (let ri = 0; ri < rows.length; ri++) {
-    const cells = rows[ri].split("|").slice(1, -1).map(c => c.trim());
-    for (let ci = 0; ci < cells.length; ci++) {
-      if (cells[ci].toLowerCase().includes(q)) {
-        results.push(cells[ci]);
-      }
-    }
-  }
-  return results;
-}
-
-function extractSnippets(content: string, query: string, maxSnippets = 3): string[] {
-  const q = query.toLowerCase().trim();
-  if (!q) return [];
-  const paragraphs = content.split(/\n\s*\n/);
-  const snippets: string[] = [];
-  for (const para of paragraphs) {
-    if (para.toLowerCase().includes(q)) {
-      if (para.trim().startsWith("|")) {
-        const cells = extractTableCells(para, q);
-        snippets.push(...cells);
-      } else {
-        snippets.push(para.trim());
-      }
-      if (snippets.length >= maxSnippets) break;
-    }
-  }
-  return snippets;
-}
-
 async function handleSearch(req: Request, ctx: ServerContext): Promise<Response | null> {
   const { query } = await req.json();
   if (!query || typeof query !== "string") {
@@ -396,7 +363,7 @@ async function handleSearch(req: Request, ctx: ServerContext): Promise<Response 
     });
   }
 
-  const results: { path: string; snippets: string[] }[] = [];
+  const results: { path: string; hits: unknown[]; snippets: string[] }[] = [];
 
   function walk(dir: string, prefix: string) {
     if (!existsSync(dir)) return;
@@ -411,9 +378,13 @@ async function handleSearch(req: Request, ctx: ServerContext): Promise<Response 
         const content = readFileSync(full, "utf-8");
         if (content.toLowerCase().includes(q)) {
           const path = prefix ? `${prefix}/${name}` : name;
+          const hits = extractHits(content, q);
           results.push({
             path: path.replace(/\.md$/, ""),
-            snippets: extractSnippets(content, q),
+            hits,
+            // Keep the raw text list for older editor clients that only know
+            // the snippet payload.
+            snippets: hits.map((hit) => hit.text),
           });
         }
       }

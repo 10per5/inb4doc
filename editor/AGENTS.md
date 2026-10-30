@@ -356,6 +356,32 @@ somewhere or flushed. Carried contents deliberately do NOT survive a reload.
    `Page` body and its baseline — otherwise the new file diffs as one huge
    change. The clipboard clears after a successful paste.
 
+## Sidebar search is block-level
+
+Results are per **block**, not per file. `src/utils/content-search.ts::extractHits`
+splits the body into paragraphs/headings/list items/table rows/code fences,
+strips markdown through markdown-it (`markdownToText`) and records the heading
+trail; providers return `hits: { text, headingPath }[]` (older remote servers
+may still send `snippets`, mapped by `hitsFromSnippets`).
+
+Clicking a hit passes its `blockText` through `AppEvent.Navigate` to
+`EditorController.scrollToText`, which locates the block in the ProseMirror
+document (`src/features/search/doc-search.ts`) and selects/flashes the exact
+range. Do **not** reintroduce DOM text walking (`cleanMarkdown`,
+`document.querySelector(".ProseMirror")`, `posAtDOM`) for search: DOM text does
+not match markdown for tables/alerts/code fences, and duplicate snippets then
+always land on the first occurrence. The flash is an inline decoration
+(`src/plugins/search-highlight.ts`), not a fixed overlay pinned to viewport
+coordinates.
+
+For `Ctrl+F` counts/indexing, `src/bridge/find.ts` uses the same doc search via
+`getEditorView()`; source mode still scans the textarea.
+
+`.book-layout` (the app's document scroller) is looked up in exactly one place —
+`src/utils/scroll.ts::scrollContainer()` — and its visible-band math lives there
+(`scrollSpanIntoView`, `centerSpan`, `scrollMainTo`). Don't re-query it with
+`document.querySelector` in controllers/plugins/stores.
+
 ## File jumper / stepping hotkeys
 
 - `Ctrl/Cmd+Shift+Space` → `AppEvent.FileJumpRequested`-style overlay picker
@@ -497,7 +523,7 @@ This generates an LLM-friendly markdown report with largest modules, dependency 
 
 | Asset     | Size           | Cause                                                                                                                                  |
 | --------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `app.js`  | ~1.3 MB initial | ProseKit + ProseMirror + CM core                                                                                                       |
+| `app.js`  | ~1.3 MB initial | ProseKit + ProseMirror                                                                                                                 |
 | `app.css` | 1.5 MB         | `katex/dist/katex.min.css` has `@font-face` blocks → Bun inlines all woff2/woff/ttf fonts as base64 data URIs (~60 font files, 1.2 MB) |
 
 ## Playwright Testing

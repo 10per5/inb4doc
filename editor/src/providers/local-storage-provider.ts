@@ -2,7 +2,7 @@ import type { ContentProvider, ImageEntry, SearchResult } from "@/providers/prov
 import type { TreeIndex } from "@/utils/tree"
 import { buildTreeIndex } from "@/utils/tree"
 import { ProviderType } from "@/providers/index"
-import { extractSnippets, contentMatches } from "@/utils/content-search"
+import { extractHits, contentMatches } from "@/utils/content-search"
 import { imageKey, IMAGE_PREFIX, STORE_FILES, type FileEntry } from "@/config/storage-keys"
 import { storageService } from "@/services/storage-service"
 import { imageStore } from "@/stores/image-store"
@@ -91,7 +91,7 @@ export class LocalStorageProvider implements ContentProvider {
     const results: SearchResult[] = []
     for (const [path, entry] of Object.entries(files)) {
       if (entry.content && contentMatches(entry.content, query)) {
-        results.push({ path, snippets: extractSnippets(entry.content, query) })
+        results.push({ path, hits: extractHits(entry.content, query) })
       }
     }
     return results

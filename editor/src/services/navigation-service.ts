@@ -73,8 +73,8 @@ export class NavigationService {
     this.cache = cache;
 
     this.unsubs.push(
-      appEvents.on(AppEvent.Navigate, ({ path, query, matchIndex, snippetText }) =>
-        this.navigate(path, true, query, matchIndex, snippetText),
+      appEvents.on(AppEvent.Navigate, ({ path, query, matchIndex, blockText, headingPath }) =>
+        this.navigate(path, true, query, matchIndex, blockText, headingPath),
       ),
       // Browser Back/Forward between documents: the URL already points at the
       // target, so load it without pushing a duplicate history entry.
@@ -153,7 +153,7 @@ export class NavigationService {
     this.navCleanup = null;
   }
 
-  async navigate(path: string, pushHistory = true, searchQuery?: string, matchIndex?: number, snippetText?: string): Promise<void> {
+  async navigate(path: string, pushHistory = true, searchQuery?: string, matchIndex?: number, blockText?: string, headingPath?: string[]): Promise<void> {
     if (this.loading) {
       // Drop a stale adoption from an aborted navigation.
       takeAdoptedDocumentPath();
@@ -190,6 +190,11 @@ export class NavigationService {
         }
         dirtyTrackingService.recompute();
         addRecent(path);
+        // Same-file result clicks land here too: the document is already open,
+        // so this is the only place that reveals the hit.
+        if (searchQuery) {
+          this.scrollToSearchHit(searchQuery, matchIndex, blockText, headingPath);
+        }
         return;
       }
 
@@ -241,9 +246,7 @@ export class NavigationService {
       await this.editor.ensureEditor(content);
       this.editor.hideSkeleton();
       if (searchQuery) {
-        requestAnimationFrame(() => {
-          this.editor.scrollToText(searchQuery, matchIndex, snippetText);
-        });
+        this.scrollToSearchHit(searchQuery, matchIndex, blockText, headingPath);
       }
 
       appEvents.emit(AppEvent.SidebarActive, { path });
@@ -252,6 +255,24 @@ export class NavigationService {
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * Reveal a search hit once the (possibly just-loaded) document has been laid
+   * out. Result clicks always target the WYSIWYG document, so leave source mode
+   * first — `revealInDoc` otherwise skips the scroll while the hidden textarea
+   * is the active view.
+   */
+  private scrollToSearchHit(
+    query: string,
+    matchIndex?: number,
+    blockText?: string,
+    headingPath?: string[],
+  ): void {
+    this.editor.exitSourceMode();
+    requestAnimationFrame(() => {
+      this.editor.scrollToText(query, matchIndex, blockText, headingPath);
+    });
   }
 
   async loadSidebar(): Promise<void> {

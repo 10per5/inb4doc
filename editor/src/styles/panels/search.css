@@ -84,6 +84,20 @@
   cursor: pointer;
 }
 
+.snippet-entry + .snippet-entry {
+  border-top: 1px solid var(--color-border);
+}
+
+.snippet-heading {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  margin-bottom: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .snippet-entry:hover {
   background: rgba(230,195,0,0.08);
 }

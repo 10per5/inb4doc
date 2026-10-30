@@ -9,6 +9,26 @@
   caret-color: var(--color-caret);
 }
 
+/* Search-result / Ctrl+F flash. The range is an inline decoration set by
+ * plugins/search-highlight.ts, so it scrolls with the text instead of being an
+ * overlay pinned to stale viewport coordinates. */
+.ProseMirror .search-flash {
+  background: var(--color-warning);
+  color: var(--color-bg-primary);
+  border-radius: 2px;
+  animation: search-flash-fade 1.6s ease-out forwards;
+}
+
+@keyframes search-flash-fade {
+  0%,
+  55% {
+    background: var(--color-warning);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 /* Empty title heading of a freshly created page: a decoration-only prompt
  * (see plugins/auto-title-placeholder.ts), never part of the document. */
 .ProseMirror h1.auto-title-empty::before {

@@ -70,10 +70,12 @@ function treePaths(tree: ReturnType<typeof treeStore.getTree>): string[] {
 }
 
 export default class Shell extends Controller {
-  static targets = ["editorArea"]
+  static targets = ["editorArea", "sourceBar"]
   static outlets = ["editor"]
 
   declare readonly editorAreaTarget: HTMLElement
+  declare readonly sourceBarTarget: HTMLElement
+  declare readonly hasSourceBarTarget: boolean
 
   private editor!: EditorController
   private cache!: FileSyncService
@@ -322,6 +324,9 @@ export default class Shell extends Controller {
         const source = this.editor.toggleSourceMode()
         appEvents.emit(AppEvent.SourceModeChanged, { source })
       }),
+      appEvents.on(AppEvent.SourceModeChanged, ({ source }) => {
+        if (this.hasSourceBarTarget) this.sourceBarTarget.hidden = !source
+      }),
       appEvents.on(AppEvent.SourceApplyRequested, ({ path, content }) => {
         this.cache.flushCurrentFile(path, content)
       }),
@@ -488,6 +493,7 @@ export default class Shell extends Controller {
 
   toggleSource = () => this.editor?.toggleSourceMode()
   applySource = () => this.editor?.applySourceContent()
+  cancelSource = () => this.editor?.cancelSourceContent()
   flush = () => this.cache?.flushDirtyFiles()
 
   /**

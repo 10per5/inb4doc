@@ -31,13 +31,12 @@ import {
   applyNoConflict,
 } from "@/features/conflict-resolver";
 import {
-  findTextMatch,
-  findHeadingTarget,
-  matchRect,
-  flashHighlight,
-  centerOnRect,
-  type TextMatch,
-} from "@/features/search/scroll-to-text";
+  findDocMatches,
+  pickDocMatch,
+  findHeadingRange,
+} from "@/features/search/doc-search";
+import { centerSpan, scrollContainer } from "@/utils/scroll";
+import { clearFlash, flashRange } from "@/plugins/search-highlight";
 import type { MentionView } from "@/features/mention";
 import { initSpellcheck, applySpellcheck } from "@/plugins/spellcheck";
 
@@ -324,15 +323,22 @@ export class EditorController extends Controller {
 
   async cancelSourceContent(): Promise<void> {
     if (!this.editor) return;
-
+    // The textarea holds a copy; nothing was applied to the document yet. Leave
+    // source mode and keep the model (and any pending ops) untouched.
     this.exitSourceMode();
-    appEvents.emit(AppEvent.SingleDiscardRequested, { path: this.currentPath });
+    this.sourceEntryContent = "";
   }
 
-  private exitSourceMode(): void {
+  /**
+   * Leave source mode (no-op when not in it). Hiding the textarea is a view
+   * concern only — the document model was never touched by Cancel, and Apply
+   * applies explicitly.
+   */
+  exitSourceMode(): void {
     if (!this.sourceMode) return;
     hideSourceMode(this.sourceTarget, this.inb4docTarget);
     this.sourceMode = false;
+    appEvents.emit(AppEvent.SourceModeChanged, { source: false });
   }
 
   // ── Content access ──
@@ -407,63 +413,75 @@ export class EditorController extends Controller {
       .replace(/\n+$/, "\n");
   }
 
-  scrollToText(query: string, matchIndex?: number, snippetText?: string): void {
-    if (!this.editor) return;
-    const match = findTextMatch(query, matchIndex, snippetText);
-    if (!match) return;
-    this.jumpToProseMirror(match);
+  /**
+   * Jump to the first match of `query` in the current document, preferring the
+   * clicked search-result block when `blockText` is given.
+   */
+  scrollToText(
+    query: string,
+    matchIndex?: number,
+    blockText?: string,
+    headingPath?: string[],
+  ): void {
+    const matches = this.editor
+      ? findDocMatches(this.editor.view.state.doc, query)
+      : [];
+    const match = pickDocMatch(matches, { matchIndex, blockText, headingPath });
+    if (match) this.revealInDoc(match.from, match.to);
   }
 
   /**
-   * Jump to a heading by re-locating it in the live DOM (same accurate
-   * reference technique as Ctrl+F search). `fallbackPos` is a stored doc
-   * position used only when the heading can't be found in the DOM.
+   * Jump to a heading by its level + text. `fallbackPos` is a stored doc
+   * position used only when the heading can no longer be found.
    */
   scrollToHeading(text: string, level: number, fallbackPos?: number): void {
     if (!this.editor) return;
-    const match = findHeadingTarget(text, level);
-    if (match) {
-      this.jumpToProseMirror(match);
+
+    const doc = this.editor.view.state.doc;
+    const heading = findHeadingRange(doc, text, level);
+    if (heading) {
+      this.revealInDoc(heading.from, heading.to);
       return;
     }
     if (fallbackPos == null) return;
-    this.editor.action(({ view }) => {
-      const doc = view.state.doc;
-      if (fallbackPos < 0 || fallbackPos > doc.content.size) return;
-      const tr = view.state.tr.setSelection(
-        TextSelection.near(doc.resolve(fallbackPos + 1)),
-      );
-      view.dispatch(tr.scrollIntoView());
-    });
+    const pos = Math.max(1, Math.min(fallbackPos + 1, doc.content.size));
+    this.revealInDoc(pos, pos);
   }
 
-  private jumpToProseMirror(match: TextMatch): void {
-    const proseMirror = document.querySelector(".ProseMirror");
-    if (proseMirror) (proseMirror as HTMLElement).focus();
+  /** Select a document range, center it, and flash it. */
+  private revealInDoc(from: number, to: number): void {
+    if (!this.editor) return;
+    const editor = this.editor;
 
+    (editor.view.dom as HTMLElement).focus({ preventScroll: true });
+
+    // Let the (possibly just-loaded) doc mount before measuring coordinates.
     requestAnimationFrame(() => {
-      this.editor!.action(({ view }) => {
-        const pos = view.posAtDOM(match.node, match.offset);
-        if (pos == null) return;
-        const tr = view.state.tr.setSelection(
-          TextSelection.create(
-            view.state.doc,
-            pos,
-            pos + match.length,
-          ),
-        );
-        view.dispatch(tr);
-      });
-      if (match.rect) {
-        const initialRect = match.rect;
-        centerOnRect(initialRect);
-        // The scroll changes viewport coords, so recompute the rect after it
-        // settles and flash the target at its real on-screen position.
-        requestAnimationFrame(() => {
-          const rect = matchRect(match) ?? initialRect;
-          flashHighlight(rect);
-        });
+      if (!this.editor || this.sourceMode) return;
+      const view = this.editor.view;
+      const state = view.state;
+      const size = state.doc.content.size;
+      const start = Math.max(0, Math.min(from, size));
+      const end = Math.max(start, Math.min(to, size));
+
+      const tr = state.tr;
+      if (end > start) {
+        tr.setSelection(TextSelection.create(state.doc, start, end));
+      } else {
+        tr.setSelection(TextSelection.near(state.doc.resolve(start)));
       }
+      tr.scrollIntoView();
+      view.dispatch(tr);
+
+      const coords = view.coordsAtPos(start);
+      if (coords && (coords.top !== 0 || coords.bottom !== 0)) {
+        centerSpan(coords);
+      }
+
+      flashRange(view, start, end);
+      window.setTimeout(() => {
+        if (this.editor) clearFlash(this.editor.view);
+      }, 1600);
     });
   }
 
@@ -493,8 +511,8 @@ export class EditorController extends Controller {
       initSpellcheck(() => this.editor?.action(({ view }) => view) ?? null),
       appEvents.on(
         AppEvent.ScrollToText,
-        ({ query, matchIndex, snippetText }) => {
-          this.scrollToText(query, matchIndex, snippetText);
+        ({ query, matchIndex, blockText, headingPath }) => {
+          this.scrollToText(query, matchIndex, blockText, headingPath);
         }
       )
     );
@@ -528,7 +546,7 @@ export class EditorController extends Controller {
   private scrollEditorToTop(): void {
     const view = this.editor?.view;
     const targets = new Set<HTMLElement>();
-    const layout = document.querySelector<HTMLElement>(".book-layout");
+    const layout = scrollContainer();
     if (layout) targets.add(layout);
     let el: HTMLElement | null = (view?.dom as HTMLElement) ?? null;
     while (el && el !== document.body) {

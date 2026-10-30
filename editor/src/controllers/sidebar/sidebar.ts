@@ -4,6 +4,7 @@ import { confirmDialog } from "@/controllers/dialog/dialog";
 import { showNotification } from "@/components/notification/notification";
 import { buildEditorUrl } from "@/utils/url";
 import { pagesStore } from "@/stores/page-store";
+import type { SearchHit } from "@/utils/content-search";
 import {
   PendingOpType,
   type PendingOp,
@@ -26,12 +27,7 @@ export const fileIcon = `<span class="sidebar-icon sidebar-icon-file">${page}</s
 export const folderIcon = `<span class="sidebar-icon sidebar-icon-folder">${folder}</span>`;
 
 export interface SidebarActions {
-  onNavigate: (
-    path: string,
-    searchQuery?: string,
-    matchIndex?: number,
-    snippetText?: string,
-  ) => void;
+  onNavigate: (path: string, query?: string, hit?: SearchHit) => void;
   onNewItem: (parentPath: string, isFolder?: boolean) => void;
   onDelete: (paths: string[]) => void;
   onSelect: (path: string, isFolder?: boolean) => void;
@@ -425,7 +421,7 @@ export interface ApplyResultsOpts {
   container: HTMLElement;
   q: string;
   filenameMatches: Set<string>;
-  contentMatches: Map<string, string[]>;
+  contentMatches: Map<string, SearchHit[]>;
   currentQuery: string;
   actions: SidebarActions;
 }
@@ -445,28 +441,24 @@ export function applyResults(opts: ApplyResultsOpts): void {
     item.style.display = matched ? "" : "none";
 
     const snippetEl = item.querySelector(".search-snippet") as HTMLElement;
-    const ctx = contentMatches.get(path);
-    if (q && ctx && ctx.length > 0) {
+    const hits = contentMatches.get(path);
+    if (q && hits && hits.length > 0) {
       if (!snippetEl) {
         const div = document.createElement("div");
         div.className = "search-snippet";
-        const matchSkips: number[] = [];
-        let cum = 0;
-        for (const snippet of ctx) {
-          matchSkips.push(cum);
-          const lower = snippet.toLowerCase();
-          let si = lower.indexOf(q);
-          while (si >= 0) {
-            cum++;
-            si = lower.indexOf(q, si + q.length);
-          }
-        }
-        for (let i = 0; i < ctx.length; i++) {
-          if (i > 0) div.appendChild(document.createElement("hr"));
+        for (const hit of hits) {
           const entry = document.createElement("div");
           entry.className = "snippet-entry";
-          const parts = highlightText(ctx[i], q);
-          for (const part of parts) {
+          entry.title = hit.text;
+
+          if (hit.headingPath.length > 0) {
+            const crumb = document.createElement("div");
+            crumb.className = "snippet-heading";
+            crumb.textContent = hit.headingPath.join(" › ");
+            entry.appendChild(crumb);
+          }
+
+          for (const part of highlightText(hit.text, q)) {
             if (typeof part === "string") {
               entry.appendChild(document.createTextNode(part));
             } else {
@@ -476,10 +468,11 @@ export function applyResults(opts: ApplyResultsOpts): void {
               entry.appendChild(span);
             }
           }
+
           entry.addEventListener("click", (e) => {
             e.stopPropagation();
             e.preventDefault();
-            actions.onNavigate(path, currentQuery, matchSkips[i], ctx[i]);
+            actions.onNavigate(path, currentQuery, hit);
           });
           div.appendChild(entry);
         }

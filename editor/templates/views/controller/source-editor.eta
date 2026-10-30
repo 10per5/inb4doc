@@ -1,7 +1,3 @@
 <div id="source-editor" data-editor-target="source">
   <textarea></textarea>
-  <div class="source-actions">
-    <button class="primary" data-action="click->editor#applySourceContent">Apply</button>
-    <button data-action="click->editor#cancelSourceContent">Cancel</button>
-  </div>
 </div>
