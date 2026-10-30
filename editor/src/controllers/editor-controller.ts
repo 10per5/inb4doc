@@ -333,6 +333,7 @@ export class EditorController extends Controller {
     if (!this.sourceMode) return;
     hideSourceMode(this.sourceTarget, this.inb4docTarget);
     this.sourceMode = false;
+    appEvents.emit(AppEvent.SourceModeChanged, { source: false });
   }
 
   // ── Content access ──

@@ -87,6 +87,37 @@
   white-space: nowrap;
 }
 
+/* Source-mode Apply/Cancel strip — same chrome as the status bar, pinned
+ * directly above it. Lives in .book-content (not inside #editor-area) so it
+ * stays put while the source textarea scrolls, and stays in the shell
+ * controller's scope for its data-actions. */
+.source-statusbar {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 28px;
+  z-index: 51;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-height: 28px;
+  padding: 4px 16px;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+  user-select: none;
+}
+
+.mobile-layout .source-statusbar {
+  bottom: 0;
+}
+
+/* Author `display:flex` beats the UA `[hidden]` rule — keep the toggle honest. */
+.source-statusbar[hidden] {
+  display: none;
+}
+
 .mobile-layout .editor-statusbar {
   display: none;
 }
