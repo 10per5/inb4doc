@@ -329,6 +329,20 @@
   color: var(--color-accent);
   font-weight: 600;
 }
+/* Pinned projects keep their golden edge even when they are the active scope. */
+.project-badge.is-pinned {
+  border-color: var(--color-pin);
+}
+.project-badge-star {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--color-pin);
+  line-height: 0;
+}
+.project-badge-star svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
 .project-badge-label {
   overflow: hidden;
   text-overflow: ellipsis;

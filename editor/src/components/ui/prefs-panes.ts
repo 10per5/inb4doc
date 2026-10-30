@@ -94,16 +94,22 @@ export function pickBadgeFolders(
   return [...head.slice(0, limit - 1), chosen]
 }
 
-/** Table rows: "Show all" first, then every root-level folder, paginated. */
+/** Table rows: "Show all" first, then every root-level folder, paginated.
+ *
+ * The table stays alphabetical on purpose: it is also where projects get
+ * starred, and re-sorting rows under the pointer made starring a couple of
+ * them a game of chase. Pinned projects still lead the badge row (see
+ * `getRootFolders`); only the badges are order-sensitive. */
 export function buildProjectRows(folders: RootFolder[], totalCount: number): ProjectRow[] {
+  const alphabetical = [...folders].sort((a, b) => a.label.localeCompare(b.label))
   const rows: ProjectOption[] = [
     { value: "", label: "Show all", count: totalCount },
-    ...folders.map((f) => ({ value: f.path, label: f.label, count: f.count })),
+    ...alphabetical.map((f) => ({ value: f.path, label: f.label, count: f.count })),
   ]
   return rows.map((row, i) => ({
     ...row,
     page: Math.floor(i / PROJECT_PAGE_SIZE),
-    pinned: row.value !== "" && folders.find((f) => f.path === row.value)?.pinned === true,
+    pinned: row.value !== "" && alphabetical.find((f) => f.path === row.value)?.pinned === true,
   }))
 }
 

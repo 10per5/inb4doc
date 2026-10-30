@@ -51,6 +51,8 @@ body {
   --color-warning: #d08770;
   --color-error: #bf616a;
   --color-info: #5e81ac;
+  /* Pinned/favourited project accents (stars + badge borders). */
+  --color-pin: #d4a72c;
 
   /* Editor text caret — high-contrast against both themes. */
   --color-caret: #5e81ac;

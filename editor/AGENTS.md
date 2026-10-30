@@ -615,6 +615,15 @@ dialog and the mobile per-section screens can never drift apart.
   the table and closes the preferences surface so the retargeted tree shows.
   Do not reintroduce a full list of radio rows — the content root can hold any
   number of top-level folders.
+- **Starring is not selecting.** The star column toggles
+  `prefsStore.pinnedProjects` only; it must never write `rootScope` or emit
+  `RootScopeChanged`. Keep the row's `click` action on the name/pages cells (not
+  the `<tr>`) and guard `projectRowKey` against events from the pin button, so a
+  star click/Enter cannot bubble into scope picking. Pins are an array and
+  persist across window reopens; starring several in a row is supported.
+  Pinned-first sorting applies to the **badge row** only — the "More…" table
+  stays alphabetical, and `redrawProjectPicker` restores the pane/table scroll,
+  the open page and the focused star after the pane is rebuilt.
 - The sidebar's "Filters" button opens the same window on `PrefsSection.Navigation`
   (`AppEvent.PrefsOpened` carries `{ section }`), so there is exactly one
   navigation-preferences UI.
