@@ -12,7 +12,7 @@ export enum PendingOpType {
 export type PendingOp =
   | { type: PendingOpType.Create; path: string; content: string }
   | { type: PendingOpType.Delete; path: string }
-  | { type: PendingOpType.Rename; from: string; to: string; content?: string }
+  | { type: PendingOpType.Rename; from: string; to: string; content?: string; folderRename?: string }
   | { type: PendingOpType.Move; from: string; to: string; content?: string }
   | { type: PendingOpType.Edit; path: string; patch: string; frontmatterPatch?: Record<string, string | number | undefined>; serverTime?: number; baseCanonical?: string; fullFormat?: boolean }
 
@@ -56,6 +56,11 @@ export class PendingOps {
     return op?.type === PendingOpType.Edit ? op as any : undefined
   }
 
+  findRename(path: string): PendingOp & { type: PendingOpType.Rename } | undefined {
+    const op = this.ops.get(path)
+    return op?.type === PendingOpType.Rename ? op as any : undefined
+  }
+
   getDirtyPaths(): string[] {
     const paths: string[] = []
     for (const [id, op] of this.ops) {
@@ -95,14 +100,20 @@ export class PendingOps {
     }
   }
 
-  queueRename(from: string, to: string, content?: string): void {
+  queueRename(from: string, to: string, content?: string, folderRename?: string): void {
     const existing = this.ops.get(from)
     if (existing?.type === PendingOpType.Create) {
       this.ops.delete(from)
       this.ops.set(to, { type: PendingOpType.Create, path: to, content: content ?? existing.content })
       return
     }
-    this.ops.set(from, { type: PendingOpType.Rename, from, to, ...(content ? { content } : {}) })
+    this.ops.set(from, {
+      type: PendingOpType.Rename,
+      from,
+      to,
+      ...(content !== undefined ? { content } : {}),
+      ...(folderRename ? { folderRename } : {}),
+    })
   }
 
   queueMove(from: string, to: string, content?: string): void {

@@ -326,10 +326,12 @@ export default class extends Controller {
   }
 
   /**
-   * "+ New" — same quick-create as File → New: a sibling of the open document
-   * (or a root-level page) under a generated slug that the first `# heading`
-   * renames. It used to force every new page into a hardcoded "docs" folder,
-   * which put pages where nobody asked for them.
+   * "+ New" — same quick-create as File → New, targeting the project scope
+   * chosen in Preferences ▸ Navigation (else the vault root). The page lands
+   * under a generated slug that the first `# heading` renames. It used to
+   * create next to whatever document happened to be open (which, on boot, is
+   * whichever page the initial-path resolver picked); use a row's context menu
+   * to create inside a specific folder.
    */
   onNewPage() {
     appEvents.emit(AppEvent.NewFileRequested);

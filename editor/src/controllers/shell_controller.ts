@@ -87,6 +87,7 @@ export default class Shell extends Controller {
   private unsubs: (() => void)[] = []
   private appInitialized = false
   private autoRenameTimer: ReturnType<typeof setTimeout> | null = null
+  private autoRenameTimerPath: string | null = null
 
   connect() {
     this.initialPath = this.data.get("path") || getCurrentPath()
@@ -126,6 +127,10 @@ export default class Shell extends Controller {
     this.cache = new FileSyncService(this.editor as any)
     this.view = new ViewService(this.editor as any, sessionStarted)
     this.nav = new NavigationService(this.editor as any, this.cache)
+    // A save must settle a debounced title rename before it captures the
+    // pending ops, or a new page is written under its throwaway slug and only
+    // renamed by the *next* save.
+    this.cache.setBeforeFlush(() => this.settleAutoRename())
     // Apply the boot layout preset (focused by default) so the View-menu panel
     // toggles are in effect from first paint.
     LayoutService.getInstance()
@@ -211,28 +216,35 @@ export default class Shell extends Controller {
       appEvents.on(AppEvent.NewFileRequested, () => {
         // File → New and the explorer's "+ New": the file is created under a
         // throwaway three-word slug and takes its real name from the first
-        // `# heading` you type (see features/auto-name).
-        const current = this.nav.getCurrentPath()
-        const parentDir = current.includes("/")
-          ? current.substring(0, current.lastIndexOf("/"))
-          : ""
-        createQuickPage(this.cache, parentDir, (p: string) => this.nav.navigate(p), () => this.nav.loadSidebar())
+        // `# heading` you type (see features/auto-name). The target folder is
+        // the project scope chosen in Preferences ▸ Navigation, else the
+        // vault root — never "whatever folder the open document happens to be
+        // in", which made boot pick an arbitrary page and new files follow its
+        // directory. Use the explorer's row menu (New…) to target a folder.
+        const parentDir = prefsStore.rootScope
+        void createQuickPage(
+          this.cache,
+          parentDir,
+          (p: string) => this.nav.navigate(p),
+          () => this.nav.loadSidebar(),
+        ).then((created) => {
+          // Put the caret in the empty title so typing can start right away.
+          if (created) this.editor.focusFirstHeading()
+        })
       }),
       // Auto-naming: while a file created unnamed still carries a heading, that
       // heading keeps renaming it. Debounced, so the rename settles once typing
-      // pauses instead of firing on every keystroke.
+      // pauses instead of firing on every keystroke. A save settles it sooner
+      // (see settleAutoRename and FileSyncService's before-flush hook).
       appEvents.on(AppEvent.EditorChanged, ({ path, md }) => {
         if (!isAutoNamed(path)) return
         if (inferTargetPath(path, md) === null) return
         if (this.autoRenameTimer !== null) clearTimeout(this.autoRenameTimer)
+        this.autoRenameTimerPath = path
         this.autoRenameTimer = setTimeout(() => {
           this.autoRenameTimer = null
-          if (!isAutoNamed(path)) return
-          const renameTarget = inferTargetPath(path, md)
-          if (renameTarget === null) return
-          clearAutoNamed(path)
-          markAutoNamed(renameTarget)
-          this.nav.renameTo(path, renameTarget)
+          this.autoRenameTimerPath = null
+          void this.performAutoRename(path, md)
         }, AUTO_RENAME_DEBOUNCE_MS)
       }),
       appEvents.on(AppEvent.FormatDocumentRequested, () => {
@@ -478,8 +490,44 @@ export default class Shell extends Controller {
   applySource = () => this.editor?.applySourceContent()
   flush = () => this.cache?.flushDirtyFiles()
 
+  /**
+   * Rename an auto-named page to the slug of its first heading. Shared by the
+   * typing debounce and save-time settlement so both follow the same
+   * "never clobber" rule; the marker only moves once the rename succeeded.
+   */
+  private async performAutoRename(path: string, md: string): Promise<void> {
+    if (!isAutoNamed(path)) return
+    const target = inferTargetPath(path, md)
+    if (target === null) return
+    if (!(await this.nav.renameTo(path, target))) return
+    clearAutoNamed(path)
+    markAutoNamed(target)
+  }
+
+  /**
+   * Apply a pending/debounced title rename immediately. A flush must not write
+   * the throwaway slug: if Save lands inside the 1.2s typing pause, this runs
+   * first and the pending Create is retargeted to the title-derived path, so
+   * one save persists the final name.
+   */
+  private async settleAutoRename(): Promise<void> {
+    const path = this.nav.getCurrentPath()
+    if (!path || !isAutoNamed(path)) return
+    if (this.autoRenameTimer !== null && this.autoRenameTimerPath === path) {
+      clearTimeout(this.autoRenameTimer)
+      this.autoRenameTimer = null
+      this.autoRenameTimerPath = null
+    }
+    await this.performAutoRename(path, this.editor.getCurrentContent())
+  }
+
   private async saveCurrentFile(): Promise<void> {
     dirtyTrackingService.flush()
+
+    // The title rename can still be inside the 1.2s typing pause. Settle it
+    // before choosing the save path, or this save writes the old name (via
+    // flushCurrentFile) and leaves the rename queued for a second save.
+    await this.settleAutoRename()
 
     const path = this.nav.getCurrentPath()
     if (!path) return

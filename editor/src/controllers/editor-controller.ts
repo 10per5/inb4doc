@@ -167,6 +167,26 @@ export class EditorController extends Controller {
     this.scrollEditorToTop();
   }
 
+  /**
+   * Focus the empty title heading of a freshly created page (File ▸ New /
+   * "+ New") so typing starts immediately. The heading already renames the
+   * file on input (features/auto-name); this only places the caret.
+   */
+  focusFirstHeading(): void {
+    const view = this.editor?.view;
+    if (!view) return;
+    const first = view.state.doc.firstChild;
+    if (!first || first.type.name !== "heading" || first.content.size > 0) {
+      return;
+    }
+    view.focus();
+    view.dispatch(
+      view.state.tr
+        .setSelection(TextSelection.near(view.state.doc.resolve(0), 1))
+        .scrollIntoView(),
+    );
+  }
+
   // ── Content loading ──
 
   async fetchContent(

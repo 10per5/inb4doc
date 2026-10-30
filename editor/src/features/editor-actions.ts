@@ -13,6 +13,7 @@ import { dirtyTrackingService } from "@/services/dirty-tracking-service"
 import { HOME_PATH, HOME_FILENAME, validateHugoSlug } from "@/utils/hugo-compat"
 import { randomSlug, markAutoNamed } from "@/features/auto-name"
 import { WEIGHT_STEP, type TreeIndex } from "@/utils/tree"
+import { PendingOpType } from "@/entities/PendingOps"
 
 /** Weight for a new sibling: the folder's current last item + WEIGHT_STEP. */
 function nextFolderWeight(parentDir: string): number {
@@ -266,7 +267,117 @@ export async function renamePage(
 
   const newPath = parentDir ? `${parentDir}/${slug}` : slug
 
+  dirtyTrackingService.flush()
   cacheService.queueRename(pagePath, newPath)
+  afterRename(newPath)
+}
+
+/**
+ * Rename a whole directory. A folder has no file of its own, so this queues a
+ * Rename for every page underneath it (all sharing the `folderRename` marker
+ * the sidebar uses to style the folder row). Nothing moves until a flush; the
+ * old paths stay readable/clickable in the meantime, exactly like a file
+ * rename.
+ */
+export async function renameFolder(
+  cacheService: FileSyncService,
+  folderPath: string,
+  afterRename: (newPath: string | null) => void,
+): Promise<void> {
+  const currentName = folderPath.split("/").pop() || folderPath
+  const result = await promptDialog({
+    title: "Rename folder",
+    label: "New name:",
+    placeholder: currentName,
+    value: currentName,
+    confirmLabel: "Rename",
+  })
+  if (!result) return
+
+  const slug = result
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+  if (!slug) return
+
+  const slugError = validateHugoSlug(slug)
+  if (slugError) {
+    alert(slugError)
+    return
+  }
+
+  const parentDir = folderPath.includes("/")
+    ? folderPath.substring(0, folderPath.lastIndexOf("/"))
+    : ""
+  const newPath = parentDir ? `${parentDir}/${slug}` : slug
+  if (newPath === folderPath) return
+
+  const tree = treeStore.getTree()
+  const ops = cacheService.getPendingOps()
+  const previewTree = ops.applyToTree(tree)
+
+  const treeConflict = [...previewTree.paths].some(
+    (path) => path === newPath || path.startsWith(`${newPath}/`),
+  )
+  if (treeConflict) {
+    showNotification(`"${slug}" already exists here.`, {
+      title: "Name conflict",
+      type: "warning",
+    })
+    return
+  }
+
+  const existingDir = findCaseInsensitiveDir(previewTree, parentDir, slug)
+  if (existingDir && existingDir !== currentName) {
+    showNotification(`A folder named "${existingDir}" already exists.`, {
+      title: "Name conflict",
+      type: "warning",
+    })
+    return
+  }
+  const existingFile = findCaseInsensitiveFile(previewTree, parentDir, slug)
+  if (existingFile) {
+    showNotification(`A file named "${existingFile}" already exists there.`, {
+      title: "Name conflict",
+      type: "warning",
+    })
+    return
+  }
+  const conflict = ops.all.find((op) => {
+    if (op.type === PendingOpType.Create) {
+      return op.path === newPath || op.path.startsWith(`${newPath}/`)
+    }
+    if (op.type === PendingOpType.Rename || op.type === PendingOpType.Move) {
+      return op.to === newPath || op.to.startsWith(`${newPath}/`)
+    }
+    return false
+  })
+  if (conflict) {
+    showNotification(`"${slug}" is already queued as another location.`, {
+      title: "Name conflict",
+      type: "warning",
+    })
+    return
+  }
+
+  const members = [...previewTree.paths].filter(
+    (path) => path.startsWith(`${folderPath}/`) && !ops.hasPendingDelete(path),
+  )
+  if (members.length === 0) {
+    showNotification("This folder has no pages to rename.", {
+      title: "Rename folder",
+      type: "warning",
+    })
+    return
+  }
+
+  // Fold any debounced body edit into the pending ops first, so each rename
+  // carries the latest text instead of a stale cached body.
+  dirtyTrackingService.flush()
+  for (const from of members) {
+    const to = `${newPath}${from.slice(folderPath.length)}`
+    cacheService.queueRename(from, to, folderPath)
+  }
   afterRename(newPath)
 }
 
@@ -374,9 +485,9 @@ export async function createDirectory(
 export async function createQuickPage(
   cacheService: FileSyncService,
   parentPath: string,
-  doNavigate: (path: string) => void,
+  doNavigate: (path: string) => Promise<void> | void,
   loadSidebar: () => Promise<void>,
-): Promise<void> {
+): Promise<boolean> {
   const parentDir = parentPath || ""
   let fullPath = ""
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -389,7 +500,7 @@ export async function createQuickPage(
   }
   if (!fullPath) {
     showNotification("Could not find a free name", { title: "New", type: "warning" })
-    return
+    return false
   }
 
   // No title on purpose: the name comes from the first line (see
@@ -411,7 +522,8 @@ export async function createQuickPage(
   markAutoNamed(fullPath)
 
   await loadSidebar()
-  doNavigate(fullPath)
+  await doNavigate(fullPath)
+  return true
 }
 
 /**
@@ -672,8 +784,12 @@ async function queuePageWeight(
   page.frontmatter = Frontmatter.fromMeta(data)
 
   const createOp = ops.findCreate(path)
+  const renameOp = ops.findRename(path)
   if (createOp) {
     ops.queueCreate(path, page.reconstructContent() ?? "")
+  } else if (renameOp) {
+    // Keep the pending rename; metadata changes ride along in its content.
+    renameOp.content = page.reconstructContent() ?? renameOp.content ?? ""
   } else {
     const editOp = ops.findEdit(path)
     const originalWeight = page.originalFrontmatter?.weight

@@ -269,12 +269,20 @@ export default class PrefsController extends BaseDialogController {
    * the new files show through instead of sitting behind the panel.
    */
   projectPicked(e: Event): void {
-    this.applyProject((e.currentTarget as HTMLElement).dataset.projectValue ?? "")
+    // The action lives on the name/pages cells (never the pin cell), so resolve
+    // the row from the event target instead of currentTarget.
+    const row = (e.currentTarget as HTMLElement).closest<HTMLElement>(
+      "[data-project-value]",
+    )
+    this.applyProject(row?.dataset.projectValue ?? "")
   }
 
   /** Rows are focusable (role=button), so Enter/Space must activate them too. */
   projectRowKey(e: KeyboardEvent): void {
     if (e.key !== "Enter" && e.key !== " ") return
+    // A focused pin button owns its own Space/Enter; bubbling that into the row
+    // would retarget the tree while the user is only starring a project.
+    if (e.target !== e.currentTarget) return
     e.preventDefault()
     this.applyProject((e.currentTarget as HTMLElement).dataset.projectValue ?? "")
   }
@@ -301,10 +309,10 @@ export default class PrefsController extends BaseDialogController {
   }
 
   /**
-   * Star/unstar a root-level project ("Show all" has no pin). The row itself is
-   * a switch that would retarget the tree, so the click is swallowed here; and
-   * because pinning reorders the list, the surface is redrawn instead of having
-   * its DOM patched.
+   * Star/unstar a root-level project ("Show all" has no pin). The row is a
+   * switch that would retarget the tree, so the click is swallowed here. The
+   * "More…" table is put back exactly as it was afterwards (same page, scroll
+   * and focus) so several projects can be starred in a row.
    */
   pinToggled(e: Event): void {
     e.stopPropagation()
@@ -313,7 +321,41 @@ export default class PrefsController extends BaseDialogController {
     const pinned = prefsStore.pinnedProjects.filter((p) => p !== value)
     if (pinned.length === prefsStore.pinnedProjects.length) pinned.push(value)
     onPrefsPinnedProjectsChanged(pinned)
+    this.redrawProjectPicker()
+  }
+
+  /**
+   * Pinning reorders the badge shortcuts, so the pane has to be rebuilt. Keep
+   * the table open on the page the user was reading and restore its scroll and
+   * the focused star; without this every star click collapsed the table and a
+   * second favourite meant opening "More…" again.
+   */
+  private redrawProjectPicker(): void {
+    const doc = this.element.ownerDocument
+    const scroller = this.element.querySelector<HTMLElement>(".prefs-panes, .screen-body")
+    const paneScrollTop = scroller?.scrollTop ?? 0
+    const table = this.hasProjectTableTarget ? this.projectTableTarget : null
+    const wasOpen = table !== null && !table.hidden
+    const page = this.currentProjectPage()
+    const scrollTop = table?.scrollTop ?? 0
+    const active = doc.activeElement as HTMLElement | null
+    const focusValue =
+      table && active && table.contains(active) && active.classList.contains("project-pin")
+        ? active.dataset.projectValue ?? ""
+        : ""
+
     this.redraw()
+
+    const nextScroller = this.element.querySelector<HTMLElement>(".prefs-panes, .screen-body")
+    if (nextScroller) nextScroller.scrollTop = paneScrollTop
+    if (!wasOpen || !this.hasProjectTableTarget) return
+    this.showProjectPage(page)
+    this.projectTableTarget.scrollTop = scrollTop
+    if (!focusValue) return
+    const nextPin = Array.from(
+      this.projectTableTarget.querySelectorAll<HTMLElement>(".project-pin"),
+    ).find((el) => el.dataset.projectValue === focusValue)
+    nextPin?.focus({ preventScroll: true })
   }
 
   private redraw(): void {

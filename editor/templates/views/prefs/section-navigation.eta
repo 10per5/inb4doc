@@ -17,7 +17,8 @@
         <span class="project-badge-label">Show all</span>
       </button>
       <% for (const folder of it.badgeFolders) { %>
-      <button type="button" class="project-badge<%= it.prefs.rootScope === folder.path ? " is-active" : "" %>" data-prefs-target="projectBadge" data-project-value="<%= folder.path %>" aria-pressed="<%= it.prefs.rootScope === folder.path ? "true" : "false" %>" data-action="click-><%= it.controller %>#projectPicked">
+      <button type="button" class="project-badge<%= it.prefs.rootScope === folder.path ? " is-active" : "" %><%= folder.pinned ? " is-pinned" : "" %>" data-prefs-target="projectBadge" data-project-value="<%= folder.path %>" aria-pressed="<%= it.prefs.rootScope === folder.path ? "true" : "false" %>" data-action="click-><%= it.controller %>#projectPicked">
+        <% if (folder.pinned) { %><span class="project-badge-star" aria-hidden="true"><%~ it.icons.star %></span><% } %>
         <span class="project-badge-label"><%= folder.label %></span>
         <% if (folder.count) { %><span class="project-badge-count" title="<%= folder.count %> page<%= folder.count === 1 ? "" : "s" %>"><%= folder.count %></span><% } %>
       </button>
@@ -37,18 +38,22 @@
         </thead>
         <tbody>
           <% for (const row of it.projectRows) { %>
-          <tr class="project-row<%= it.prefs.rootScope === row.value ? " is-active" : "" %><%= row.pinned ? " is-pinned" : "" %>" data-prefs-target="projectRow" data-project-value="<%= row.value %>" data-page="<%= row.page %>"<%= row.page === 0 ? "" : " hidden" %> tabindex="0" role="button" data-action="click-><%= it.controller %>#projectPicked keydown-><%= it.controller %>#projectRowKey">
+          <% /* The row is still focusable for keyboard users, but the click
+              actions live on the cells: the pin cell must never retarget the
+              tree, so a star click (or its focus/Enter) stays isolated from
+              scope picking. */ %>
+          <tr class="project-row<%= it.prefs.rootScope === row.value ? " is-active" : "" %><%= row.pinned ? " is-pinned" : "" %>" data-prefs-target="projectRow" data-project-value="<%= row.value %>" data-page="<%= row.page %>"<%= row.page === 0 ? "" : " hidden" %> tabindex="0" role="button" data-action="keydown-><%= it.controller %>#projectRowKey">
             <% if (row.value !== "") { %>
             <td class="project-col-pin">
               <button type="button" class="project-pin<%= row.pinned ? " is-pinned" : "" %>" data-action="click-><%= it.controller %>#pinToggled" data-project-value="<%= row.value %>" aria-pressed="<%= row.pinned ? "true" : "false" %>" title="<%= row.pinned ? "Unpin project" : "Pin project" %>" aria-label="<%= row.pinned ? "Unpin project" : "Pin project" %>"><%~ it.icons.star %></button>
             </td>
             <% } else { %>
-            <td class="project-col-pin"></td>
+            <td class="project-col-pin" data-action="click-><%= it.controller %>#projectPicked"></td>
             <% } %>
-            <td class="project-col-name">
+            <td class="project-col-name" data-action="click-><%= it.controller %>#projectPicked">
               <span class="project-row-label"><%= row.label %></span>
             </td>
-            <td class="project-col-pages"><%= row.count || "—" %></td>
+            <td class="project-col-pages" data-action="click-><%= it.controller %>#projectPicked"><%= row.count || "—" %></td>
           </tr>
           <% } %>
         </tbody>
